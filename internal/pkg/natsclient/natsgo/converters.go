@@ -16,13 +16,22 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/convcodecs"
 )
 
+// srcDestToEntity maps jetstream Source/Destination onto entity Src/Dest.
+var srcDestToEntity = converter.WithFieldMappings(map[string]string{
+	"Source":      "Src",
+	"Destination": "Dest",
+})
+
+// srcDestToJetStream maps entity Src/Dest onto jetstream Source/Destination.
+var srcDestToJetStream = converter.WithFieldMappings(map[string]string{
+	"Src":  "Source",
+	"Dest": "Destination",
+})
+
 // streamConvertOpts maps jetstream.StreamInfo → entities.StreamInfo. TimeStamp set
 // explicitly by toStreamInfo.
 var streamConvertOpts = []converter.Option{
-	converter.WithFieldMappings(map[string]string{
-		"Source":      "Src",
-		"Destination": "Dest",
-	}),
+	srcDestToEntity,
 	converter.WithIgnoreFields("TimeStamp"),
 }
 

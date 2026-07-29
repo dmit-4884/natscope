@@ -356,22 +356,14 @@ func (c *Client) mergeStreamUpdate(
 	converter.Convert(update, &current,
 		converter.WithIgnoreNilValues(),
 		converter.WithIgnoreFields("Sources", "Republish"),
-		converter.WithFieldMappings(map[string]string{
-			"Src":  "Source",
-			"Dest": "Destination",
-		}),
+		srcDestToJetStream,
 	)
 	convertedSources := slices.To(update.Sources, func(src *entities.StreamSource) *jetstream.StreamSource {
 		return converter.Convert(src, &jetstream.StreamSource{})
 	})
 	current.Sources = append(current.Sources, convertedSources...)
 	if update.Republish != nil {
-		current.RePublish = converter.Convert(update.Republish, &jetstream.RePublish{},
-			converter.WithFieldMappings(map[string]string{
-				"Src":  "Source",
-				"Dest": "Destination",
-			}),
-		)
+		current.RePublish = converter.Convert(update.Republish, &jetstream.RePublish{}, srcDestToJetStream)
 	}
 
 	return current

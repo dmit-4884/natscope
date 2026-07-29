@@ -44,7 +44,7 @@ func (h *Handler) CreateKVBucket(
 
 	cr := converter.Convert(cfg, &entities.KVBucketConfig{},
 		protoCodecs,
-		converter.WithFieldMappings(map[string]string{"NumReplicas": "Replicas"}),
+		replicasMappingToEntity,
 		converter.WithIgnoreFields("Placement", "History", "Mirror", "Sources", "Republish"),
 	)
 	cr.History = uint8(cfg.GetHistory())
