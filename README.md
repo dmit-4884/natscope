@@ -4,6 +4,11 @@
 
 **A single-binary web UI for NATS JetStream — browse, decode, publish and manage your streams, with first-class Protobuf support.**
 
+[![Release](https://img.shields.io/github/v/release/dmit-4884/natscope)](https://github.com/dmit-4884/natscope/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/dmit-4884/natscope/ci.yml?branch=main&label=CI)](https://github.com/dmit-4884/natscope/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dmit-4884/natscope)](https://goreportcard.com/report/github.com/dmit-4884/natscope)
+[![License](https://img.shields.io/github/license/dmit-4884/natscope)](LICENSE)
+
 [Quick start](#quick-start) · [Features](#features) · [Configuration](#configuration) · [Remote access](#remote-access)
 
 ![Natscope walkthrough](docs/demo/natscope-demo.gif)
