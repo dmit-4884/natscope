@@ -1,0 +1,33 @@
+# Runtime-only image for goreleaser: the binary is prebuilt on the host
+# (frontend embedded), so this stage just packages it.
+FROM alpine:3.22
+
+RUN apk add --no-cache ca-certificates tzdata wget && \
+    cp /usr/share/zoneinfo/UTC /etc/localtime && \
+    echo "UTC" > /etc/timezone
+
+COPY natscope /opt/bin/natscope
+
+# Run as a non-root user; /data holds the bbolt store and file vault and is the
+# volume mount point (STORAGE__LOCAL__DATA_DIR pins it independent of $HOME).
+RUN addgroup -S natscope && adduser -S -G natscope -h /home/natscope natscope && \
+    mkdir -p /data && chown natscope:natscope /data
+
+# File vault + all-interfaces bind. Fail-closed: won't start without
+# WEB_AUTH__USERNAME/PASSWORD or ALLOW_INSECURE=true. -p 127.0.0.1:4280:4280 keeps it local.
+ENV GRPC_WEB_ADDRESS=0.0.0.0:4280 \
+    ALLOW_REMOTE=true \
+    SECRETS__BACKEND=file \
+    STORAGE__LOCAL__DATA_DIR=/data
+
+USER natscope
+VOLUME ["/data"]
+EXPOSE 4280
+
+# Liveness: any HTTP response (including 401 when WebAuth is on) means the
+# listener is up; a refused connection prints no HTTP status line.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -S -q -O /dev/null -T 3 "http://127.0.0.1:4280/" 2>&1 | grep -q "HTTP/" || exit 1
+
+ENTRYPOINT ["/opt/bin/natscope"]
+CMD ["server", "run"]

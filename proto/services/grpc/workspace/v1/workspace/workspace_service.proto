@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package natscope.workspace.v1;
+
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/workspace/v1/workspace;grpc_workspace";
+
+import "buf/validate/validate.proto";
+
+// WorkspaceService exports and imports a Natscope workspace: a bundle of
+// independent sections (connections, proto sources, mappings, templates,
+// settings). Sections are self-describing — the UI builds its checkboxes from
+// ListSections rather than hard-coding the set. Secrets (credentials, tokens,
+// TLS keys) are never included in an export by design.
+service WorkspaceService {
+  // ListSections returns the registered, exportable sections with item counts.
+  rpc ListSections(ListSectionsRequest) returns (ListSectionsResponse);
+
+  // ExportWorkspace serializes the selected sections into a workspace file.
+  rpc ExportWorkspace(ExportWorkspaceRequest) returns (ExportWorkspaceResponse);
+
+  // ValidateWorkspace dry-runs an import, reporting per-section created /
+  // updated / conflict counts without mutating anything.
+  rpc ValidateWorkspace(ValidateWorkspaceRequest) returns (ValidateWorkspaceResponse);
+
+  // ImportWorkspace applies the selected sections from a workspace file using
+  // the given strategy.
+  rpc ImportWorkspace(ImportWorkspaceRequest) returns (ImportWorkspaceResponse);
+}
+
+// Import conflict-resolution strategy.
+enum Strategy {
+  // Defaults to MERGE.
+  STRATEGY_UNSPECIFIED = 0;
+
+  // Upsert by name: update items that already exist, create the rest.
+  STRATEGY_MERGE = 1;
+
+  // Replace: clear the section, then create everything from the file.
+  STRATEGY_REPLACE = 2;
+}
+
+// Self-description of one exportable section.
+message SectionInfo {
+  // Stable section key, e.g. "mappings", "connections".
+  string key = 1;
+
+  // Human-readable title for the UI.
+  string title = 2;
+
+  // Number of items currently in this section.
+  int32 count = 3;
+}
+
+message ListSectionsRequest {}
+
+message ListSectionsResponse {
+  repeated SectionInfo sections = 1;
+}
+
+message ExportWorkspaceRequest {
+  // Section keys to export. Empty means "all sections".
+  repeated string section_keys = 1;
+}
+
+message ExportWorkspaceResponse {
+  // The workspace file as UTF-8 JSON bytes.
+  bytes payload = 1;
+}
+
+// Per-section dry-run outcome.
+message SectionReport {
+  string key = 1;
+  int32 created = 2;
+  int32 updated = 3;
+
+  // Names of items that collide under the chosen strategy.
+  repeated string conflicts = 4;
+
+  // Non-fatal warnings (e.g. connections imported without credentials).
+  repeated string warnings = 5;
+
+  // True when the file contains this section but the server does not support it.
+  bool unknown = 6;
+
+  // Number of existing items this import would DELETE. Non-zero only under the
+  // REPLACE strategy, where the section is cleared before recreating. Surfaced
+  // so the UI can warn before a destructive, irreversible import (e.g. "this
+  // will delete N saved connections along with their credentials").
+  int32 deleted = 7;
+}
+
+message ValidateWorkspaceRequest {
+  // The workspace file as UTF-8 JSON bytes. Capped at 16 MiB — workspace files
+  // are small JSON manifests; the bound guards the unmarshal against a hostile
+  // or corrupt oversized payload.
+  bytes payload = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).bytes = {max_len: 16777216}
+  ];
+
+  // Section keys to apply. Empty means "every section in the file".
+  repeated string section_keys = 2;
+
+  Strategy strategy = 3;
+}
+
+message ValidateWorkspaceResponse {
+  repeated SectionReport reports = 1;
+}
+
+// Per-section import outcome.
+message SectionResult {
+  string key = 1;
+  int32 created = 2;
+  int32 updated = 3;
+  int32 deleted = 4;
+  repeated string warnings = 5;
+}
+
+message ImportWorkspaceRequest {
+  // The workspace file as UTF-8 JSON bytes. Capped at 16 MiB (see
+  // ValidateWorkspaceRequest.payload).
+  bytes payload = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).bytes = {max_len: 16777216}
+  ];
+  repeated string section_keys = 2;
+  Strategy strategy = 3;
+}
+
+message ImportWorkspaceResponse {
+  repeated SectionResult results = 1;
+}

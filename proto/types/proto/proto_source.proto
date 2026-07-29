@@ -1,0 +1,109 @@
+syntax = "proto3";
+package natscope.types.proto;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/proto;protopb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// Source type determines how proto files are obtained.
+enum SourceType {
+  SOURCE_TYPE_UNSPECIFIED = 0;
+  // Git repository — fetch by tag.
+  SOURCE_TYPE_GIT = 1;
+  // Local directory on server disk — optionally watched for changes.
+  SOURCE_TYPE_LOCAL = 2;
+  // Manual: explicit list of .proto files plus optional include directories
+  // for resolving imports. No file watcher; recompilation is user-triggered.
+  SOURCE_TYPE_FILES = 3;
+}
+
+// Defines a registered source of .proto files.
+message ProtoSource {
+  // Required. Unique identifier. Format: UUID.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // Required. Human-readable name of the proto source.
+  string name = 2 [(google.api.field_behavior) = REQUIRED];
+  // Git repository URL (Git type only).
+  string repository = 3;
+  // Required. Creation timestamp.
+  google.protobuf.Timestamp created_at = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Last update timestamp.
+  google.protobuf.Timestamp updated_at = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Source type (git, local). Defaults to git for backward compatibility.
+  SourceType source_type = 6 [(google.api.field_behavior) = REQUIRED];
+  // Local directory path on server (Local type only).
+  optional string local_path = 7;
+  // Whether file watcher is enabled (Local type only).
+  bool watcher_enabled = 8;
+  // Whether this source is enabled (participates in descriptor compilation).
+  bool enabled = 9;
+
+  // Optional. Manual import roots (slash-relative). When set, automatic root
+  // detection (buf config / inference) is DISABLED and these become the only
+  // roots. No implicit defaults.
+  repeated string import_roots = 10;
+
+  // Optional. Slash-relative path prefixes excluded from compilation
+  // entirely (e.g. "gen", "pb"). No implicit defaults.
+  repeated string exclude_prefixes = 11;
+
+  // Explicit list of absolute paths to .proto files (Files type only).
+  // Only these files are compile targets.
+  repeated string files = 12;
+
+  // Absolute directory paths used to resolve imports (Files type only).
+  // Files inside are NOT compiled — they only satisfy `import "..."` statements.
+  // Equivalent to JMeter's "Library Directory" or `protoc -I` flag.
+  repeated string include_dirs = 13;
+
+  // Snapshot of the most recent compile attempt. Populated by the backend
+  // after every FetchAndCompile / file-watcher recompile / manual compile.
+  // Never accepted from the client — read-only telemetry that powers the
+  // settings page health badges.
+  optional ProtoCompileResult last_compile = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Outcome of a compilation pass. Stored on ProtoSource so the UI can show
+// "compiled X ago · 1850 messages" without re-running the compiler.
+message ProtoCompileResult {
+  // Required. When the compile finished.
+  int64 at = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Whether the compile succeeded.
+  bool ok = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Compiler error message when ok=false. May be a multi-line
+  // diagnostic; the UI is expected to truncate as needed.
+  optional string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Number of message types in the resulting descriptor set.
+  // Zero on failure or for unmeasured passes.
+  int32 message_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Number of .proto files actually compiled (post-resolution).
+  int32 file_count = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Bounded snapshot of compile diagnostics (errors first). Lets the UI show
+  // details for auto-walk sources without re-running the compiler.
+  repeated CompileDiagnostic diagnostics = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Resolved import roots; empty means everything compiled relative to the
+  // source root.
+  repeated string roots = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Which resolution tier produced roots: "manual" | "buf" | "inferred".
+  string roots_origin = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// CompileDiagnostic is a single error/warning produced during proto compilation.
+message CompileDiagnostic {
+  // Severity. Currently always "error" — warnings reserved for future.
+  string severity = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // File the diagnostic refers to. May be empty for source-less errors.
+  string file = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 1-based line number. 0 if no position info.
+  int32 line = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 1-based column. 0 if no position info.
+  int32 column = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Human-readable message from the compiler.
+  string message = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Set when the diagnostic is "import not found" — holds the requested
+  // import path (e.g. "google/protobuf/timestamp.proto"). Empty otherwise.
+  string missing_import = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional human-readable suggestion produced by the service.
+  string hint = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

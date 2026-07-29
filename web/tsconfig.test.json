@@ -1,0 +1,11 @@
+{
+  // Type-checks the test files too — `tsconfig.json` excludes them, so `tsc`
+  // in `npm run build` never sees them and they silently rot against the
+  // types they exercise. `npm run typecheck` runs both.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
+  },
+  "include": ["src"],
+  "exclude": []
+}

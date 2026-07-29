@@ -1,0 +1,212 @@
+syntax = "proto3";
+package natscope.nats.connections.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections;grpc_nats_connections";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "types/nats/nats_connection.proto";
+
+// Provides operations for managing saved NATS connection configurations.
+service ConnectionsService {
+  // Creates a new saved NATS connection configuration.
+  rpc CreateConnection(CreateConnectionRequest) returns (CreateConnectionResponse) {}
+
+  // Returns a paginated list of saved NATS connections.
+  // Pagination: Cursor-based.
+  rpc ListConnections(ListConnectionsRequest) returns (ListConnectionsResponse) {}
+
+  // Updates an existing saved NATS connection configuration.
+  rpc UpdateConnection(UpdateConnectionRequest) returns (UpdateConnectionResponse) {}
+
+  // Deletes a saved NATS connection configuration by ID.
+  rpc DeleteConnection(DeleteConnectionRequest) returns (DeleteConnectionResponse) {}
+
+  // Tests a NATS connection without saving it. Returns server info and diagnostics.
+  rpc TestConnection(TestConnectionRequest) returns (TestConnectionResponse) {}
+
+  // Duplicates an existing saved connection with a new name.
+  rpc DuplicateConnection(DuplicateConnectionRequest) returns (DuplicateConnectionResponse) {}
+}
+
+// Defines the request message for creating a new saved connection.
+message CreateConnectionRequest {
+  // Required. Human-readable display name for the connection.
+  string name = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. User description or notes about this connection.
+  optional string description = 2;
+
+  // Required. NATS server URLs. Supports nats://, tls://, ws://, wss:// schemes.
+  repeated string urls = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).repeated.min_items = 1];
+
+  // Optional. Authentication configuration.
+  optional .natscope.types.nats.AuthConfig auth = 10;
+
+  // Optional. TLS configuration.
+  optional .natscope.types.nats.TlsConfig tls = 11;
+
+  // Optional. Connection behavior settings.
+  optional .natscope.types.nats.ConnectionConfig connection = 12;
+
+  // Optional. Reconnection behavior settings.
+  optional .natscope.types.nats.ReconnectConfig reconnect = 13;
+
+  // Optional. Ping/pong health check settings.
+  optional .natscope.types.nats.PingConfig ping = 14;
+}
+
+// Defines the response message for creating a new saved connection.
+message CreateConnectionResponse {
+  // Required. The newly created saved connection.
+  .natscope.types.nats.SavedConnection connection = 1;
+}
+
+// Defines the request message for listing saved connections.
+message ListConnectionsRequest {
+  // Optional. Maximum number of connections to return in a single page.
+  int32 page_size = 1 [(buf.validate.field).int32.gte = 0];
+  // Optional. A pagination token returned from a previous call.
+  string page_token = 2;
+}
+
+// Defines the response message for listing saved connections.
+message ListConnectionsResponse {
+  // Required. List of saved connection configurations.
+  repeated .natscope.types.nats.SavedConnection connections = 1;
+
+  // Optional. Cursor for fetching the next page of results. Absent when no more pages remain.
+  optional string next_page_token = 2;
+}
+
+// Defines the request message for updating a saved connection.
+message UpdateConnectionRequest {
+  // Required. Unique identifier of the connection to update. Format: UUID.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Optional. Updated display name for the connection.
+  optional string name = 2;
+
+  // Optional. Updated description.
+  optional string description = 3;
+
+  // Optional. Updated NATS server URLs. Replaces all existing URLs.
+  repeated string urls = 4;
+
+  // Optional. Updated authentication configuration. Replaces the entire auth config.
+  optional .natscope.types.nats.AuthConfig auth = 10;
+
+  // Optional. Updated TLS configuration. Replaces the entire TLS config.
+  optional .natscope.types.nats.TlsConfig tls = 11;
+
+  // Optional. Updated connection behavior settings. Replaces the entire config.
+  optional .natscope.types.nats.ConnectionConfig connection = 12;
+
+  // Optional. Updated reconnection behavior settings. Replaces the entire config.
+  optional .natscope.types.nats.ReconnectConfig reconnect = 13;
+
+  // Optional. Updated ping/pong health check settings. Replaces the entire config.
+  optional .natscope.types.nats.PingConfig ping = 14;
+
+  // Defines options for the update operation.
+  message Options {
+    reserved 1;
+  }
+
+  // Optional. Additional options for the update operation.
+  optional Options options = 99;
+}
+
+// Defines the response message for updating a saved connection.
+message UpdateConnectionResponse {
+  // Required. The updated saved connection.
+  .natscope.types.nats.SavedConnection connection = 1;
+}
+
+// Defines the request message for deleting a saved connection.
+message DeleteConnectionRequest {
+  // Required. Unique identifier of the connection to delete. Format: UUID.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Defines options for the delete operation.
+  message Options {
+    reserved 1;
+  }
+
+  // Optional. Additional options for the delete operation.
+  optional Options options = 99;
+}
+
+// Defines the response message for deleting a saved connection.
+message DeleteConnectionResponse {}
+
+// Defines the request message for testing a NATS connection without saving.
+message TestConnectionRequest {
+  // Required. NATS server URLs to test.
+  repeated string urls = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).repeated.min_items = 1];
+
+  // Optional. Authentication configuration.
+  optional .natscope.types.nats.AuthConfig auth = 10;
+
+  // Optional. TLS configuration.
+  optional .natscope.types.nats.TlsConfig tls = 11;
+
+  // Optional. Connection timeout in milliseconds. Default: 10000 (10s).
+  google.protobuf.Duration connect_timeout = 12;
+
+  // Optional. ID of an existing saved connection. When set, the probe result
+  // (version / RTT / JetStream / error) is persisted to that connection's
+  // meta after the test, success or fail.
+  optional string connection_id = 13 [(buf.validate.field).string.uuid = true];
+}
+
+// Defines the response message for testing a NATS connection.
+message TestConnectionResponse {
+  // Required. Whether the connection was established successfully.
+  bool success = 1;
+
+  // Optional. Error message if the connection failed.
+  optional string error = 2;
+
+  // Optional. Round-trip time in milliseconds.
+  optional int64 rtt_ms = 3;
+
+  // Optional. NATS server version.
+  optional string server_version = 4;
+
+  // Optional. NATS server name.
+  optional string server_name = 5;
+
+  // Optional. NATS server ID.
+  optional string server_id = 6;
+
+  // Optional. Cluster name if the server is part of a cluster.
+  optional string cluster_name = 7;
+
+  // Optional. Maximum payload size in bytes accepted by the server.
+  optional int64 max_payload = 8;
+
+  // Optional. Whether JetStream is enabled on the server.
+  optional bool jetstream_enabled = 9;
+
+  // Optional. The URL of the server that was actually connected to.
+  optional string connected_url = 10;
+
+  // Optional. Additional server URLs discovered via cluster INFO.
+  repeated string discovered_servers = 11;
+}
+
+// Defines the request message for duplicating a saved connection.
+message DuplicateConnectionRequest {
+  // Required. Unique identifier of the connection to duplicate. Format: UUID.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Name for the duplicated connection.
+  string name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for duplicating a saved connection.
+message DuplicateConnectionResponse {
+  // Required. The newly created duplicate connection.
+  .natscope.types.nats.SavedConnection connection = 1;
+}

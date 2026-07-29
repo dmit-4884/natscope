@@ -1,0 +1,89 @@
+syntax = "proto3";
+package natscope.proto.codec.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/codec;grpc_proto_codec";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/proto/proto_codec.proto";
+
+// Provides operations for protobuf encoding, decoding, and validation.
+// All operations are scoped to a specific proto source. The same fully-qualified
+// message name can exist in multiple sources with different schemas; the source
+// must be picked explicitly.
+service CodecService {
+  // Decodes binary protobuf data into a human-readable representation using the specified message type.
+  rpc DecodeMessage(DecodeMessageRequest) returns (DecodeMessageResponse) {}
+
+  // Encodes a JSON representation of a protobuf message into binary wire format.
+  rpc EncodeMessage(EncodeMessageRequest) returns (EncodeMessageResponse) {}
+
+  // Validates binary protobuf data against the specified message type schema.
+  rpc ValidateMessage(ValidateMessageRequest) returns (ValidateMessageResponse) {}
+}
+
+// Defines the request message for decoding binary protobuf data.
+message DecodeMessageRequest {
+  // Required. Binary protobuf payload to decode. Must not be empty.
+  bytes data = 1 [(buf.validate.field).bytes.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Fully qualified protobuf message type name used to interpret the binary data.
+  // Format: "package.MessageName" (e.g., "google.protobuf.Timestamp").
+  string message_type = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Identifier of the proto source whose snapshot the decoder uses.
+  string source_id = 3 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Optional. Specific tag of the source snapshot. When omitted, the active selection of the source is used.
+  // Local sources always resolve to "local" regardless of this field.
+  optional string tag = 4;
+}
+
+// Defines the response message for decoding binary protobuf data.
+message DecodeMessageResponse {
+  // Required. The decoded result containing the human-readable representation.
+  .natscope.types.proto.DecodeResult result = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request message for encoding a JSON representation into binary protobuf format.
+message EncodeMessageRequest {
+  // Required. Fully qualified protobuf message type name used for encoding.
+  // Format: "package.MessageName" (e.g., "google.protobuf.Timestamp").
+  string message_type = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. JSON string representation of the protobuf message to encode.
+  string data = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Identifier of the proto source whose snapshot the encoder uses.
+  string source_id = 3 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Optional. Specific tag of the source snapshot. When omitted, the active selection of the source is used.
+  optional string tag = 4;
+}
+
+// Defines the response message for encoding a protobuf message.
+message EncodeMessageResponse {
+  // Required. The encoding result containing the binary wire-format data.
+  .natscope.types.proto.EncodeResult result = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request message for validating binary protobuf data against a message type.
+message ValidateMessageRequest {
+  // Required. Binary protobuf payload to validate. Must not be empty.
+  bytes data = 1 [(buf.validate.field).bytes.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Fully qualified protobuf message type name to validate against.
+  // Format: "package.MessageName" (e.g., "google.protobuf.Timestamp").
+  string message_type = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Identifier of the proto source whose snapshot the validator uses.
+  string source_id = 3 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Optional. Specific tag of the source snapshot. When omitted, the active selection of the source is used.
+  optional string tag = 4;
+}
+
+// Defines the response message for validating binary protobuf data.
+message ValidateMessageResponse {
+  // Required. The validation result indicating whether the data conforms to the schema.
+  .natscope.types.proto.ValidationResult result = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

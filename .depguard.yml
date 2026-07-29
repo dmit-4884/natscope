@@ -1,0 +1,34 @@
+{
+  "Main": {
+    "files": [
+      "$all",
+      "!$test"
+    ],
+    "listMode": "lax",
+    "allow": [
+      "$gostd",
+      "github.com/spf13/cobra",
+      "github.com/altessa-s/go-atlas",
+      "github.com/google/uuid",
+      "github.com/go-ozzo/ozzo-validation/v4",
+      "github.com/dmit-4884/natscope",
+      "github.com/nats-io/nats.go",
+      "github.com/bufbuild/protocompile",
+      "buf.build/go/protovalidate",
+      "buf.build/gen/go/bufbuild/protovalidate",
+      "connectrpc.com/connect",
+      "github.com/planetscale/vtprotobuf",
+      "github.com/fsnotify/fsnotify",
+      "github.com/go-git/go-git",
+      "github.com/joho/godotenv",
+      "github.com/zalando/go-keyring",
+      "github.com/MakeNowJust/heredoc",
+      "github.com/stretchr/testify",
+      "google.golang.org/grpc",
+      "google.golang.org/genproto",
+      "google.golang.org/protobuf",
+      "golang.org/x/sync",
+      "golang.org/x/net"
+    ]
+  }
+}

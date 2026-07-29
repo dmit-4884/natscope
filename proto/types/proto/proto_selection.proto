@@ -1,0 +1,20 @@
+syntax = "proto3";
+package natscope.types.proto;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/proto;protopb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines user's active choice of protobuf source and version.
+message ProtoSelection {
+  // Required. Unique identifier. Format: UUID.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // Required. Identifier of the proto source. Format: UUID.
+  string source_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // Required. Git tag of the selected version.
+  string tag = 3 [(google.api.field_behavior) = REQUIRED];
+  // Required. Creation timestamp.
+  google.protobuf.Timestamp created_at = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Last update timestamp.
+  google.protobuf.Timestamp updated_at = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

@@ -1,0 +1,990 @@
+syntax = "proto3";
+package natscope.nats.management.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management;grpc_nats_management";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "types/nats/nats_stream.proto";
+import "types/nats/nats_kv.proto";
+import "types/nats/nats_object.proto";
+
+// Provides comprehensive JetStream resource management including streams, consumers,
+// KeyValue stores, and Object stores.
+service ManagementService {
+  // --- Streams ---
+
+  // Creates a new JetStream stream with the specified configuration.
+  rpc CreateStream(CreateStreamRequest) returns (CreateStreamResponse) {}
+
+  // Updates the configuration of an existing JetStream stream.
+  rpc UpdateStream(UpdateStreamRequest) returns (UpdateStreamResponse) {}
+
+  // Permanently deletes a JetStream stream and all of its data.
+  rpc DeleteStream(DeleteStreamRequest) returns (DeleteStreamResponse) {}
+
+  // Purges messages from a JetStream stream, optionally filtered by subject or sequence.
+  rpc PurgeStream(PurgeStreamRequest) returns (PurgeStreamResponse) {}
+
+  // Seals a JetStream stream, making it read-only and preventing any further modifications.
+  rpc SealStream(SealStreamRequest) returns (SealStreamResponse) {}
+
+  // Deletes a single message from a stream by sequence number. When secure is
+  // set the server overwrites the message data before removing it.
+  rpc DeleteMessage(DeleteMessageRequest) returns (DeleteMessageResponse) {}
+
+  // --- Consumers ---
+
+  // Retrieves all consumers attached to the specified JetStream stream.
+  rpc ListConsumers(ListConsumersRequest) returns (ListConsumersResponse) {}
+
+  // Creates a new consumer on the specified JetStream stream.
+  rpc CreateConsumer(CreateConsumerRequest) returns (CreateConsumerResponse) {}
+
+  // Updates the configuration of an existing consumer on the specified JetStream stream.
+  rpc UpdateConsumer(UpdateConsumerRequest) returns (UpdateConsumerResponse) {}
+
+  // Permanently deletes a consumer from the specified JetStream stream.
+  rpc DeleteConsumer(DeleteConsumerRequest) returns (DeleteConsumerResponse) {}
+
+  // Pauses message delivery for a consumer until the specified time.
+  rpc PauseConsumer(PauseConsumerRequest) returns (PauseConsumerResponse) {}
+
+  // Resumes message delivery for a previously paused consumer.
+  rpc ResumeConsumer(ResumeConsumerRequest) returns (ResumeConsumerResponse) {}
+
+  // --- KeyValue ---
+
+  // Retrieves all KeyValue buckets available on the connection.
+  rpc ListKVBuckets(ListKVBucketsRequest) returns (ListKVBucketsResponse) {}
+
+  // Creates a new KeyValue bucket with the specified configuration.
+  rpc CreateKVBucket(CreateKVBucketRequest) returns (CreateKVBucketResponse) {}
+
+  // Retrieves detailed information about a specific KeyValue bucket.
+  rpc GetKVBucket(GetKVBucketRequest) returns (GetKVBucketResponse) {}
+
+  // Permanently deletes a KeyValue bucket and all of its entries.
+  rpc DeleteKVBucket(DeleteKVBucketRequest) returns (DeleteKVBucketResponse) {}
+
+  // Retrieves all keys stored in the specified KeyValue bucket.
+  rpc ListKVKeys(ListKVKeysRequest) returns (ListKVKeysResponse) {}
+
+  // Retrieves the value and metadata for a specific key in a KeyValue bucket.
+  rpc GetKVKey(GetKVKeyRequest) returns (GetKVKeyResponse) {}
+
+  // Retrieves the stored revision history for a key, oldest first, bounded by
+  // the bucket's history depth. Includes delete/purge markers.
+  rpc GetKVKeyHistory(GetKVKeyHistoryRequest) returns (GetKVKeyHistoryResponse) {}
+
+  // Creates or updates a key-value entry in the specified bucket.
+  rpc PutKVKey(PutKVKeyRequest) returns (PutKVKeyResponse) {}
+
+  // Deletes a specific key from a KeyValue bucket by adding a delete marker.
+  rpc DeleteKVKey(DeleteKVKeyRequest) returns (DeleteKVKeyResponse) {}
+
+  // Purges all revisions of a specific key from a KeyValue bucket.
+  rpc PurgeKVKey(PurgeKVKeyRequest) returns (PurgeKVKeyResponse) {}
+
+  // --- Object Store ---
+
+  // Retrieves all Object Store buckets available on the connection.
+  rpc ListObjectBuckets(ListObjectBucketsRequest) returns (ListObjectBucketsResponse) {}
+
+  // Creates a new Object Store bucket with the specified configuration.
+  rpc CreateObjectBucket(CreateObjectBucketRequest) returns (CreateObjectBucketResponse) {}
+
+  // Retrieves detailed information about a specific Object Store bucket.
+  rpc GetObjectBucket(GetObjectBucketRequest) returns (GetObjectBucketResponse) {}
+
+  // Permanently deletes an Object Store bucket and all of its objects.
+  rpc DeleteObjectBucket(DeleteObjectBucketRequest) returns (DeleteObjectBucketResponse) {}
+
+  // Seals an Object Store bucket, making it read-only and preventing any further modifications.
+  rpc SealObjectBucket(SealObjectBucketRequest) returns (SealObjectBucketResponse) {}
+
+  // Retrieves metadata for all objects stored in the specified Object Store bucket.
+  rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse) {}
+
+  // Retrieves the metadata and binary data of a specific object from an Object Store bucket.
+  rpc GetObject(GetObjectRequest) returns (GetObjectResponse) {}
+
+  // Creates or updates an object in the specified Object Store bucket.
+  rpc PutObject(PutObjectRequest) returns (PutObjectResponse) {}
+
+  // Permanently deletes an object from the specified Object Store bucket.
+  rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse) {}
+}
+
+// ============================================================================
+// Stream Management
+// ============================================================================
+
+// Defines the request message for creating a new JetStream stream.
+message CreateStreamRequest {
+  // Required. Identifier of the NATS connection to create the stream on.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Unique name for the stream within the JetStream context.
+  string name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Human-readable description of the stream's purpose.
+  string description = 3;
+
+  // Optional. List of NATS subjects this stream will capture messages from.
+  // Supports NATS wildcards: "*" for single token, ">" for remaining tokens.
+  repeated string subjects = 4;
+
+  // Optional. Retention policy for the stream.
+  // Values: 0 = LimitsPolicy, 1 = InterestPolicy, 2 = WorkQueuePolicy.
+  int32 retention = 5;
+
+  // Optional. Storage backend type for the stream.
+  // Values: 0 = FileStorage, 1 = MemoryStorage.
+  int32 storage = 6;
+
+  // Optional. Discard policy when stream limits are reached.
+  // Values: 0 = DiscardOld, 1 = DiscardNew.
+  int32 discard = 7;
+
+  // Optional. Maximum number of messages allowed in the stream. -1 for unlimited.
+  int64 max_msgs = 8;
+
+  // Optional. Maximum total size of all messages in bytes. -1 for unlimited.
+  int64 max_bytes = 9;
+
+  // Optional. Maximum age of messages. Unset for unlimited.
+  google.protobuf.Duration max_age = 10;
+
+  // Optional. Maximum number of messages per subject. -1 for unlimited.
+  int64 max_msgs_per_subject = 11;
+
+  // Optional. Maximum size of a single message in bytes. -1 for unlimited.
+  int32 max_msg_size = 12;
+
+  // Optional. Maximum number of consumers allowed on the stream. -1 for unlimited.
+  int32 max_consumers = 13;
+
+  // Optional. Number of replicas for the stream in a clustered environment.
+  int32 replicas = 14;
+
+  // Optional. Duplicate detection window.
+  google.protobuf.Duration duplicates = 15;
+
+  // Optional. When true, prevents message deletion via the API.
+  bool deny_delete = 16;
+
+  // Optional. When true, prevents stream purge operations via the API.
+  bool deny_purge = 17;
+
+  // Optional. When true, allows message rollup headers to be used.
+  bool allow_rollup = 18;
+
+  // Optional. When true, allows direct message access via the get API.
+  bool allow_direct = 19;
+
+  // Optional. When true, allows direct access for mirror streams.
+  bool mirror_direct = 20;
+
+  // Optional. When true, applies the discard new policy on a per-subject basis.
+  bool discard_new_per_subject = 21;
+
+  // Optional. Compression algorithm for stream data.
+  // Values: 0 = None, 1 = S2.
+  int32 compression = 22;
+
+  // Optional. Initial sequence number for the stream. Defaults to 1.
+  uint64 first_seq = 23;
+
+  // Optional. Placement configuration for stream data within the cluster.
+  optional PlacementConfig placement = 24;
+
+  // Optional. Mirror configuration to replicate data from another stream.
+  optional StreamSourceConfig mirror = 25;
+
+  // Optional. List of source stream configurations to aggregate data from.
+  repeated StreamSourceConfig sources = 26;
+
+  // Optional. Subject transform applied to messages stored in the stream.
+  optional SubjectTransform subject_transform = 27;
+
+  // Optional. Arbitrary key-value metadata attached to the stream.
+  map<string, string> metadata = 28;
+
+  // Optional. When true, disables message acknowledgement for the stream.
+  bool no_ack = 29;
+
+  // Optional. When true, allows per-message TTL via Nats-TTL header (NATS 2.11+).
+  bool allow_msg_ttl = 30;
+
+  // Optional. When true, allows atomic batch publish.
+  bool allow_atomic_publish = 31;
+
+  // Optional. Republish configuration — messages are republished to another subject.
+  optional .natscope.types.nats.RePublish republish = 32;
+
+  // Optional. Default consumer limits inherited by all consumers on this stream.
+  optional .natscope.types.nats.ConsumerLimits consumer_limits = 33;
+}
+
+// Defines the response message for creating a JetStream stream.
+message CreateStreamResponse {
+  // Required. Information about the newly created stream including its configuration and state.
+  .natscope.types.nats.StreamInfo stream = 1;
+}
+
+// Defines the request message for updating an existing JetStream stream.
+message UpdateStreamRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream to update.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Updated list of NATS subjects this stream will capture messages from.
+  repeated string subjects = 3;
+
+  // Optional. Updated human-readable description of the stream.
+  optional string description = 4;
+
+  // Optional. Updated maximum number of messages allowed. -1 for unlimited.
+  optional int64 max_msgs = 5;
+
+  // Optional. Updated maximum total size of all messages in bytes. -1 for unlimited.
+  optional int64 max_bytes = 6;
+
+  // Optional. Updated maximum age of messages. Unset for unlimited.
+  google.protobuf.Duration max_age = 7;
+
+  // Optional. Updated maximum number of messages per subject. -1 for unlimited.
+  optional int64 max_msgs_per_subject = 8;
+
+  // Optional. Updated maximum size of a single message in bytes. -1 for unlimited.
+  optional int32 max_msg_size = 9;
+
+  // Optional. Updated maximum number of consumers allowed. -1 for unlimited.
+  optional int32 max_consumers = 10;
+
+  // Optional. Updated duplicate detection window.
+  google.protobuf.Duration duplicates = 11;
+
+  // Optional. Updated setting to allow direct message access via the get API.
+  optional bool allow_direct = 12;
+
+  // Optional. Updated setting to allow direct access for mirror streams.
+  optional bool mirror_direct = 13;
+
+  // Optional. Updated discard policy when stream limits are reached.
+  // Values: 0 = DiscardOld, 1 = DiscardNew.
+  optional int32 discard = 14;
+
+  // Optional. Updated setting to apply discard new policy on a per-subject basis.
+  optional bool discard_new_per_subject = 15;
+
+  // Optional. Updated list of source stream configurations.
+  repeated StreamSourceConfig sources = 16;
+
+  // Optional. Updated arbitrary key-value metadata attached to the stream.
+  map<string, string> metadata = 17;
+
+  // Optional. Updated compression algorithm (mutable since NATS 2.10).
+  // Values: 0 = None, 1 = S2.
+  optional int32 compression = 18;
+
+  // Optional. Updated republish configuration. Send empty message to clear.
+  optional .natscope.types.nats.RePublish republish = 19;
+
+  // Optional. Updated subject transform. Send empty message to clear.
+  optional .natscope.types.nats.SubjectTransformConfig subject_transform = 20;
+
+  // Optional. Updated default consumer limits.
+  optional .natscope.types.nats.ConsumerLimits consumer_limits = 21;
+
+  // Optional. Updated allow-message-TTL setting (mutable since NATS 2.11).
+  optional bool allow_msg_ttl = 22;
+
+  // Optional. Updated allow-atomic-publish setting.
+  optional bool allow_atomic_publish = 23;
+}
+
+// Defines the response message for updating a JetStream stream.
+message UpdateStreamResponse {
+  // Required. Information about the updated stream including its new configuration and state.
+  .natscope.types.nats.StreamInfo stream = 1;
+}
+
+// Defines the request message for deleting a JetStream stream.
+message DeleteStreamRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream to delete.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for deleting a JetStream stream.
+message DeleteStreamResponse {}
+
+// Defines the request message for purging messages from a JetStream stream.
+message PurgeStreamRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream to purge messages from.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Subject filter to purge only messages matching the given subject.
+  optional string filter = 3;
+
+  // Optional. Purge all messages up to but not including this sequence number.
+  optional uint64 sequence = 4;
+
+  // Optional. Number of most recent messages to keep after the purge.
+  optional uint64 keep = 5;
+}
+
+// Defines the response message for purging messages from a JetStream stream.
+message PurgeStreamResponse {
+  // Required. Number of messages that were purged from the stream.
+  uint64 purged = 1;
+}
+
+// Defines the request message for sealing a JetStream stream.
+message SealStreamRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream to seal.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for sealing a JetStream stream.
+message SealStreamResponse {
+  // Required. Information about the sealed stream including its updated state.
+  .natscope.types.nats.StreamInfo stream = 1;
+}
+
+// Defines the request message for deleting a single message from a stream.
+message DeleteMessageRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream the message belongs to.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Sequence number of the message to delete. Must be > 0.
+  uint64 sequence = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).uint64.gt = 0];
+
+  // Optional. When true, perform a secure erase: the server overwrites the
+  // message data with random bytes before removing it (slower, irreversible).
+  optional bool secure = 4;
+}
+
+// Defines the response message for deleting a single message from a stream.
+message DeleteMessageResponse {}
+
+// Defines the placement configuration for stream data within a NATS cluster.
+message PlacementConfig {
+  // Optional. Target cluster name for stream data placement.
+  string cluster = 1;
+
+  // Optional. List of server tags to constrain stream placement to specific servers.
+  repeated string tags = 2;
+}
+
+// Defines the configuration for a stream source or mirror.
+message StreamSourceConfig {
+  // Required. Name of the source stream to replicate data from.
+  string name = 1;
+
+  // Optional. Sequence number to start replication from. Defaults to the beginning.
+  uint64 opt_start_seq = 2;
+
+  // Optional. Timestamp to start replication from.
+  // Format: RFC 3339 (e.g., "2024-01-15T10:30:00Z").
+  optional string opt_start_time = 3;
+
+  // Optional. Subject filter to replicate only messages matching the given subject.
+  string filter_subject = 4;
+
+  // Optional. List of subject transformations applied to replicated messages.
+  repeated SubjectTransform subject_transforms = 5;
+
+  // Optional. Configuration for sourcing from an external NATS cluster.
+  optional ExternalStreamConfig external = 6;
+}
+
+// Defines the configuration for accessing a stream from an external NATS cluster.
+message ExternalStreamConfig {
+  // Required. API prefix for the external JetStream API.
+  string api_prefix = 1;
+
+  // Required. Delivery prefix for the external stream messages.
+  string deliver_prefix = 2;
+}
+
+// Defines a subject transformation rule for stream messages.
+message SubjectTransform {
+  // Required. Source subject pattern to match.
+  string source = 1;
+
+  // Required. Destination subject pattern to transform to.
+  string destination = 2;
+}
+
+// ============================================================================
+// Consumer Management
+// ============================================================================
+
+// Defines the request message for listing consumers on a JetStream stream.
+message ListConsumersRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream whose consumers to list.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for listing consumers on a JetStream stream.
+message ListConsumersResponse {
+  // Required. List of all consumers attached to the specified stream.
+  repeated .natscope.types.nats.ConsumerInfo consumers = 1;
+}
+
+// Defines the request message for creating a new consumer on a JetStream stream.
+message CreateConsumerRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream to create the consumer on.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Unique name for the consumer within the stream.
+  string name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Human-readable description of the consumer's purpose.
+  string description = 4;
+
+  // Optional. Message delivery start policy.
+  // Values: 0 = DeliverAll, 1 = DeliverLast, 2 = DeliverNew, 3 = DeliverByStartSequence,
+  // 4 = DeliverByStartTime, 5 = DeliverLastPerSubject.
+  int32 deliver_policy = 5;
+
+  // Optional. Starting sequence number when deliverPolicy is DeliverByStartSequence.
+  uint64 opt_start_seq = 6;
+
+  // Optional. Starting timestamp when deliverPolicy is DeliverByStartTime.
+  // Format: RFC 3339 (e.g., "2024-01-15T10:30:00Z").
+  string opt_start_time = 7;
+
+  // Optional. Acknowledgement policy.
+  // Values: 0 = AckExplicit, 1 = AckNone, 2 = AckAll.
+  int32 ack_policy = 8;
+
+  // Optional. Duration to wait for message acknowledgement before redelivery.
+  google.protobuf.Duration ack_wait = 9;
+
+  // Optional. Maximum number of delivery attempts for a single message. -1 for unlimited.
+  int32 max_deliver = 10;
+
+  // Optional. List of backoff durations between redelivery attempts.
+  repeated google.protobuf.Duration back_off = 11;
+
+  // Optional. Subject filter to consume only messages matching the given subject pattern.
+  string filter_subject = 12;
+
+  // Optional. List of subject filters when multiple filter subjects are needed.
+  repeated string filter_subjects = 13;
+
+  // Optional. Replay policy for historical messages.
+  // Values: 0 = ReplayInstant, 1 = ReplayOriginal.
+  int32 replay_policy = 14;
+
+  // Optional. Maximum message delivery rate in bits per second. 0 for unlimited.
+  uint64 rate_limit = 15;
+
+  // Optional. Percentage of acknowledgements to sample for monitoring.
+  // Format: "0"-"100" (e.g., "50" for 50% sampling).
+  string sample_frequency = 16;
+
+  // Optional. Maximum number of outstanding unacknowledged messages.
+  int32 max_ack_pending = 17;
+
+  // Optional. Maximum number of waiting pull requests for pull-based consumers.
+  int32 max_waiting = 18;
+
+  // Optional. When true, delivers only message headers without the body payload.
+  bool headers_only = 19;
+
+  // Optional. Maximum number of messages per pull request batch.
+  int32 max_request_batch = 20;
+
+  // Optional. Maximum total size in bytes per pull request batch.
+  int64 max_request_max_bytes = 21;
+
+  // Optional. Maximum duration to wait for a pull request to complete.
+  google.protobuf.Duration max_request_expires = 22;
+
+  // Optional. Duration after which an inactive consumer will be garbage collected.
+  google.protobuf.Duration inactive_threshold = 23;
+
+  // Optional. Number of consumer replicas in a clustered environment.
+  int32 replicas = 24;
+
+  // Optional. When true, uses in-memory storage instead of file-based storage.
+  bool memory_storage = 25;
+
+  // Optional. Arbitrary key-value metadata attached to the consumer.
+  map<string, string> metadata = 26;
+
+  // Optional. Delivery subject for push-based consumers. When set, the consumer becomes push-based.
+  string deliver_subject = 27;
+
+  // Optional. Queue group name for push-based consumers to enable load balancing.
+  string deliver_group = 28;
+
+  // Optional. When true, enables flow control for push-based consumers.
+  bool flow_control = 29;
+
+  // Optional. Idle heartbeat interval for push-based consumers.
+  google.protobuf.Duration idle_heartbeat = 30;
+}
+
+// Defines the response message for creating a consumer.
+message CreateConsumerResponse {
+  // Required. Information about the newly created consumer including its configuration and state.
+  .natscope.types.nats.ConsumerInfo consumer = 1;
+}
+
+// Defines the request message for updating an existing consumer on a JetStream stream.
+message UpdateConsumerRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream the consumer belongs to.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the consumer to update.
+  string consumer_name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Updated human-readable description of the consumer.
+  optional string description = 4;
+
+  // Optional. Updated duration to wait for acknowledgement before redelivery.
+  google.protobuf.Duration ack_wait = 5;
+
+  // Optional. Updated maximum number of delivery attempts. -1 for unlimited.
+  optional int32 max_deliver = 6;
+
+  // Optional. Updated maximum number of outstanding unacknowledged messages.
+  optional int32 max_ack_pending = 7;
+
+  // Optional. Updated maximum number of waiting pull requests.
+  optional int32 max_waiting = 8;
+
+  // Optional. Updated maximum delivery rate in bits per second. 0 for unlimited.
+  optional uint64 rate_limit = 9;
+
+  // Optional. Updated acknowledgement sampling percentage.
+  // Format: "0"-"100" (e.g., "50" for 50% sampling).
+  optional string sample_frequency = 10;
+
+  // Optional. Updated inactivity threshold before garbage collection.
+  google.protobuf.Duration inactive_threshold = 11;
+
+  // Optional. Updated list of backoff durations between redelivery attempts.
+  repeated google.protobuf.Duration back_off = 12;
+
+  // Optional. Updated maximum number of messages per pull request batch.
+  optional int32 max_request_batch = 13;
+
+  // Optional. Updated maximum total size in bytes per pull request batch.
+  optional int64 max_request_max_bytes = 14;
+
+  // Optional. Updated maximum duration for pull request completion.
+  google.protobuf.Duration max_request_expires = 15;
+
+  // Optional. Updated arbitrary key-value metadata attached to the consumer.
+  map<string, string> metadata = 16;
+}
+
+// Defines the response message for updating a consumer.
+message UpdateConsumerResponse {
+  // Required. Information about the updated consumer including its new configuration and state.
+  .natscope.types.nats.ConsumerInfo consumer = 1;
+}
+
+// Defines the request message for deleting a consumer from a JetStream stream.
+message DeleteConsumerRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream the consumer belongs to.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the consumer to delete.
+  string consumer_name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for deleting a consumer.
+message DeleteConsumerResponse {}
+
+// Defines the request message for pausing a consumer on a JetStream stream.
+message PauseConsumerRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream the consumer belongs to.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the consumer to pause.
+  string consumer_name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Timestamp until which the consumer should be paused.
+  // Format: RFC 3339 (e.g., "2024-01-15T10:30:00Z").
+  string pause_until = 4 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for pausing a consumer.
+message PauseConsumerResponse {
+  // Required. Indicates whether the consumer is currently paused.
+  bool paused = 1;
+
+  // Optional. Timestamp until which the consumer is paused.
+  // Format: RFC 3339.
+  optional string pause_until = 2;
+
+  // Required. Remaining pause duration.
+  google.protobuf.Duration pause_remaining = 3;
+}
+
+// Defines the request message for resuming a paused consumer.
+message ResumeConsumerRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the stream the consumer belongs to.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the consumer to resume.
+  string consumer_name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for resuming a consumer.
+message ResumeConsumerResponse {
+  // Required. Indicates whether the consumer is still paused (should be false after a successful resume).
+  bool paused = 1;
+}
+
+// ============================================================================
+// KeyValue Management
+// ============================================================================
+
+// Defines the request message for listing all KeyValue buckets.
+message ListKVBucketsRequest {
+  // Required. Identifier of the NATS connection to list KeyValue buckets from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for listing all KeyValue buckets.
+message ListKVBucketsResponse {
+  // Required. List of all KeyValue buckets available on the connection.
+  repeated .natscope.types.nats.KVBucketInfo buckets = 1;
+}
+
+// Defines the request message for creating a new KeyValue bucket.
+message CreateKVBucketRequest {
+  // Required. Identifier of the NATS connection to create the bucket on.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Configuration for the new KeyValue bucket including name, TTL, and storage settings.
+  .natscope.types.nats.KVBucketConfig config = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true];
+}
+
+// Defines the response message for creating a KeyValue bucket.
+message CreateKVBucketResponse {
+  // Required. Information about the newly created KeyValue bucket.
+  .natscope.types.nats.KVBucketInfo bucket = 1;
+}
+
+// Defines the request message for retrieving a specific KeyValue bucket.
+message GetKVBucketRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the KeyValue bucket to retrieve.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving a KeyValue bucket.
+message GetKVBucketResponse {
+  // Required. Detailed information about the requested KeyValue bucket.
+  .natscope.types.nats.KVBucketInfo bucket = 1;
+}
+
+// Defines the request message for deleting a KeyValue bucket.
+message DeleteKVBucketRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the KeyValue bucket to delete.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for deleting a KeyValue bucket.
+message DeleteKVBucketResponse {}
+
+// Defines the request message for listing all keys in a KeyValue bucket.
+message ListKVKeysRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the KeyValue bucket to list keys from.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for listing all keys in a KeyValue bucket.
+message ListKVKeysResponse {
+  // Required. List of all key names stored in the bucket.
+  repeated string keys = 1;
+}
+
+// Defines the request message for retrieving a specific key from a KeyValue bucket.
+message GetKVKeyRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the KeyValue bucket containing the key.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the key to retrieve.
+  string key = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving a key from a KeyValue bucket.
+message GetKVKeyResponse {
+  // Required. The key-value entry including value, revision, and metadata.
+  .natscope.types.nats.KVEntry entry = 1;
+}
+
+// Defines the request message for retrieving a key's revision history.
+message GetKVKeyHistoryRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the KeyValue bucket containing the key.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the key whose revision history to retrieve.
+  string key = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving a key's revision history.
+message GetKVKeyHistoryResponse {
+  // Required. Stored revisions of the key, oldest first, including
+  // delete/purge markers.
+  repeated .natscope.types.nats.KVEntry entries = 1;
+}
+
+// Defines the request message for creating or updating a key-value entry.
+message PutKVKeyRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the KeyValue bucket to store the entry in.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the key to create or update.
+  string key = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. String value to store for the key. Empty string stores an empty value.
+  string value = 4;
+
+  // Optional. Expected revision number for compare-and-swap updates.
+  // When non-zero, the update will fail if the current revision does not match.
+  uint64 revision = 5;
+}
+
+// Defines the response message for creating or updating a key-value entry.
+message PutKVKeyResponse {
+  // Required. New revision number assigned to the entry after the update.
+  uint64 revision = 1;
+}
+
+// Defines the request message for deleting a key from a KeyValue bucket.
+message DeleteKVKeyRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the KeyValue bucket containing the key.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the key to delete.
+  string key = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for deleting a key from a KeyValue bucket.
+message DeleteKVKeyResponse {}
+
+// Defines the request message for purging all revisions of a key from a KeyValue bucket.
+message PurgeKVKeyRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the KeyValue bucket containing the key.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the key whose revision history to purge.
+  string key = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for purging all revisions of a key.
+message PurgeKVKeyResponse {}
+
+// ============================================================================
+// Object Store Management
+// ============================================================================
+
+// Defines the request message for listing all Object Store buckets.
+message ListObjectBucketsRequest {
+  // Required. Identifier of the NATS connection to list Object Store buckets from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for listing all Object Store buckets.
+message ListObjectBucketsResponse {
+  // Required. List of all Object Store buckets available on the connection.
+  repeated .natscope.types.nats.ObjectBucketInfo buckets = 1;
+}
+
+// Defines the request message for creating a new Object Store bucket.
+message CreateObjectBucketRequest {
+  // Required. Identifier of the NATS connection to create the bucket on.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Configuration for the new Object Store bucket including name and storage settings.
+  .natscope.types.nats.ObjectBucketConfig config = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true];
+}
+
+// Defines the response message for creating an Object Store bucket.
+message CreateObjectBucketResponse {
+  // Required. Information about the newly created Object Store bucket.
+  .natscope.types.nats.ObjectBucketInfo bucket = 1;
+}
+
+// Defines the request message for retrieving a specific Object Store bucket.
+message GetObjectBucketRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the Object Store bucket to retrieve.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving an Object Store bucket.
+message GetObjectBucketResponse {
+  // Required. Detailed information about the requested Object Store bucket.
+  .natscope.types.nats.ObjectBucketInfo bucket = 1;
+}
+
+// Defines the request message for deleting an Object Store bucket.
+message DeleteObjectBucketRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the Object Store bucket to delete.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for deleting an Object Store bucket.
+message DeleteObjectBucketResponse {}
+
+// Defines the request message for sealing an Object Store bucket.
+message SealObjectBucketRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the Object Store bucket to seal.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for sealing an Object Store bucket.
+message SealObjectBucketResponse {}
+
+// Defines the request message for listing all objects in an Object Store bucket.
+message ListObjectsRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the Object Store bucket to list objects from.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for listing all objects in an Object Store bucket.
+message ListObjectsResponse {
+  // Required. List of metadata for all objects stored in the bucket.
+  repeated .natscope.types.nats.ObjectInfo objects = 1;
+}
+
+// Defines the request message for retrieving an object from an Object Store bucket.
+message GetObjectRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the Object Store bucket containing the object.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the object to retrieve.
+  string name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving an object from an Object Store bucket.
+message GetObjectResponse {
+  // Required. Metadata about the retrieved object including size, digest, and timestamps.
+  .natscope.types.nats.ObjectInfo info = 1;
+
+  // Required. Binary content of the object.
+  bytes data = 2;
+}
+
+// Defines the request message for creating or updating an object in an Object Store bucket.
+message PutObjectRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the Object Store bucket to store the object in.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the object to create or update.
+  string name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Human-readable description of the object.
+  string description = 4;
+
+  // Optional. Binary content of the object to store.
+  bytes data = 5;
+
+  // Optional. Arbitrary key-value metadata attached to the object.
+  map<string, string> metadata = 6;
+}
+
+// Defines the response message for creating or updating an object.
+message PutObjectResponse {
+  // Required. Metadata about the stored object including computed digest and size.
+  .natscope.types.nats.ObjectInfo info = 1;
+}
+
+// Defines the request message for deleting an object from an Object Store bucket.
+message DeleteObjectRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the Object Store bucket containing the object.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the object to delete.
+  string name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for deleting an object from an Object Store bucket.
+message DeleteObjectResponse {}

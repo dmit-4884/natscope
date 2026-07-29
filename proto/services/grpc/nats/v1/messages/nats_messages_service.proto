@@ -1,0 +1,108 @@
+syntax = "proto3";
+package natscope.nats.messages.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/messages;grpc_nats_messages";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "types/nats/nats_message.proto";
+
+// Provides access to JetStream messages with server-side protobuf decoding support.
+service MessagesService {
+  // Returns a paginated list of messages from a JetStream stream with optional subject filtering and direction control.
+  // Pagination: Cursor-based.
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse) {}
+
+  // Returns a single message from a JetStream stream by its sequence number.
+  rpc GetMessage(GetMessageRequest) returns (GetMessageResponse) {}
+}
+
+// Defines the direction for sequential message retrieval.
+enum Direction {
+  // Default value. The server decides the direction.
+  DIRECTION_UNSPECIFIED = 0;
+
+  // Retrieve messages in ascending sequence order (oldest first).
+  DIRECTION_FORWARD = 1;
+
+  // Retrieve messages in descending sequence order (newest first).
+  DIRECTION_BACKWARD = 2;
+}
+
+// Defines the request message for listing JetStream messages.
+message ListMessagesRequest {
+  // start_seq and start_time both pick the first message of the page and so
+  // are mutually exclusive — the server resolves start_time to a sequence and
+  // would have no consistent way to honor an explicit start_seq as well.
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.messages.start_seq_xor_start_time"
+    message: "start_seq and start_time are mutually exclusive"
+    expression: "!(has(this.start_seq) && has(this.start_time))"
+  };
+
+  // Required. Identifier of the NATS connection to read messages from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the JetStream stream to read messages from.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. NATS subject filter to narrow results. Supports wildcards (* and >).
+  optional string subject_filter = 3;
+
+  // Optional. Direction of message retrieval. Defaults to DIRECTION_UNSPECIFIED.
+  Direction direction = 4;
+
+  // Optional. Starting sequence number for cursor-based pagination.
+  optional uint64 start_seq = 5;
+
+  // Optional. Maximum number of messages to return per page.
+  optional int64 limit = 6;
+
+  // Optional. Case-insensitive substring filter applied to message payload content (decoded JSON or raw text).
+  optional string content_filter = 7;
+
+  // Optional. When > 0, truncate each message's `data` (and decoded JSON) to
+  // this many bytes for the list view. The original byte count is preserved
+  // in NatsMessage.dataSize and NatsMessage.truncated is set so the UI can
+  // render a "load full payload" affordance that calls Get(sequence). When 0
+  // or omitted, the server falls back to user settings
+  // (Messages.maxPayloadBytesInList); 0 disables truncation.
+  optional int32 max_payload_bytes = 8;
+
+  // Optional. Jump to the first message at or after this publish time. The
+  // server resolves it to a starting sequence (honoring the user's
+  // fetch_method: binary search for "direct", a DeliverByStartTime consumer
+  // for "consumer") and then pages from there. Mutually exclusive with
+  // start_seq.
+  optional google.protobuf.Timestamp start_time = 9;
+}
+
+// Defines the response message for listing JetStream messages.
+message ListMessagesResponse {
+  // Required. List of NATS messages, optionally decoded from protobuf if a mapping exists.
+  repeated .natscope.types.nats.NatsMessage messages = 1;
+
+  // Required. Indicates whether additional messages are available beyond this page.
+  bool has_more = 2;
+
+  // Required. Sequence number to use as startSeq for fetching the next page.
+  uint64 next_seq = 3;
+}
+
+// Defines the request message for getting a single JetStream message.
+message GetMessageRequest {
+  // Required. Identifier of the NATS connection to read the message from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the JetStream stream containing the message.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Sequence number of the message to retrieve.
+  uint64 sequence = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Defines the response message for getting a single JetStream message.
+message GetMessageResponse {
+  // Required. The requested NATS message, optionally decoded from protobuf if a mapping exists.
+  .natscope.types.nats.NatsMessage message = 1;
+}

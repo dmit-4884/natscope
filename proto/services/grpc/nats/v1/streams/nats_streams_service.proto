@@ -1,0 +1,43 @@
+syntax = "proto3";
+package natscope.nats.streams.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/streams;grpc_nats_streams";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/nats/nats_stream.proto";
+
+// Provides read-only access to JetStream streams for a given NATS connection.
+service StreamsService {
+  // Returns all JetStream streams available on the specified connection.
+  rpc ListStreams(ListStreamsRequest) returns (ListStreamsResponse) {}
+
+  // Returns detailed information about a single JetStream stream.
+  rpc GetStream(GetStreamRequest) returns (GetStreamResponse) {}
+}
+
+// Defines the request message for listing JetStream streams.
+message ListStreamsRequest {
+  // Required. Identifier of the NATS connection to query streams from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for listing JetStream streams.
+message ListStreamsResponse {
+  // Required. List of JetStream stream information objects.
+  repeated .natscope.types.nats.StreamInfo streams = 1;
+}
+
+// Defines the request message for getting a single JetStream stream.
+message GetStreamRequest {
+  // Required. Identifier of the NATS connection to query.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the JetStream stream to retrieve.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for getting a single JetStream stream.
+message GetStreamResponse {
+  // Required. Detailed information about the requested stream.
+  .natscope.types.nats.StreamInfo stream = 1;
+}

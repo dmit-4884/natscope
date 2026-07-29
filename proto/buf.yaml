@@ -1,0 +1,33 @@
+version: v2
+modules:
+  - path: .
+    name: buf.build/dmit4884/natscope
+    excludes:
+      - third_party
+  - path: third_party
+lint:
+  use:
+    - STANDARD
+  except:
+    # ENFORCED now: FIELD_LOWER_SNAKE_CASE (AIP-140), RPC_REQUEST_STANDARD_NAME,
+    # RPC_REQUEST_RESPONSE_UNIQUE — every service uses snake_case fields and
+    # AIP-131-135 entity-prefixed methods with standard request message names.
+    #
+    # The three below stay relaxed for principled reasons:
+    # - PACKAGE_DIRECTORY_MATCH: on-disk layout is services/grpc/<area>/v1/<resource>
+    #   (version mid-path); matching it means relocating files.
+    # - PACKAGE_VERSION_SUFFIX: the shared natscope.types.* packages are intentionally
+    #   unversioned, mirroring Google's own unversioned google.type.* library.
+    # - RPC_RESPONSE_STANDARD_NAME: the live server-stream emits a domain LiveEvent
+    #   (oneof batch/stats/error/proto_reload), not a SubscribeResponse wrapper.
+    - PACKAGE_DIRECTORY_MATCH
+    - PACKAGE_VERSION_SUFFIX
+    - RPC_RESPONSE_STANDARD_NAME
+  ignore:
+    # Vendored Google / buf protos evolve at upstream cadence; never lint them.
+    - third_party
+breaking:
+  use:
+    - FILE
+  ignore:
+    - third_party

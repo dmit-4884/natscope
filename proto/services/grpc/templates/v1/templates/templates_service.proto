@@ -1,0 +1,147 @@
+syntax = "proto3";
+package natscope.templates.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/templates/v1/templates;grpc_templates";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/templates/templates_template.proto";
+
+// Provides CRUD for reusable publish payload templates.
+//
+// AIP-compliant: entity-prefixed standard methods (AIP-131-135), standard
+// request/response message names, AIP-158 pagination (page_size / page_token /
+// next_page_token / total_size), google.api.field_behavior annotations.
+service TemplatesService {
+  // Creates a new template.
+  rpc CreateTemplate(CreateTemplateRequest) returns (CreateTemplateResponse) {}
+
+  // Updates an existing template (partial update — only set fields are applied).
+  rpc UpdateTemplate(UpdateTemplateRequest) returns (UpdateTemplateResponse) {}
+
+  // Retrieves a single template by id.
+  rpc GetTemplate(GetTemplateRequest) returns (GetTemplateResponse) {}
+
+  // Lists templates (AIP-158 pagination).
+  rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse) {}
+
+  // Deletes a template by id.
+  rpc DeleteTemplate(DeleteTemplateRequest) returns (DeleteTemplateResponse) {}
+
+  // Creates multiple templates in one call (AIP-233). Used for client migration
+  // from localStorage and JSON import. Existing templates are kept; the new
+  // items get fresh ids/timestamps.
+  rpc BatchCreateTemplates(BatchCreateTemplatesRequest) returns (BatchCreateTemplatesResponse) {}
+
+  // Deletes ALL templates. Custom method (AIP-136) for the "Clear all" control.
+  rpc DeleteAllTemplates(DeleteAllTemplatesRequest) returns (DeleteAllTemplatesResponse) {}
+}
+
+message CreateTemplateRequest {
+  // Required. Human-readable label.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1
+  ];
+  string subject = 2;
+  string message_type = 3;
+  string data = 4;
+  map<string, string> headers = 5;
+  repeated string wildcards = 6;
+}
+message CreateTemplateResponse {
+  .natscope.types.templates.MessageTemplate template = 1;
+}
+
+message UpdateTemplateRequest {
+  // Required. Identifier of the template to update.
+  string id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+  optional string name = 2;
+  optional string subject = 3;
+  optional string message_type = 4;
+  optional string data = 5;
+  // Headers are replaced wholesale when provided. Use an empty map to clear,
+  // omit the field to leave existing headers untouched.
+  optional HeadersPatch headers = 6;
+  // Wildcards are replaced wholesale when provided. Use an empty list to
+  // clear, omit the field to leave existing wildcards untouched.
+  optional WildcardsPatch wildcards = 7;
+}
+message HeadersPatch {
+  map<string, string> values = 1;
+}
+message WildcardsPatch {
+  repeated string values = 1;
+}
+message UpdateTemplateResponse {
+  .natscope.types.templates.MessageTemplate template = 1;
+}
+
+message GetTemplateRequest {
+  // Required. Identifier of the template to retrieve.
+  string id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+message GetTemplateResponse {
+  .natscope.types.templates.MessageTemplate template = 1;
+}
+
+message ListTemplatesRequest {
+  // Optional. Maximum number of templates to return in a single page.
+  // Zero requests the server default; negative is rejected.
+  int32 page_size = 1 [(buf.validate.field).int32.gte = 0];
+  // Optional. A pagination token returned from a previous call.
+  // Empty string requests the first page.
+  string page_token = 2;
+  // Optional. If true, populate ListTemplatesResponse.total_size.
+  bool include_total_count = 3;
+}
+message ListTemplatesResponse {
+  // The page of templates matching the request.
+  repeated .natscope.types.templates.MessageTemplate templates = 1;
+  // A pagination token to retrieve the next page. Empty on the last page.
+  optional string next_page_token = 2;
+  // Total number of templates. Populated only when include_total_count is true.
+  optional int64 total_size = 3;
+}
+
+message DeleteTemplateRequest {
+  // Required. Identifier of the template to delete.
+  string id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+message DeleteTemplateResponse {}
+
+message TemplateBulkCreateItem {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1
+  ];
+  string subject = 2;
+  string message_type = 3;
+  string data = 4;
+  map<string, string> headers = 5;
+  repeated string wildcards = 6;
+}
+message BatchCreateTemplatesRequest {
+  repeated TemplateBulkCreateItem templates = 1 [(buf.validate.field).repeated.min_items = 1];
+}
+message BatchCreateTemplatesResponse {
+  int32 created = 1;
+}
+
+message DeleteAllTemplatesRequest {}
+message DeleteAllTemplatesResponse {
+  int32 deleted = 1;
+}

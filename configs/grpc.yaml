@@ -1,0 +1,27 @@
+# Connect-RPC transport configuration for the natscope service.
+# The server uses a single HTTP listener that speaks Connect, gRPC-Web, and
+# gRPC natively — there is no separate gRPC port or grpc-web bridge.
+# All parameters are commented out by default (template mode).
+
+# Listen address for Connect-RPC + embedded SPA. Loopback default: the API
+# returns connection secrets. Binding to a non-loopback address additionally
+# requires allowRemote: true and should be paired with webAuth.
+# grpcWebAddress: "127.0.0.1:4280"   # (default: 127.0.0.1:4280)
+
+# <bool> Permit binding grpcWebAddress to a non-loopback address (e.g.
+# 0.0.0.0:4280). Without this flag the server refuses to start on a wide bind.
+# Env: ALLOW_REMOTE=true
+# allowRemote: false   # (default: false)
+
+# HTTP basic auth protecting the whole listener (UI + API). The browser shows
+# its native credentials prompt; API clients pass an Authorization header.
+# Strongly recommended together with allowRemote.
+#
+# IMPORTANT: the listener has no TLS — it speaks cleartext h2c. Basic-auth
+# credentials and API responses (including stored connection secrets) travel
+# unencrypted, so any remote exposure MUST sit behind a TLS-terminating
+# reverse proxy (nginx, caddy, traefik).
+# Env: WEB_AUTH__USERNAME / WEB_AUTH__PASSWORD
+# webAuth:
+#   username: ""
+#   password: ""

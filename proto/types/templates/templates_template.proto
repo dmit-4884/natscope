@@ -1,0 +1,32 @@
+syntax = "proto3";
+package natscope.types.templates;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/templates;templatespb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines a reusable publish payload template — saved subject, message type,
+// JSON body, and headers — that the user can reload while publishing.
+message MessageTemplate {
+  // Identifier. Server-minted UUID used as the lookup key on every RPC.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // Output only. Creation timestamp.
+  google.protobuf.Timestamp created_at = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. Last update timestamp.
+  google.protobuf.Timestamp updated_at = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Human-readable label.
+  string name = 4 [(google.api.field_behavior) = REQUIRED];
+  // Optional. Subject pattern (NATS wildcards * and > supported).
+  string subject = 5;
+  // Optional. Fully qualified protobuf message type (e.g. "api.v1.Order").
+  string message_type = 6;
+  // Required. Stored payload (raw JSON, may include {{helpers}} placeholders).
+  string data = 7 [(google.api.field_behavior) = REQUIRED];
+  // Optional. Header key/value pairs to attach when publishing.
+  map<string, string> headers = 8;
+  // Optional. Wildcard slot values for the subject pattern (positional;
+  // index N corresponds to the N-th `*` or `>` token). Restored verbatim
+  // when the template loads so users don't have to refill them by hand.
+  repeated string wildcards = 9;
+}

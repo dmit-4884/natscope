@@ -1,0 +1,30 @@
+syntax = "proto3";
+package natscope.types.mappings;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/mappings;mappingspb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines mapping between a NATS subject pattern and a protobuf message type
+// scoped to a specific proto source.
+message SubjectMapping {
+  // Required. Unique identifier. Format: UUID.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // Required. NATS subject pattern (supports wildcards * and >).
+  string pattern = 2 [(google.api.field_behavior) = REQUIRED];
+  // Required. Fully-qualified protobuf message type name.
+  string message_type = 3 [(google.api.field_behavior) = REQUIRED];
+  // Required. Creation timestamp.
+  google.protobuf.Timestamp created_at = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Last update timestamp.
+  google.protobuf.Timestamp updated_at = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Identifier of the proto source this mapping is bound to.
+  // Decode resolution loads the descriptor only from this source's active selection.
+  string source_id = 6 [(google.api.field_behavior) = REQUIRED];
+  // Optional. Pin resolution to a specific tag of the source, overriding the
+  // active selection. Use for decoding old messages produced by an older schema.
+  optional string pinned_tag = 7;
+  // Optional. Pin resolution to a specific descriptor by content hash (sha256).
+  // Survives recompiles. Takes precedence over pinnedTag.
+  optional string pinned_fingerprint = 8;
+}

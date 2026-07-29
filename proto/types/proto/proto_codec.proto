@@ -1,0 +1,45 @@
+syntax = "proto3";
+package natscope.types.proto;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/proto;protopb";
+
+import "google/api/field_behavior.proto";
+
+// Defines result of protobuf message decoding.
+message DecodeResult {
+  // Required. Decoded message content as JSON string.
+  string data = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Fully-qualified protobuf message type that was used for decoding.
+  string message_type = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Error message if decoding failed.
+  optional string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines result of protobuf message encoding.
+message EncodeResult {
+  // Required. Encoded protobuf message as binary bytes.
+  bytes data = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Size of the encoded message in bytes.
+  int64 data_size = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Error message if encoding failed.
+  optional string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines result of protobuf message validation.
+message ValidationResult {
+  // Required. Whether the message passes all validation rules.
+  bool valid = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Repeated. List of validation violations found.
+  repeated ValidationViolation violations = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Error message if validation could not be performed.
+  optional string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines a single validation rule violation.
+message ValidationViolation {
+  // Required. Dot-separated path to the field that violated a rule.
+  string field_path = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Identifier of the validation constraint that was violated.
+  string constraint_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Human-readable description of the violation.
+  string message = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

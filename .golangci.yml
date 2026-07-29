@@ -1,0 +1,151 @@
+version: "2"
+run:
+  concurrency: 4
+  go: "1.26"
+  tests: false
+  allow-parallel-runners: false
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - exhaustive
+    - goconst
+    - gocritic
+    - godox
+    - goprintffuncname
+    - govet
+    - ineffassign
+    - lll
+    - makezero
+    - misspell
+    - mnd
+    - nilnil
+    - noctx
+    - prealloc
+    - predeclared
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+  settings:
+    depguard:
+      rules:
+        prevent_unmaintained_packages:
+          list-mode: lax
+          files:
+            - $all
+            - '!$test'
+          allow:
+            - $gostd
+            - github.com/spf13/cobra
+            - github.com/altessa-s/go-atlas
+            - github.com/google/uuid
+            - github.com/go-ozzo/ozzo-validation/v4
+            - github.com/dmit-4884/natscope
+            - github.com/nats-io/nats.go
+            - github.com/bufbuild/protocompile
+            - buf.build/go/protovalidate
+            - buf.build/gen/go/bufbuild/protovalidate
+            - connectrpc.com/connect
+            - golang.org/x/net/http2
+            - github.com/planetscale/vtprotobuf
+            - github.com/fsnotify/fsnotify
+            - github.com/go-git/go-git
+            - github.com/joho/godotenv
+            - github.com/zalando/go-keyring
+            - github.com/MakeNowJust/heredoc
+            - github.com/stretchr/testify
+            - google.golang.org/grpc
+            - google.golang.org/genproto
+            - google.golang.org/protobuf
+            - golang.org/x/sync
+            - golang.org/x/net
+          deny:
+            - pkg: io/ioutil
+              desc: 'replaced by io and os packages since Go 1.16: https://tip.golang.org/doc/go1.16#ioutil'
+    dogsled:
+      max-blank-identifiers: 2
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    exhaustive:
+      default-signifies-exhaustive: true
+      package-scope-only: false
+    goconst:
+      match-constant: true
+      min-len: 3
+      numbers: true
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+    lll:
+      line-length: 159
+    makezero:
+      always: false
+    misspell:
+      locale: US
+    mnd:
+      ignored-functions:
+        - strings.SplitN
+        - strconv.*
+        - os.OpenFile
+    staticcheck:
+      checks:
+        - all
+        - -ST1003
+    varnamelen:
+      ignore-names:
+        - err
+        - ch
+        - ok
+      ignore-type-assert-ok: true
+      ignore-map-index-ok: true
+      ignore-chan-recv-ok: true
+      ignore-decls:
+        - i int
+        - ch chan
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - goconst
+        path: (.+)_test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(google.golang.org)
+        - prefix(golang.org)
+        - prefix(github.com/altessa-s/go-atlas)
+        - prefix(github.com/dmit-4884/natscope)
+        - blank
+        - alias
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

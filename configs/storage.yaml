@@ -1,0 +1,17 @@
+# Storage configuration for the natscope service.
+# Data is persisted in a single embedded bbolt database file (go.etcd.io/bbolt,
+# pure Go, no CGO): one bucket per domain, one JSON document per row.
+# Secrets are NOT stored here — they live in the secret vault (see
+# configs/secrets.yaml).
+# All parameters are commented out by default (template mode): the values shown
+# are the built-in defaults, applied automatically when this section is omitted.
+# Uncomment and edit only the keys you want to override.
+
+#storage:
+#  # Local data directory. The bbolt database file (natscope.bolt) lives here,
+#  # alongside the file vault (secrets.vault + vault.key) when it is in use.
+#  local:
+#    # <string> Directory for storing the database file.
+#    # Env: STORAGE__LOCAL__DATA_DIR
+#    # Default value: ~/.natscope/data
+#    dataDir: ~/.natscope/data

@@ -1,0 +1,19 @@
+# TypeScript for the error-detail schemas the transport attaches to failed requests:
+# io.altessa.badrequest.v1 (field violations + reason codes) and google.rpc.ErrorInfo
+# (domain reason codes). Consumed by web/src/api/errors.ts.
+#
+# TypeScript only — the Go binary links these schemas via proto-gen-go and genproto,
+# and registering the same descriptors twice panics at init.
+version: v2
+inputs:
+  # Pinned refs keep codegen reproducible; bump deliberately.
+  - module: buf.build/altessa-s/proto:v0.3.0
+    paths:
+      - io/altessa/badrequest/v1
+  - module: buf.build/googleapis/googleapis:c17df5b2beca46928cc87d5656bd5343
+    paths:
+      - google/rpc/error_details.proto
+plugins:
+  - local: ../node_modules/.bin/protoc-gen-es
+    out: ../web/src/gen
+    opt: target=ts

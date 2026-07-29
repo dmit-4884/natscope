@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+package natscope.types.settings;
+
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/settings;settingspb";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// UserSettings represents user-level configuration preferences.
+message UserSettings {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Message fetching settings.
+  optional MessageSettings messages = 2;
+
+  // Live subscription settings.
+  optional LiveSettings live = 3;
+
+  // Display and UI settings.
+  optional DisplaySettings display = 4;
+
+  // Publish settings.
+  optional PublishSettings publish = 5;
+
+  // Behavioral settings: confirm-toggles and defaults for destructive ops.
+  // (Field number 8 — appended after the timestamps were already assigned 6/7.)
+  optional BehaviorSettings behavior = 8;
+
+  google.protobuf.Timestamp created_at = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp updated_at = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// MessageSettings configures how messages are fetched from streams.
+message MessageSettings {
+  // Fetch method: "direct" (GetMsg API) or "consumer" (ordered consumer).
+  // Stays user-tunable: in installations where the user lacks
+  // create_consumer permission, "direct" is the only viable mode.
+  optional string fetch_method = 1;
+
+  // Default number of messages per page.
+  optional int32 default_page_size = 2 [(buf.validate.field).int32 = {gte: 1, lte: 10000}];
+
+  // Default fetch direction: "backward" or "forward".
+  optional string default_direction = 3;
+
+  // Maximum payload size (bytes) per message returned in list & live views.
+  // 0 = unlimited (full payload). When the cap is hit, NatsMessage.truncated
+  // is set and the UI offers a "load full payload" action via Get(sequence).
+  // nil = server default (4 KB) — small enough to keep list-view responses tiny
+  // on streams full of multi-MB messages, since anyone inspecting >4 KB reaches
+  // for "load full payload" anyway.
+  optional int32 max_payload_bytes_in_list = 4 [(buf.validate.field).int32 = {gte: 0}];
+
+  // Default format pre-selected in the message export dialog: "json",
+  // "ndjson", or "csv". nil = "json". The constraint applies only when the
+  // field is present (proto3 optional), so an unset value still defaults.
+  optional string default_export_format = 5 [
+    (buf.validate.field).string = {in: ["json", "ndjson", "csv"]}
+  ];
+
+  // Hard cap on the number of messages a full-range export will fetch from
+  // the server. nil = 50000. 0 is treated as the default (not "unlimited") —
+  // range export always needs a ceiling to bound the cursor loop.
+  optional int32 export_range_limit = 6 [(buf.validate.field).int32 = {gte: 0}];
+}
+
+// LiveSettings configures live message subscription behavior.
+message LiveSettings {
+  // Subscription mode: "core_nats" or "jetstream_ordered".
+  // Stays user-tunable: same auth-perm reason as fetch_method —
+  // in installations where the user lacks create_consumer permission,
+  // "core_nats" is the only viable mode.
+  optional string subscription_mode = 1;
+
+  // Max messages per second sent to browser. 0 = unlimited. Range: 0–10000.
+  optional int32 max_display_rate = 2 [(buf.validate.field).int32 = {gte: 0, lte: 10000}];
+}
+
+// DisplaySettings configures UI display preferences.
+message DisplaySettings {
+  // UI density: "comfortable" or "compact".
+  optional string density = 1;
+
+  // Default view mode: "history" or "realtime".
+  optional string default_view_mode = 2;
+
+  // Payload preview truncation length in characters.
+  optional int32 payload_preview_len = 3 [(buf.validate.field).int32 = {gte: 0}];
+
+  // Timestamp format: "relative", "absolute", or "iso".
+  optional string timestamp_format = 4;
+
+  // JSON indent size: 2 or 4.
+  optional int32 json_indent_size = 5 [(buf.validate.field).int32 = {gte: 0, lte: 8}];
+
+  // Auto-scroll in live mode.
+  optional bool auto_scroll_live = 6;
+}
+
+// PublishSettings configures message publishing behavior.
+message PublishSettings {
+  // JetStream publish acknowledgment timeout in seconds.
+  optional int32 publish_timeout_sec = 1 [(buf.validate.field).int32 = {gte: 0, lte: 3600}];
+}
+
+// BehaviorSettings configures confirm-toggles and defaults for destructive
+// operations. Every confirm_* field is optional and nil means "ask for
+// confirmation" — confirmations are ON by default, disabling one is a
+// deliberate per-operation opt-out.
+//
+// Only operations of recoverable scope get a toggle. Operations of
+// irreversible scale (delete stream, purge stream, delete KV/Object bucket)
+// deliberately have NO toggle here — they always keep type-to-confirm in the
+// UI. The whitelist of toggle-able operations is fixed in the frontend
+// useConfirmation hook.
+message BehaviorSettings {
+  // Whether to confirm before deleting a consumer. nil = confirm.
+  optional bool confirm_delete_consumer = 1;
+
+  // Whether to confirm before deleting a single stream message. nil = confirm.
+  optional bool confirm_delete_message = 2;
+
+  // Whether to confirm before deleting a KV key. nil = confirm.
+  optional bool confirm_delete_kv_key = 3;
+
+  // Whether to confirm before deleting an object-store object. nil = confirm.
+  optional bool confirm_delete_object = 4;
+
+  // Whether to confirm before purging the revision history of a KV key.
+  // nil = confirm.
+  optional bool confirm_purge_kv_history = 5;
+
+  // Default mode offered for message deletion: when true, the delete dialog
+  // pre-selects "secure erase" (overwrite). nil/false = normal delete.
+  optional bool secure_delete_default = 6;
+}

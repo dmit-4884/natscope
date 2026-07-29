@@ -1,0 +1,114 @@
+syntax = "proto3";
+package natscope.types.nats;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "types/nats/nats_stream.proto";
+
+// Defines the information about a NATS JetStream Key-Value bucket.
+message KVBucketInfo {
+  // Required. Name of the Key-Value bucket.
+  string bucket = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Optional. Human-readable description of the bucket.
+  string description = 2;
+
+  // Required. Total number of key-value entries in the bucket.
+  uint64 values = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total size of all entries in bytes.
+  uint64 bytes = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Maximum number of history entries kept per key.
+  uint32 history = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Time-to-live for entries (unset for no expiry).
+  google.protobuf.Duration ttl = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Storage backend type (0 = FileStorage, 1 = MemoryStorage).
+  int32 storage = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of replicas in the cluster.
+  int32 num_replicas = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether S2 compression is enabled for this bucket.
+  bool is_compressed = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. User-defined metadata as key-value pairs.
+  map<string, string> metadata = 10;
+}
+
+// Defines the configuration for creating or updating a NATS JetStream Key-Value bucket.
+message KVBucketConfig {
+  // Required. Name of the Key-Value bucket.
+  string bucket = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true];
+
+  // Optional. Human-readable description of the bucket.
+  string description = 2;
+
+  // Optional. Maximum size of a single value in bytes (-1 for unlimited).
+  int32 max_value_size = 3;
+
+  // Optional. Maximum total size of the bucket in bytes (-1 for unlimited).
+  int64 max_bytes = 4;
+
+  // Optional. Maximum number of history entries kept per key.
+  uint32 history = 5;
+
+  // Optional. Time-to-live for entries (unset for no expiry).
+  google.protobuf.Duration ttl = 6;
+
+  // Optional. Storage backend type (0 = FileStorage, 1 = MemoryStorage).
+  int32 storage = 7;
+
+  // Optional. Number of replicas in the cluster.
+  int32 num_replicas = 8;
+
+  // Optional. Placement preferences for the bucket.
+  optional Placement placement = 9;
+
+  // Optional. User-defined metadata as key-value pairs.
+  map<string, string> metadata = 10;
+
+  // Optional. Mirror configuration — bucket mirrors exactly one other bucket.
+  optional .natscope.types.nats.StreamSourceRef mirror = 11;
+
+  // Optional. Sources — bucket aggregates from one or more upstream buckets.
+  repeated .natscope.types.nats.StreamSourceRef sources = 12;
+
+  // Optional. Republish — re-publish bucket operations to a different subject.
+  optional .natscope.types.nats.RePublish republish = 13;
+}
+
+// Defines a single entry in a NATS JetStream Key-Value bucket.
+message KVEntry {
+  // Required. Name of the Key-Value bucket this entry belongs to.
+  string bucket = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. Key of the entry.
+  string key = 2 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. Value of the entry as a string.
+  string value = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Revision number of the entry (monotonically increasing).
+  uint64 revision = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Creation timestamp of this revision.
+  google.protobuf.Timestamp created = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Operation type (e.g., "PUT", "DEL", "PURGE").
+  string operation = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the placement preferences for a NATS JetStream resource.
+message Placement {
+  // Optional. Name of the target cluster.
+  string cluster = 1;
+
+  // Optional. List of server tags for placement selection.
+  repeated string tags = 2;
+}

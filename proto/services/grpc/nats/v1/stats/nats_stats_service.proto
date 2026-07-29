@@ -1,0 +1,88 @@
+syntax = "proto3";
+package natscope.nats.stats.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/stats;grpc_nats_stats";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/nats/nats_stats.proto";
+
+// Provides stream and consumer statistics and connection health checks for NATS JetStream.
+service StatsService {
+  // Returns aggregated statistics for all JetStream streams on the specified connection.
+  rpc GetAllStreamsStats(GetAllStreamsStatsRequest) returns (GetAllStreamsStatsResponse) {}
+
+  // Returns statistics for a single JetStream stream.
+  rpc GetStreamStats(GetStreamStatsRequest) returns (GetStreamStatsResponse) {}
+
+  // Returns all consumers and their statistics across all streams on the specified connection.
+  rpc GetAllConsumers(GetAllConsumersRequest) returns (GetAllConsumersResponse) {}
+
+  // Returns the health status of the specified NATS connection.
+  rpc GetHealth(GetHealthRequest) returns (GetHealthResponse) {}
+
+  // Returns detailed NATS server information including cluster topology and JetStream account stats.
+  rpc GetServerInfo(GetServerInfoRequest) returns (GetServerInfoResponse) {}
+}
+
+// Defines the request message for retrieving statistics for all streams.
+message GetAllStreamsStatsRequest {
+  // Required. Identifier of the NATS connection to query statistics from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving statistics for all streams.
+message GetAllStreamsStatsResponse {
+  // Required. List of per-stream statistics.
+  repeated .natscope.types.nats.StreamStats streams = 1;
+}
+
+// Defines the request message for retrieving statistics for a single stream.
+message GetStreamStatsRequest {
+  // Required. Identifier of the NATS connection to query.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the JetStream stream to retrieve statistics for.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving statistics for a single stream.
+message GetStreamStatsResponse {
+  // Required. Statistics for the requested stream.
+  .natscope.types.nats.StreamStats stream = 1;
+}
+
+// Defines the request message for retrieving all consumer statistics.
+message GetAllConsumersRequest {
+  // Required. Identifier of the NATS connection to query consumers from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving all consumer statistics.
+message GetAllConsumersResponse {
+  // Required. List of consumer statistics across all streams.
+  repeated .natscope.types.nats.ConsumerStats consumers = 1;
+}
+
+// Defines the request message for checking NATS connection health.
+message GetHealthRequest {
+  // Required. Identifier of the NATS connection to check health for.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for checking NATS connection health.
+message GetHealthResponse {
+  // Required. Health status of the NATS connection including RTT and server info.
+  .natscope.types.nats.ConnectionHealth health = 1;
+}
+
+// Defines the request message for retrieving NATS server information.
+message GetServerInfoRequest {
+  // Required. Identifier of the NATS connection to query server info from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for retrieving NATS server information.
+message GetServerInfoResponse {
+  // Required. Detailed server information including cluster and JetStream account data.
+  .natscope.types.nats.ServerInfo server_info = 1;
+}
