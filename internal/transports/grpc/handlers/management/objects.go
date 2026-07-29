@@ -43,7 +43,7 @@ func (h *Handler) CreateObjectBucket(
 
 	cr := converter.Convert(cfg, &entities.ObjectBucketConfig{},
 		protoCodecs,
-		converter.WithFieldMappings(map[string]string{"NumReplicas": "Replicas"}),
+		replicasMappingToEntity,
 		converter.WithIgnoreFields("Placement"),
 	)
 

@@ -23,6 +23,10 @@ var protoCodecs = grpchelpers.ProtoCodecs
 // BucketInfo).
 var replicasMapping = converter.WithFieldMappings(map[string]string{"Replicas": "NumReplicas"})
 
+// replicasMappingToEntity maps proto NumReplicas onto entity Replicas (KV/Object
+// BucketConfig).
+var replicasMappingToEntity = converter.WithFieldMappings(map[string]string{"NumReplicas": "Replicas"})
+
 // protoStreamSourceToEntity converts proto StreamSourceConfig;
 // OptStartTime/SubjectTransforms/External handled manually (converter gaps).
 func protoStreamSourceToEntity(src *grpc_nats_management.StreamSourceConfig) *entities.StreamSource {

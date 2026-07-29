@@ -55,9 +55,7 @@ func (c *Client) CreateKVBucket(ctx context.Context, config entities.KVBucketCon
 		kvConfig.Sources = append(kvConfig.Sources, converter.Convert(src, &jetstream.StreamSource{}))
 	}
 	if config.Republish != nil {
-		kvConfig.RePublish = converter.Convert(config.Republish, &jetstream.RePublish{},
-			converter.WithFieldMappings(map[string]string{"Src": "Source", "Dest": "Destination"}),
-		)
+		kvConfig.RePublish = converter.Convert(config.Republish, &jetstream.RePublish{}, srcDestToJetStream)
 	}
 	kv, err := c.jetStream.CreateKeyValue(ctx, *kvConfig)
 	if err != nil {
