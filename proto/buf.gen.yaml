@@ -1,0 +1,29 @@
+version: v2
+inputs:
+  - directory: .
+    paths:
+      - services
+      - types
+  # protoc-gen-es embeds file descriptors, so every imported file needs a generated
+  # counterpart — including the option schemas (buf.validate, google.api). Separate
+  # input because third_party is its own module in the workspace.
+  - directory: third_party
+plugins:
+  # Go message structs (no protoc-gen-go-grpc — transport is Connect-RPC)
+  - local: protoc-gen-go
+    out: gen
+    opt: paths=source_relative
+  # Go Connect handlers/clients
+  - local: protoc-gen-connect-go
+    out: gen
+    opt: paths=source_relative
+  # Go vtprotobuf fast marshalers (picked up via VTCodec)
+  - local: protoc-gen-go-vtproto
+    out: gen
+    opt:
+      - paths=source_relative
+      - features=marshal+unmarshal+size+pool
+  # TypeScript types + Connect service descriptors
+  - local: ../node_modules/.bin/protoc-gen-es
+    out: ../web/src/gen
+    opt: target=ts

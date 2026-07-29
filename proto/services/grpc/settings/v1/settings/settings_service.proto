@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package natscope.settings.settings.v1;
+
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/settings/v1/settings;grpc_settings";
+
+import "types/settings/user_settings.proto";
+
+// SettingsService provides user settings management.
+service SettingsService {
+  // GetSettings returns the current user's settings.
+  // Returns default settings if no custom settings exist.
+  rpc GetSettings(GetSettingsRequest) returns (GetSettingsResponse);
+
+  // UpdateSettings updates the current user's settings (partial update, nil fields are ignored).
+  rpc UpdateSettings(UpdateSettingsRequest) returns (UpdateSettingsResponse);
+
+  // ResetSettings resets the current user's settings to defaults.
+  rpc ResetSettings(ResetSettingsRequest) returns (ResetSettingsResponse);
+}
+
+message GetSettingsRequest {}
+
+message GetSettingsResponse {
+  .natscope.types.settings.UserSettings settings = 1;
+}
+
+message UpdateSettingsRequest {
+  // Message fetching settings.
+  optional .natscope.types.settings.MessageSettings messages = 1;
+
+  // Live subscription settings.
+  optional .natscope.types.settings.LiveSettings live = 2;
+
+  // Display and UI settings.
+  optional .natscope.types.settings.DisplaySettings display = 3;
+
+  // Publish settings.
+  optional .natscope.types.settings.PublishSettings publish = 4;
+
+  // Behavioral settings: confirm-toggles and destructive-op defaults.
+  optional .natscope.types.settings.BehaviorSettings behavior = 5;
+
+  message Options {
+    reserved 1;
+  }
+
+  optional Options options = 99;
+}
+
+message UpdateSettingsResponse {
+  .natscope.types.settings.UserSettings settings = 1;
+}
+
+message ResetSettingsRequest {}
+
+message ResetSettingsResponse {
+  .natscope.types.settings.UserSettings settings = 1;
+}

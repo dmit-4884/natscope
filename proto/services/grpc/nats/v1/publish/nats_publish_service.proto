@@ -1,0 +1,112 @@
+syntax = "proto3";
+package natscope.nats.publish.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/publish;grpc_nats_publish";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/proto/proto_codec.proto";
+
+// Provides operations for publishing messages to NATS, encoding payloads to protobuf, and validating JSON against protobuf schemas.
+service PublishService {
+  // Publishes a JSON-encoded message to a NATS subject. The server encodes the payload to protobuf before publishing.
+  rpc PublishMessage(PublishMessageRequest) returns (PublishMessageResponse) {}
+
+  // Encodes a JSON payload into protobuf binary format using the specified message type.
+  rpc EncodeMessage(EncodeMessageRequest) returns (EncodeMessageResponse) {}
+
+  // Validates a JSON payload against a protobuf message type schema without encoding or publishing.
+  rpc ValidateJson(ValidateJsonRequest) returns (ValidateJsonResponse) {}
+
+}
+
+// Defines the request message for publishing a message to NATS.
+message PublishMessageRequest {
+  // Required. Identifier of the NATS connection to publish through.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. NATS subject to publish the message to.
+  string subject = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Fully qualified protobuf message type name for encoding. If empty, data is published as raw JSON bytes.
+  optional string message_type = 3;
+
+  // Required. JSON-encoded message payload to encode and publish.
+  string data = 4 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Custom NATS headers to include with the published message. Key-value pairs.
+  map<string, string> headers = 5;
+
+  // Optional. Subject pattern used for publishing (e.g., "ORDERS.*.UPDATES").
+  optional string subject_pattern = 6;
+
+  // Optional. Identifier of the proto source whose snapshot is used for protobuf encoding.
+  // Required if messageType is set.
+  optional string source_id = 7;
+
+  // Optional. Specific tag of the source snapshot. Empty means active selection.
+  optional string source_tag = 8;
+}
+
+// Defines the response message for publishing a message to NATS.
+message PublishMessageResponse {
+  // Required. Name of the JetStream stream that acknowledged the message.
+  string stream = 1;
+
+  // Required. Sequence number assigned to the published message by JetStream.
+  uint64 sequence = 2;
+
+  // Optional. Error message if the publish operation partially failed.
+  optional string error = 3;
+
+  // Indicates if this message was a duplicate (matched Nats-Msg-Id within the dedup window).
+  bool duplicate = 4;
+}
+
+// Defines the request message for encoding a JSON payload to protobuf binary format.
+message EncodeMessageRequest {
+  // Required. Fully qualified protobuf message type name. Format: "package.MessageName".
+  string message_type = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. JSON-encoded payload to encode into protobuf binary format.
+  string data = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Identifier of the proto source whose snapshot is used for encoding.
+  string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Specific tag of the source snapshot. Empty means active selection.
+  optional string source_tag = 4;
+}
+
+// Defines the response message for encoding a JSON payload to protobuf binary format.
+message EncodeMessageResponse {
+  // Required. Protobuf-encoded binary payload.
+  bytes data = 1;
+
+  // Required. Size of the encoded binary payload in bytes.
+  int64 data_size = 2;
+
+  // Optional. Error message if the encoding operation failed.
+  optional string error = 3;
+}
+
+// Defines the request message for validating a JSON payload against a protobuf schema.
+message ValidateJsonRequest {
+  // Required. Fully qualified protobuf message type name to validate against. Format: "package.MessageName".
+  string message_type = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. JSON-encoded payload to validate.
+  string data = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Identifier of the proto source whose snapshot is used for validation.
+  string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Specific tag of the source snapshot. Empty means active selection.
+  optional string source_tag = 4;
+}
+
+// Defines the response message for validating a JSON payload against a protobuf schema.
+message ValidateJsonResponse {
+  // Required. Validation result containing validity status and any errors found.
+  .natscope.types.proto.ValidationResult result = 1;
+}
+

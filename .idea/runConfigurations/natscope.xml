@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="natscope" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="natscope" />
+    <working_directory value="$PROJECT_DIR$" />
+    <go_parameters value="-race -tags=cse -ldflags &quot;-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Name=natscope -X github.com/altessa-s/go-atlas/core/runtime/appinfo.Project=natscope -X github.com/altessa-s/go-atlas/core/runtime/appinfo.Build=development&quot;" />
+    <parameters value="server run" />
+    <envs>
+      <env name="VAR_DIR" value="./var" />
+    </envs>
+    <kind value="PACKAGE" />
+    <package value="github.com/dmit-4884/Natscope/cmd/natscope" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/cmd/natscope/main.go" />
+    <pty_enabled value="true" />
+    <method v="2" />
+  </configuration>
+</component>

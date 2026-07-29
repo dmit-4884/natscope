@@ -1,0 +1,39 @@
+syntax = "proto3";
+package natscope.history.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/history/v1/history;grpc_history";
+
+import "buf/validate/validate.proto";
+import "types/history/history_entry.proto";
+
+// Provides access to publish history records for auditing and replaying previously sent messages.
+service HistoryService {
+  // Returns a paginated list of publish history entries with optional filtering by connection URL and stream.
+  // Pagination: Cursor-based.
+  rpc ListPublishHistory(ListPublishHistoryRequest) returns (ListPublishHistoryResponse) {}
+}
+
+// Defines the request message for listing publish history entries.
+message ListPublishHistoryRequest {
+  // Optional. Maximum number of entries to return in a single page.
+  // Zero requests the server default; negative is rejected.
+  int32 page_size = 1 [(buf.validate.field).int32.gte = 0];
+
+  // Optional. A pagination token returned from a previous call.
+  // Empty string requests the first page.
+  string page_token = 2;
+
+  // Optional. Filter results by NATS connection URL.
+  optional string connection_url = 3;
+
+  // Optional. Filter results by JetStream stream name.
+  optional string stream = 4;
+}
+
+// Defines the response message for listing publish history entries.
+message ListPublishHistoryResponse {
+  // Required. List of publish history entries matching the filter criteria.
+  repeated .natscope.types.history.PublishHistory entries = 1;
+
+  // Optional. Cursor for fetching the next page of results. Absent when no more pages remain.
+  optional string next_page_token = 2;
+}

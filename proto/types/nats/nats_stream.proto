@@ -1,0 +1,385 @@
+syntax = "proto3";
+package natscope.types.nats;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines the full information about a NATS JetStream stream.
+message StreamInfo {
+  // Required. Stream configuration settings.
+  StreamConfig config = 1;
+
+  // Required. Stream creation timestamp.
+  google.protobuf.Timestamp created = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Current state of the stream (message counts, sequence numbers, etc.).
+  optional StreamState state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Cluster information if the stream is replicated.
+  optional ClusterInfo cluster = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Timestamp when this info was retrieved.
+  google.protobuf.Timestamp time_stamp = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Raw JSON representation of the stream info from the NATS server.
+  string raw = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the configuration parameters for a NATS JetStream stream.
+message StreamConfig {
+  // Required. Name of the stream.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. Human-readable description of the stream.
+  string description = 2;
+
+  // Required. List of NATS subjects bound to this stream (supports wildcards).
+  repeated string subjects = 3 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. Retention policy (0 = LimitsPolicy, 1 = InterestPolicy, 2 = WorkQueuePolicy).
+  int32 retention = 4;
+
+  // Required. Maximum number of messages allowed in the stream (-1 for unlimited).
+  int64 max_msgs = 5;
+
+  // Required. Maximum total size of messages in bytes (-1 for unlimited).
+  int64 max_bytes = 6;
+
+  // Required. Maximum age of messages (unset for unlimited).
+  google.protobuf.Duration max_age = 7;
+
+  // Required. Maximum number of consumers allowed (-1 for unlimited).
+  int32 max_consumers = 8;
+
+  // Required. Maximum number of messages per subject (-1 for unlimited).
+  int64 max_msgs_per_subject = 9;
+
+  // Required. Maximum size of a single message in bytes (-1 for unlimited).
+  int32 max_msg_size = 10;
+
+  // Required. Storage backend type (0 = FileStorage, 1 = MemoryStorage).
+  int32 storage = 11;
+
+  // Required. Discard policy when limits are reached (0 = DiscardOld, 1 = DiscardNew).
+  int32 discard = 12;
+
+  // Required. Number of stream replicas in the cluster.
+  int32 replicas = 13;
+
+  // Required. Duplicate message detection window.
+  google.protobuf.Duration duplicates = 14;
+
+  // Required. Compression algorithm (0 = None, 1 = S2).
+  int32 compression = 15;
+
+  // Required. Whether the stream is sealed and no longer accepts messages.
+  bool sealed = 16;
+
+  // Required. Whether message deletion is denied.
+  bool deny_delete = 17;
+
+  // Required. Whether stream purge is denied.
+  bool deny_purge = 18;
+
+  // Required. Whether rollup headers are allowed for subject-based compaction.
+  bool allow_rollup = 19;
+
+  // Required. Whether direct-get API is allowed for this stream.
+  bool allow_direct = 20;
+
+  // Required. Whether mirror direct-get API is allowed.
+  bool mirror_direct = 21;
+
+  // Optional. User-defined metadata as key-value pairs.
+  map<string, string> metadata = 22;
+
+  // Required. Whether per-message TTL is allowed.
+  bool allow_msg_ttl = 23;
+
+  // Required. Whether discard-new policy applies per subject.
+  bool discard_new_per_subject = 24;
+
+  // Required. Whether acknowledgements are disabled for this stream.
+  bool no_ack = 25;
+
+  // Optional. Initial sequence number for the stream.
+  uint64 first_seq = 26;
+
+  // Required. Whether atomic batch publish is allowed.
+  bool allow_atomic_publish = 27;
+
+  // Optional. Mirror configuration — this stream mirrors exactly one other stream.
+  optional StreamSourceRef mirror = 28;
+
+  // Optional. Source configurations — this stream aggregates messages from one or more streams.
+  repeated StreamSourceRef sources = 29;
+
+  // Optional. Republish configuration — messages are republished to another subject.
+  optional RePublish republish = 30;
+
+  // Optional. Subject transform applied to messages stored in the stream.
+  optional SubjectTransformConfig subject_transform = 31;
+
+  // Optional. Default consumer limits inherited by all consumers on this stream.
+  optional ConsumerLimits consumer_limits = 32;
+}
+
+// Default consumer limits applied to all consumers created on a stream.
+message ConsumerLimits {
+  // Optional. Default inactive threshold. Unset = no default.
+  google.protobuf.Duration inactive_threshold = 1;
+
+  // Optional. Default max ack pending. 0 = no default.
+  int32 max_ack_pending = 2;
+}
+
+// Subject transform applied to messages on storage or replication.
+message SubjectTransformConfig {
+  // Required. Source subject pattern (supports wildcards).
+  string source = 1;
+
+  // Required. Destination subject pattern (may reference $1, $2 captures).
+  string destination = 2;
+}
+
+// Reference to a source or mirror stream.
+message StreamSourceRef {
+  // Required. Name of the source stream.
+  string name = 1;
+
+  // Optional. Starting sequence number.
+  uint64 opt_start_seq = 2;
+
+  // Optional. Filter subject pattern.
+  string filter_subject = 3;
+
+  // Optional. External stream access configuration (cross-account/domain).
+  optional ExternalStream external = 4;
+}
+
+// External stream reference for cross-account or cross-domain access.
+message ExternalStream {
+  // Required. API prefix for external access.
+  string api_prefix = 1;
+
+  // Optional. Deliver prefix for external access.
+  string deliver_prefix = 2;
+}
+
+// Republish configuration for re-publishing messages to different subjects.
+message RePublish {
+  // Required. Source subject pattern to match.
+  string src = 1;
+
+  // Required. Destination subject to republish to.
+  string dest = 2;
+
+  // Optional. Whether to republish headers only (no payload).
+  bool headers_only = 3;
+}
+
+// Defines the current state of a NATS JetStream stream.
+message StreamState {
+  // Required. Total number of messages in the stream.
+  uint64 msgs = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total size of all messages in bytes.
+  uint64 bytes = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Sequence number of the first message in the stream.
+  uint64 first_seq = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Timestamp of the first message.
+  google.protobuf.Timestamp first_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Sequence number of the last message in the stream.
+  uint64 last_seq = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Timestamp of the last message.
+  google.protobuf.Timestamp last_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of active consumers on the stream.
+  int32 consumers = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of deleted messages in the stream.
+  int64 num_deleted = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of unique subjects with messages in the stream.
+  uint64 num_subjects = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the cluster information for a replicated stream or consumer.
+message ClusterInfo {
+  // Required. Name of the NATS cluster.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Name of the current cluster leader node.
+  string leader = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. List of peer replicas in the cluster.
+  repeated PeerInfo replicas = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the information about a single peer in a NATS cluster.
+message PeerInfo {
+  // Required. Name of the peer node.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether the peer is up to date with the leader.
+  bool current = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether the peer is currently offline.
+  bool offline = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Duration since the peer was last active.
+  google.protobuf.Duration active = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of operations the peer is behind the leader.
+  uint64 lag = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the full information about a NATS JetStream consumer.
+message ConsumerInfo {
+  // Required. Name of the consumer.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. Name of the stream this consumer is bound to.
+  string stream = 2 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Optional. Consumer configuration settings.
+  optional ConsumerConfig config = 3;
+
+  // Optional. Consumer creation timestamp.
+  google.protobuf.Timestamp created = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Sequence information for delivered messages.
+  SequenceInfo delivered = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Sequence information for acknowledged messages.
+  SequenceInfo ack_floor = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of messages pending delivery.
+  uint64 num_pending = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of messages delivered but not yet acknowledged.
+  int32 num_ack_pending = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of messages that have been redelivered.
+  int32 num_redelivered = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of pull requests waiting (pull consumers only).
+  int32 num_waiting = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether a push consumer is currently bound to a client.
+  bool push_bound = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Cluster information if the consumer is replicated.
+  optional ClusterInfo cluster = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Timestamp when this info was retrieved.
+  google.protobuf.Timestamp time_stamp = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Raw JSON representation of the consumer info from the NATS server.
+  string raw = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the sequence tracking information for a consumer.
+message SequenceInfo {
+  // Required. Consumer-specific sequence number.
+  uint64 consumer = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Corresponding stream sequence number.
+  uint64 stream = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the configuration parameters for a NATS JetStream consumer.
+message ConsumerConfig {
+  // Optional. Name of the consumer (server-assigned if not provided).
+  string name = 1;
+
+  // Optional. Durable consumer name for persistent subscriptions.
+  string durable = 2;
+
+  // Optional. Human-readable description of the consumer.
+  string description = 3;
+
+  // Required. Delivery policy (0 = DeliverAll, 1 = DeliverLast, 2 = DeliverNew, 3 = DeliverByStartSequence, 4 = DeliverByStartTime, 5 = DeliverLastPerSubject).
+  int32 deliver_policy = 4;
+
+  // Optional. Starting sequence number when deliver_policy is DeliverByStartSequence.
+  uint64 opt_start_seq = 5;
+
+  // Optional. Starting time (RFC 3339 format) when deliver_policy is DeliverByStartTime.
+  string opt_start_time = 6;
+
+  // Required. Acknowledgement policy (0 = AckExplicit, 1 = AckNone, 2 = AckAll).
+  int32 ack_policy = 7;
+
+  // Required. Duration to wait for acknowledgement before redelivery.
+  google.protobuf.Duration ack_wait = 8;
+
+  // Required. Maximum number of delivery attempts (-1 for unlimited).
+  int32 max_deliver = 9;
+
+  // Optional. Backoff durations between redelivery attempts.
+  repeated google.protobuf.Duration back_off = 10;
+
+  // Optional. Subject filter for the consumer (single subject pattern).
+  string filter_subject = 11;
+
+  // Optional. Multiple subject filters for the consumer.
+  repeated string filter_subjects = 12;
+
+  // Required. Replay policy (0 = ReplayInstant, 1 = ReplayOriginal).
+  int32 replay_policy = 13;
+
+  // Optional. Rate limit in bits per second for message delivery.
+  uint64 rate_limit = 14;
+
+  // Optional. Sampling frequency for observability (e.g., "100" for 100%).
+  string sample_frequency = 15;
+
+  // Required. Maximum number of pull requests that can be waiting (pull consumers only).
+  int32 max_waiting = 16;
+
+  // Required. Maximum number of outstanding unacknowledged messages.
+  int32 max_ack_pending = 17;
+
+  // Required. Whether flow control is enabled (push consumers only).
+  bool flow_control = 18;
+
+  // Required. Idle heartbeat interval (push consumers only).
+  google.protobuf.Duration idle_heartbeat = 19;
+
+  // Required. Whether only message headers are delivered (no body).
+  bool headers_only = 20;
+
+  // Required. Maximum batch size for pull requests.
+  int32 max_request_batch = 21;
+
+  // Required. Maximum duration for pull requests.
+  google.protobuf.Duration max_request_expires = 22;
+
+  // Required. Duration of inactivity before the consumer is removed.
+  google.protobuf.Duration inactive_threshold = 23;
+
+  // Required. Number of consumer replicas in the cluster.
+  int32 replicas = 24;
+
+  // Required. Whether the consumer uses memory storage instead of file.
+  bool memory_storage = 25;
+
+  // Required. Maximum total bytes for a single pull request.
+  int32 max_request_max_bytes = 26;
+
+  // Optional. User-defined metadata as key-value pairs.
+  map<string, string> metadata = 27;
+
+  // Optional. Subject to deliver messages to (push consumers only).
+  string deliver_subject = 28;
+
+  // Optional. Queue group for load-balanced delivery (push consumers only).
+  string deliver_group = 29;
+}

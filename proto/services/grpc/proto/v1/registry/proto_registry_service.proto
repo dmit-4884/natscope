@@ -1,0 +1,79 @@
+syntax = "proto3";
+package natscope.proto.registry.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/registry;grpc_proto_registry";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/proto/proto_message_info.proto";
+
+// Provides access to the loaded protobuf message type registry.
+service RegistryService {
+  // Retrieves all registered protobuf message types currently loaded in the registry.
+  rpc ListProtoMessages(ListProtoMessagesRequest) returns (ListProtoMessagesResponse) {}
+
+  // Retrieves detailed information about a single protobuf message type by its fully qualified name.
+  rpc GetProtoMessage(GetProtoMessageRequest) returns (GetProtoMessageResponse) {}
+
+  // Generates an example JSON representation for the specified protobuf message type with default values.
+  rpc GenerateExample(GenerateExampleRequest) returns (GenerateExampleResponse) {}
+
+  // Returns the current status of the protobuf registry, including load state and statistics.
+  rpc GetProtoStatus(GetProtoStatusRequest) returns (GetProtoStatusResponse) {}
+}
+
+// Defines the request message for listing all registered protobuf message types.
+message ListProtoMessagesRequest {}
+
+// Defines the response message for listing all registered protobuf message types.
+message ListProtoMessagesResponse {
+  // Required. List of all protobuf message types currently loaded in the registry.
+  repeated .natscope.types.proto.ProtoMessageInfo messages = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request message for retrieving a single protobuf message type.
+message GetProtoMessageRequest {
+  // Required. Fully qualified protobuf message type name.
+  // Format: "package.MessageName" (e.g., "google.protobuf.Timestamp").
+  string full_name = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Identifier of the proto source whose snapshot is queried.
+  // The same FullName can exist in multiple sources with different schemas.
+  string source_id = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+}
+
+// Defines the response message for retrieving a single protobuf message type.
+message GetProtoMessageResponse {
+  // Required. Detailed information about the requested protobuf message type.
+  .natscope.types.proto.ProtoMessageInfo message = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request message for generating an example JSON for a protobuf message type.
+message GenerateExampleRequest {
+  // Required. Fully qualified protobuf message type name to generate an example for.
+  // Format: "package.MessageName" (e.g., "google.protobuf.Timestamp").
+  string full_name = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Identifier of the proto source whose snapshot is queried.
+  string source_id = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+}
+
+// Defines the response message for generating an example JSON representation.
+message GenerateExampleResponse {
+  // Required. JSON string containing the example message with default/sample values.
+  string json = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request message for retrieving the protobuf registry status.
+message GetProtoStatusRequest {}
+
+// Defines the response message for retrieving the protobuf registry status.
+message GetProtoStatusResponse {
+  // Required. Indicates whether protobuf descriptors have been successfully loaded into the registry.
+  bool loaded = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total number of protobuf message types available in the registry.
+  int32 message_count = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total number of protobuf files loaded into the registry.
+  int32 file_count = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

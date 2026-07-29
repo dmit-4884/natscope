@@ -1,0 +1,15 @@
+# Optional go-atlas HTTP server for internal/observability endpoints.
+# Disabled by default: with no `http` section the server never starts.
+# Uncomment to enable ping/healthz/readyz/metrics and (opt-in) pprof.
+# Built-in endpoints are served under the internal prefix (default /internal).
+# All parameters are commented out by default (template mode).
+
+# http:
+#   # Bind to loopback: the endpoints expose runtime internals and are
+#   # unauthenticated. go-atlas defaults this to 0.0.0.0:9080 — override it.
+#   listenAddress: "127.0.0.1:9080"   # (go-atlas default: 0.0.0.0:9080)
+#
+#   pprof:
+#     # Exposes net/http/pprof under /internal/pprof/* (heap, goroutine, CPU,
+#     # trace, ...). Privileged: keep the listener on loopback only.
+#     enabled: true                   # (default: false)

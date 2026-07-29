@@ -1,0 +1,203 @@
+syntax = "proto3";
+package natscope.types.nats;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines the authentication method for a NATS connection.
+enum AuthMethod {
+  // No authentication.
+  AUTH_METHOD_UNSPECIFIED = 0;
+
+  // Username and password authentication.
+  AUTH_METHOD_USER_PASSWORD = 1;
+
+  // Token-based authentication.
+  AUTH_METHOD_TOKEN = 2;
+
+  // NKey seed authentication (Ed25519 challenge-response).
+  AUTH_METHOD_NKEY = 3;
+
+  // Credentials file authentication (JWT + NKey seed).
+  AUTH_METHOD_CREDENTIALS = 4;
+}
+
+// Authentication configuration for a NATS connection.
+message AuthConfig {
+  // Required. Authentication method.
+  AuthMethod method = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. Username for USER_PASSWORD auth.
+  optional string username = 2;
+
+  // Optional. Password for USER_PASSWORD auth.
+  optional string password = 3;
+
+  // Optional. Token for TOKEN auth.
+  optional string token = 4;
+
+  // Optional. NKey seed content for NKEY auth (e.g., "SUAM...").
+  optional string nkey_seed = 5;
+
+  // Optional. Full credentials file content for CREDENTIALS auth (.creds file).
+  optional string credentials = 6;
+
+  // Optional. JWT content for CREDENTIALS auth. Used as alternative to full credentials file.
+  optional string jwt = 7;
+
+  // Secret-presence flags. The secret *values* above are input-only: the server
+  // never echoes them back. These read-only booleans tell the UI whether a
+  // secret is stored, so an edit form can show "set — leave blank to keep".
+  bool has_password = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool has_token = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool has_nkey_seed = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool has_credentials = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool has_jwt = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// TLS configuration for a NATS connection.
+message TlsConfig {
+  // Optional. CA certificate in PEM format. Required for self-signed server certificates.
+  optional string ca_cert = 1;
+
+  // Optional. Client certificate in PEM format. Required for mutual TLS authentication.
+  optional string client_cert = 2;
+
+  // Optional. Client private key in PEM format. Required for mutual TLS authentication.
+  optional string client_key = 3;
+
+  // Optional. Skip server certificate verification. Use only in development/testing.
+  bool skip_verify = 4;
+
+  // Optional. Perform TLS handshake before NATS INFO protocol. Requires server support (NATS >= 2.10.4).
+  bool tls_first = 5;
+
+  // Read-only presence flag for the input-only client_key (never echoed back).
+  bool has_client_key = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Connection behavior settings.
+message ConnectionConfig {
+  // Optional. Connection timeout. Default 10s.
+  google.protobuf.Duration connect_timeout = 1;
+
+  // Optional. Client name reported to the NATS server. Visible in server monitoring.
+  optional string connection_name = 2;
+
+  // Optional. Custom inbox prefix for request-reply. Default: "_INBOX".
+  optional string inbox_prefix = 3;
+
+  // Optional. Do not receive messages published by this connection. Default: false.
+  bool no_echo = 4;
+
+  // Optional. Connect to servers in order instead of random. Default: false.
+  bool no_randomize = 5;
+
+  // Optional. Ignore servers discovered via cluster INFO. Default: false.
+  bool ignore_discovered_servers = 6;
+}
+
+// Reconnection behavior settings.
+message ReconnectConfig {
+  // Optional. Maximum reconnection attempts. -1 = unlimited. Default: -1.
+  optional int32 max_reconnects = 1;
+
+  // Optional. Wait time between reconnect attempts. Default 2s.
+  google.protobuf.Duration reconnect_wait = 2;
+
+  // Optional. Buffer size for messages queued during reconnect in bytes. -1 = disabled. Default: 8388608 (8MB).
+  optional int32 reconnect_buf_size = 3;
+
+  // Optional. Treat failed initial connection as reconnect scenario instead of error. Default: false.
+  bool retry_on_failed_connect = 4;
+}
+
+// Ping/pong health check settings.
+message PingConfig {
+  // Optional. Interval between PING messages. 0 = disabled. Default 2m.
+  google.protobuf.Duration ping_interval = 1;
+
+  // Optional. Maximum outstanding PINGs before connection is considered stale. Default: 2.
+  optional int32 max_pings_outstanding = 2;
+}
+
+// Snapshot of the most recent server probe, written by the backend after a
+// successful or failed Test. Surfaces what the broker reported (version,
+// JetStream, RTT) so the UI can show meaningful info on saved-connection
+// cards without needing to live-connect.
+message ConnectionMeta {
+  // Required. When the last probe ran. Unset = never.
+  google.protobuf.Timestamp last_tested_at = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether the most recent probe succeeded.
+  bool last_success = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Round-trip time of the last successful probe in milliseconds.
+  optional int64 last_rtt_ms = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. NATS server version reported on last probe.
+  optional string server_version = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. NATS server name reported on last probe.
+  optional string server_name = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. NATS server unique ID reported on last probe.
+  optional string server_id = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Cluster name if reported.
+  optional string cluster_name = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Maximum payload size accepted by the server, bytes.
+  optional int64 max_payload = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Whether JetStream is enabled on the server.
+  optional bool jetstream_enabled = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. URL of the server actually reached on the last probe.
+  optional string connected_url = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Error string from the most recent failed probe.
+  optional string last_error = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the saved NATS connection configuration for a user.
+message SavedConnection {
+  // Required. Unique identifier (UUID) of the saved connection.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. Human-readable name of the connection.
+  string name = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. User description or notes about this connection.
+  optional string description = 3;
+
+  // Required. NATS server URLs. Supports nats://, tls://, ws://, wss:// schemes.
+  repeated string urls = 4 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. Authentication configuration.
+  optional AuthConfig auth = 5;
+
+  // Optional. TLS configuration. Auto-enabled when using tls:// or wss:// URLs.
+  optional TlsConfig tls = 6;
+
+  // Optional. Connection behavior settings.
+  optional ConnectionConfig connection = 7;
+
+  // Optional. Reconnection behavior settings.
+  optional ReconnectConfig reconnect = 8;
+
+  // Optional. Ping/pong health check settings.
+  optional PingConfig ping = 9;
+
+  // Required. Creation timestamp.
+  google.protobuf.Timestamp created_at = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Last update timestamp.
+  google.protobuf.Timestamp updated_at = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Probe snapshot from the most recent Test run. Filled in by the
+  // backend, never by clients.
+  optional ConnectionMeta meta = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

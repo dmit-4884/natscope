@@ -1,0 +1,58 @@
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+  - pre-push
+
+default_stages:
+  - commit
+  - push
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-vcs-permalinks
+      # Check for files with names that would conflict on a case-insensitive filesystem like MacOS HFS+ or Windows FAT.
+      - id: check-case-conflict
+      # Check for files that contain merge conflict strings.
+      - id: check-merge-conflict
+      # Checks for symlinks which do not point to anything.
+      - id: check-symlinks
+      # Checks for the existence of private keys.
+      - id: detect-private-key
+      # Makes sure files end in a newline and only a newline.
+      - id: end-of-file-fixer
+        exclude: "tests/((commands|data)/|test_).+"
+      - id: no-commit-to-branch
+        args: [--branch, main]
+      # non-binary executables have shebang
+      - id: check-executables-have-shebangs
+      # verify shebang scripts are executable
+      - id: check-shebang-scripts-are-executable
+      # fails if a file larger than 10 MB exists
+      - id: check-added-large-files
+        args: ['--maxkb=10240', '--enforce-all']
+
+
+  - repo: local
+    hooks:
+      - id: gci
+        name: 'gci'
+        language: system
+        types: [ go ]
+        entry: gci write -s standard -s default -s prefix(google.golang.org) -s prefix(golang.org) -s prefix(github.com/altessa-s/go-atlas) -s prefix(github.com/dmit-4884/natscope) -s blank -s alias
+      - id: go-mod-tidy
+        name: 'go mod tidy'
+        language: system
+        entry: go mod tidy
+        files: (\.go|go\.mod|go\.sum)$
+        pass_filenames: false
+      - id: golangci-lint
+        name: 'golangci-lint'
+        language: system
+        types: [ go ]
+        pass_filenames: false
+        entry: golangci-lint run
+        stages:
+          - push

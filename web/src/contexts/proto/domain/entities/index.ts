@@ -1,0 +1,1 @@
+export { ProtoMessage } from './ProtoMessage'

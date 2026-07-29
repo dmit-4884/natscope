@@ -1,0 +1,33 @@
+# Logging configuration for the natscope service.
+# Defines settings for the application's logging behavior, output format, and level.
+# All parameters are commented out by default (template mode).
+# Uncomment and configure as needed for your environment.
+
+#logger:
+#  # <string> Specifies the logging level for the application.
+#  # Controls the minimum severity of messages that will be logged.
+#  # Supported values: error, warning, info, debug
+#  # Default value: info
+#  level: info
+#
+#  # <string> Specifies the output destination for log messages.
+#  # Determines where log messages are written.
+#  # Supported values: stdout, stderr
+#  # Default value: stdout
+#  output: stdout
+#
+#  # <string> Specifies the output format for log messages.
+#  # Controls the structure and formatting of log entries.
+#  # Supported values: json, text
+#  # Default value: text
+#  outputFormat: text
+#
+#  # <bool> Enables colorized output for better readability.
+#  # Should only be used with 'text' output format, ignored for 'json'.
+#  # Default value: true
+#  colorized: true
+#
+#  # <bool> Enables source code location information in logs.
+#  # Includes file name and line number in log entries for debugging.
+#  # Default value: false
+#  outputSource: false

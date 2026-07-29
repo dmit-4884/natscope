@@ -1,0 +1,96 @@
+syntax = "proto3";
+package natscope.types.nats;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "types/nats/nats_kv.proto";
+
+// Defines the information about a NATS JetStream Object Store bucket.
+message ObjectBucketInfo {
+  // Required. Name of the Object Store bucket.
+  string bucket = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Optional. Human-readable description of the bucket.
+  string description = 2;
+
+  // Required. Total size of all objects in the bucket in bytes.
+  uint64 size = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total number of objects in the bucket.
+  uint64 objects = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Storage backend type (0 = FileStorage, 1 = MemoryStorage).
+  int32 storage = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of replicas in the cluster.
+  int32 num_replicas = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether the bucket is sealed and no longer accepts new objects.
+  bool sealed = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether S2 compression is enabled for this bucket.
+  bool is_compressed = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. User-defined metadata as key-value pairs.
+  map<string, string> metadata = 9;
+}
+
+// Defines the configuration for creating or updating a NATS JetStream Object Store bucket.
+message ObjectBucketConfig {
+  // Required. Name of the Object Store bucket.
+  string bucket = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true];
+
+  // Optional. Human-readable description of the bucket.
+  string description = 2;
+
+  // Optional. Maximum total size of the bucket in bytes (-1 for unlimited).
+  int64 max_bytes = 3;
+
+  // Optional. Time-to-live for objects (unset for no expiry).
+  google.protobuf.Duration ttl = 4;
+
+  // Optional. Storage backend type (0 = FileStorage, 1 = MemoryStorage).
+  int32 storage = 5;
+
+  // Optional. Number of replicas in the cluster.
+  int32 num_replicas = 6;
+
+  // Optional. Placement preferences for the bucket.
+  optional Placement placement = 7;
+
+  // Optional. User-defined metadata as key-value pairs.
+  map<string, string> metadata = 8;
+}
+
+// Defines the metadata information about a single object in a NATS JetStream Object Store.
+message ObjectInfo {
+  // Required. Name of the object.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Optional. Human-readable description of the object.
+  string description = 2;
+
+  // Required. Total size of the object in bytes.
+  uint64 size = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of chunks the object is split into.
+  uint32 chunks = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Last modification timestamp.
+  google.protobuf.Timestamp mod_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Content digest hash for integrity verification (e.g., "SHA-256=...").
+  string digest = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Unique NUID identifier assigned by the server.
+  string nuid = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether the object has been marked as deleted.
+  bool deleted = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. User-defined metadata as key-value pairs.
+  map<string, string> metadata = 9;
+}

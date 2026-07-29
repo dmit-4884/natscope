@@ -1,0 +1,36 @@
+syntax = "proto3";
+package natscope.types.proto;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/proto;protopb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines a fetched snapshot of .proto files from a Git repository at a specific tag.
+message ProtoVersion {
+  // Required. Unique identifier. Format: UUID.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // Required. Identifier of the proto source. Format: UUID.
+  string source_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Git tag that was fetched.
+  string tag = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Repeated. List of .proto files in this version.
+  repeated ProtoFileEntry files = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Timestamp when the files were fetched.
+  google.protobuf.Timestamp fetched_at = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Email of the user who triggered the fetch.
+  optional string fetched_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Creation timestamp.
+  google.protobuf.Timestamp created_at = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Last update timestamp.
+  google.protobuf.Timestamp updated_at = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines a single .proto file from a fetched version.
+message ProtoFileEntry {
+  // Required. Relative file path within the repository.
+  string path = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Full content of the .proto file as a string.
+  string content = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. File size in bytes.
+  int64 size = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

@@ -1,0 +1,203 @@
+syntax = "proto3";
+package natscope.types.nats;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "types/nats/nats_stream.proto";
+
+// Defines the aggregated statistics for a NATS JetStream stream.
+message StreamStats {
+  // Required. Name of the stream.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. Total number of messages in the stream.
+  uint64 messages = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total size of all messages in bytes.
+  uint64 bytes = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Sequence number of the first message in the stream.
+  uint64 first_seq = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Sequence number of the last message in the stream.
+  uint64 last_seq = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Number of active consumers on the stream.
+  int32 consumer_count = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Message count per subject as key-value pairs.
+  map<string, uint64> subjects = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Stream creation timestamp.
+  google.protobuf.Timestamp created = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Cluster information if the stream is replicated.
+  optional ClusterStats cluster = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the cluster statistics for a replicated stream.
+message ClusterStats {
+  // Required. Name of the NATS cluster.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Name of the current cluster leader node.
+  string leader = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. List of replica node names in the cluster.
+  repeated string replicas = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the detailed statistics and configuration for a NATS JetStream consumer.
+// Uses int32 enums and well-known Timestamp/Duration types matching ConsumerConfig.
+message ConsumerStats {
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string stream = 2 [(google.api.field_behavior) = IDENTIFIER];
+  google.protobuf.Timestamp created = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  uint64 num_pending = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 num_ack_pending = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 num_redelivered = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 num_waiting = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  SequenceInfo delivered = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  SequenceInfo ack_floor = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  bool push_bound = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Enums (int32, same values as ConsumerConfig)
+  int32 deliver_policy = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  uint64 opt_start_seq = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp opt_start_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY]; // unset = not set
+  string filter_subject = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated string filter_subjects = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  int32 ack_policy = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Duration ack_wait = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 max_ack_pending = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 max_deliver = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 replay_policy = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated google.protobuf.Duration back_off = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  uint64 rate_limit = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  int32 max_waiting = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 max_request_batch = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Duration max_request_expires = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 max_request_max_bytes = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  string durable = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string description = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string sample_frequency = 30 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Duration inactive_threshold = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool headers_only = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 replicas = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool memory_storage = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
+  map<string, string> metadata = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  optional ClusterInfo cluster = 36 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the NATS server information and cluster topology.
+message ServerInfo {
+  // Required. Unique server identifier.
+  string server_id = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. Server name.
+  string server_name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. NATS server version string.
+  string version = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Server host address.
+  string host = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Server port number.
+  int32 port = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Cluster name if the server is part of a cluster.
+  string cluster_name = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Maximum payload size in bytes.
+  int64 max_payload = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. URL of the currently connected server.
+  string connected_url = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether JetStream is enabled on the server.
+  bool jetstream = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  optional JetStreamAccountInfo js_account = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool auth_required = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool tls_required = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated string connect_urls = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional ClientStatistics client_stats = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Version-gated feature support computed by the backend.
+  optional ServerCapabilities capabilities = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ClientStatistics {
+  uint64 in_msgs = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  uint64 out_msgs = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  uint64 in_bytes = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  uint64 out_bytes = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  uint64 reconnects = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message JetStreamAccountInfo {
+  int64 memory = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 storage = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 streams = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 consumers = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 memory_limit = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 storage_limit = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 stream_limit = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 consumer_limit = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  uint64 api_total = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  uint64 api_errors = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string domain = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines version-gated NATS feature support computed by the backend from the
+// JetStream API level (with a semver fallback for servers older than 2.12).
+message ServerCapabilities {
+  // Required. JetStream API level (0 if the server does not advertise one).
+  int32 api_level = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Consumer pause/resume support (NATS 2.11+).
+  bool consumer_pause = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Per-message TTL support (NATS 2.11+).
+  bool message_ttl = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Atomic batch publish support (NATS 2.12+).
+  bool atomic_publish = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the health status of a NATS connection.
+message ConnectionHealth {
+  // Required. Unique identifier (UUID) of the connection.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. NATS server URL this connection targets.
+  string url = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Current connection status as a human-readable string (e.g., "CONNECTED", "DISCONNECTED").
+  string status = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Round-trip time to the server as a human-readable string (e.g., "1.5ms").
+  string rtt = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Error message if the connection is unhealthy.
+  string error = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether the connection is currently established.
+  bool is_connected = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Whether the connection is in a reconnecting state.
+  bool is_reconnecting = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. NATS server version string.
+  string server_version = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

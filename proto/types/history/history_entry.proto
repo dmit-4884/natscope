@@ -1,0 +1,40 @@
+syntax = "proto3";
+package natscope.types.history;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/history;historypb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines record of a message publish operation.
+message PublishHistory {
+  // Required. Unique identifier. Format: UUID.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // Optional. Identifier of the NATS connection used. Format: UUID.
+  optional string connection_id = 2;
+  // Required. URL of the NATS server.
+  string connection_url = 3;
+  // Required. JetStream stream name.
+  string stream = 4;
+  // Required. NATS subject the message was published to.
+  string subject = 5;
+  // Optional. Subject pattern used for publishing.
+  optional string subject_pattern = 6;
+  // Required. Encoding type used for publishing: "json" or "protobuf".
+  string encoding_type = 7;
+  // Optional. Fully-qualified protobuf message type. Empty for raw JSON publishes.
+  optional string message_type = 8;
+  // Required. JSON representation of the published message payload.
+  string payload_json = 9;
+  // Required. Size of the serialized payload in bytes.
+  int32 payload_size = 10;
+  // Optional. JetStream sequence number assigned to the published message.
+  optional uint64 sequence = 11;
+  // Required. Whether the publish operation was successful.
+  bool success = 12;
+  // Optional. Error message if the publish operation failed.
+  optional string error = 13;
+  // Required. Creation timestamp.
+  google.protobuf.Timestamp created_at = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Last update timestamp.
+  google.protobuf.Timestamp updated_at = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

@@ -1,0 +1,112 @@
+syntax = "proto3";
+package natscope.proto.selections.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/selections;grpc_proto_selections";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/proto/proto_selection.proto";
+
+// Provides operations for managing the user's active protobuf version selections.
+service SelectionsService {
+  // Retrieves a paginated list of the user's active protobuf version selections.
+  // Pagination: Cursor-based.
+  rpc ListSelections(ListSelectionsRequest) returns (ListSelectionsResponse) {}
+
+  // Activates a specific protobuf version by source and tag, creating or updating the selection.
+  rpc SelectVersion(SelectVersionRequest) returns (SelectVersionResponse) {}
+
+  // Removes a protobuf version selection, deactivating it for the user.
+  rpc DeleteSelection(DeleteSelectionRequest) returns (DeleteSelectionResponse) {}
+
+  // Loads all selected protobuf versions into the active registry for message decoding.
+  rpc LoadSelections(LoadSelectionsRequest) returns (LoadSelectionsResponse) {}
+
+  // Returns the current load status of the user's protobuf selections.
+  rpc GetSelectionStatus(GetSelectionStatusRequest) returns (GetSelectionStatusResponse) {}
+}
+
+// Defines the request message for listing protobuf version selections.
+message ListSelectionsRequest {
+  // Optional. Maximum number of selections to return in a single page.
+  // Zero requests the server default; negative is rejected.
+  int32 page_size = 1 [(buf.validate.field).int32.gte = 0];
+
+  // Optional. A pagination token returned from a previous call.
+  // Empty string requests the first page.
+  string page_token = 2;
+
+  // Optional. Filter selections by protobuf source identifier.
+  // Format: UUID (e.g., "550e8400-e29b-41d4-a716-446655440000").
+  optional string source_id = 3;
+}
+
+// Defines the response message for listing protobuf version selections.
+message ListSelectionsResponse {
+  // Required. List of protobuf selection entities for the current page.
+  repeated .natscope.types.proto.ProtoSelection selections = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Cursor token for retrieving the next page of results.
+  // Absent when there are no more pages.
+  optional string next_page_token = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request message for selecting a protobuf version.
+message SelectVersionRequest {
+  // Required. Unique identifier of the protobuf source to select a version from.
+  // Format: UUID (e.g., "550e8400-e29b-41d4-a716-446655440000").
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Git tag name identifying the version to activate.
+  string tag = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+}
+
+// Defines the response message for selecting a protobuf version.
+message SelectVersionResponse {
+  // Required. The created or updated protobuf selection entity.
+  .natscope.types.proto.ProtoSelection selection = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request message for deleting a protobuf version selection.
+message DeleteSelectionRequest {
+  // Required. Unique identifier of the selection to delete.
+  // Format: UUID (e.g., "550e8400-e29b-41d4-a716-446655440000").
+  string id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+
+  // Defines optional delete control parameters.
+  message Options {
+    reserved 1;
+  }
+
+  // Optional. Delete control options including optimistic concurrency.
+  optional Options options = 99;
+}
+
+// Defines the response message for deleting a protobuf version selection.
+message DeleteSelectionResponse {}
+
+// Defines the request message for loading selected protobuf versions into the registry.
+message LoadSelectionsRequest {}
+
+// Defines the response message for loading selected protobuf versions.
+message LoadSelectionsResponse {
+  // Required. Total number of protobuf message types loaded into the registry.
+  int32 message_count = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total number of protobuf files loaded into the registry.
+  int32 file_count = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request message for retrieving the selection load status.
+message GetSelectionStatusRequest {}
+
+// Defines the response message for retrieving the selection load status.
+message GetSelectionStatusResponse {
+  // Required. Indicates whether protobuf selections have been successfully loaded into the registry.
+  bool loaded = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total number of protobuf message types currently loaded.
+  int32 message_count = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total number of protobuf files currently loaded.
+  int32 file_count = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "project": ["src/**/*.{ts,tsx}"],
+  "entry": [
+    "src/contexts/**/index.ts",
+    "src/shared/**/index.ts",
+    "src/stores/streamTabState/index.ts",
+    "src/components/ui/index.ts",
+    "src/components/common/forms/index.ts",
+    "src/test/utils.tsx"
+  ],
+  "ignoreDependencies": ["@eslint/js", "@types/diff"],
+  "vite": {
+    "config": ["vite.config.ts"]
+  },
+  "vitest": {
+    "config": ["vitest.config.ts"]
+  },
+  "playwright": {
+    "config": ["playwright.config.ts"]
+  },
+  "tailwind": {
+    "config": ["tailwind.config.js"]
+  },
+  "postcss": {
+    "config": ["postcss.config.js"]
+  },
+  "eslint": {
+    "config": ["eslint.config.js"]
+  }
+}

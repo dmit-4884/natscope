@@ -1,0 +1,116 @@
+version: 2
+
+project_name: natscope
+
+before:
+  hooks:
+    # The Go binary embeds web/dist via go:embed — build the frontend first.
+    - make build-frontend
+
+builds:
+  - id: natscope
+    main: ./cmd/natscope
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    tags:
+      - cse
+    ldflags:
+      - -s -w
+      - -X github.com/altessa-s/go-atlas/core/runtime/appinfo.Name=natscope
+      - -X github.com/altessa-s/go-atlas/core/runtime/appinfo.Version={{ .Version }}
+      - -X github.com/altessa-s/go-atlas/core/runtime/appinfo.Commit={{ .ShortCommit }}
+      - -X github.com/altessa-s/go-atlas/core/runtime/appinfo.BuildTime={{ .Date }}
+
+archives:
+  - id: natscope
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: checksums.txt
+
+# Software bill of materials per archive (syft must be on PATH — the release
+# workflow installs it before running goreleaser).
+sboms:
+  - id: archive
+    artifacts: archive
+
+changelog:
+  use: github
+  filters:
+    exclude:
+      - "^chore"
+
+dockers:
+  - id: natscope-amd64
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    image_templates:
+      - ghcr.io/dmit-4884/natscope:{{ .Version }}-amd64
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title=natscope
+      - --label=org.opencontainers.image.source=https://github.com/dmit-4884/natscope
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+  - id: natscope-arm64
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    image_templates:
+      - ghcr.io/dmit-4884/natscope:{{ .Version }}-arm64
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.title=natscope
+      - --label=org.opencontainers.image.source=https://github.com/dmit-4884/natscope
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+
+docker_manifests:
+  - name_template: ghcr.io/dmit-4884/natscope:{{ .Version }}
+    image_templates:
+      - ghcr.io/dmit-4884/natscope:{{ .Version }}-amd64
+      - ghcr.io/dmit-4884/natscope:{{ .Version }}-arm64
+  - name_template: ghcr.io/dmit-4884/natscope:latest
+    image_templates:
+      - ghcr.io/dmit-4884/natscope:{{ .Version }}-amd64
+      - ghcr.io/dmit-4884/natscope:{{ .Version }}-arm64
+
+brews:
+  - name: natscope
+    ids: [natscope]
+    repository:
+      owner: dmit-4884
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/dmit-4884/natscope
+    description: Web UI for browsing NATS JetStream with protobuf decoding
+    license: "Apache-2.0"
+    install: |
+      bin.install "natscope"
+    test: |
+      system "#{bin}/natscope", "version"
+
+release:
+  draft: false
+  prerelease: auto

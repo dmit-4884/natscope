@@ -1,0 +1,158 @@
+syntax = "proto3";
+package natscope.mappings.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/mappings/v1/mappings;grpc_mappings";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/mappings/mappings_mapping.proto";
+
+// Provides operations for managing subject-to-protobuf-type mappings for automatic message decoding.
+service MappingsService {
+  // Creates a new subject-to-protobuf-type mapping for automatic message decoding.
+  rpc CreateMapping(CreateMappingRequest) returns (CreateMappingResponse) {}
+
+  // Retrieves a paginated list of all subject-to-protobuf-type mappings.
+  // Pagination: Cursor-based.
+  rpc ListMappings(ListMappingsRequest) returns (ListMappingsResponse) {}
+
+  // Deletes a subject-to-protobuf-type mapping by its unique identifier.
+  rpc DeleteMapping(DeleteMappingRequest) returns (DeleteMappingResponse) {}
+
+  // Replaces all existing mappings with the provided set in a single atomic operation.
+  rpc BatchSaveMappings(BatchSaveMappingsRequest) returns (BatchSaveMappingsResponse) {}
+
+  // Computes resolvability health for the given mapping ids. UI uses this lazily
+  // (e.g. for visible rows) instead of List computing health for every mapping.
+  rpc BatchCheckMappingHealth(BatchCheckMappingHealthRequest) returns (BatchCheckMappingHealthResponse) {}
+}
+
+// Defines the request message for creating a new subject mapping.
+message CreateMappingRequest {
+  // Required. NATS subject pattern to match against incoming messages.
+  // Supports NATS wildcards: "*" for single token, ">" for remaining tokens.
+  string pattern = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Fully qualified protobuf message type name to decode matched messages with.
+  // Format: "package.MessageName" (e.g., "myapp.events.UserCreated").
+  string message_type = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Identifier of the proto source this mapping is bound to.
+  string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Pin resolution to a specific tag.
+  optional string pinned_tag = 4;
+
+  // Optional. Pin resolution to a specific descriptor by content hash.
+  optional string pinned_fingerprint = 5;
+}
+
+// Defines the response message for creating a new subject mapping.
+message CreateMappingResponse {
+  // Required. The newly created subject mapping entity.
+  .natscope.types.mappings.SubjectMapping mapping = 1;
+}
+
+// Defines the request message for listing subject mappings.
+message ListMappingsRequest {
+  // Optional. Maximum number of mappings to return in a single page.
+  // Zero requests the server default; negative is rejected.
+  int32 page_size = 1 [(buf.validate.field).int32.gte = 0];
+
+  // Optional. A pagination token returned from a previous call.
+  // Empty string requests the first page.
+  string page_token = 2;
+
+  // Optional. When true, the response includes the total number of mappings
+  // in `total_size`. Off by default — counting walks every record on the storage,
+  // so callers that don't display a total shouldn't pay for it.
+  bool include_total_count = 3;
+}
+
+// Defines the response message for listing subject mappings.
+message ListMappingsResponse {
+  // Required. List of subject mapping entities for the current page.
+  repeated .natscope.types.mappings.SubjectMapping mappings = 1;
+
+  // Optional. Cursor token for retrieving the next page of results.
+  // Absent when there are no more pages.
+  optional string next_page_token = 2;
+
+  // Optional. Total number of mappings matching the request, ignoring
+  // pagination. Only populated when the request set `includeTotalCount = true`.
+  optional int64 total_size = 3;
+}
+
+// Defines the request message for deleting a subject mapping.
+message DeleteMappingRequest {
+  // Required. Unique identifier of the mapping to delete.
+  // Format: UUID (e.g., "550e8400-e29b-41d4-a716-446655440000").
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Defines optional delete control parameters.
+  message Options {
+    reserved 1;
+  }
+
+  // Optional. Delete control options including optimistic concurrency.
+  optional Options options = 99;
+}
+
+// Defines the response message for deleting a subject mapping.
+message DeleteMappingResponse {}
+
+// Defines the request message for bulk saving subject mappings.
+message BatchSaveMappingsRequest {
+  // Required. List of mapping items to save. Replaces all existing mappings atomically.
+  // Must contain at least one item.
+  repeated MappingBulkItem mappings = 1 [(buf.validate.field).repeated.min_items = 1];
+}
+
+// Defines a single mapping item within a bulk save operation.
+message MappingBulkItem {
+  // Required. NATS subject pattern to match against incoming messages.
+  // Supports NATS wildcards: "*" for single token, ">" for remaining tokens.
+  string pattern = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Fully qualified protobuf message type name to decode matched messages with.
+  // Format: "package.MessageName" (e.g., "myapp.events.UserCreated").
+  string message_type = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Identifier of the proto source this mapping is bound to.
+  string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for bulk saving subject mappings.
+message BatchSaveMappingsResponse {
+  // Required. Number of new mappings created during the bulk operation.
+  int32 created = 1;
+
+  // Required. Number of existing mappings updated during the bulk operation.
+  int32 updated = 2;
+
+  // Required. Number of mappings removed during the bulk operation (those not in the new set).
+  int32 deleted = 3;
+}
+
+// Defines the request message for computing health states of multiple mappings.
+message BatchCheckMappingHealthRequest {
+  // Required. Mapping ids to evaluate. Empty list returns empty result.
+  repeated string ids = 1;
+}
+
+// Defines a health state for a single mapping.
+message MappingHealthItem {
+  // Required. Mapping id.
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Health state value. One of:
+  //   "ok", "source_missing", "source_disabled", "selection_missing",
+  //   "descriptor_missing", "type_missing".
+  string health = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Human-readable detail (e.g. which source is missing).
+  string detail = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the response message for batch health computation.
+message BatchCheckMappingHealthResponse {
+  // Required. Health item per requested id (in input order).
+  repeated MappingHealthItem items = 1;
+}

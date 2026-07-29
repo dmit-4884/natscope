@@ -1,0 +1,283 @@
+syntax = "proto3";
+package natscope.proto.sources.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/sources;grpc_proto_sources";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/proto/proto_source.proto";
+import "types/proto/proto_version.proto";
+
+// Provides operations for managing protobuf file sources (Git repos, local dirs).
+service SourcesService {
+  // Creates a new protobuf source.
+  rpc CreateSource(CreateSourceRequest) returns (CreateSourceResponse) {}
+
+  // Retrieves a single protobuf source by its unique identifier.
+  rpc GetSource(GetSourceRequest) returns (GetSourceResponse) {}
+
+  // Retrieves a paginated list of all registered protobuf sources.
+  rpc ListSources(ListSourcesRequest) returns (ListSourcesResponse) {}
+
+  // Updates an existing protobuf source configuration.
+  rpc UpdateSource(UpdateSourceRequest) returns (UpdateSourceResponse) {}
+
+  // Deletes a protobuf source and its associated data.
+  rpc DeleteSource(DeleteSourceRequest) returns (DeleteSourceResponse) {}
+
+  // Validates that a Git repository is accessible and contains protobuf files.
+  rpc ValidateRepository(ValidateRepositoryRequest) returns (ValidateRepositoryResponse) {}
+
+  // Validates that a local directory path exists and contains .proto files.
+  rpc ValidateLocalPath(ValidateLocalPathRequest) returns (ValidateLocalPathResponse) {}
+
+  // Lists all available Git tags for the specified protobuf source repository.
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {}
+
+  // Fetches protobuf files from a specific Git tag and creates a version snapshot.
+  rpc FetchVersion(FetchVersionRequest) returns (FetchVersionResponse) {}
+
+  // Enables or disables a source (controls whether it participates in compilation).
+  rpc SetEnabled(SetEnabledRequest) returns (SetEnabledResponse) {}
+
+  // Enables or disables the file watcher for a local directory source.
+  rpc SetWatcher(SetWatcherRequest) returns (SetWatcherResponse) {}
+
+  // Triggers manual compilation of a local directory source.
+  rpc CompileLocal(CompileLocalRequest) returns (CompileLocalResponse) {}
+
+  // Validates a Files-type source by attempting compilation without persisting.
+  // Returns the full list of diagnostics, even on success (warnings).
+  rpc ValidateFiles(ValidateFilesRequest) returns (ValidateFilesResponse) {}
+
+  // Triggers manual compilation of a Files-type source. On compile error,
+  // returns INVALID_ARGUMENT with diagnostics in the response (not as gRPC
+  // status details — the trailers are reserved for transport-level errors).
+  rpc CompileFiles(CompileFilesRequest) returns (CompileFilesResponse) {}
+
+}
+
+// --- Create ---
+
+message CreateSourceRequest {
+  // Required. Human-readable display name.
+  string name = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+
+  // Required. Source type.
+  .natscope.types.proto.SourceType source_type = 2 [(buf.validate.field).required = true, (google.api.field_behavior) = REQUIRED];
+
+  // Git repository URL (required for Git type).
+  optional string repository = 3;
+
+  // Authentication token for private Git repositories (Git type only).
+  optional string token = 4;
+
+  // Local directory path (required for Local type).
+  optional string local_path = 5;
+
+  // Enable file watcher on create (Local type only, default: true).
+  optional bool watcher_enabled = 6;
+
+  // Optional. Manual import roots (slash-relative). When set, automatic root
+  // detection (buf config / inference) is DISABLED and these become the only
+  // roots. No implicit defaults.
+  repeated string import_roots = 7;
+
+  // Optional. Slash-relative path prefixes excluded from compilation
+  // entirely (e.g. "gen", "pb"). No implicit defaults.
+  repeated string exclude_prefixes = 8;
+
+  // Explicit list of absolute paths to .proto files (Files type only).
+  repeated string files = 9;
+
+  // Absolute directory paths used to resolve imports (Files type only).
+  repeated string include_dirs = 10;
+}
+
+message CreateSourceResponse {
+  .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Get ---
+
+message GetSourceRequest {
+  string id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+}
+
+message GetSourceResponse {
+  .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- List ---
+
+message ListSourcesRequest {
+  // Optional. Maximum number of sources to return in a single page.
+  // Zero requests the server default; negative is rejected.
+  int32 page_size = 1 [(buf.validate.field).int32.gte = 0];
+
+  // Optional. A pagination token returned from a previous call.
+  // Empty string requests the first page.
+  string page_token = 2;
+}
+
+message ListSourcesResponse {
+  repeated .natscope.types.proto.ProtoSource sources = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional string next_page_token = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Update ---
+
+message UpdateSourceRequest {
+  string id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+  optional string name = 2;
+  optional string repository = 3;
+  optional string token = 4;
+  optional string local_path = 5;
+  // Optional. Override import roots; nil/empty leaves prior value untouched
+  // (use repeated empty string only — semantics are "replace if non-nil list").
+  repeated string import_roots = 6;
+  // Optional. Override exclude prefixes; same semantics as above.
+  repeated string exclude_prefixes = 7;
+  // Optional. Override files (Files type only).
+  repeated string files = 8;
+  // Optional. Override include dirs (Files type only).
+  repeated string include_dirs = 9;
+
+  message Options {
+    reserved 1;
+  }
+  optional Options options = 99;
+}
+
+message UpdateSourceResponse {
+  .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Delete ---
+
+message DeleteSourceRequest {
+  string id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+  message Options {
+    reserved 1;
+  }
+  optional Options options = 99;
+}
+
+message DeleteSourceResponse {}
+
+// --- Validate Repository ---
+
+message ValidateRepositoryRequest {
+  string repository = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+  optional string token = 2;
+}
+
+message ValidateRepositoryResponse {
+  bool valid = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional string error = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Validate Local Path ---
+
+message ValidateLocalPathRequest {
+  string path = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+}
+
+message ValidateLocalPathResponse {
+  bool valid = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 proto_file_count = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- List Tags ---
+
+message ListTagsRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+}
+
+message ListTagsResponse {
+  repeated string tags = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Fetch Version ---
+
+message FetchVersionRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+  string tag = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+}
+
+message FetchVersionResponse {
+  .natscope.types.proto.ProtoVersion version = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Set Enabled ---
+
+message SetEnabledRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+  bool enabled = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SetEnabledResponse {
+  .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Set Watcher ---
+
+message SetWatcherRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+  bool enabled = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SetWatcherResponse {
+  .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Compile Local ---
+
+message CompileLocalRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+}
+
+message CompileLocalResponse {
+  int32 message_types = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 file_descriptors = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // True when compilation succeeded (warnings allowed). False -> diagnostics
+  // explain why; message_types/file_descriptors are zero.
+  bool valid = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Full diagnostic list, same contract as CompileFilesResponse.
+  repeated .natscope.types.proto.CompileDiagnostic diagnostics = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Validate Files (dry run) ---
+
+message ValidateFilesRequest {
+  // Either a saved source id (validate stored config), or inline files+include_dirs
+  // for pre-save validation while creating a source. Exactly one of the two
+  // groups must be provided.
+  optional string source_id = 1;
+  repeated string files = 2;
+  repeated string include_dirs = 3;
+}
+
+message ValidateFilesResponse {
+  bool valid = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Number of message types extracted on success. 0 if invalid.
+  int32 message_types = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Number of file descriptors compiled on success. 0 if invalid.
+  int32 file_descriptors = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Full list of diagnostics. Empty when valid=true and no warnings.
+  repeated .natscope.types.proto.CompileDiagnostic diagnostics = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Compile Files (persist) ---
+
+message CompileFilesRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+}
+
+message CompileFilesResponse {
+  bool valid = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 message_types = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 file_descriptors = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated .natscope.types.proto.CompileDiagnostic diagnostics = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+

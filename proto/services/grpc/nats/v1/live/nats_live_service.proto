@@ -1,0 +1,91 @@
+syntax = "proto3";
+package natscope.nats.live.v1;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/live;grpc_nats_live";
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "types/nats/nats_message.proto";
+
+// Provides server-streaming subscription for real-time NATS message delivery.
+service LiveService {
+  // Opens a server-streaming subscription that delivers live NATS messages, periodic statistics, errors, and proto reload notifications.
+  rpc Subscribe(SubscribeRequest) returns (stream LiveEvent) {}
+}
+
+// Defines the request message for subscribing to live NATS messages.
+message SubscribeRequest {
+  // Required. Identifier of the NATS connection to subscribe through.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. List of subscriptions to activate. At least one subscription must be provided.
+  repeated LiveSubscription subscriptions = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).repeated.min_items = 1];
+
+  // Optional. Per-message payload cap in bytes. When > 0, each delivered
+  // message has its `data` and `decoded` truncated to this many bytes and
+  // `truncated` is set; the UI uses MessagesService.Get(sequence) to load
+  // the full payload on demand. When 0 or omitted, falls back to user
+  // settings (Messages.maxPayloadBytesInList).
+  optional int32 max_payload_bytes = 3;
+}
+
+// Defines a single subscription target for live message delivery.
+message LiveSubscription {
+  // Required. NATS subject pattern to subscribe to. Supports wildcards (* and >).
+  string subject = 1;
+
+  // Optional. JetStream stream name to bind the subscription to. If omitted, a core NATS subscription is used.
+  optional string stream_name = 2;
+}
+
+// Defines a server-streamed event envelope. Exactly one event field is set per message.
+message LiveEvent {
+  oneof event {
+    // A batch of received NATS messages.
+    LiveMessageBatch batch = 1;
+
+    // Periodic subscription statistics snapshot.
+    LiveStats stats = 2;
+
+    // An error encountered during message delivery.
+    LiveError error = 3;
+
+    // Notification that protobuf descriptors have been reloaded.
+    LiveProtoReload proto_reload = 4;
+  }
+}
+
+// Defines a batch of live NATS messages delivered in a single server-stream frame.
+message LiveMessageBatch {
+  // Required. List of NATS messages received since the last batch, optionally decoded from protobuf.
+  repeated .natscope.types.nats.NatsMessage messages = 1;
+}
+
+// Defines periodic statistics for the active live subscription.
+message LiveStats {
+  // Required. Total number of messages received since the subscription started.
+  int64 total_messages = 1;
+
+  // Required. Current message throughput in messages per second.
+  int64 messages_per_second = 2;
+
+  // Required. Per-subject message count breakdown. Key: subject name, Value: message count.
+  map<string, int64> subject_counts = 3;
+
+  // Total messages dropped due to rate limiting since subscription started.
+  int64 messages_dropped = 4;
+}
+
+// Defines an error event encountered during live message delivery.
+message LiveError {
+  // Required. Machine-readable error code identifying the error category.
+  string code = 1;
+
+  // Required. Human-readable error description.
+  string message = 2;
+}
+
+// Defines a notification that protobuf descriptors have been reloaded on the server.
+message LiveProtoReload {
+  // Required. Number of protobuf message types available after the reload.
+  int32 messages_count = 1;
+}
