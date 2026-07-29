@@ -59,7 +59,7 @@ test.describe('workspace: validate (dry-run, non-mutating)', () => {
   })
 
   test('CHK corrupted payload is rejected/reported, not silently accepted', async () => {
-    let handled = false
+    let handled: boolean
     try {
       const rep = (await A.validateWorkspace({ payload: A.b64('this is not json {'), strategy: 'STRATEGY_MERGE' })) as { reports?: unknown[] }
       // If it does not throw, it must report an unknown/empty result, not pretend success.

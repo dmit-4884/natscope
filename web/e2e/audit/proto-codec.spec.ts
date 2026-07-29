@@ -56,7 +56,7 @@ test.describe('proto: codec roundtrip', () => {
     const ok = (await A.validateJson({ messageType: MESSAGE_TYPE, data: '{"name":"x","count":3}', sourceId })) as { result?: { valid?: boolean } }
     expect(ok.result?.valid).toBe(true)
     // Rejection surfaces either as result.valid=false (+error) or a Connect error.
-    let rejected = false
+    let rejected: boolean
     try {
       const bad = (await A.validateJson({ messageType: MESSAGE_TYPE, data: '{"count":"not-an-int"}', sourceId })) as { result?: { valid?: boolean; error?: string } }
       rejected = bad.result?.valid !== true && !!bad.result?.error

@@ -145,7 +145,7 @@ test.describe('consumers: lifecycle', () => {
   test('CHK [suspected-bug] CreateConsumer silently accepts malformed opt_start_time (deliverPolicy=byStartTime)', async () => {
     // Discovery slice 2 flagged: consumers.go drops a malformed opt_start_time
     // with no error, unlike PauseConsumer. Document actual behavior.
-    let created = false
+    let created: boolean
     try {
       await A.createConsumer(cid, stream, 'badstart', { deliverPolicy: 4, optStartTime: 'garbage', ackPolicy: 0 })
       created = true

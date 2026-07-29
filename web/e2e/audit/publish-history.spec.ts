@@ -56,7 +56,7 @@ test.describe('publish: validation & limits', () => {
 
   test('CHK oversize payload (> max_msg_size) fails', async () => {
     const big = 'x'.repeat(MAX + 500)
-    let failed = false
+    let failed: boolean
     try {
       const r = await A.publish(cid, N.subject('big'), N.wildcard, big)
       failed = !!(r.error && r.error.length > 0)
