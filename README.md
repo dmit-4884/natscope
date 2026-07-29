@@ -40,7 +40,7 @@ for seeing what actually flows through your streams, including binary Protobuf p
 
 ```bash
 brew install dmit-4884/tap/natscope
-natscope server run
+natscope
 ```
 
 ### Docker
@@ -56,7 +56,7 @@ docker run -d -p 127.0.0.1:4280:4280 -v natscope-data:/data ghcr.io/dmit-4884/na
 ```bash
 make deps   # Go modules, npm deps and codegen tools (first build only)
 make build
-./build/bin/<version>/<os>-<arch>/natscope server run
+./build/bin/<version>/<os>-<arch>/natscope
 ```
 
 Requires Go 1.26+ and Node.js 22+. A clean clone must run `make deps` before `make build`, because the
@@ -189,7 +189,7 @@ loopback and **refuses to start on a wider bind** unless you opt in:
 
 ```bash
 GRPC_WEB_ADDRESS=0.0.0.0:4280 ALLOW_REMOTE=true \
-WEB_AUTH__USERNAME=admin WEB_AUTH__PASSWORD=change-me natscope server run
+WEB_AUTH__USERNAME=admin WEB_AUTH__PASSWORD=change-me natscope
 ```
 
 `webAuth` protects the whole listener (UI and API) with HTTP basic auth — required for anything beyond

@@ -14,6 +14,7 @@ import (
 	"github.com/altessa-s/go-atlas/core/runtime/appinfo"
 
 	"github.com/dmit-4884/natscope/cmd/natscope/commands/server"
+	"github.com/dmit-4884/natscope/cmd/natscope/commands/server/run"
 	"github.com/dmit-4884/natscope/cmd/natscope/commands/version"
 )
 
@@ -32,13 +33,14 @@ func New() *cobra.Command {
 				natscope browses NATS JetStream messages with protobuf decoding support.
 
 				Runs as a single binary with an embedded React frontend.
+				Invoked without a subcommand, it starts the server.
 			`),
 			Example: heredoc.Doc(`
 				# Start the natscope server
-				natscope server run
+				natscope
 
 				# Start with a custom listen address
-				GRPC_WEB_ADDRESS=127.0.0.1:9090 natscope server run
+				GRPC_WEB_ADDRESS=127.0.0.1:9090 natscope
 
 				# Show version information
 				natscope version
@@ -62,6 +64,8 @@ func (c *Command) configure() {
 
 	c.PersistentFlags().StringP("config", "c", "", "path to config file")
 
+	c.RunE = c.run
+
 	c.SuggestionsMinimumDistance = 1
 	c.SilenceUsage = true
 
@@ -71,6 +75,12 @@ func (c *Command) configure() {
 
 	c.AddCommand(version.New())
 	c.AddCommand(server.New())
+}
+
+// run starts the server, making a bare "natscope" equivalent to "natscope server run".
+func (c *Command) run(cmd *cobra.Command, args []string) error {
+	app := run.NewApp()
+	return app.Run(cmd, args)
 }
 
 // Run executes the root command with explicit args, recovering from panics
