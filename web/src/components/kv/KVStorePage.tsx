@@ -12,7 +12,7 @@ import {
 } from '@/contexts/kv'
 import { decodeBase64 } from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
-import { formatBytes } from '@/utils/formatters'
+import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
 import { useConfirmation } from '@/contexts/settings'
 import { Button, Modal, Input, Badge, Alert, Spinner, SearchInput, CloseIcon, PlusIcon, RefreshIcon, OverflowMenu } from '@/components/ui'
@@ -364,7 +364,7 @@ export default function KVStorePage() {
                       {keyEntry && (
                         <span className="flex gap-2">
                           <Badge variant="default" size="sm">Rev {keyEntry.revision}</Badge>
-                          <span>Last updated: {new Date(keyEntry.created).toLocaleString()}</span>
+                          <span>Last updated: {formatDateTime(keyEntry.created)}</span>
                         </span>
                       )}
                     </p>
@@ -503,7 +503,7 @@ export default function KVStorePage() {
                         {entry.operation}
                       </Badge>
                       <span className="text-xs text-content-tertiary">
-                        {new Date(entry.created).toLocaleString()}
+                        {formatDateTime(entry.created)}
                       </span>
                     </div>
                     {entry.operation === 'put' ? (

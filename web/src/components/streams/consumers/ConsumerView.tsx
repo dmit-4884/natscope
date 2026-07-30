@@ -2,7 +2,7 @@ import { Button, CopyButton, PencilIcon, RefreshIcon, InfoIcon } from '@/compone
 import Tooltip from '@/components/common/Tooltip'
 import JsonViewer from '@/components/common/JsonViewer'
 import type { ConsumerInfo } from '@/types/nats'
-import { formatNsDuration } from '@/utils/formatters'
+import { formatDateTime, formatNsDuration } from '@/utils/formatters'
 import { consumerConfigToNatsCli } from '../natsCli'
 import { StatCard, ConfigRow } from './consumerHelpers'
 import { getFilterSubjectsArray } from './consumerUtils'
@@ -33,6 +33,8 @@ export function ConsumerView({
   isResuming,
   pauseUnsupportedReason,
 }: Props) {
+  const filterSubjects = getFilterSubjectsArray(consumer)
+
   return (
     <>
       <div className="flex items-center px-4 py-3 border-b bg-surface-secondary shrink-0">
@@ -98,11 +100,15 @@ export function ConsumerView({
                     </Tooltip>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {getFilterSubjectsArray(consumer).map((subject, idx) => (
-                      <span key={idx} className="px-2 py-1 bg-accent-light text-accent-text text-xs font-mono rounded">
-                        {subject}
-                      </span>
-                    ))}
+                    {filterSubjects.length === 0 ? (
+                      <span className="text-xs text-content-tertiary">— all subjects</span>
+                    ) : (
+                      filterSubjects.map((subject, idx) => (
+                        <span key={idx} className="px-2 py-1 bg-accent-light text-accent-text text-xs font-mono rounded">
+                          {subject}
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -164,7 +170,7 @@ export function ConsumerView({
                   )}
                   <ConfigRow
                     label="Created"
-                    value={consumer.created ? new Date(consumer.created).toLocaleString() : '-'}
+                    value={consumer.created ? formatDateTime(consumer.created) : '-'}
                     hint="When this consumer was created"
                   />
                 </div>

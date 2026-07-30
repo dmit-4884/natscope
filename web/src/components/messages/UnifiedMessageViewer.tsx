@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/utils/toast'
 import { copyText } from '@/utils/clipboard'
+import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { useStreamDetail } from '@/contexts/streams'
 import { useMappingItems, type MappingItem } from '@/contexts/mappings'
@@ -510,17 +511,17 @@ export default function UnifiedMessageViewer({
             {displayMessage?.subject || '—'}
           </button>
           <span className="mx-2">•</span>
-          <span className="whitespace-nowrap">{displayMessage?.data_size || 0} bytes</span>
+          <span className="whitespace-nowrap">{formatBytes(displayMessage?.data_size || 0)}</span>
           <span className="mx-2">•</span>
           <span className="whitespace-nowrap">
-            {displayMessage?.timestamp ? new Date(displayMessage.timestamp).toLocaleString() : '—'}
+            {displayMessage?.timestamp ? formatDateTime(displayMessage.timestamp) : '—'}
           </span>
           {isTruncated && (
             <>
               <span className="mx-2">•</span>
               <span
                 className="px-2 py-0.5 text-xs font-medium bg-status-warning-light text-amber-800 rounded-full"
-                title={`Server truncated this preview to keep the list response small. Original size: ${displayMessage?.data_size ?? 0} bytes.`}
+                title={`Server truncated this preview to keep the list response small. Original size: ${formatBytes(displayMessage?.data_size ?? 0)}.`}
               >
                 Preview
               </span>

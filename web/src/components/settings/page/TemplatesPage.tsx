@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '@/api/errors'
 import { toast } from '@/utils/toast'
+import { formatDate, formatDateTime } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
 import {
   Button,
@@ -41,7 +42,7 @@ function formatRelative(ts: number): string {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
   if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)}d ago`
-  return new Date(ts).toLocaleDateString()
+  return formatDate(ts)
 }
 
 function headerCount(h?: Record<string, string>): number {
@@ -307,7 +308,7 @@ export default function TemplatesPage() {
       key: 'updated',
       header: 'Updated',
       render: (t) => (
-        <span className="text-xs text-content-tertiary" title={new Date(t.updatedAt).toLocaleString()}>
+        <span className="text-xs text-content-tertiary" title={formatDateTime(t.updatedAt)}>
           {formatRelative(t.updatedAt)}
         </span>
       ),

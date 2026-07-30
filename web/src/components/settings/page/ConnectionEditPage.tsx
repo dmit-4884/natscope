@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Alert, Button, Spinner, DestructiveConfirm, WarningIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
+import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { toast } from '@/utils/toast'
 import { getErrorMessage, stripErrorCodePrefix } from '@/api/errors'
 import {
@@ -387,7 +388,7 @@ export default function ConnectionEditPage({ mode }: Props) {
                   {testResult.data.maxPayload !== undefined && Number(testResult.data.maxPayload) > 0 && (
                     <li className="flex justify-between gap-2">
                       <span className="text-content-tertiary">Max payload</span>
-                      <span className="font-mono">{Number(testResult.data.maxPayload).toLocaleString()} B</span>
+                      <span className="font-mono">{formatBytes(Number(testResult.data.maxPayload))}</span>
                     </li>
                   )}
                   {testResult.data.discoveredServers && testResult.data.discoveredServers.length > 0 && (
@@ -409,7 +410,7 @@ export default function ConnectionEditPage({ mode }: Props) {
               )}
               {isEdit && existing?.meta && (
                 <p className="mt-3 pt-3 border-t border-gray-100 text-2xs text-content-tertiary">
-                  Last persisted probe: {new Date(existing.meta.lastTestedAt).toLocaleString()}
+                  Last persisted probe: {formatDateTime(existing.meta.lastTestedAt)}
                 </p>
               )}
             </div>

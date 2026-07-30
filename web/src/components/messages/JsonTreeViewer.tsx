@@ -1,7 +1,7 @@
 import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { CopyIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
-import { formatBytes } from '@/utils/formatters'
+import { formatBytes, formatCount } from '@/utils/formatters'
 import { copyText } from '@/utils/clipboard'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
@@ -366,7 +366,7 @@ const TreeNode: React.FC<TreeNodeProps> = memo(function TreeNode({
           // content-visibility skips painting off-screen glyphs — required so
           // multi-MB values don't freeze the tree.
           style={{ contentVisibility: 'auto', containIntrinsicSize: '0 256px' }}
-          title={`${displayValue.length.toLocaleString()} chars — click to copy full value`}
+          title={`${formatCount(displayValue.length)} chars — click to copy full value`}
         >
           {displayValue}
         </button>

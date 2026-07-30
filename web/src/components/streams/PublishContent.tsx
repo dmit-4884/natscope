@@ -7,6 +7,7 @@ import { publishMessage, validateJSON, type ValidationResult } from '@/api/publi
 import { getProtoMessageExample } from '@/api/proto'
 import { getMessages } from '@/api/messages'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
+import { formatBytes } from '@/utils/formatters'
 import { useProtoMessageEntity } from '@/contexts/proto'
 import { useSubjectMappingEntity } from '@/contexts/mappings'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
@@ -456,8 +457,8 @@ export default function PublishContent({
                 className="mt-2 px-3 py-2 bg-status-warning-bg border border-amber-200 rounded-lg text-xs text-amber-800"
                 data-testid="payload-oversize-warning"
               >
-                Payload is {payloadBytes.toLocaleString()} bytes — over this stream's max message size (
-                {maxMsgSize!.toLocaleString()} bytes). NATS will reject the publish.
+                Payload is {formatBytes(payloadBytes)} — over this stream's max message size (
+                {formatBytes(maxMsgSize!)}). NATS will reject the publish.
               </div>
             )}
             <ValidationResultDisplay result={validationResult} />

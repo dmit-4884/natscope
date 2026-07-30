@@ -1,6 +1,6 @@
 import { Button, CopyButton, CheckIcon, PauseIcon, PencilIcon, RefreshIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
-import { formatBytes, formatNsDuration, formatNumber } from '@/utils/formatters'
+import { formatBytes, formatDateTime, formatNsDuration, formatNumber } from '@/utils/formatters'
 import type { StreamDetail } from '@/types/nats'
 import JsonViewer from '@/components/common/JsonViewer'
 import { streamConfigToNatsCli } from '../natsCli'
@@ -85,7 +85,7 @@ export function StreamConfigView({
                   <ConfigRow label="Stream Name" value={streamDetail.name} />
                   <ConfigRow
                     label="Created"
-                    value={new Date(streamDetail.created).toLocaleString()}
+                    value={formatDateTime(streamDetail.created)}
                     hint="When this stream was created"
                   />
                   {streamDetail.description && (
@@ -206,12 +206,12 @@ export function StreamConfigView({
                     <ConfigRow label="Last Sequence" value={String(streamDetail.state.last_seq)} hint="Sequence number of the last message in the stream" />
                     <ConfigRow
                       label="First Message"
-                      value={streamDetail.state.first_ts > 0 ? new Date(streamDetail.state.first_ts).toLocaleString() : '—'}
+                      value={streamDetail.state.first_ts > 0 ? formatDateTime(streamDetail.state.first_ts) : '—'}
                       hint="Timestamp of the first message"
                     />
                     <ConfigRow
                       label="Last Message"
-                      value={streamDetail.state.last_ts > 0 ? new Date(streamDetail.state.last_ts).toLocaleString() : '—'}
+                      value={streamDetail.state.last_ts > 0 ? formatDateTime(streamDetail.state.last_ts) : '—'}
                       hint="Timestamp of the last message"
                     />
                   </div>

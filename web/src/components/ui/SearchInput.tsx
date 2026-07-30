@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react'
 import { cn } from '@/utils/cn'
+import { formatCount } from '@/utils/formatters'
 import { CloseIcon } from './icons'
 
 export interface SearchInputProps {
@@ -224,7 +225,7 @@ export function SearchInput({
       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
         {resultsCount !== undefined && localValue && (
           <span className="text-xs text-content-muted tabular-nums">
-            {resultsCount.toLocaleString()}
+            {formatCount(resultsCount)}
           </span>
         )}
         {clearable && localValue && (
