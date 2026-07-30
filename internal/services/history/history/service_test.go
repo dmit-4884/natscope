@@ -91,6 +91,52 @@ func TestService_Record(t *testing.T) {
 	}
 }
 
+func TestService_Record_PayloadSize(t *testing.T) {
+	t.Parallel()
+
+	t.Run("KeepsEncodedSizeFromCaller", func(t *testing.T) {
+		t.Parallel()
+
+		store := &mockStorage{}
+		svc := New(store)
+
+		got, err := svc.Record(t.Context(), &entities.PublishHistoryCreate{
+			ConnectionURL: "nats://localhost:4222",
+			Stream:        "ORDERS",
+			Subject:       "orders.created",
+			EncodingType:  entities.EncodingTypeProtobuf,
+			MessageType:   "api.v1.Order",
+			PayloadJSON:   `{"id":1}`,
+			PayloadSize:   2,
+			Success:       true,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, got.PayloadSize, "encoded payload size must win over the JSON source length")
+		require.NotNil(t, store.saveInput)
+		assert.Equal(t, 2, store.saveInput.PayloadSize)
+	})
+
+	t.Run("FallsBackToJSONLengthWhenOmitted", func(t *testing.T) {
+		t.Parallel()
+
+		store := &mockStorage{}
+		svc := New(store)
+
+		got, err := svc.Record(t.Context(), &entities.PublishHistoryCreate{
+			ConnectionURL: "nats://localhost:4222",
+			Stream:        "ORDERS",
+			Subject:       "orders.created",
+			EncodingType:  entities.EncodingTypeJSON,
+			PayloadJSON:   `{"id":1}`,
+			Success:       true,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, len(`{"id":1}`), got.PayloadSize)
+	})
+}
+
 func TestService_List(t *testing.T) {
 	t.Parallel()
 
