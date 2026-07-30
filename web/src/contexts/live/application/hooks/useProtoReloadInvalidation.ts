@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { plural } from '@/utils/plural'
 import { toast } from '@/utils/toast'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 
@@ -32,7 +33,7 @@ export function useProtoReloadInvalidation(client: LiveStreamClient | null) {
         },
       })
 
-      toast.info(`Proto schemas reloaded — ${payload.messages_count} message types available`)
+      toast.info(`Proto schemas reloaded — ${plural(payload.messages_count, 'message type')} available`)
     }
 
     return () => {

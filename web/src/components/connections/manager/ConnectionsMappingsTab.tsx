@@ -207,6 +207,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
           sourceNamesById={sourceNamesById}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onAdd={showAddForm ? undefined : () => setShowAddForm(true)}
           searchFilter={searchFilter}
         />
       </div>

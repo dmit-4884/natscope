@@ -1,6 +1,7 @@
 import { Button, Toggle } from '@/components/ui'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { CompileDiagnostic } from '@/api/protoSources'
+import { plural } from '@/utils/plural'
 import { CompileDiagnosticsList } from './CompileDiagnosticsList'
 import { FolderIcon } from './protoCardIcons'
 
@@ -72,7 +73,7 @@ export function ProtoSourceLocalFooter({
       {compileError && <ErrorAlert compact message={compileError.message} />}
       {compileResult?.valid && !diagnostics?.some((d) => d.severity === 'error') && (
         <div className="text-xs text-green-700 p-2 bg-status-success-bg rounded">
-          Compiled: {compileResult.fileDescriptors} file descriptors, {compileResult.messageTypes} message types
+          Compiled: {plural(compileResult.fileDescriptors, 'file descriptor')}, {plural(compileResult.messageTypes, 'message type')}
         </div>
       )}
       {detectedRoots && detectedRoots.length > 0 && (

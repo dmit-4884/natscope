@@ -1,5 +1,5 @@
 import type { MappingItem, MappingHealthInfo } from '@/contexts/mappings'
-import { ClipboardIcon, DataTable, EmptyState, RowActionButton, WarningIcon, type DataTableColumn } from '@/components/ui'
+import { Button, ClipboardIcon, DataTable, EmptyState, PlusIcon, RowActionButton, WarningIcon, type DataTableColumn } from '@/components/ui'
 import { MappingHealthBadge } from './MappingHealthBadge'
 
 const MAPPINGS_ICON = <ClipboardIcon className="w-full h-full" />
@@ -15,16 +15,24 @@ interface Props {
   sourceNamesById?: Record<string, string>
   onEdit?: (item: MappingItem) => void
   onDelete: (id: string) => void
+  onAdd?: () => void
   searchFilter: string
 }
 
-export function MappingTable({ items, healthById, sourceNamesById, onEdit, onDelete, searchFilter }: Props) {
+export function MappingTable({ items, healthById, sourceNamesById, onEdit, onDelete, onAdd, searchFilter }: Props) {
   if (items.length === 0) {
     return (
       <EmptyState
         icon={MAPPINGS_ICON}
         title={searchFilter ? 'No mappings match your search' : 'No mappings configured'}
         description={searchFilter ? undefined : 'Add your first mapping to start decoding messages by subject pattern.'}
+        action={
+          searchFilter || !onAdd ? undefined : (
+            <Button onClick={onAdd} icon={<PlusIcon />}>
+              Add mapping
+            </Button>
+          )
+        }
       />
     )
   }

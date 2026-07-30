@@ -1,4 +1,4 @@
-import { WarningIcon, InfoIcon } from '@/components/ui'
+import { EmptyState, WarningIcon, InfoIcon } from '@/components/ui'
 import type { WsStatus } from './messageListUtils'
 
 export function NoStreamSelected() {
@@ -30,26 +30,37 @@ export function RealtimeStatusBar({ status }: { status: WsStatus }) {
   )
 }
 
+const MESSAGES_ICON = (
+  <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+    />
+  </svg>
+)
+
 export function EmptyMessagesState({ subjectFilter, isRealtime }: { subjectFilter: string; isRealtime: boolean }) {
+  const title = subjectFilter
+    ? `No messages match “${subjectFilter}”`
+    : isRealtime
+      ? 'Waiting for messages…'
+      : 'No messages found'
+
   return (
-    <div className="flex-1 flex items-center justify-center text-content-tertiary">
-      <div className="text-center">
-        <svg className="mx-auto h-12 w-12 text-content-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-          />
-        </svg>
-        <p className="text-sm">
-          {subjectFilter
-            ? `No messages match "${subjectFilter}"`
+    <div className="flex-1 flex items-center justify-center">
+      <EmptyState
+        icon={MESSAGES_ICON}
+        title={title}
+        description={
+          subjectFilter
+            ? 'Clear the subject filter or widen the pattern.'
             : isRealtime
-              ? 'Waiting for messages...'
-              : 'No messages found'}
-        </p>
-      </div>
+              ? 'New messages appear here as they are published.'
+              : 'This stream has no messages in the selected range.'
+        }
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { CopyIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import { formatBytes, formatCount } from '@/utils/formatters'
 import { copyText } from '@/utils/clipboard'
+import { plural } from '@/utils/plural'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 interface JsonTreeViewerProps {
@@ -169,7 +170,7 @@ const TreeNode: React.FC<TreeNodeProps> = memo(function TreeNode({
       ? (value as unknown[]).map((v, i) => [i, v] as const)
       : Object.entries(value as Record<string, unknown>)
     const count = entries.length
-    const label = type === 'array' ? `Array (${count})` : `Object (${count} keys)`
+    const label = type === 'array' ? `Array (${count})` : `Object (${plural(count, 'key')})`
 
     return (
       <div className={`${depth > 0 ? 'ml-4' : ''}`}>
@@ -253,7 +254,7 @@ const TreeNode: React.FC<TreeNodeProps> = memo(function TreeNode({
       ? (parsed as unknown[]).map((v, i) => [i, v] as const)
       : Object.entries(parsed as Record<string, unknown>)
     const count = entries.length
-    const label = Array.isArray(parsed) ? `JSON string — Array (${count})` : `JSON string — Object (${count} keys)`
+    const label = Array.isArray(parsed) ? `JSON string — Array (${count})` : `JSON string — Object (${plural(count, 'key')})`
 
     return (
       <div className={`${depth > 0 ? 'ml-4' : ''}`}>
