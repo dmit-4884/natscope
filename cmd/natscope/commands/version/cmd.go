@@ -93,7 +93,6 @@ func printText(full bool) {
 	}
 }
 
-// orNone substitutes a visible placeholder for empty build metadata fields.
 func orNone(s string) string {
 	if s == "" {
 		return "(none)"
