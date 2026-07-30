@@ -50,6 +50,21 @@ func toStreamInfo(info *jetstream.StreamInfo) *entities.StreamInfo {
 	return result
 }
 
+func toJetStreamConsumerConfig(config entities.ConsumerCreateRequest) *jetstream.ConsumerConfig {
+	jsConfig := converter.Convert(config, &jetstream.ConsumerConfig{},
+		converter.WithIgnoreFields("OptStartTime"),
+	)
+	jsConfig.Durable = jsConfig.Name
+
+	if config.OptStartTime != "" {
+		if t, err := time.Parse(time.RFC3339, config.OptStartTime); err == nil {
+			jsConfig.OptStartTime = &t
+		}
+	}
+
+	return jsConfig
+}
+
 // toConsumerInfo uses a caller-supplied Stream since the SDK doesn't always carry
 // the parent stream name.
 func toConsumerInfo(info *jetstream.ConsumerInfo, streamName string) *entities.ConsumerInfo {
