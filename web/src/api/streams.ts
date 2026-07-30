@@ -80,11 +80,33 @@ function toConsumerConfig(c: ProtoConsumerConfig | undefined): ConsumerConfig | 
   }
 }
 
+/**
+ * Pause state lives only in the server's raw ConsumerInfo JSON (`paused`,
+ * `config.pause_until`) — the proto contract carries neither field.
+ */
+export function readConsumerPauseState(
+  raw: Record<string, unknown> | undefined,
+): { paused: boolean; pauseUntil: string | undefined } {
+  if (!raw) return { paused: false, pauseUntil: undefined }
+
+  const config = raw.config
+  const pauseUntilRaw =
+    config !== null && typeof config === 'object'
+      ? (config as Record<string, unknown>).pause_until
+      : undefined
+
+  return {
+    paused: raw.paused === true,
+    pauseUntil: typeof pauseUntilRaw === 'string' && pauseUntilRaw ? pauseUntilRaw : undefined,
+  }
+}
+
 export function toConsumerInfo(c: ProtoConsumerInfo): ConsumerInfo {
   let raw: Record<string, unknown> | undefined
   if (c.raw) {
     try { raw = JSON.parse(c.raw) } catch { /* ignore */ }
   }
+  const pause = readConsumerPauseState(raw)
   return {
     name: c.name,
     stream_name: c.stream || undefined,
@@ -103,6 +125,8 @@ export function toConsumerInfo(c: ProtoConsumerInfo): ConsumerInfo {
     num_redelivered: c.numRedelivered || undefined,
     num_waiting: c.numWaiting || undefined,
     push_bound: c.pushBound || undefined,
+    paused: pause.paused,
+    pause_until: pause.pauseUntil,
     cluster: toClusterInfo(c.cluster),
     raw,
   }

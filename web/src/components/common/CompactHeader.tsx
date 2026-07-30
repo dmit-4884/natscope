@@ -1,15 +1,29 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SavedConnection } from '@/api/connections'
-import { useConnections , useConnectionHealth } from '@/contexts/connection'
+import { useConnections , useConnectionHealth, type ConnectionStatus } from '@/contexts/connection'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
-import { BoltIcon, ChevronDownIcon, PlusIcon, RefreshIcon } from '@/components/ui'
+import { Badge, BoltIcon, ChevronDownIcon, PlusIcon, RefreshIcon } from '@/components/ui'
 import type { ConnectionSummary } from './ConnectedLayout'
 import { SIDEBAR_PANEL_ID } from './Sidebar'
 import Tooltip from './Tooltip'
 
 const ServerInfo = lazy(() => import('../streams/ServerInfo'))
+
+const STATUS_LABELS: Record<ConnectionStatus, string> = {
+  connecting: 'Connecting',
+  connected: 'Connected',
+  reconnecting: 'Reconnecting',
+  disconnected: 'Not connected',
+}
+
+const STATUS_DOT_CLASSES: Record<ConnectionStatus, string> = {
+  connecting: 'bg-amber-500 animate-pulse',
+  connected: 'bg-green-500',
+  reconnecting: 'bg-amber-500 animate-pulse',
+  disconnected: 'bg-red-500',
+}
 
 interface CompactHeaderProps {
   connectionId: string | null
@@ -32,7 +46,8 @@ export default function CompactHeader({
   const [showServerInfo, setShowServerInfo] = useState(false)
 
   // Connection health
-  const { serverVersion, refetch: refetchHealth } = useConnectionHealth(connectionId)
+  const { status: healthStatus, serverVersion, refetch: refetchHealth } = useConnectionHealth(connectionId)
+  const status: ConnectionStatus = connectionId ? healthStatus : 'disconnected'
   const queryClient = useQueryClient()
   const [isRefreshing, setIsRefreshing] = useState(false)
 
@@ -132,8 +147,8 @@ export default function CompactHeader({
             {/* Status dot */}
             <div
               role="img"
-              aria-label={currentConnection ? 'Connected' : 'Not connected'}
-              className={`w-2 h-2 rounded-full shrink-0 ${currentConnection ? 'bg-green-500' : 'bg-gray-400'}`}
+              aria-label={STATUS_LABELS[status]}
+              className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT_CLASSES[status]}`}
             />
 
             {currentConnection ? (
@@ -145,6 +160,17 @@ export default function CompactHeader({
               </>
             ) : (
               <span className="text-content-tertiary">Click to connect...</span>
+            )}
+
+            {connectionId && status !== 'connected' && (
+              <Badge
+                variant={status === 'disconnected' ? 'error' : 'warning'}
+                size="sm"
+                className="shrink-0"
+                aria-hidden="true"
+              >
+                {STATUS_LABELS[status]}
+              </Badge>
             )}
 
             {serverVersion && (

@@ -249,6 +249,7 @@ export default function StreamConsumersTab() {
               onResume={() => handleResume(selectedConsumer)}
               onDelete={() => requestDeleteConsumer(selectedConsumer)}
               isResuming={resumeConsumer.isPending}
+              isPausing={pauseConsumer.isPending}
               pauseUnsupportedReason={pauseUnsupportedReason}
             />
           )

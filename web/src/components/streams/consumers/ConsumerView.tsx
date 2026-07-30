@@ -1,4 +1,4 @@
-import { Button, CopyButton, PencilIcon, RefreshIcon, InfoIcon } from '@/components/ui'
+import { Badge, Button, CopyButton, PencilIcon, RefreshIcon, InfoIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import JsonViewer from '@/components/common/JsonViewer'
 import type { ConsumerInfo } from '@/types/nats'
@@ -17,8 +17,15 @@ interface Props {
   onResume: () => void
   onDelete: () => void
   isResuming: boolean
+  isPausing: boolean
   /** When set, the server doesn't support pause/resume — buttons are disabled with this tooltip. */
   pauseUnsupportedReason?: string
+}
+
+function formatPauseUntil(pauseUntil: string | undefined): string | null {
+  if (!pauseUntil) return null
+  const parsed = new Date(pauseUntil)
+  return Number.isNaN(parsed.getTime()) ? pauseUntil : parsed.toLocaleString()
 }
 
 export function ConsumerView({
@@ -31,13 +38,24 @@ export function ConsumerView({
   onResume,
   onDelete,
   isResuming,
+  isPausing,
   pauseUnsupportedReason,
 }: Props) {
+  const isPaused = consumer.paused === true
+  const pauseUntilLabel = formatPauseUntil(consumer.pause_until)
+
   return (
     <>
       <div className="flex items-center px-4 py-3 border-b bg-surface-secondary shrink-0">
         <div>
-          <h3 className="font-semibold text-content-primary">{consumer.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-content-primary">{consumer.name}</h3>
+            {isPaused && (
+              <Badge variant="warning" size="sm">
+                Paused
+              </Badge>
+            )}
+          </div>
           {consumer.config?.description && (
             <p className="text-sm text-content-tertiary mt-0.5">{consumer.config.description}</p>
           )}
@@ -167,6 +185,13 @@ export function ConsumerView({
                     value={consumer.created ? new Date(consumer.created).toLocaleString() : '-'}
                     hint="When this consumer was created"
                   />
+                  {isPaused && (
+                    <ConfigRow
+                      label="Paused Until"
+                      value={pauseUntilLabel ?? 'Unknown'}
+                      hint="Message delivery stays suspended until this time"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -185,12 +210,16 @@ export function ConsumerView({
                 </Tooltip>
               ) : (
                 <>
-                  <Button variant="secondary" size="sm" onClick={onPause}>
-                    Pause
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={onResume} disabled={isResuming}>
-                    Resume
-                  </Button>
+                  <Tooltip content={isPaused ? 'Consumer is already paused' : 'Suspend message delivery'}>
+                    <Button variant="secondary" size="sm" onClick={onPause} disabled={isPaused || isPausing}>
+                      Pause
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content={isPaused ? 'Resume message delivery now' : 'Consumer is not paused'}>
+                    <Button variant="secondary" size="sm" onClick={onResume} disabled={!isPaused || isResuming}>
+                      Resume
+                    </Button>
+                  </Tooltip>
                 </>
               )}
               <Button variant="danger" size="sm" onClick={onDelete}>

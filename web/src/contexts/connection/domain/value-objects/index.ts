@@ -4,3 +4,9 @@ export {
   isAuthMethod,
   type AuthMethod,
 } from './AuthMethod'
+export {
+  resolveConnectionStatus,
+  type ConnectionStatus,
+  type ConnectionStatusInput,
+  type ReportedHealthStatus,
+} from './ConnectionStatus'
