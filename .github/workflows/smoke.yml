@@ -1,0 +1,86 @@
+name: smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unix:
+    name: smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            pattern: "*_linux_amd64.tar.gz"
+          - os: macos-latest
+            pattern: "*_darwin_arm64.tar.gz"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Download latest release binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download --repo ${{ github.repository }} --pattern "${{ matrix.pattern }}"
+
+      - name: Unpack
+        run: tar xzf natscope_*.tar.gz
+
+      - name: Version
+        run: ./natscope version
+
+      - name: Boot server and probe UI
+        env:
+          GRPC_WEB_ADDRESS: 127.0.0.1:4280
+          SECRETS__BACKEND: file
+          SECRETS__FILE_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        run: |
+          STORAGE__LOCAL__DATA_DIR="$RUNNER_TEMP/data" ./natscope &
+          server_pid=$!
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4280/ || true)
+            if [ "$code" = "200" ]; then
+              echo "UI responded 200"
+              kill "$server_pid"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "UI never became ready"
+          exit 1
+
+  windows:
+    name: smoke (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - name: Download latest release binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download --repo ${{ github.repository }} --pattern "*_windows_amd64.zip"
+
+      - name: Unpack
+        run: Expand-Archive -Path (Get-Item natscope_*.zip).FullName -DestinationPath app
+
+      - name: Version
+        run: .\app\natscope.exe version
+
+      - name: Boot server and probe UI
+        env:
+          GRPC_WEB_ADDRESS: 127.0.0.1:4280
+          SECRETS__BACKEND: file
+          SECRETS__FILE_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          STORAGE__LOCAL__DATA_DIR: ${{ runner.temp }}\data
+        run: |
+          $proc = Start-Process -FilePath .\app\natscope.exe -PassThru -NoNewWindow
+          $ok = $false
+          foreach ($i in 1..30) {
+            try {
+              $resp = Invoke-WebRequest -Uri http://127.0.0.1:4280/ -UseBasicParsing -TimeoutSec 2
+              if ($resp.StatusCode -eq 200) { $ok = $true; break }
+            } catch { }
+            Start-Sleep -Seconds 1
+          }
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { Write-Error "UI never became ready"; exit 1 }
+          Write-Output "UI responded 200"
