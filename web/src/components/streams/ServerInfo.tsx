@@ -1,5 +1,5 @@
 import { getServerInfo } from '@/api/stats'
-import { useConnectionHealth } from '@/contexts/connection'
+import { useConnectionHealth, type ConnectionStatus } from '@/contexts/connection'
 import { useConnectionQuery } from '@/hooks/useConnectionQuery'
 import { formatBytes, formatNumber } from '@/utils/formatters'
 import { Spinner, Alert, CloseIcon, Modal, Badge, CopyButton } from '@/components/ui'
@@ -9,7 +9,8 @@ interface Props {
   onClose: () => void
 }
 
-const STATUS_META: Record<'connected' | 'reconnecting' | 'disconnected', { dot: string; text: string; label: string }> = {
+const STATUS_META: Record<ConnectionStatus, { dot: string; text: string; label: string }> = {
+  connecting: { dot: 'bg-status-warning-border', text: 'text-status-warning-text', label: 'connecting' },
   connected: { dot: 'bg-status-success-border', text: 'text-status-success-text', label: 'connected' },
   reconnecting: { dot: 'bg-status-warning-border', text: 'text-status-warning-text', label: 'reconnecting' },
   disconnected: { dot: 'bg-status-error-border', text: 'text-status-error-text', label: 'disconnected' },
