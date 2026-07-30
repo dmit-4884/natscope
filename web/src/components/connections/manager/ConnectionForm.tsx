@@ -12,10 +12,8 @@ interface Props {
   value: ConnectionFormData
   onChange: (value: ConnectionFormData) => void
   onCancel: () => void
-  onSave: () => void
   onTest: () => void
   isTesting: boolean
-  isSaving?: boolean
   mode?: 'create' | 'edit'
   nameError?: string
   urlErrors?: (string | undefined)[]
@@ -50,10 +48,8 @@ export function ConnectionForm({
   value,
   onChange,
   onCancel,
-  onSave,
   onTest,
   isTesting,
-  isSaving = false,
   mode = 'create',
   nameError,
   urlErrors,
@@ -409,19 +405,6 @@ export function ConnectionForm({
               </svg>
             )}
             Test
-          </button>
-          <button
-            onClick={onSave}
-            disabled={isSaving}
-            className="px-4 py-2 text-sm bg-accent text-content-inverse rounded-lg hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-          >
-            {isSaving ? 'Saving…' : mode === 'edit' ? 'Save changes' : 'Save'}
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm bg-surface-tertiary text-gray-700 rounded-lg hover:bg-surface-hover transition-colors"
-          >
-            Cancel
           </button>
         </div>
       </div>

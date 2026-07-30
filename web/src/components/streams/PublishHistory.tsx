@@ -3,7 +3,7 @@ import { usePublishHistory, type PublishHistoryEntry } from '@/contexts/messages
 import JsonTreeViewer from '@/components/messages/JsonTreeViewer'
 import { CopyIcon, SearchIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
-import { formatBytes } from '@/utils/formatters'
+import { formatBytes, formatMonthDay, formatTime } from '@/utils/formatters'
 import { toast } from '@/utils/toast'
 import { copyText } from '@/utils/clipboard'
 import { setLastPattern, setPatternDraft } from '@/stores/streamTabState/publishDraftStore'
@@ -19,16 +19,6 @@ interface PublishHistoryProps {
   connectionUrl: string | null
   /** Current stream's subject patterns — used to attribute failed publishes. */
   subjects?: string[]
-}
-
-function formatHistoryTime(timestamp: number): string {
-  const date = new Date(timestamp) // Unix milliseconds
-  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-}
-
-function formatHistoryDate(timestamp: number): string {
-  const date = new Date(timestamp) // Unix milliseconds
-  return date.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' })
 }
 
 function parsePayloadJson(payloadJson: string): Record<string, unknown> {
@@ -250,7 +240,7 @@ export default function PublishHistory({ streamName, connectionId, connectionUrl
                           className={`w-2 h-2 rounded-full ${entry.success ? 'bg-green-400' : 'bg-red-400'}`}
                         />
                         <span className="text-xs text-content-tertiary">
-                          {formatHistoryDate(entry.created_at)} {formatHistoryTime(entry.created_at)}
+                          {formatMonthDay(entry.created_at)} {formatTime(entry.created_at)}
                         </span>
                       </div>
                       <span

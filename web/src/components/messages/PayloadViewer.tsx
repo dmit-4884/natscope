@@ -2,6 +2,7 @@ import { memo, useState, useMemo, useEffect, useRef } from 'react'
 import { Tabs, tabPanelProps } from '@/components/ui'
 import { copyText } from '@/utils/clipboard'
 import { decodeBase64ToBytes } from '@/utils/base64'
+import { formatBytes } from '@/utils/formatters'
 import JsonTreeViewer from './JsonTreeViewer'
 
 type ViewMode = 'decoded' | 'json' | 'raw' | 'hex'
@@ -208,7 +209,7 @@ const PayloadViewer = memo(function PayloadViewer({
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-gray-700">
-                    Decoded UTF-8 ({bytes.length} bytes)
+                    Decoded UTF-8 ({formatBytes(bytes.length)})
                   </h3>
                   <button
                     onClick={() => copyText(rawText)}
@@ -230,7 +231,7 @@ const PayloadViewer = memo(function PayloadViewer({
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-700">
-                Hex Dump ({bytes.length} bytes)
+                Hex Dump ({formatBytes(bytes.length)})
               </h3>
               <button
                 onClick={() => copyText(hexLines.join('\n'))}

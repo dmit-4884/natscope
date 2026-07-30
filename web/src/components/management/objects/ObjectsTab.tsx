@@ -14,7 +14,7 @@ import {
 import { decodeBase64ToBytes } from '@/utils/base64'
 import { toast } from '@/utils/toast'
 import { plural } from '@/utils/plural'
-import { formatBytes } from '@/utils/formatters'
+import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { useConfirmation } from '@/contexts/settings'
 import { Button, Modal, Input, Badge, Alert, Spinner, JsonEditor, CloseIcon, Tabs, tabPanelProps, OverflowMenu } from '@/components/ui'
 import type { ConnectionOutletContext } from '@/components/common/ConnectedLayout'
@@ -404,7 +404,7 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                   <div>
                     <h3 className="font-semibold text-content-primary">{selectedObject.name}</h3>
                     <p className="text-sm text-content-tertiary mt-1">
-                      {formatBytes(selectedObject.size)} | {selectedObject.chunks} chunks | Modified: {new Date(selectedObject.mod_time).toLocaleString()}
+                      {formatBytes(selectedObject.size)} | {selectedObject.chunks} chunks | Modified: {formatDateTime(selectedObject.mod_time)}
                     </p>
                   </div>
                   <div className="flex gap-2">

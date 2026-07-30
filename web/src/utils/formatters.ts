@@ -2,14 +2,26 @@
 
 import { format } from 'date-fns'
 
-/** Bytes -> human-readable (e.g. "1.5 MB"). */
+/**
+ * The UI is English-only, so every date and number is pinned to this locale
+ * rather than the browser's — otherwise an ru-RU browser mixes `30.07.2026`
+ * into English labels.
+ */
+const UI_LOCALE = 'en-US'
+
+/** Bytes -> human-readable (e.g. "1.5 MB"); raw byte counts stay integers. */
 export function formatBytes(bytes: number, precision = 2): string {
   if (bytes === 0) return '0 B'
   if (bytes < 0 || !Number.isFinite(bytes)) return 'Unlimited'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
-  return `${(bytes / Math.pow(k, i)).toFixed(precision)} ${sizes[i]}`
+  return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : precision)} ${sizes[i]}`
+}
+
+/** Number -> grouped decimal (e.g. "1,234"), pinned to the UI locale. */
+export function formatCount(value: number): string {
+  return value.toLocaleString(UI_LOCALE)
 }
 
 /** Bytes/sec -> human-readable (e.g. "1.5 MB/s"). */
@@ -61,19 +73,22 @@ export function formatTimestamp(
 
 /** Timestamp -> time with ms (HH:mm:ss.SSS); for live messages. */
 export function formatTimeWithMs(timestamp: DateInput): string {
-  const d = toDate(timestamp)
-  const time = d.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
-  const ms = d.getMilliseconds().toString().padStart(3, '0')
-  return `${time}.${ms}`
+  return format(toDate(timestamp), 'HH:mm:ss.SSS')
+}
+
+/** Timestamp -> 24-hour time (HH:mm:ss). */
+export function formatTime(timestamp: DateInput): string {
+  return format(toDate(timestamp), 'HH:mm:ss')
 }
 
 /** Date -> ISO date (yyyy-MM-dd). */
 export function formatDate(date: DateInput): string {
   return format(toDate(date), 'yyyy-MM-dd')
+}
+
+/** Date -> compact month/day (MM-dd); for dense history columns. */
+export function formatMonthDay(date: DateInput): string {
+  return format(toDate(date), 'MM-dd')
 }
 
 /** Date -> full datetime (yyyy-MM-dd HH:mm:ss); for debug. */

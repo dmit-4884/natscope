@@ -12,7 +12,7 @@ import {
 } from '@/contexts/kv'
 import { decodeBase64 } from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
-import { formatBytes } from '@/utils/formatters'
+import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
 import { useConfirmation } from '@/contexts/settings'
 import { Button, Modal, Input, Badge, Alert, Spinner, SearchInput, CloseIcon, PlusIcon, RefreshIcon, OverflowMenu } from '@/components/ui'
@@ -253,16 +253,22 @@ export default function KVStorePage() {
                 {filteredKeys.map((key: string) => (
                   <div
                     key={key}
-                    className={`p-2 border-b cursor-pointer hover:bg-surface-secondary flex items-center justify-between group ${
+                    className={`pr-2 border-b hover:bg-surface-secondary flex items-center justify-between group ${
                       selectedKey === key ? 'bg-accent-light' : ''
                     }`}
-                    onClick={() => {
-                      setSelectedKey(key)
-                      setIsCreatingKey(false)
-                    }}
                   >
-                    <span className="text-sm truncate flex-1">{key}</span>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                    <button
+                      type="button"
+                      aria-current={selectedKey === key ? 'true' : undefined}
+                      className="w-full text-left p-2 text-sm truncate flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus rounded"
+                      onClick={() => {
+                        setSelectedKey(key)
+                        setIsCreatingKey(false)
+                      }}
+                    >
+                      {key}
+                    </button>
+                    <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
                       <Tooltip content="Purge all revisions">
                         <button
                           onClick={(e) => {
@@ -364,7 +370,7 @@ export default function KVStorePage() {
                       {keyEntry && (
                         <span className="flex gap-2">
                           <Badge variant="default" size="sm">Rev {keyEntry.revision}</Badge>
-                          <span>Last updated: {new Date(keyEntry.created).toLocaleString()}</span>
+                          <span>Last updated: {formatDateTime(keyEntry.created)}</span>
                         </span>
                       )}
                     </p>
@@ -503,7 +509,7 @@ export default function KVStorePage() {
                         {entry.operation}
                       </Badge>
                       <span className="text-xs text-content-tertiary">
-                        {new Date(entry.created).toLocaleString()}
+                        {formatDateTime(entry.created)}
                       </span>
                     </div>
                     {entry.operation === 'put' ? (

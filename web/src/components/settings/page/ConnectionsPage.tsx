@@ -58,9 +58,7 @@ export default function ConnectionsPage() {
     if (!pendingDelete) return
     try {
       await deleteConnectionMutation.mutateAsync({ id: pendingDelete.id })
-    } catch {
-      toast.error('Failed to delete connection')
-    } finally {
+    } catch { /* toasted by the global mutation handler */ } finally {
       setPendingDelete(null)
     }
   }

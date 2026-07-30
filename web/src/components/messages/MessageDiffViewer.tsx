@@ -291,6 +291,7 @@ export default function MessageDiffViewer({
             </div>
             <button
               onClick={onClose}
+              aria-label="Close diff"
               className="text-content-muted hover:text-content-secondary text-xl leading-none"
             >
               &times;
