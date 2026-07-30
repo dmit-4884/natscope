@@ -12,10 +12,13 @@ interface Props {
   validationState: ValidationState
   violationCount?: number
   canPublish: boolean
+  disabledReason?: string | null
   isPublishing: boolean
   onPublish: () => void
   children?: React.ReactNode
 }
+
+const DISABLED_REASON_ID = 'publish-disabled-reason'
 
 function ValidationBadge({ state, violationCount }: { state: ValidationState; violationCount: number }) {
   if (state === 'none') return null
@@ -63,11 +66,13 @@ export function PublishActionBar({
   validationState,
   violationCount = 0,
   canPublish,
+  disabledReason,
   isPublishing,
   onPublish,
   children,
 }: Props) {
   const platformCmd = isMacPlatform() ? '⌘' : 'Ctrl'
+  const showDisabledReason = !isPublishing && !canPublish && !!disabledReason
 
   return (
     <div className="flex items-center justify-between">
@@ -76,10 +81,20 @@ export function PublishActionBar({
         {children}
       </div>
       <div className="flex items-center gap-3">
+        {showDisabledReason && (
+          <span
+            id={DISABLED_REASON_ID}
+            data-testid="publish-disabled-reason"
+            className="text-xs text-status-warning-text"
+          >
+            {disabledReason}
+          </span>
+        )}
         <ValidationBadge state={validationState} violationCount={violationCount} />
         <button
           onClick={onPublish}
           disabled={isPublishing || !canPublish}
+          aria-describedby={showDisabledReason ? DISABLED_REASON_ID : undefined}
           className="px-6 py-2.5 bg-accent text-content-inverse font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {isPublishing ? (

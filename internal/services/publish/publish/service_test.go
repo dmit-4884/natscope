@@ -158,6 +158,7 @@ func TestPublish_ProtoEncoded(t *testing.T) {
 	defer hist.mu.Unlock()
 	assert.Equal(t, entities.EncodingTypeProtobuf, hist.last.EncodingType)
 	assert.Equal(t, "api.v1.Order", hist.last.MessageType)
+	assert.Equal(t, len(encoded), hist.last.PayloadSize, "history must record the encoded payload size, not the JSON source length")
 }
 
 func TestPublish_EncodeError(t *testing.T) {
