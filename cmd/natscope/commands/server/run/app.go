@@ -49,8 +49,6 @@ type App struct {
 	// Service instance ID.
 	sid *id.Service
 
-	// dirsFallback holds the home-local base directory when the default
-	// service directories were not writable and got redirected there.
 	dirsFallback string
 }
 
@@ -85,11 +83,6 @@ func (srv *App) Run(cmd *cobra.Command, args []string) error {
 	return srv.run(context.Background())
 }
 
-// ensureServiceDirs makes appinfo.VarDir/LibDir usable before anything touches
-// them. The platform defaults (/var, /var/lib/<name>) are not writable for
-// non-root installs (Homebrew, Docker non-root user), so when they cannot be
-// created and the user has not overridden them, the directories are redirected
-// to ~/.<name>/{var,lib}.
 func (srv *App) ensureServiceDirs() error {
 	mkErr := appinfo.MakeAllDirs()
 	if mkErr == nil {
@@ -123,8 +116,6 @@ func (srv *App) ensureServiceDirs() error {
 	return nil
 }
 
-// envVarName mirrors appinfo.GetEnvVar's prefixing to name environment
-// variables in overrides and error messages.
 func envVarName(key string) string {
 	if appinfo.EnvPrefix != "" {
 		key = strings.TrimRight(appinfo.EnvPrefix, "_") + "_" + key
