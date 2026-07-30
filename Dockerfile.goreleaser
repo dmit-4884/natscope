@@ -13,12 +13,18 @@ COPY natscope /opt/bin/natscope
 RUN addgroup -S natscope && adduser -S -G natscope -h /home/natscope natscope && \
     mkdir -p /data && chown natscope:natscope /data
 
-# File vault + all-interfaces bind. Fail-closed: won't start without
-# WEB_AUTH__USERNAME/PASSWORD or ALLOW_INSECURE=true. -p 127.0.0.1:4280:4280 keeps it local.
+# File vault + all-interfaces bind (required for -p port mapping). The listener
+# is unauthenticated inside the container, so ALLOW_INSECURE acknowledges that;
+# publish with -p 127.0.0.1:4280:4280 to keep it host-local, or set
+# WEB_AUTH__USERNAME/WEB_AUTH__PASSWORD to put basic auth in front.
+# LIB_DIR/VAR_DIR keep service state (instance id, cert cache) on the volume.
 ENV GRPC_WEB_ADDRESS=0.0.0.0:4280 \
     ALLOW_REMOTE=true \
+    ALLOW_INSECURE=true \
     SECRETS__BACKEND=file \
-    STORAGE__LOCAL__DATA_DIR=/data
+    STORAGE__LOCAL__DATA_DIR=/data \
+    LIB_DIR=/data/lib \
+    VAR_DIR=/data/var
 
 USER natscope
 VOLUME ["/data"]

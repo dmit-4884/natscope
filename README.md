@@ -197,6 +197,7 @@ Natscope works with zero configuration. When you need to tweak it:
 | Config file | `--config` flag or `CONFIG_FILE` env var (templates in `configs/`) |
 | Env overrides | any config field; nested keys use double underscores (`LOGGER__LEVEL`) |
 | Data directory | `STORAGE__LOCAL__DATA_DIR` (default `~/.natscope/data/`) |
+| Service state dirs | `LIB_DIR` / `VAR_DIR` — instance id and cert cache (default `/var/lib/natscope`; falls back to `~/.natscope/{lib,var}` automatically when the system path is not writable) |
 | Secret vault | `SECRETS__BACKEND=auto\|keyring\|file`; for `file`, supply `SECRETS__FILE_KEY` (64 hex chars, AES-256) out-of-band |
 
 ## Remote access
