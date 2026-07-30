@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Alert, Badge, Button, Input, Toggle } from '@/components/ui'
 import { getErrorMessage } from '@/api/errors'
+import { plural } from '@/utils/plural'
 import {
   useCreateProtoSource,
   useUpdateProtoSource,
@@ -355,7 +356,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
                 localValidate.valid ? 'bg-status-success-bg text-green-700' : 'bg-status-error-bg text-red-700'
               }`}>
                 {localValidate.valid
-                  ? `Valid path - ${localValidate.protoFileCount} .proto file(s) found`
+                  ? `Valid path - ${plural(localValidate.protoFileCount, '.proto file')} found`
                   : localValidate.error || 'Invalid path'}
               </div>
             )}
@@ -568,8 +569,8 @@ export default function ProtoSourceEditPage({ mode }: Props) {
                         compileOut.valid ? 'bg-status-success-bg text-green-700' : 'bg-surface-secondary text-content-secondary'
                       }`}
                     >
-                      Compiled: {compileOut.fileDescriptors} file descriptors,{' '}
-                      {compileOut.messageTypes} message types
+                      Compiled: {plural(compileOut.fileDescriptors, 'file descriptor')},{' '}
+                      {plural(compileOut.messageTypes, 'message type')}
                     </div>
                     {compileOut.diagnostics.length > 0 && (
                       <CompileDiagnosticsList diagnostics={compileOut.diagnostics} />

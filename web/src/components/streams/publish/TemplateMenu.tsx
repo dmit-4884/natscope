@@ -180,13 +180,13 @@ export function TemplateMenu({ subjectPattern, messageType, messageJson, headers
           <div className="flex-1 overflow-auto">
             {total === 0 && (
               <div className="px-3 py-6 text-xs text-content-muted text-center">
-                No templates yet. Hit «Save Template» to create one.
+                No templates yet. Hit &ldquo;Save as template&rdquo; to create one.
               </div>
             )}
 
             {total > 0 && totalMatching === 0 && (
               <div className="px-3 py-6 text-xs text-content-muted text-center">
-                No templates match «{query}».
+                No templates match &ldquo;{query}&rdquo;.
               </div>
             )}
 

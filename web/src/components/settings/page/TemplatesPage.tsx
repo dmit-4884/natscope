@@ -365,7 +365,7 @@ export default function TemplatesPage() {
         ) : visible === 0 ? (
           <EmptyState
             title="No matching templates"
-            description={`No templates match «${query}». Try a different search.`}
+            description={`No templates match “${query}”. Try a different search.`}
           />
         ) : (
           <DataTable

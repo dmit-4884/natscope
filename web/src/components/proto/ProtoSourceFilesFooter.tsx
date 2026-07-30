@@ -59,7 +59,7 @@ export function ProtoSourceFilesFooter({
       {compileError && <ErrorAlert compact message={compileError.message} />}
       {result && !diagnostics?.some((d) => d.severity === 'error') && (
         <div className="text-xs text-green-700 p-2 bg-status-success-bg rounded">
-          Compiled: {result.fileDescriptors} file descriptors, {result.messageTypes} message types
+          Compiled: {plural(result.fileDescriptors, 'file descriptor')}, {plural(result.messageTypes, 'message type')}
         </div>
       )}
       {diagnostics && diagnostics.length > 0 && <CompileDiagnosticsList diagnostics={diagnostics} compact />}

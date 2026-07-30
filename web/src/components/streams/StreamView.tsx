@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { NavLink, Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
+import { Code } from '@connectrpc/connect'
 import { useStreamDetail } from '@/contexts/streams'
 import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
 import {
@@ -16,7 +17,8 @@ import {
   type HeaderDraft,
 } from '@/stores/streamTabState/publishDraftStore'
 import { useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
-import { UsersIcon } from '@/components/ui'
+import { getErrorReason, isErrorCode } from '@/api/errors'
+import { Button, EmptyState, UsersIcon, WarningIcon } from '@/components/ui'
 import type { SelectedMessage } from '../messages/UnifiedMessageList'
 import { useMessageNavigation } from '../messages/unified/useMessageNavigation'
 import UnifiedMessageViewer from '../messages/UnifiedMessageViewer'
@@ -165,7 +167,7 @@ export default function StreamView() {
     document.body.style.userSelect = 'none'
   }, [])
 
-  const { data: streamDetail } = useStreamDetail(streamName ?? null, connectionId)
+  const { data: streamDetail, error: streamError } = useStreamDetail(streamName ?? null, connectionId)
 
   useEffect(() => {
     if (!isScopeReady(scope)) return
@@ -214,6 +216,9 @@ export default function StreamView() {
   // Config and Consumers tabs use full width (no right panel)
   const isFullWidthTab = isConfigTab || isConsumersTab
 
+  const streamMissing =
+    getErrorReason(streamError) === 'NATS_STREAM_NOT_FOUND' || isErrorCode(streamError, Code.NotFound)
+
   // Arrow navigation — must be called before the early return (hooks rule).
   const isMessagesTab = !isPublishTab && !isFullWidthTab
   const navigation = useMessageNavigation({
@@ -227,6 +232,24 @@ export default function StreamView() {
 
   if (!connectionId || !streamName) {
     return null
+  }
+
+  if (streamMissing) {
+    return (
+      <main className="flex-1 flex items-center justify-center bg-surface-primary" id="main-content" role="main">
+        <EmptyState
+          size="lg"
+          icon={<WarningIcon className="w-full h-full" />}
+          title={`Stream "${decodeURIComponent(streamName)}" not found`}
+          description="It may have been deleted, or it lives on a different connection."
+          action={
+            <Button onClick={() => navigate('/streams')}>
+              Back to streams
+            </Button>
+          }
+        />
+      </main>
+    )
   }
 
   const baseUrl = `/streams/${encodeURIComponent(streamName)}`
