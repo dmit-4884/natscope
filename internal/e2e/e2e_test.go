@@ -168,20 +168,39 @@ func TestE2E(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, consResp.Msg.GetConsumer())
 		assert.Equal(t, "e2e-consumer", consResp.Msg.GetConsumer().GetName())
+		assert.Equal(t, "e2e-consumer", consResp.Msg.GetConsumer().GetConfig().GetDurable(),
+			"created consumer must be durable, otherwise the server reaps it after its ephemeral inactivity default")
 
-		// ListConsumers contains it
+		// ListConsumers contains it, still durable when read back from the server.
 		listCons, err := env.management.ListConsumers(ctx, connect.NewRequest(&managementpb.ListConsumersRequest{
 			ConnectionId: connectionID,
 			StreamName:   streamName,
 		}))
 		require.NoError(t, err)
-		found := false
+		var listed *natstypes.ConsumerInfo
 		for _, c := range listCons.Msg.GetConsumers() {
 			if c.GetName() == "e2e-consumer" {
-				found = true
+				listed = c
 			}
 		}
-		assert.True(t, found, "created consumer should be listed")
+		require.NotNil(t, listed, "created consumer should be listed")
+		assert.Equal(t, "e2e-consumer", listed.GetConfig().GetDurable(), "durable_name must round-trip through the server")
+		assert.Zero(t, listed.GetConfig().GetInactiveThreshold().AsDuration(),
+			"a durable consumer must not inherit the server's 5s ephemeral inactivity default")
+
+		// UpdateConsumer must not drop the durable name it was created with.
+		newDesc := "e2e consumer updated"
+		updCons, err := env.management.UpdateConsumer(ctx, connect.NewRequest(&managementpb.UpdateConsumerRequest{
+			ConnectionId: connectionID,
+			StreamName:   streamName,
+			ConsumerName: "e2e-consumer",
+			Description:  &newDesc,
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, newDesc, updCons.Msg.GetConsumer().GetConfig().GetDescription())
+		assert.Equal(t, "e2e-consumer", updCons.Msg.GetConsumer().GetConfig().GetDurable(), "update must preserve durable_name")
+		assert.Zero(t, updCons.Msg.GetConsumer().GetConfig().GetInactiveThreshold().AsDuration(),
+			"update must not downgrade the consumer to ephemeral")
 
 		// Stats: stream stats, server info, health.
 		statsResp, err := env.stats.GetStreamStats(ctx, connect.NewRequest(&statspb.GetStreamStatsRequest{

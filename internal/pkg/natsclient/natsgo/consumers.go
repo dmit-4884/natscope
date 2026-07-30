@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nats-io/nats.go/jetstream"
-
 	"github.com/altessa-s/go-atlas/core/errors"
 	"github.com/altessa-s/go-atlas/core/runtime/concurrency"
 	"github.com/altessa-s/go-atlas/core/runtime/panics"
@@ -105,14 +103,7 @@ func (c *Client) CreateConsumer(
 		return nil, wrapErr(err)
 	}
 
-	jsConfig := converter.Convert(config, &jetstream.ConsumerConfig{},
-		converter.WithIgnoreFields("OptStartTime"),
-	)
-	if config.OptStartTime != "" {
-		if t, parseErr := time.Parse(time.RFC3339, config.OptStartTime); parseErr == nil {
-			jsConfig.OptStartTime = &t
-		}
-	}
+	jsConfig := toJetStreamConsumerConfig(config)
 
 	consumer, err := stream.CreateConsumer(ctx, *jsConfig)
 	if err != nil {
