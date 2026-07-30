@@ -157,11 +157,10 @@ func TestConsumerCreateConversion(t *testing.T) {
 		IdleHeartbeat:      15 * time.Second,
 	}
 
-	jsConfig := converter.Convert(entity, &jetstream.ConsumerConfig{},
-		converter.WithIgnoreFields("OptStartTime"),
-	)
+	jsConfig := toJetStreamConsumerConfig(entity)
 
 	assert.Equal(t, "test-consumer", jsConfig.Name)
+	assert.Equal(t, "test-consumer", jsConfig.Durable, "Durable must mirror Name so the server keeps the consumer")
 	assert.Equal(t, "test consumer desc", jsConfig.Description)
 	assert.Equal(t, jetstream.DeliverByStartSequencePolicy, jsConfig.DeliverPolicy)
 	assert.Equal(t, uint64(500), jsConfig.OptStartSeq)
@@ -191,6 +190,40 @@ func TestConsumerCreateConversion(t *testing.T) {
 	assert.Equal(t, "workers", jsConfig.DeliverGroup)
 	assert.True(t, jsConfig.FlowControl)
 	assert.Equal(t, 15*time.Second, jsConfig.IdleHeartbeat, "IdleHeartbeat: int64 → time.Duration")
+}
+
+// TestConsumerCreateConversion_Durable pins the durable identity: a named create request must
+// reach the SDK with Durable set, otherwise the server treats the consumer as ephemeral and
+// reaps it after its 5s inactivity default.
+func TestConsumerCreateConversion_Durable(t *testing.T) {
+	t.Run("named request becomes durable", func(t *testing.T) {
+		jsConfig := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{Name: "orders-worker"})
+
+		assert.Equal(t, "orders-worker", jsConfig.Name)
+		assert.Equal(t, "orders-worker", jsConfig.Durable)
+		assert.Zero(t, jsConfig.InactiveThreshold, "unset InactiveThreshold must stay unset")
+	})
+
+	t.Run("unnamed request stays ephemeral", func(t *testing.T) {
+		jsConfig := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{})
+
+		assert.Empty(t, jsConfig.Name)
+		assert.Empty(t, jsConfig.Durable)
+	})
+
+	t.Run("opt start time is parsed", func(t *testing.T) {
+		start := time.Now().UTC().Truncate(time.Second)
+
+		jsConfig := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{
+			Name:          "replayer",
+			DeliverPolicy: entities.DeliverByStartTime,
+			OptStartTime:  start.Format(time.RFC3339),
+		})
+
+		require.NotNil(t, jsConfig.OptStartTime)
+		assert.Equal(t, start, jsConfig.OptStartTime.UTC())
+		assert.Equal(t, "replayer", jsConfig.Durable)
+	})
 }
 
 // TestStreamInfoConversion verifies jetstream.StreamInfo → entities.StreamInfo (response path).
