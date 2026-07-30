@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
+import { getErrorMessage } from '@/api/errors'
 import { Alert, Spinner } from '@/components/ui'
 import { useStreamDetail, useUpdateStream, useDeleteStream, usePurgeStream, useSealStream } from '@/contexts/streams'
 import { useConfigEditorEntry } from '@/stores/streamTabState/configEditorStore'
@@ -93,7 +94,7 @@ export default function StreamConfigTab() {
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Alert variant="error">Failed to load stream: {error instanceof Error ? error.message : 'Unknown error'}</Alert>
+        <Alert variant="error">Failed to load stream: {getErrorMessage(error)}</Alert>
       </div>
     )
   }

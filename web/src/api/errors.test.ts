@@ -199,8 +199,25 @@ describe('getErrorMessage', () => {
     expect(getErrorMessage(new ConnectError('something broke', Code.Internal))).toBe('something broke')
   })
 
+  it.each([
+    [Code.InvalidArgument, 'connection name is required'],
+    [Code.NotFound, 'consumer not found'],
+    [Code.AlreadyExists, 'stream name already in use'],
+    [Code.PermissionDenied, 'not allowed'],
+    [Code.DeadlineExceeded, 'took too long'],
+    [Code.FailedPrecondition, 'stream is sealed'],
+    [Code.ResourceExhausted, 'too many requests'],
+    [Code.OutOfRange, 'sequence past the end'],
+  ])('strips the multi-word %s code prefix', (code, text) => {
+    expect(getErrorMessage(new ConnectError(text, code))).toBe(text)
+  })
+
   it('falls back to a code label when there is no message', () => {
     expect(getErrorMessage(new ConnectError('', Code.Unavailable))).toBe('Service unavailable')
+  })
+
+  it('falls back to a code label when the message is only a multi-word code prefix', () => {
+    expect(getErrorMessage(new ConnectError('', Code.InvalidArgument))).toBe('Invalid request')
   })
 
   it('handles plain errors and unknown values', () => {

@@ -203,11 +203,9 @@ export function getErrorMessage(error: unknown): string {
       return summarizeViolations(violations)
     }
 
-    // Fall back to server message, stripping the [code] prefix
-    const codePrefix = '[' + Code[error.code].toLowerCase() + '] '
-    if (error.message && error.message !== '[' + Code[error.code].toLowerCase() + ']') {
-      return error.message.startsWith(codePrefix) ? error.message.slice(codePrefix.length) : error.message
-    }
+    // Fall back to server message, stripping the [code] prefix Connect prepends.
+    const serverMessage = stripErrorCodePrefix(error.message ?? '')
+    if (serverMessage) return serverMessage
 
     // Fall back to code label
     return CODE_LABELS[error.code] || `Error: ${Code[error.code]}`
@@ -220,6 +218,7 @@ export function getErrorMessage(error: unknown): string {
   return String(error)
 }
 
+/** Drops the `[code]` prefix Connect prepends to a status message. */
 export function stripErrorCodePrefix(message: string): string {
   return message.replace(/^\[\w+]\s*/, '')
 }

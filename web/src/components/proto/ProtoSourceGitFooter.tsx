@@ -1,6 +1,7 @@
 import { Badge, Dropdown, Spinner } from '@/components/ui'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { ProtoSelection, CompileDiagnostic } from '@/api/protoSources'
+import { getErrorMessage } from '@/api/errors'
 import { CompileDiagnosticsList } from './CompileDiagnosticsList'
 import { TagIcon, CheckIcon } from './protoCardIcons'
 
@@ -91,7 +92,7 @@ export function ProtoSourceGitFooter({
               options={tags.map((tag) => ({ value: tag, label: tag }))}
             />
           )}
-          {selectError && <ErrorAlert compact message={selectError.message} className="mt-2" />}
+          {selectError && <ErrorAlert compact message={getErrorMessage(selectError)} className="mt-2" />}
         </div>
       )}
       {diagnostics && diagnostics.length > 0 && (

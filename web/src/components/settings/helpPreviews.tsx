@@ -2,6 +2,7 @@
  * change rarely, and live next to the map keying them; not worth a file split. */
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { CopyButton } from '@/components/ui'
+import { formatCount, formatTimestamp as formatTimestampSetting } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
 
 // Interactive HelpModal previews for visual settings: toggle option values and
@@ -201,8 +202,7 @@ function TimestampFormatPreview() {
 
 function formatTimestamp(date: Date, fmt: 'relative' | 'absolute' | 'iso', relative: string): string {
   if (fmt === 'relative') return relative
-  if (fmt === 'iso') return date.toISOString()
-  return date.toLocaleString()
+  return formatTimestampSetting(date, fmt)
 }
 
 const JSON_SAMPLE = {
@@ -607,7 +607,7 @@ function DefaultPageSizePreview() {
           ]}
         />
         <span className="text-2xs text-content-tertiary">
-          Total stream: <span className="font-medium text-gray-700">{TOTAL_MESSAGES.toLocaleString()}</span> messages
+          Total stream: <span className="font-medium text-gray-700">{formatCount(TOTAL_MESSAGES)}</span> messages
         </span>
       </div>
 
@@ -647,13 +647,13 @@ function DefaultPageSizePreview() {
           </span>
           <span className="text-content-secondary">
             Page <span className="font-medium text-content-primary">1</span> of{' '}
-            <span className="font-medium text-content-primary">{totalPages.toLocaleString()}</span>
+            <span className="font-medium text-content-primary">{formatCount(totalPages)}</span>
           </span>
         </div>
       </div>
 
       <p className="text-2xs text-accent-text mt-2">
-        ↑ Page size = {pageSize} → {totalPages.toLocaleString()} pages for {TOTAL_MESSAGES.toLocaleString()} messages.
+        ↑ Page size = {pageSize} → {formatCount(totalPages)} pages for {formatCount(TOTAL_MESSAGES)} messages.
         {pageSize >= 250 && ' Large pages mean more memory in the browser per load.'}
         {pageSize <= 25 && ' Small pages mean more clicks to browse.'}
       </p>

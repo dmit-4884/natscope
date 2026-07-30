@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { getErrorMessage } from '@/api/errors'
 import { toast } from '@/utils/toast'
 import { DestructiveConfirm, ChevronDownIcon, PencilIcon, TrashIcon, ClipboardIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
@@ -89,7 +90,7 @@ export function TemplateMenu({ subjectPattern, messageType, messageJson, headers
         setShowSaveModal(false)
         toast.success(`Template "${values.name}" saved`)
       },
-      onError: (e) => toast.error(`Failed to save: ${e instanceof Error ? e.message : String(e)}`),
+      onError: (e) => toast.error(`Failed to save: ${getErrorMessage(e)}`),
     })
   }
 
@@ -117,7 +118,7 @@ export function TemplateMenu({ subjectPattern, messageType, messageJson, headers
     if (!t) return
     deleteMutation.mutate(t.id, {
       onSuccess: () => toast.success(`Deleted template "${t.name}"`),
-      onError: (err) => toast.error(`Failed to delete: ${err instanceof Error ? err.message : String(err)}`),
+      onError: (err) => toast.error(`Failed to delete: ${getErrorMessage(err)}`),
     })
     setPendingDelete(null)
   }
@@ -179,13 +180,13 @@ export function TemplateMenu({ subjectPattern, messageType, messageJson, headers
           <div className="flex-1 overflow-auto">
             {total === 0 && (
               <div className="px-3 py-6 text-xs text-content-muted text-center">
-                No templates yet. Hit «Save Template» to create one.
+                No templates yet. Hit &ldquo;Save as template&rdquo; to create one.
               </div>
             )}
 
             {total > 0 && totalMatching === 0 && (
               <div className="px-3 py-6 text-xs text-content-muted text-center">
-                No templates match «{query}».
+                No templates match &ldquo;{query}&rdquo;.
               </div>
             )}
 

@@ -13,8 +13,9 @@ test.describe('Connections management (Settings > Connections)', () => {
   test('create: empty name and empty URL shows a client-side validation error', async ({ page, env }) => {
     void env
     await page.goto('/settings/connections/new')
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page.getByText('Name and at least one URL are required')).toBeVisible()
+    await page.getByRole('button', { name: 'Create connection' }).click()
+    await expect(page.getByText('Name is required')).toBeVisible()
+    await expect(page.getByText('At least one server URL is required')).toBeVisible()
   })
 
   test('create: duplicate name is rejected by the backend unique constraint', async ({ page, env }) => {
@@ -22,7 +23,7 @@ test.describe('Connections management (Settings > Connections)', () => {
     await page.goto('/settings/connections/new')
     await page.getByLabel('Name').fill('local')
     await page.getByLabel('Server URL 1').fill('nats://127.0.0.1:4300')
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await page.getByRole('button', { name: 'Create connection' }).click()
     // Backend ErrConnectionNameAlreadyInUse (or similar) surfaces as an inline error.
     await expect(page.locator('text=/already|in use|exists/i')).toBeVisible({ timeout: 10_000 })
   })
@@ -33,7 +34,7 @@ test.describe('Connections management (Settings > Connections)', () => {
     await page.goto('/settings/connections/new')
     await page.getByLabel('Name').fill(name)
     await page.getByLabel('Server URL 1').fill('nats://127.0.0.1:4300')
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await page.getByRole('button', { name: 'Create connection' }).click()
     await expect(page).toHaveURL(/\/settings\/connections$/)
     await expect(page.getByText(name, { exact: true })).toBeVisible()
 
@@ -69,13 +70,13 @@ test.describe('Connections management (Settings > Connections)', () => {
     await page.goto('/settings/connections/new')
     await page.getByLabel('Name').fill(name)
     await page.getByLabel('Server URL 1').fill('nats://127.0.0.1:4300')
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await page.getByRole('button', { name: 'Create connection' }).click()
     await expect(page.getByText(name, { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: `Edit ${name}` }).click()
     await expect(page).toHaveURL(/\/settings\/connections\/.+\/edit$/)
     await page.getByLabel('Description (optional)').fill('edited via e2e')
-    await page.getByRole('button', { name: 'Save changes' }).first().click()
+    await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page).toHaveURL(/\/settings\/connections$/)
     await expect(page.getByText('edited via e2e')).toBeVisible()
 
@@ -91,7 +92,7 @@ test.describe('Connections management (Settings > Connections)', () => {
     await page.goto('/settings/connections/new')
     await page.getByLabel('Name').fill(name)
     await page.getByLabel('Server URL 1').fill('nats://127.0.0.1:4300')
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await page.getByRole('button', { name: 'Create connection' }).click()
     await expect(page.getByText(name, { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: `Delete ${name}` }).click()

@@ -2,7 +2,7 @@ import { Badge, Button, CopyButton, PencilIcon, RefreshIcon, InfoIcon } from '@/
 import Tooltip from '@/components/common/Tooltip'
 import JsonViewer from '@/components/common/JsonViewer'
 import type { ConsumerInfo } from '@/types/nats'
-import { formatNsDuration } from '@/utils/formatters'
+import { formatDateTime, formatNsDuration } from '@/utils/formatters'
 import { consumerConfigToNatsCli } from '../natsCli'
 import { StatCard, ConfigRow } from './consumerHelpers'
 import { getFilterSubjectsArray } from './consumerUtils'
@@ -25,7 +25,7 @@ interface Props {
 function formatPauseUntil(pauseUntil: string | undefined): string | null {
   if (!pauseUntil) return null
   const parsed = new Date(pauseUntil)
-  return Number.isNaN(parsed.getTime()) ? pauseUntil : parsed.toLocaleString()
+  return Number.isNaN(parsed.getTime()) ? pauseUntil : formatDateTime(parsed)
 }
 
 export function ConsumerView({
@@ -43,6 +43,7 @@ export function ConsumerView({
 }: Props) {
   const isPaused = consumer.paused === true
   const pauseUntilLabel = formatPauseUntil(consumer.pause_until)
+  const filterSubjects = getFilterSubjectsArray(consumer)
 
   return (
     <>
@@ -116,11 +117,15 @@ export function ConsumerView({
                     </Tooltip>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {getFilterSubjectsArray(consumer).map((subject, idx) => (
-                      <span key={idx} className="px-2 py-1 bg-accent-light text-accent-text text-xs font-mono rounded">
-                        {subject}
-                      </span>
-                    ))}
+                    {filterSubjects.length === 0 ? (
+                      <span className="text-xs text-content-tertiary">— all subjects</span>
+                    ) : (
+                      filterSubjects.map((subject, idx) => (
+                        <span key={idx} className="px-2 py-1 bg-accent-light text-accent-text text-xs font-mono rounded">
+                          {subject}
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -182,7 +187,7 @@ export function ConsumerView({
                   )}
                   <ConfigRow
                     label="Created"
-                    value={consumer.created ? new Date(consumer.created).toLocaleString() : '-'}
+                    value={consumer.created ? formatDateTime(consumer.created) : '-'}
                     hint="When this consumer was created"
                   />
                   {isPaused && (

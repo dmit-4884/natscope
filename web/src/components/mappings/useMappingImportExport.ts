@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getErrorMessage } from '@/api/errors'
 import { downloadBlob } from '@/utils/download'
 import { useMappingItems, useBulkSaveMappings } from '@/contexts/mappings'
 
@@ -105,8 +106,7 @@ export function useMappingImportExport(opts?: Options) {
       opts?.onImportSuccess?.()
       return true
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      setImportError(`Failed to save mappings: ${message}`)
+      setImportError(`Failed to save mappings: ${getErrorMessage(err)}`)
       return false
     }
   }

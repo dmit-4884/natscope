@@ -2,10 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { toast } from '@/utils/toast'
+import { getErrorMessage } from '@/api/errors'
 import { publishMessage, validateJSON, type ValidationResult } from '@/api/publish'
 import { getProtoMessageExample } from '@/api/proto'
 import { getMessages } from '@/api/messages'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
+import { formatBytes } from '@/utils/formatters'
 import { useProtoMessageEntity } from '@/contexts/proto'
 import { useSubjectMappingEntity } from '@/contexts/mappings'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
@@ -137,7 +139,7 @@ export default function PublishContent({
       })
     },
     onError: (error) => {
-      toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error(`Error: ${getErrorMessage(error)}`)
       queryClient.invalidateQueries({
         predicate: (q) => {
           const k = q.queryKey
@@ -172,7 +174,7 @@ export default function PublishContent({
       const response = await getProtoMessageExample(mappedSourceId, mappedMessageType)
       onMessageJsonChange(JSON.stringify(response.example, null, 2))
     } catch (error) {
-      toast.error(`Failed to generate example: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error(`Failed to generate example: ${getErrorMessage(error)}`)
     } finally {
       setExampleLoading(false)
     }
@@ -212,7 +214,7 @@ export default function PublishContent({
       onMessageJsonChange(body)
       toast.success(`Loaded message #${msg.sequence} from ${msg.subject}`)
     } catch (error) {
-      toast.error(`Failed to load last message: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error(`Failed to load last message: ${getErrorMessage(error)}`)
     } finally {
       setPrefillLoading(false)
     }
@@ -455,8 +457,8 @@ export default function PublishContent({
                 className="mt-2 px-3 py-2 bg-status-warning-bg border border-amber-200 rounded-lg text-xs text-amber-800"
                 data-testid="payload-oversize-warning"
               >
-                Payload is {payloadBytes.toLocaleString()} bytes — over this stream's max message size (
-                {maxMsgSize!.toLocaleString()} bytes). NATS will reject the publish.
+                Payload is {formatBytes(payloadBytes)} — over this stream's max message size (
+                {formatBytes(maxMsgSize!)}). NATS will reject the publish.
               </div>
             )}
             <ValidationResultDisplay result={validationResult} />

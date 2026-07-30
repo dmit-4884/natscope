@@ -2,6 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Message } from '@/types/nats'
 import { Modal, DownloadIcon } from '@/components/ui'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
+import { formatCount } from '@/utils/formatters'
+import { getErrorMessage } from '@/api/errors'
 import { getMessages } from '@/api/messages'
 import { useMessagesPolicy } from '@/contexts/settings'
 import { toast } from '@/utils/toast'
@@ -242,19 +244,19 @@ export default function ExportDialog({
         // Cancelled mid-export with partial data — warn so the user knows the
         // file is incomplete.
         toast.warning(
-          `Export cancelled — ${result.messages.length.toLocaleString()} of ${limit.toLocaleString()} messages saved`,
+          `Export cancelled — ${formatCount(result.messages.length)} of ${formatCount(limit)} messages saved`,
         )
       } else if (result.truncated) {
-        toast.warning(`Exported first ${result.messages.length.toLocaleString()} messages (limit reached)`) // explicit truncation
+        toast.warning(`Exported first ${formatCount(result.messages.length)} messages (limit reached)`) // explicit truncation
       } else {
-        toast.success(`Exported ${result.messages.length.toLocaleString()} messages`)
+        toast.success(`Exported ${formatCount(result.messages.length)} messages`)
       }
       onClose()
     } catch (error) {
       if (controller.signal.aborted) {
         toast.info('Export cancelled')
       } else {
-        toast.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`)
+        toast.error(`Export failed: ${getErrorMessage(error)}`)
       }
     } finally {
       setIsExporting(false)
@@ -274,7 +276,7 @@ export default function ExportDialog({
       download(serializeMessages(messagesToExport.slice(0, limit)))
       onClose()
     } catch (error) {
-      toast.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`)
+      toast.error(`Export failed: ${getErrorMessage(error)}`)
     } finally {
       setIsExporting(false)
     }
@@ -359,8 +361,8 @@ export default function ExportDialog({
                   data-testid="export-scope-range"
                 />
                 <span className="text-sm text-gray-700">
-                  Full range from server
-                  {totalCount != null && <span className="text-content-muted ml-1">(~{totalCount.toLocaleString()} in stream)</span>}
+                  Full range from server{' '}
+                  {totalCount != null && <span className="text-content-muted">(~{formatCount(totalCount)} in stream)</span>}
                 </span>
               </label>
             </div>
@@ -442,11 +444,11 @@ export default function ExportDialog({
             {options.scope === 'range' ? (
               rangeProgress != null ? (
                 <span>
-                  Fetched <strong>{rangeProgress.toLocaleString()}</strong> messages…
+                  Fetched <strong>{formatCount(rangeProgress)}</strong> messages…
                 </span>
               ) : (
                 <span>
-                  Up to <strong>{(rangeLimit || msgPolicy.exportRangeLimit).toLocaleString()}</strong> messages
+                  Up to <strong>{formatCount(rangeLimit || msgPolicy.exportRangeLimit)}</strong> messages
                 </span>
               )
             ) : (
