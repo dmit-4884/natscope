@@ -41,8 +41,10 @@ func (s *Service) Record(
 
 	entry := converter.Convert(in, entities.PublishHistoryNew())
 
-	// PayloadSize keeps the original byte count; PayloadJSON is the preview.
-	entry.PayloadSize = len(in.PayloadJSON)
+	entry.PayloadSize = in.PayloadSize
+	if entry.PayloadSize == 0 {
+		entry.PayloadSize = len(in.PayloadJSON)
+	}
 	if len(entry.PayloadJSON) > entities.HistoryPayloadPreviewBytes {
 		entry.PayloadJSON = entry.PayloadJSON[:entities.HistoryPayloadPreviewBytes]
 		entry.PayloadTruncated = true
