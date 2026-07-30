@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { CompileDiagnostic } from '@/api/protoSources'
+import { getErrorMessage } from '@/api/errors'
 import { plural } from '@/utils/plural'
 import { CompileDiagnosticsList } from './CompileDiagnosticsList'
 
@@ -56,7 +57,7 @@ export function ProtoSourceFilesFooter({
         </Button>
       </div>
 
-      {compileError && <ErrorAlert compact message={compileError.message} />}
+      {compileError && <ErrorAlert compact message={getErrorMessage(compileError)} />}
       {result && !diagnostics?.some((d) => d.severity === 'error') && (
         <div className="text-xs text-green-700 p-2 bg-status-success-bg rounded">
           Compiled: {plural(result.fileDescriptors, 'file descriptor')}, {plural(result.messageTypes, 'message type')}
