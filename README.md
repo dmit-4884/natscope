@@ -74,6 +74,8 @@ Then open <http://localhost:4280>, add a connection to your NATS server and star
 <details>
 <summary><b>Connections</b> — saved connections, every NATS auth method, full TLS, cluster failover</summary>
 
+![Connections](docs/screenshots/connections.png)
+
 - Multiple saved connections with quick switching, one-click test (RTT, server version, JetStream
   availability), duplication and cluster failover via multiple URLs (`nats://`, `tls://`, `ws://`, `wss://`)
 - Every auth method NATS supports: username/password, token, NKey, credentials files (JWT + seed)
@@ -85,6 +87,8 @@ Then open <http://localhost:4280>, add a connection to your NATS server and star
 
 <details>
 <summary><b>Message browsing</b> — pagination, jump to time, wildcard filters, search, export, edit &amp; resend</summary>
+
+![Message browsing](docs/screenshots/messages.png)
 
 - Paginated browsing forward or backward from any sequence
 - **Jump to time** — pick a date/time and open the stream at the first message published at or after it
@@ -100,6 +104,8 @@ Then open <http://localhost:4280>, add a connection to your NATS server and star
 <details>
 <summary><b>Live tailing</b> — real-time subscriptions with on-the-fly Protobuf decoding</summary>
 
+![Live tailing](docs/screenshots/live.png)
+
 - Real-time subscription to any subject pattern via server streaming — core NATS or bound to a stream
 - Messages are Protobuf-decoded on the fly, delivered in batches with live throughput stats
   (msgs/sec, per-subject counts, drop tracking)
@@ -109,6 +115,8 @@ Then open <http://localhost:4280>, add a connection to your NATS server and star
 
 <details>
 <summary><b>Publishing</b> — schema-aware editor, reusable templates, automatic publish history</summary>
+
+![Publishing](docs/screenshots/publish.png)
 
 - Publish raw JSON or Protobuf-encoded messages (JSON in, binary out) with custom NATS headers
 - Schema-aware editor: field autocompletion, pre-publish validation against the Protobuf schema and
@@ -120,6 +128,8 @@ Then open <http://localhost:4280>, add a connection to your NATS server and star
 
 <details>
 <summary><b>Protobuf support</b> — Git/local sources, versioning, live reload, subject mappings</summary>
+
+![Protobuf support](docs/screenshots/proto.png)
 
 The proto pipeline is the heart of Natscope:
 
@@ -141,6 +151,8 @@ The proto pipeline is the heart of Natscope:
 
 <details>
 <summary><b>JetStream management</b> — streams, consumers, Key/Value, Object Store, monitoring</summary>
+
+![JetStream management](docs/screenshots/jetstream.png)
 
 - **Streams** — create and edit with the full config surface (retention, storage, limits, replicas,
   mirrors/sources, subject transforms, republish, compression…), purge, seal, delete
