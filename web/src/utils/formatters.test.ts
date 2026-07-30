@@ -2,11 +2,15 @@ import { describe, it, expect } from 'vitest'
 import {
   formatBytes,
   formatBytesPerSecond,
+  formatCount,
   formatNumber,
   toDate,
   formatTimestamp,
   formatDate,
   formatDateTime,
+  formatMonthDay,
+  formatTime,
+  formatTimeWithMs,
   formatDuration,
   formatNanoseconds,
   formatNsDuration,
@@ -18,8 +22,11 @@ describe('formatters', () => {
       expect(formatBytes(0)).toBe('0 B')
     })
 
-    it('formats bytes', () => {
-      expect(formatBytes(500)).toBe('500.00 B')
+    it('formats raw byte counts as integers', () => {
+      expect(formatBytes(1)).toBe('1 B')
+      expect(formatBytes(15)).toBe('15 B')
+      expect(formatBytes(500)).toBe('500 B')
+      expect(formatBytes(1023)).toBe('1023 B')
     })
 
     it('formats kilobytes', () => {
@@ -39,9 +46,24 @@ describe('formatters', () => {
       expect(formatBytes(1099511627776)).toBe('1.00 TB')
     })
 
-    it('respects precision', () => {
+    it('respects precision above the byte unit', () => {
       expect(formatBytes(1536, 1)).toBe('1.5 KB')
       expect(formatBytes(1536, 0)).toBe('2 KB')
+      expect(formatBytes(500, 2)).toBe('500 B')
+    })
+
+    it('reports a negative or non-finite size as unlimited', () => {
+      expect(formatBytes(-1)).toBe('Unlimited')
+      expect(formatBytes(Number.POSITIVE_INFINITY)).toBe('Unlimited')
+    })
+  })
+
+  describe('formatCount', () => {
+    it('groups thousands with the pinned en-US locale', () => {
+      expect(formatCount(0)).toBe('0')
+      expect(formatCount(999)).toBe('999')
+      expect(formatCount(1234)).toBe('1,234')
+      expect(formatCount(1234567)).toBe('1,234,567')
     })
   })
 
@@ -129,6 +151,20 @@ describe('formatters', () => {
   describe('formatDateTime', () => {
     it('formats full datetime', () => {
       expect(formatDateTime(new Date(2024, 0, 15, 10, 30, 45))).toBe('2024-01-15 10:30:45')
+    })
+  })
+
+  describe('locale-independent clock formats', () => {
+    it('formats a 24-hour time regardless of the browser locale', () => {
+      expect(formatTime(new Date(2024, 0, 15, 23, 30, 45))).toBe('23:30:45')
+    })
+
+    it('formats a time with milliseconds', () => {
+      expect(formatTimeWithMs(new Date(2024, 0, 15, 23, 30, 45, 7))).toBe('23:30:45.007')
+    })
+
+    it('formats a compact month/day', () => {
+      expect(formatMonthDay(new Date(2024, 0, 15))).toBe('01-15')
     })
   })
 

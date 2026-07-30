@@ -1,6 +1,7 @@
 import type { SavedConnection } from '@/api/connections'
 import { stripErrorCodePrefix } from '@/api/errors'
 import { LockClosedIcon, RowActionButton } from '@/components/ui'
+import { formatDate } from '@/utils/formatters'
 import { AUTH_LABELS } from './connectionFormData'
 
 interface Props {
@@ -27,7 +28,7 @@ function relativeTime(ms: number): string {
   if (hour < 24) return `${hour}h ago`
   const day = Math.round(hour / 24)
   if (day < 7) return `${day}d ago`
-  return new Date(ms).toLocaleDateString()
+  return formatDate(ms)
 }
 
 export function ConnectionCard({

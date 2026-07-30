@@ -47,5 +47,5 @@ export function getFilterSubjectsArray(consumer: ConsumerInfo): string[] {
   if (consumer.config?.filter_subject) {
     return [consumer.config.filter_subject]
   }
-  return ['*']
+  return []
 }

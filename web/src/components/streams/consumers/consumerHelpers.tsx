@@ -1,5 +1,6 @@
 import Tooltip from '@/components/common/Tooltip'
 import { InfoIcon } from '@/components/ui'
+import { formatCount } from '@/utils/formatters'
 
 function HelpIcon({ hint }: { hint: string }) {
   return (
@@ -28,7 +29,7 @@ export function StatCard({
         {label}
         {hint && <HelpIcon hint={hint} />}
       </div>
-      <div className={`text-xl font-semibold ${valueColor}`}>{value.toLocaleString()}</div>
+      <div className={`text-xl font-semibold ${valueColor}`}>{formatCount(value)}</div>
     </div>
   )
 }

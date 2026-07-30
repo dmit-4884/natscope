@@ -9,6 +9,7 @@ import { useStreamDetail } from '@/contexts/streams'
 import type { Message } from '@/types/nats'
 import type { SelectedMessage } from '@/types/messages'
 import { getErrorMessage, getErrorReason } from '@/api/errors'
+import { formatDateTime } from '@/utils/formatters'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { RefreshIcon } from '@/components/ui'
 import {
@@ -380,13 +381,13 @@ export default function UnifiedMessageList({
           </svg>
           {displayMessages.length > 0 ? (
             <span>
-              Jumped to {new Date(jumpStartMs!).toLocaleString()} → first message{' '}
+              Jumped to {formatDateTime(jumpStartMs!)} → first message{' '}
               <span className="font-mono font-semibold" data-testid="jump-resolved-seq">
                 #{(displayMessages[0] as Message).sequence}
               </span>
             </span>
           ) : (
-            <span>No messages at or after {new Date(jumpStartMs!).toLocaleString()}</span>
+            <span>No messages at or after {formatDateTime(jumpStartMs!)}</span>
           )}
         </div>
       )}
