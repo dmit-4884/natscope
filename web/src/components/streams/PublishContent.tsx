@@ -10,6 +10,7 @@ import { useProtoMessageEntity } from '@/contexts/proto'
 import { useSubjectMappingEntity } from '@/contexts/mappings'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
 import { processHelpers } from '@/utils/helpers'
+import { plural } from '@/utils/plural'
 import { SubjectDropdown } from './publish/SubjectDropdown'
 import { EditableSubject } from './publish/EditableSubject'
 import { HeadersEditor, type HeaderEntry } from './publish/HeadersEditor'
@@ -37,6 +38,17 @@ interface PublishContentProps {
 }
 
 const AUTO_VALIDATE_DEBOUNCE_MS = 600
+const HELPER_JSON_DEBOUNCE_MS = 200
+
+function jsonSyntaxError(value: string): string | null {
+  if (!value.trim()) return null
+  try {
+    JSON.parse(value.includes('{{') ? processHelpers(value) : value)
+    return null
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Invalid JSON'
+  }
+}
 
 export default function PublishContent({
   subjects,
@@ -53,7 +65,7 @@ export default function PublishContent({
   maxMsgSize,
   onOpenMappings,
 }: PublishContentProps) {
-  const [jsonError, setJsonError] = useState<string | null>(null)
+  const [helperJsonCheck, setHelperJsonCheck] = useState<{ value: string; error: string | null } | null>(null)
   const [exampleLoading, setExampleLoading] = useState(false)
   const [prefillLoading, setPrefillLoading] = useState(false)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
@@ -75,7 +87,6 @@ export default function PublishContent({
   )
 
   const queryClient = useQueryClient()
-  const validateTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   const { messageType: mappedMessageType, sourceId: mappedSourceId } = useSubjectMappingEntity(
     subjectPattern || null,
@@ -137,9 +148,22 @@ export default function PublishContent({
   })
 
   useEffect(() => {
-    setJsonError(null)
     setValidationResult(null)
   }, [subjectPattern])
+
+  useEffect(() => {
+    if (!messageJson.includes('{{')) return
+    const timer = setTimeout(
+      () => setHelperJsonCheck({ value: messageJson, error: jsonSyntaxError(messageJson) }),
+      HELPER_JSON_DEBOUNCE_MS,
+    )
+    return () => clearTimeout(timer)
+  }, [messageJson])
+
+  const jsonError = useMemo(() => {
+    if (!messageJson.includes('{{')) return jsonSyntaxError(messageJson)
+    return helperJsonCheck?.value === messageJson ? helperJsonCheck.error : null
+  }, [messageJson, helperJsonCheck])
 
   const handleUseExample = async () => {
     if (!mappedMessageType || !mappedSourceId) return
@@ -147,7 +171,6 @@ export default function PublishContent({
     try {
       const response = await getProtoMessageExample(mappedSourceId, mappedMessageType)
       onMessageJsonChange(JSON.stringify(response.example, null, 2))
-      setJsonError(null)
     } catch (error) {
       toast.error(`Failed to generate example: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
@@ -187,45 +210,11 @@ export default function PublishContent({
         }
       }
       onMessageJsonChange(body)
-      setJsonError(null)
       toast.success(`Loaded message #${msg.sequence} from ${msg.subject}`)
     } catch (error) {
       toast.error(`Failed to load last message: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setPrefillLoading(false)
-    }
-  }
-
-  const debouncedValidateJson = useCallback((value: string) => {
-    if (validateTimerRef.current) clearTimeout(validateTimerRef.current)
-    validateTimerRef.current = setTimeout(() => {
-      try {
-        const processed = processHelpers(value)
-        JSON.parse(processed)
-        setJsonError(null)
-      } catch (e) {
-        setJsonError(e instanceof Error ? e.message : 'Invalid JSON')
-      }
-    }, 200)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (validateTimerRef.current) clearTimeout(validateTimerRef.current)
-    }
-  }, [])
-
-  const handleJsonChange = (value: string) => {
-    onMessageJsonChange(value)
-    if (!value.includes('{{')) {
-      try {
-        JSON.parse(value)
-        setJsonError(null)
-      } catch (e) {
-        setJsonError(e instanceof Error ? e.message : 'Invalid JSON')
-      }
-    } else {
-      debouncedValidateJson(value)
     }
   }
 
@@ -268,13 +257,24 @@ export default function PublishContent({
           : 'invalid'
         : 'none'
 
-  const canPublish = useMemo(() => {
-    if (!subjectPattern) return false
-    if (patternHasWildcards && wildcardValues.some((v) => !v.trim())) return false
-    if (jsonError) return false
-    if (!messageJson.trim()) return false
-    return true
-  }, [subjectPattern, patternHasWildcards, wildcardValues, jsonError, messageJson])
+  const unfilledWildcards = useMemo(() => {
+    const slots = countWildcards(subjectPattern)
+    let missing = 0
+    for (let i = 0; i < slots; i++) {
+      if (!(wildcardValues[i] ?? '').trim()) missing++
+    }
+    return missing
+  }, [subjectPattern, wildcardValues])
+
+  const publishDisabledReason = useMemo(() => {
+    if (!subjectPattern) return 'Select a subject pattern'
+    if (unfilledWildcards > 0) return `Fill ${plural(unfilledWildcards, 'wildcard slot')}`
+    if (!messageJson.trim()) return 'Message body is empty'
+    if (jsonError) return 'Fix the JSON syntax error below'
+    return null
+  }, [subjectPattern, unfilledWildcards, messageJson, jsonError])
+
+  const canPublish = publishDisabledReason === null
 
   const handlePublish = () => {
     if (!canPublish) return
@@ -437,7 +437,7 @@ export default function PublishContent({
           <div className="flex-1 min-h-0">
             <TemplateJsonEditor
               value={messageJson}
-              onChange={handleJsonChange}
+              onChange={onMessageJsonChange}
               error={jsonError ?? undefined}
               onUseExample={handleUseExample}
               exampleLoading={exampleLoading}
@@ -468,6 +468,7 @@ export default function PublishContent({
             validationState={validationState}
             violationCount={validationResult?.violations?.length ?? 0}
             canPublish={canPublish}
+            disabledReason={publishDisabledReason}
             isPublishing={publishMutation.isPending}
             onPublish={handlePublish}
           />
