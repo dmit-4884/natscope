@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Message } from '@/types/nats'
 import { Modal, DownloadIcon } from '@/components/ui'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
+import { getErrorMessage } from '@/api/errors'
 import { getMessages } from '@/api/messages'
 import { useMessagesPolicy } from '@/contexts/settings'
 import { toast } from '@/utils/toast'
@@ -254,7 +255,7 @@ export default function ExportDialog({
       if (controller.signal.aborted) {
         toast.info('Export cancelled')
       } else {
-        toast.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`)
+        toast.error(`Export failed: ${getErrorMessage(error)}`)
       }
     } finally {
       setIsExporting(false)
@@ -274,7 +275,7 @@ export default function ExportDialog({
       download(serializeMessages(messagesToExport.slice(0, limit)))
       onClose()
     } catch (error) {
-      toast.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`)
+      toast.error(`Export failed: ${getErrorMessage(error)}`)
     } finally {
       setIsExporting(false)
     }

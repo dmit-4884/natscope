@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from '@/utils/toast'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage, stripErrorCodePrefix } from '@/api/errors'
 import { useRowKeys } from '@/hooks/useRowKeys'
 import type { SavedConnection } from '@/api/connections'
 import { safeSetItem } from '@/utils/safeStorage'
@@ -35,6 +35,7 @@ export default function ConnectionSelector() {
 
   // New connection form state
   const [newName, setNewName] = useState('')
+  const [nameError, setNameError] = useState<string | undefined>(undefined)
   const [newUrls, setNewUrls] = useState([''])
   const [urlErrors, setUrlErrors] = useState<(string | undefined)[]>([])
   const urlKeys = useRowKeys(newUrls.length)
@@ -93,6 +94,7 @@ export default function ConnectionSelector() {
   }
 
   const handleTestConnection = async () => {
+    if (!validateUrls()) return
     setError(null)
     try {
       const result = await testConnectionMutation.mutateAsync({
@@ -102,14 +104,19 @@ export default function ConnectionSelector() {
       if (result.success) {
         toast.success(`Connected to ${result.serverName || result.connectedUrl} (v${result.serverVersion}, RTT: ${result.rttMs}ms${result.jetstreamEnabled ? ', JetStream' : ''})`)
       } else {
-        toast.error(result.error || 'Connection failed')
-        setError({ id: '__test__', message: result.error || 'Connection failed' })
+        const msg = result.error ? stripErrorCodePrefix(result.error) : 'Connection failed'
+        toast.error(msg)
+        setError({ id: '__test__', message: msg })
       }
     } catch (err) {
-      const msg = getErrorMessage(err) || 'Test failed'
-      toast.error(msg)
-      setError({ id: '__test__', message: msg })
+      setError({ id: '__test__', message: getErrorMessage(err) || 'Test failed' })
     }
+  }
+
+  const validateName = (): boolean => {
+    const blankButTyped = newName !== '' && newName.trim() === ''
+    setNameError(blankButTyped ? 'Name is required' : undefined)
+    return !blankButTyped
   }
 
   const validateUrls = (): boolean => {
@@ -126,13 +133,14 @@ export default function ConnectionSelector() {
   }
 
   const handleNewConnection = async () => {
-    if (!validateUrls()) return
+    const nameOk = validateName()
+    if (!validateUrls() || !nameOk) return
     const urls = newUrls.filter(Boolean)
     setConnectingId('__new__')
     setError(null)
     try {
       const savedConnection = await createConnectionMutation.mutateAsync({
-        name: newName || urls[0],
+        name: newName.trim() || urls[0],
         urls,
         auth: toApiAuthConfig(buildAuthConfig()),
       })
@@ -143,9 +151,7 @@ export default function ConnectionSelector() {
       }))
       navigate('/streams')
     } catch (err) {
-      const msg = getErrorMessage(err) || 'Connection failed'
-      setError({ id: '__new__', message: msg })
-      toast.error(msg)
+      setError({ id: '__new__', message: getErrorMessage(err) || 'Connection failed' })
     } finally {
       setConnectingId(null)
     }
@@ -286,13 +292,15 @@ export default function ConnectionSelector() {
 
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-connection-name">Name</label>
+                <Input
+                  id="new-connection-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="My NATS Server"
-                  className="w-full px-3 py-2 border border-border-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-border-focus focus:border-border-focus"
+                  error={!!nameError}
+                  errorMessage={nameError}
                 />
               </div>
 

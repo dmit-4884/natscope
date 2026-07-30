@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/api/errors'
 import { getServerInfo } from '@/api/stats'
 import { useConnectionHealth } from '@/contexts/connection'
 import { useConnectionQuery } from '@/hooks/useConnectionQuery'
@@ -64,7 +65,7 @@ export default function ServerInfo({ connectionId, onClose }: Props) {
         {error && (
           <div className="p-5">
             <Alert variant="error">
-              <div className="text-sm">{error instanceof Error ? error.message : String(error)}</div>
+              <div className="text-sm">{getErrorMessage(error)}</div>
             </Alert>
           </div>
         )}
