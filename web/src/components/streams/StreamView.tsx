@@ -31,6 +31,7 @@ const EMPTY_HEADERS: HeaderDraft[] = []
 const DEFAULT_RIGHT_PANEL_PCT = 50
 const MIN_PANEL_PCT = 20
 const MAX_PANEL_PCT = 80
+const RESIZE_STEP_PCT = 2
 
 export interface StreamViewOutletContext {
   /** Stream-scoped storage key (connection URL + stream name). */
@@ -165,6 +166,18 @@ export default function StreamView() {
     isDragging.current = true
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
+  }, [])
+
+  const handleResizeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const step = e.key === 'ArrowLeft' ? RESIZE_STEP_PCT : e.key === 'ArrowRight' ? -RESIZE_STEP_PCT : 0
+    if (step === 0) return
+    e.preventDefault()
+    setRightPanelPct((prev) => {
+      const next = Math.min(Math.max(prev + step, MIN_PANEL_PCT), MAX_PANEL_PCT)
+      latestPctRef.current = next
+      safeSetItem(RIGHT_PANEL_WIDTH_KEY, String(Math.round(next)))
+      return next
+    })
   }, [])
 
   const { data: streamDetail, error: streamError } = useStreamDetail(streamName ?? null, connectionId)
@@ -361,11 +374,19 @@ export default function StreamView() {
         <>
           {/* Resize handle */}
           <div
-            className="flex-shrink-0 cursor-col-resize group flex items-stretch"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize details panel"
+            aria-valuenow={Math.round(rightPanelPct)}
+            aria-valuemin={MIN_PANEL_PCT}
+            aria-valuemax={MAX_PANEL_PCT}
+            tabIndex={0}
+            className="flex-shrink-0 cursor-col-resize group flex items-stretch focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
             onMouseDown={handleDragStart}
+            onKeyDown={handleResizeKeyDown}
             style={{ padding: '0 2px' }}
           >
-            <div className="w-px bg-surface-hover group-hover:bg-blue-400 group-active:bg-blue-500 transition-colors" />
+            <div className="w-px bg-surface-hover group-hover:bg-blue-400 group-active:bg-blue-500 group-focus-visible:bg-blue-500 transition-colors" />
           </div>
           <aside
             className="bg-surface-secondary flex flex-col overflow-hidden"

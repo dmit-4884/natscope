@@ -1,9 +1,11 @@
-import { Button, JsonEditor, ClipboardIcon } from '@/components/ui'
+import { Button, JsonEditor, ClipboardIcon, Tabs, tabPanelProps } from '@/components/ui'
 import { ConsumerFormFields } from '@/components/common/forms'
 import type { ConsumerCreateRequest } from '@/types/management'
 import { CONSUMER_IMMUTABLE_FIELDS } from '@/types/management'
 
 type EditorMode = 'form' | 'json'
+
+const EDITOR_TABS_PREFIX = 'consumer-editor'
 
 interface Props {
   title: string
@@ -64,27 +66,25 @@ export function ConsumerEditor({
       </div>
 
       <div className="flex items-center justify-between p-3 border-b bg-surface-secondary shrink-0">
-        <div className="flex gap-1 bg-surface-hover p-0.5 rounded">
-          <button
-            onClick={() => onModeChange('form')}
-            className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
-              mode === 'form' ? 'bg-surface-primary text-content-primary shadow-sm' : 'text-content-secondary hover:text-content-primary'
-            }`}
-          >
-            Form View
-          </button>
-          <button
-            onClick={() => onModeChange('json')}
-            className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
-              mode === 'json' ? 'bg-surface-primary text-content-primary shadow-sm' : 'text-content-secondary hover:text-content-primary'
-            }`}
-          >
-            JSON View
-          </button>
-        </div>
+        <Tabs
+          variant="pills"
+          label="Editor mode"
+          idPrefix={EDITOR_TABS_PREFIX}
+          className="w-fit"
+          value={mode}
+          onChange={(next) => onModeChange(next as EditorMode)}
+          tabs={[
+            { value: 'form', label: 'Form View' },
+            { value: 'json', label: 'JSON View' },
+          ]}
+        />
       </div>
 
-      <div className={mode === 'form' ? 'flex-1 overflow-auto p-4 min-h-0' : 'hidden'}>
+      <div
+        {...tabPanelProps(EDITOR_TABS_PREFIX, 'form')}
+        hidden={mode !== 'form'}
+        className={mode === 'form' ? 'flex-1 overflow-auto p-4 min-h-0' : undefined}
+      >
         <ConsumerFormFields
           value={value}
           onChange={onChange}
@@ -92,7 +92,11 @@ export function ConsumerEditor({
           immutableFields={isEditMode ? (CONSUMER_IMMUTABLE_FIELDS as unknown as string[]) : undefined}
         />
       </div>
-      <div className={mode === 'json' ? 'flex-1 flex flex-col p-4 min-h-0' : 'hidden'}>
+      <div
+        {...tabPanelProps(EDITOR_TABS_PREFIX, 'json')}
+        hidden={mode !== 'json'}
+        className={mode === 'json' ? 'flex-1 flex flex-col p-4 min-h-0' : undefined}
+      >
         <JsonEditor
           value={value}
           onChange={onChange}
