@@ -160,11 +160,8 @@ export default function ConnectionEditPage({ mode }: Props) {
   }
 
   const handleTest = async () => {
+    if (!validateUrls()) return
     const urls = form.urls.filter(Boolean)
-    if (urls.length === 0) {
-      setError('Add at least one server URL before testing')
-      return
-    }
     setError(null)
     // Snapshot exactly what the user sent so we can detect later edits.
     const snap = JSON.stringify(form)
@@ -196,9 +193,7 @@ export default function ConnectionEditPage({ mode }: Props) {
     navigate('/settings/connections')
   }
 
-  const validate = (): boolean => {
-    const nextNameError = form.name.trim() ? undefined : 'Name is required'
-
+  const validateUrls = (): boolean => {
     const nextUrlErrors = form.urls.map((u) => {
       if (!u.trim()) return undefined
       const result = NatsUrl.create(u)
@@ -208,10 +203,16 @@ export default function ConnectionEditPage({ mode }: Props) {
       nextUrlErrors[0] = 'At least one server URL is required'
     }
 
-    setNameError(nextNameError)
     setUrlErrors(nextUrlErrors)
+    return nextUrlErrors.every((e) => !e)
+  }
 
-    return !nextNameError && nextUrlErrors.every((e) => !e)
+  const validate = (): boolean => {
+    const nextNameError = form.name.trim() ? undefined : 'Name is required'
+    setNameError(nextNameError)
+    const urlsOk = validateUrls()
+
+    return !nextNameError && urlsOk
   }
 
   const handleSave = async () => {
@@ -219,6 +220,7 @@ export default function ConnectionEditPage({ mode }: Props) {
     const urls = form.urls.filter(Boolean)
     setError(null)
     try {
+      const name = form.name.trim()
       const description = form.description.trim() || undefined
       // Edit mode sends explicit auth/tls (even empty) so the user can clear
       // them; Create mode only sends what's actually filled in.
@@ -226,7 +228,7 @@ export default function ConnectionEditPage({ mode }: Props) {
         await updateMutation.mutateAsync({
           id,
           connection: {
-            name: form.name,
+            name,
             description,
             urls,
             auth: toApiAuthConfig(buildAuth({ explicit: true })),
@@ -236,7 +238,7 @@ export default function ConnectionEditPage({ mode }: Props) {
         toast.success('Connection updated')
       } else {
         await createMutation.mutateAsync({
-          name: form.name,
+          name,
           description,
           urls,
           auth: toApiAuthConfig(buildAuth({ explicit: false })),
@@ -318,10 +320,8 @@ export default function ConnectionEditPage({ mode }: Props) {
               value={form}
               onChange={setForm}
               onCancel={handleCancel}
-              onSave={handleSave}
               onTest={handleTest}
               isTesting={testMutation.isPending}
-              isSaving={createMutation.isPending || updateMutation.isPending}
               mode={mode}
               nameError={nameError}
               urlErrors={urlErrors}
@@ -416,8 +416,8 @@ export default function ConnectionEditPage({ mode }: Props) {
 
             <div className="bg-accent-light border border-blue-100 rounded-lg p-4 text-xs text-blue-900 space-y-1">
               <p className="font-medium">Storage</p>
-              <p>Saved to <code className="text-2xs">~/.natscope/data/natscope.bolt</code>.</p>
-              <p>Secrets are stored in the OS keychain, never in the database file.</p>
+              <p>Saved to the local database.</p>
+              <p>Secrets go to the OS keychain or an encrypted file vault, never the database.</p>
             </div>
           </aside>
         </div>

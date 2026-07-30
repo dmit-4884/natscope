@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/api/errors'
 import { cn } from '@/utils/cn'
 import { Button } from './Button'
 import { WarningIcon } from './icons'
@@ -25,8 +26,7 @@ export function QueryErrorState({
   title = 'Failed to load',
   className,
 }: QueryErrorStateProps) {
-  const message =
-    error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error'
+  const message = error == null ? 'Unknown error' : getErrorMessage(error)
 
   return (
     <div

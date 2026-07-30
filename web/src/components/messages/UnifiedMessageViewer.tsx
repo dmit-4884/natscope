@@ -150,7 +150,7 @@ export default function UnifiedMessageViewer({
       toast.success('Full payload loaded')
     } catch (err: unknown) {
       if (selectionIdRef.current !== idAtCall) return
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = getErrorMessage(err)
       setLoadFullError(msg)
       toast.error(`Failed to load: ${msg}`)
     } finally {
@@ -224,8 +224,7 @@ export default function UnifiedMessageViewer({
         resendDecoded =
           typeof normalized.decoded === 'object' ? normalized.decoded : undefined
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err)
-        toast.error(`Failed to load full payload: ${msg}`)
+        toast.error(`Failed to load full payload: ${getErrorMessage(err)}`)
         return
       }
     }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { getErrorMessage } from '@/api/errors'
 import { toast } from '@/utils/toast'
 import { plural } from '@/utils/plural'
 import {
@@ -134,7 +135,7 @@ export default function TemplatesPage() {
             toast.success(`Updated "${values.name}"`)
             closeModal()
           },
-          onError: (e) => toast.error(`Update failed: ${e instanceof Error ? e.message : String(e)}`),
+          onError: (e) => toast.error(`Update failed: ${getErrorMessage(e)}`),
         },
       )
     } else {
@@ -143,7 +144,7 @@ export default function TemplatesPage() {
           toast.success(`Saved "${values.name}"`)
           closeModal()
         },
-        onError: (e) => toast.error(`Save failed: ${e instanceof Error ? e.message : String(e)}`),
+        onError: (e) => toast.error(`Save failed: ${getErrorMessage(e)}`),
       })
     }
   }
@@ -176,7 +177,7 @@ export default function TemplatesPage() {
           })
           toast.success(`Deleted "${name}"`)
         },
-        onError: (e) => toast.error(`Delete failed: ${e instanceof Error ? e.message : String(e)}`),
+        onError: (e) => toast.error(`Delete failed: ${getErrorMessage(e)}`),
       })
       setPendingDelete(null)
     } else if (pendingDelete.kind === 'bulk') {
@@ -192,7 +193,7 @@ export default function TemplatesPage() {
         const firstError = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')?.reason
         toast.error(
           `Deleted ${ids.length - failedIds.length} of ${ids.length}, ${failedIds.length} failed: ` +
-            `${firstError instanceof Error ? firstError.message : String(firstError)}`,
+            getErrorMessage(firstError),
         )
       }
       setPendingDelete(null)
@@ -202,7 +203,7 @@ export default function TemplatesPage() {
           setSelected(new Set())
           toast.success(`Cleared ${n} templates`)
         },
-        onError: (e) => toast.error(`Clear failed: ${e instanceof Error ? e.message : String(e)}`),
+        onError: (e) => toast.error(`Clear failed: ${getErrorMessage(e)}`),
       })
       setPendingDelete(null)
     }
@@ -225,7 +226,7 @@ export default function TemplatesPage() {
   const handleImport = (incoming: TemplateValues[]) => {
     bulkCreateMutation.mutate(incoming, {
       onSuccess: (n) => toast.success(`Imported ${plural(n, 'template')}`),
-      onError: (e) => toast.error(`Import failed: ${e instanceof Error ? e.message : String(e)}`),
+      onError: (e) => toast.error(`Import failed: ${getErrorMessage(e)}`),
     })
   }
 
