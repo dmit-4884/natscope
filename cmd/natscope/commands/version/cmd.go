@@ -86,11 +86,19 @@ func printText(full bool) {
 		fmt.Printf("Version:    %s\n", appinfo.Version)
 		fmt.Printf("Build Time: %s\n", appinfo.BuildTime)
 		fmt.Printf("Commit:     %s\n", appinfo.Commit)
-		fmt.Printf("Project:    %s\n", appinfo.Project)
-		fmt.Printf("Env Prefix: %s\n", appinfo.EnvPrefix)
+		fmt.Printf("Project:    %s\n", orNone(appinfo.Project))
+		fmt.Printf("Env Prefix: %s\n", orNone(appinfo.EnvPrefix))
 	} else {
 		fmt.Println(appinfo.Version)
 	}
+}
+
+// orNone substitutes a visible placeholder for empty build metadata fields.
+func orNone(s string) string {
+	if s == "" {
+		return "(none)"
+	}
+	return s
 }
 
 // printJSON prints version information in JSON format

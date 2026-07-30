@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -47,20 +48,28 @@ type App struct {
 
 	// Service instance ID.
 	sid *id.Service
+
+	// dirsFallback holds the home-local base directory when the default
+	// service directories were not writable and got redirected there.
+	dirsFallback string
 }
 
 // NewApp creates a new server app.
 func NewApp() *App {
 	return &App{
-		sid: id.MustNewWithFileProvider(
-			path.Join(appinfo.LibDir(), strings.ToLower(appinfo.Name)+".sid"),
-		),
 		healthCoordinator: health.New(),
 	}
 }
 
 // Run resolves the config path (flag or CONFIG_FILE env) and starts the server.
 func (srv *App) Run(cmd *cobra.Command, args []string) error {
+	if err := srv.ensureServiceDirs(); err != nil {
+		return err
+	}
+	srv.sid = id.MustNewWithFileProvider(
+		path.Join(appinfo.LibDir(), strings.ToLower(appinfo.Name)+".sid"),
+	)
+
 	configFile, _ := cmd.Flags().GetString("config") //nolint:errcheck
 	if cf := appinfo.GetEnvVar("CONFIG_FILE"); cf != "" {
 		configFile = cf
@@ -74,6 +83,53 @@ func (srv *App) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	return srv.run(context.Background())
+}
+
+// ensureServiceDirs makes appinfo.VarDir/LibDir usable before anything touches
+// them. The platform defaults (/var, /var/lib/<name>) are not writable for
+// non-root installs (Homebrew, Docker non-root user), so when they cannot be
+// created and the user has not overridden them, the directories are redirected
+// to ~/.<name>/{var,lib}.
+func (srv *App) ensureServiceDirs() error {
+	mkErr := appinfo.MakeAllDirs()
+	if mkErr == nil {
+		return nil
+	}
+
+	if appinfo.GetEnvVar("LIB_DIR") != "" || appinfo.GetEnvVar("VAR_DIR") != "" {
+		return errors.Wrapf(mkErr, "failed to create service directories (check %s and %s)", envVarName("LIB_DIR"), envVarName("VAR_DIR"))
+	}
+
+	home, homeErr := os.UserHomeDir()
+	if homeErr != nil {
+		return errors.Wrapf(mkErr, "failed to create service directories and no home directory to fall back to (set %s and %s)",
+			envVarName("LIB_DIR"), envVarName("VAR_DIR"))
+	}
+
+	base := filepath.Join(home, "."+strings.ToLower(appinfo.Name))
+	if err := os.Setenv(envVarName("VAR_DIR"), filepath.Join(base, "var")); err != nil {
+		return errors.WrapOperation(err, "override service var dir")
+	}
+	if err := os.Setenv(envVarName("LIB_DIR"), filepath.Join(base, "lib")); err != nil {
+		return errors.WrapOperation(err, "override service lib dir")
+	}
+
+	if err := appinfo.MakeAllDirs(); err != nil {
+		return errors.WrapOperation(err, "create fallback service directories")
+	}
+
+	srv.dirsFallback = base
+
+	return nil
+}
+
+// envVarName mirrors appinfo.GetEnvVar's prefixing to name environment
+// variables in overrides and error messages.
+func envVarName(key string) string {
+	if appinfo.EnvPrefix != "" {
+		key = strings.TrimRight(appinfo.EnvPrefix, "_") + "_" + key
+	}
+	return strings.ToUpper(key)
 }
 
 // run performs the actual server startup.
@@ -107,8 +163,8 @@ func (srv *App) run(ctx context.Context) error {
 		),
 	)
 
-	if err := appinfo.MakeAllDirs(); err != nil {
-		return errors.WrapOperation(err, "create service directories")
+	if srv.dirsFallback != "" {
+		slog.Default().Info("default service directories not writable, using home-local fallback", slog.String("base", srv.dirsFallback))
 	}
 
 	startCtx, startCancel := context.WithTimeout(ctx, startTimeout)
