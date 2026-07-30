@@ -1,40 +1,34 @@
 import { useEffect } from 'react'
 import { ConnectError, Code } from '@connectrpc/connect'
-import { getHealth } from '@/api/stats'
 import { getErrorReason } from '@/api/errors'
-import { useConnectionQuery } from '@/hooks/useConnectionQuery'
 import { logger } from '@/utils/logger'
+import { useConnectionHealth } from './useConnectionHealth'
 
 /**
- * Validate a saved connection is reachable; calls onInvalidConnection when
- * the server reports it gone, closed, or unavailable. Uses getHealth (~100B)
+ * Validate a saved connection is reachable; calls onInvalidConnection with the
+ * failing error when the server reports it gone, closed, or unavailable.
+ * Shares the polled ['health'] query (~100B) with the header indicator.
  */
 export function useConnectionValidation(
   connectionId: string | null,
-  onInvalidConnection: () => void,
+  onInvalidConnection: (error: unknown) => void,
 ) {
-  const { error } = useConnectionQuery({
-    key: ['health'],
-    connectionId,
-    fetcher: (signal) => getHealth(connectionId!, signal),
-    retry: false,
-    refetchOnWindowFocus: false,
-  })
+  const { queryError } = useConnectionHealth(connectionId)
 
   useEffect(() => {
-    if (error) {
-      const connectError = error instanceof ConnectError ? error : null
-      const reason = getErrorReason(error)
+    if (!queryError) return
 
-      if (
-        connectError?.code === Code.NotFound ||
-        connectError?.code === Code.Unavailable ||
-        reason === 'CONNECTION_NOT_FOUND' ||
-        reason === 'NATS_CONNECTION_CLOSED'
-      ) {
-        logger.warn('Connection validation failed, clearing connection state')
-        onInvalidConnection()
-      }
+    const connectError = queryError instanceof ConnectError ? queryError : null
+    const reason = getErrorReason(queryError)
+
+    if (
+      connectError?.code === Code.NotFound ||
+      connectError?.code === Code.Unavailable ||
+      reason === 'CONNECTION_NOT_FOUND' ||
+      reason === 'NATS_CONNECTION_CLOSED'
+    ) {
+      logger.warn('Connection validation failed, clearing connection state')
+      onInvalidConnection(queryError)
     }
-  }, [error, onInvalidConnection])
+  }, [queryError, onInvalidConnection])
 }

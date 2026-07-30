@@ -120,6 +120,9 @@ export interface ConsumerInfo {
   num_redelivered?: number
   num_waiting?: number
   push_bound?: boolean
+  paused?: boolean
+  /** RFC3339 instant the pause lifts; only meaningful while paused. */
+  pause_until?: string
   cluster?: ClusterInfo
   raw?: Record<string, unknown>
 }

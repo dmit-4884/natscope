@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { z } from 'zod'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -10,9 +10,11 @@ import {
   useConnectionValidation,
 } from '@/contexts/connection'
 import type { SavedConnection } from '@/api/connections'
+import { getErrorMessage } from '@/api/errors'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { resetAllStores } from '@/stores/resetAllStores'
 import { logger } from '@/utils/logger'
+import { toast } from '@/utils/toast'
 import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
 import {
   rememberSettingsReturn,
@@ -69,7 +71,6 @@ export default function ConnectedLayout() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const [connectionLost, setConnectionLost] = useState(false)
   const location = useLocation()
 
   // Initialize currentConnection from localStorage for instant display
@@ -82,14 +83,6 @@ export default function ConnectedLayout() {
   const [connectionId, setConnectionId] = useState<string | null>(() =>
     getActiveConnectionId()
   )
-
-  const connectionLostTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
-
-  useEffect(() => {
-    return () => {
-      if (connectionLostTimeoutRef.current) clearTimeout(connectionLostTimeoutRef.current)
-    }
-  }, [])
 
   // If no connectionId, redirect to connection selector
   useEffect(() => {
@@ -111,14 +104,15 @@ export default function ConnectedLayout() {
     navigate('/', { replace: true })
   }, [queryClient, navigate])
 
-  // Handle invalid connection (lazy connect failed on backend)
-  const handleInvalidConnection = useCallback(() => {
+  // Handle invalid connection (lazy connect failed on backend). This layout
+  // unmounts as part of the disconnect, so the notice has to be a toast.
+  const handleInvalidConnection = useCallback((error: unknown) => {
     logger.warn('Connection is no longer valid, disconnecting...')
-    setConnectionLost(true)
+    const name = currentConnection?.name
+    const detail = getErrorMessage(error)
+    toast.error(name ? `Disconnected from "${name}": ${detail}` : `Disconnected: ${detail}`)
     handleDisconnect()
-    if (connectionLostTimeoutRef.current) clearTimeout(connectionLostTimeoutRef.current)
-    connectionLostTimeoutRef.current = setTimeout(() => setConnectionLost(false), 3000)
-  }, [handleDisconnect])
+  }, [currentConnection?.name, handleDisconnect])
 
   useConnectionValidation(connectionId, handleInvalidConnection)
 
@@ -134,7 +128,6 @@ export default function ConnectedLayout() {
     storeConnectionInfo(connection)
     setConnectionId(connection.id)
     setCurrentConnection(connection)
-    setConnectionLost(false)
 
     // Always navigate to streams list to avoid stale stream from previous connection
     navigate('/streams')
@@ -174,13 +167,6 @@ export default function ConnectedLayout() {
 
   return (
     <>
-      {/* Connection Lost Notification */}
-      {connectionLost && (
-        <div className="fixed top-4 right-4 z-50 bg-red-500 text-content-inverse px-4 py-2 rounded-lg shadow-lg text-sm">
-          Connection lost - please reconnect
-        </div>
-      )}
-
       {/* Compact Header */}
       <CompactHeader
         connectionId={connectionId}

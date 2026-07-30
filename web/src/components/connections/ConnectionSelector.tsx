@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from '@/utils/toast'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage, stripErrorCodePrefix } from '@/api/errors'
 import { useRowKeys } from '@/hooks/useRowKeys'
 import type { SavedConnection } from '@/api/connections'
 import { safeSetItem } from '@/utils/safeStorage'
@@ -18,7 +18,7 @@ import {
   useTestConnection,
   type AuthMethod,
 } from '@/contexts/connection'
-import { BoltIcon, CloseIcon, EyeIcon, EyeOffIcon, Input, PlusIcon } from '@/components/ui'
+import { BoltIcon, CloseIcon, EyeIcon, EyeOffIcon, Input, PlusIcon, Spinner } from '@/components/ui'
 import { AUTH_LABELS } from './manager/connectionFormData'
 
 type AuthMethodTab = AuthMethod
@@ -65,12 +65,34 @@ export default function ConnectionSelector() {
     navigate('/streams')
   }, [loadingConnections, savedConnections, navigate])
 
-  const handleConnectToSaved = (connection: SavedConnection) => {
-    setActiveConnectionId(connection.id)
-    safeSetItem(ACTIVE_CONNECTION_INFO_KEY, JSON.stringify({
-      id: connection.id, name: connection.name, urls: connection.urls,
-    }))
-    navigate('/streams')
+  // Probe the server before entering the app: a dead server used to be
+  // discovered only after navigating, which bounced the user back silently.
+  const handleConnectToSaved = async (connection: SavedConnection) => {
+    setConnectingId(connection.id)
+    setError(null)
+    try {
+      const result = await testConnectionMutation.mutateAsync({
+        urls: connection.urls,
+        connectionId: connection.id,
+      })
+      if (!result.success) {
+        const message = result.error ? stripErrorCodePrefix(result.error) : 'Connection failed'
+        setError({ id: connection.id, message })
+        toast.error(`${connection.name}: ${message}`)
+        return
+      }
+
+      setActiveConnectionId(connection.id)
+      safeSetItem(ACTIVE_CONNECTION_INFO_KEY, JSON.stringify({
+        id: connection.id, name: connection.name, urls: connection.urls,
+      }))
+      navigate('/streams')
+    } catch (err) {
+      // The global MutationCache.onError already toasts; keep the row inline.
+      setError({ id: connection.id, message: getErrorMessage(err) })
+    } finally {
+      setConnectingId(null)
+    }
   }
 
   const buildAuthConfig = (): AuthConfig | undefined => {
@@ -211,16 +233,29 @@ export default function ConnectionSelector() {
                   {savedConnections.map((conn) => (
                     <button
                       key={conn.id}
-                      onClick={() => handleConnectToSaved(conn)}
+                      onClick={() => void handleConnectToSaved(conn)}
                       disabled={connectingId !== null}
+                      aria-busy={connectingId === conn.id}
                       className={`w-full px-4 py-3 text-left hover:bg-surface-secondary flex items-center gap-3 transition-colors disabled:opacity-50 ${
                         error?.id === conn.id ? 'bg-status-error-bg' : ''
                       }`}
                     >
                       <div
                         role="img"
-                        aria-label={error?.id === conn.id ? 'Connection error' : 'Saved connection'}
-                        className={`w-2 h-2 rounded-full shrink-0 ${error?.id === conn.id ? 'bg-red-500' : 'bg-gray-300'}`}
+                        aria-label={
+                          connectingId === conn.id
+                            ? 'Connecting'
+                            : error?.id === conn.id
+                              ? 'Connection error'
+                              : 'Saved connection'
+                        }
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          connectingId === conn.id
+                            ? 'bg-amber-500 animate-pulse'
+                            : error?.id === conn.id
+                              ? 'bg-red-500'
+                              : 'bg-gray-300'
+                        }`}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-content-primary truncate">{conn.name}</div>
@@ -239,9 +274,13 @@ export default function ConnectionSelector() {
                           {conn.urls.length} servers
                         </span>
                       )}
-                      <svg className="w-4 h-4 text-content-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+                      {connectingId === conn.id ? (
+                        <Spinner size="sm" className="shrink-0" />
+                      ) : (
+                        <svg className="w-4 h-4 text-content-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      )}
                     </button>
                   ))}
                 </div>

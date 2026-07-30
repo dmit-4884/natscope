@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { useMessages, Subject } from '@/contexts/messages'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { type StreamScope, isScopeReady } from '@/stores/streamTabState'
 import { setNavQuery } from '@/stores/streamTabState/messagesViewStore'
-import { useStreamDetail } from '@/contexts/streams'
+import { useStreamDetail, streamKeys } from '@/contexts/streams'
 import type { Message } from '@/types/nats'
 import type { SelectedMessage } from '@/types/messages'
 import { getErrorMessage, getErrorReason } from '@/api/errors'
@@ -34,6 +33,7 @@ import {
   WorkQueueRealtimeNotice,
 } from './unified/MessageListStates'
 import { MessageVirtualTable } from './unified/MessageVirtualTable'
+import { useHistoryRefreshOnModeChange } from './unified/useHistoryRefreshOnModeChange'
 import { useLiveSubscription } from './unified/useLiveSubscription'
 import { useLoadMoreMessages } from './unified/useLoadMoreMessages'
 import { toSelectedHistoryMessage } from './unified/selectedMessage'
@@ -185,6 +185,8 @@ export default function UnifiedMessageList({
     subjectFilter: filters.subject || undefined,
   })
 
+  useHistoryRefreshOnModeChange(mode, connectionId, streamName)
+
   // Clear selection only on real stream change, not on mount — mount-time
   // clearing would defeat the per-stream view store's restore.
   const prevStreamRef = useRef<string | null | undefined>(undefined)
@@ -288,12 +290,8 @@ export default function UnifiedMessageList({
 
   const handleRefetch = () => {
     refetch()
-    queryClient.invalidateQueries({
-      queryKey: [CONNECTION_QUERY_PREFIX, connectionId, 'stream', streamName],
-    })
-    queryClient.invalidateQueries({
-      queryKey: [CONNECTION_QUERY_PREFIX, connectionId, 'streamStats', streamName],
-    })
+    if (!connectionId || !streamName) return
+    queryClient.invalidateQueries({ queryKey: streamKeys.detail(connectionId, streamName) })
   }
 
   const handleMaxDisplayRateChange = (rate: number) => {

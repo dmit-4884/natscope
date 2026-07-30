@@ -87,6 +87,11 @@ export function ConsumerList({
                       Push
                     </Badge>
                   )}
+                  {consumer.paused && (
+                    <Badge variant="warning" size="sm">
+                      Paused
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="text-xs text-content-tertiary flex gap-3">
