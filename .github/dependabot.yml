@@ -18,7 +18,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      root-npm-deps:
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions-deps:
+        patterns: ["*"]
