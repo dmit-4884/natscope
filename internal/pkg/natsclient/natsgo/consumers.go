@@ -103,7 +103,10 @@ func (c *Client) CreateConsumer(
 		return nil, wrapErr(err)
 	}
 
-	jsConfig := toJetStreamConsumerConfig(config)
+	jsConfig, err := toJetStreamConsumerConfig(config)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
 
 	consumer, err := stream.CreateConsumer(ctx, *jsConfig)
 	if err != nil {
