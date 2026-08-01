@@ -309,6 +309,9 @@ type ConsumerCreateRequest struct {
 	// Metadata is custom key-value metadata.
 	Metadata map[string]string
 
+	// Ephemeral creates a non-durable consumer removed after inactivity.
+	Ephemeral bool
+
 	// --- Push Consumer Specific ---
 
 	// DeliverSubject is the subject for push delivery.
@@ -365,6 +368,12 @@ type ConsumerUpdateRequest struct {
 
 	// Metadata is custom key-value metadata (mutable).
 	Metadata map[string]string
+
+	// FilterSubject is the subject filter (mutable, NATS 2.10+).
+	FilterSubject *string
+
+	// FilterSubjects are the subject filters (mutable, NATS 2.10+).
+	FilterSubjects []string
 }
 
 // ConsumerPauseResponse is the outcome of a consumer pause request.
