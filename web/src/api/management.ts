@@ -215,6 +215,7 @@ export async function createConsumer(
     ackPolicy: ACK_POLICY_INT[config.ack_policy ?? ''] ?? 0,
     ackWait: config.ack_wait != null ? nanosToDur(config.ack_wait) : undefined,
     maxDeliver: config.max_deliver ?? 0,
+    backOff: (config.backoff ?? []).map(nanosToDur),
     filterSubject: config.filter_subject ?? '',
     filterSubjects: config.filter_subjects ?? [],
     replayPolicy: REPLAY_POLICY_INT[config.replay_policy ?? ''] ?? 0,
@@ -259,6 +260,7 @@ export async function updateConsumer(
     maxRequestMaxBytes: config.max_bytes != null ? BigInt(config.max_bytes) : undefined,
     maxRequestExpires: config.max_expires != null ? nanosToDur(config.max_expires) : undefined,
     inactiveThreshold: config.inactive_threshold != null ? nanosToDur(config.inactive_threshold) : undefined,
+    backOff: (config.backoff ?? []).map(nanosToDur),
     metadata: config.metadata ?? {},
   })
   return toConsumerInfo(response.consumer!)
