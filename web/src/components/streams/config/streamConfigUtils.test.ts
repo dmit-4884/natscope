@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { StreamCreateRequest } from '@/types/management'
-import { canCreateStream, formatCompression, isMirrorConfigured, normalizeSubjects } from './streamConfigUtils'
+import { COMPRESSION_LABELS, canCreateStream, isMirrorConfigured, normalizeSubjects } from './streamConfigUtils'
 
 function draft(over: Partial<StreamCreateRequest> = {}): StreamCreateRequest {
   return { name: 'ORDERS', subjects: [''], ...over }
@@ -18,15 +18,10 @@ describe('isMirrorConfigured', () => {
   })
 })
 
-describe('formatCompression', () => {
+describe('COMPRESSION_LABELS', () => {
   it('renders both algorithms with consistent casing', () => {
-    expect(formatCompression('none')).toBe('None')
-    expect(formatCompression('s2')).toBe('S2')
-    expect(formatCompression('S2')).toBe('S2')
-  })
-
-  it('falls back to the readable form for unknown values', () => {
-    expect(formatCompression('zstd')).toBe('Zstd')
+    expect(COMPRESSION_LABELS.none).toBe('None')
+    expect(COMPRESSION_LABELS.s2).toBe('S2')
   })
 })
 

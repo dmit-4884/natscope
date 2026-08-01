@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import * as Diff from 'diff'
 import { Modal, Button } from '@/components/ui'
+import { stableJson } from '@/utils/stableJson'
 
 interface ConfigDiffModalProps {
   isOpen: boolean
@@ -10,6 +11,7 @@ interface ConfigDiffModalProps {
   description?: string
   originalConfig: unknown
   newConfig: unknown
+  notice?: ReactNode
   isLoading?: boolean
 }
 
@@ -28,11 +30,12 @@ export default function ConfigDiffModal({
   description,
   originalConfig,
   newConfig,
+  notice,
   isLoading = false,
 }: ConfigDiffModalProps) {
   const { leftLines, rightLines, hasChanges } = useMemo(() => {
-    const originalJson = JSON.stringify(originalConfig, null, 2)
-    const newJson = JSON.stringify(newConfig, null, 2)
+    const originalJson = stableJson(originalConfig, 2)
+    const newJson = stableJson(newConfig, 2)
 
     const changes = Diff.diffLines(originalJson, newJson)
 
@@ -102,6 +105,8 @@ export default function ConfigDiffModal({
           {description && (
             <p className="text-sm text-content-secondary mb-4">{description}</p>
           )}
+
+          {notice && <div className="mb-4">{notice}</div>}
 
           {!hasChanges ? (
             <div className="text-center py-8 text-content-tertiary">

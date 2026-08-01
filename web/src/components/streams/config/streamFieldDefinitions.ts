@@ -1,5 +1,6 @@
 import type { CapabilityKey } from '@/contexts/connection'
 import type { StreamCreateRequest, StreamUpdateRequest } from '@/types/management'
+import { stableJson } from '@/utils/stableJson'
 import { isMirrorConfigured, normalizeSubjects } from './streamConfigUtils'
 
 // UI-only metadata for stream config fields (rendering + payload filtering);
@@ -341,9 +342,29 @@ const STREAM_CREATE_PASSTHROUGH_KEYS: ReadonlyArray<keyof StreamCreateRequest> =
   'consumer_limits',
 ]
 
+const STREAM_UPDATE_LOCKED_EXTRA_KEYS: ReadonlyArray<string> = ['mirror', 'placement', 'first_seq', 'no_ack']
+
 /** Field keys that cannot be changed when updating an existing stream. */
 export function getStreamUpdateLockedKeys(): readonly string[] {
-  return STREAM_FIELDS.filter((f) => !f.editableOnUpdate).map((f) => f.key as string)
+  const fromFields = STREAM_FIELDS.filter((f) => !f.editableOnUpdate).map((f) => f.key as string)
+  return [...new Set([...fromFields, ...STREAM_UPDATE_LOCKED_EXTRA_KEYS])]
+}
+
+export function getIgnoredUpdateKeys(original: StreamCreateRequest, next: StreamCreateRequest): string[] {
+  const supported = new Set<string>([
+    ...STREAM_FIELDS.filter((f) => f.editableOnUpdate).map((f) => f.key as string),
+    ...STREAM_UPDATE_PASSTHROUGH_KEYS.map((k) => k as string),
+  ])
+  const before = original as unknown as Record<string, unknown>
+  const after = next as unknown as Record<string, unknown>
+
+  const ignored: string[] = []
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (supported.has(key)) continue
+    if (stableJson(before[key]) === stableJson(after[key])) continue
+    ignored.push(key)
+  }
+  return ignored.sort()
 }
 
 /**
@@ -367,9 +388,6 @@ export function buildStreamUpdatePayload(values: StreamCreateRequest): StreamUpd
 
 /**
  * Build a create payload by picking only fields that are editable on create.
- *
- * Blank subject rows are dropped, and the key is omitted entirely for mirror
- * streams — NATS rejects `stream mirrors can not contain subjects`.
  */
 export function buildStreamCreatePayload(values: StreamCreateRequest): StreamCreateRequest {
   const src = values as unknown as Record<string, unknown>
