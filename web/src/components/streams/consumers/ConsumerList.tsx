@@ -77,9 +77,13 @@ export function ConsumerList({
               <div className="flex items-center justify-between mb-1">
                 <span className="font-medium text-sm truncate">{consumer.name}</span>
                 <div className="flex gap-1 shrink-0">
-                  {consumer.config?.durable_name && (
+                  {consumer.config?.durable_name ? (
                     <Badge variant="default" size="sm">
                       Durable
+                    </Badge>
+                  ) : (
+                    <Badge variant="default" size="sm">
+                      Ephemeral
                     </Badge>
                   )}
                   {consumer.push_bound && (
