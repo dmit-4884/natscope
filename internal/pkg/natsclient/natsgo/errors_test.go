@@ -64,6 +64,55 @@ func TestWrapErr_SentinelMapping(t *testing.T) {
 	}
 }
 
+func TestWrapErr_ClientValidationMapping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		src  error
+	}{
+		{"InvalidStreamName", jetstream.ErrInvalidStreamName},
+		{"StreamNameRequired", jetstream.ErrStreamNameRequired},
+		{"InvalidConsumerName", jetstream.ErrInvalidConsumerName},
+		{"InvalidSubject", jetstream.ErrInvalidSubject},
+		{"InvalidBucketName", jetstream.ErrInvalidBucketName},
+		{"InvalidKey", jetstream.ErrInvalidKey},
+		{"InvalidStoreName", jetstream.ErrInvalidStoreName},
+		{"NameRequired", jetstream.ErrNameRequired},
+		{"BucketRequired", jetstream.ErrBucketRequired},
+		{"KeyValueConfigRequired", jetstream.ErrKeyValueConfigRequired},
+		{"ObjectConfigRequired", jetstream.ErrObjectConfigRequired},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := wrapErr(tt.src)
+			require.Error(t, got)
+			assert.ErrorIs(t, got, errs.ErrNATSInvalidArgument, "must map to the invalid-argument domain error")
+			assert.ErrorIs(t, got, tt.src, "original SDK err should remain in chain")
+		})
+	}
+}
+
+func TestWrapErr_ClientValidationKeepsSDKMessage(t *testing.T) {
+	t.Parallel()
+
+	got := wrapErr(fmt.Errorf("%w: %q", jetstream.ErrInvalidStreamName, "bad name"))
+
+	require.Error(t, got)
+	assert.ErrorIs(t, got, errs.ErrNATSInvalidArgument)
+	assert.Contains(t, got.Error(), `"bad name"`)
+}
+
+func TestWrapErr_ClientValidationIdempotent(t *testing.T) {
+	t.Parallel()
+
+	once := wrapErr(jetstream.ErrInvalidKey)
+	twice := wrapErr(once)
+	assert.Equal(t, once, twice, "wrapping a validation error again is a no-op")
+}
+
 // TestWrapErr_WrappedSentinel ensures a sentinel wrapped via fmt.Errorf still
 // gets mapped — services often add context with %w.
 func TestWrapErr_WrappedSentinel(t *testing.T) {

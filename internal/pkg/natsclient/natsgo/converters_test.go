@@ -14,6 +14,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 )
 
 // TestStreamCreateConversion verifies every field of StreamCreateRequest → jetstream.StreamConfig.
@@ -174,7 +175,8 @@ func TestConsumerCreateConversion(t *testing.T) {
 		IdleHeartbeat:      15 * time.Second,
 	}
 
-	jsConfig := toJetStreamConsumerConfig(entity)
+	jsConfig, err := toJetStreamConsumerConfig(entity)
+	require.NoError(t, err)
 
 	assert.Equal(t, "test-consumer", jsConfig.Name)
 	assert.Equal(t, "test-consumer", jsConfig.Durable, "Durable must mirror Name so the server keeps the consumer")
@@ -214,7 +216,8 @@ func TestConsumerCreateConversion(t *testing.T) {
 // reaps it after its 5s inactivity default.
 func TestConsumerCreateConversion_Durable(t *testing.T) {
 	t.Run("named request becomes durable", func(t *testing.T) {
-		jsConfig := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{Name: "orders-worker"})
+		jsConfig, err := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{Name: "orders-worker"})
+		require.NoError(t, err)
 
 		assert.Equal(t, "orders-worker", jsConfig.Name)
 		assert.Equal(t, "orders-worker", jsConfig.Durable)
@@ -222,7 +225,8 @@ func TestConsumerCreateConversion_Durable(t *testing.T) {
 	})
 
 	t.Run("unnamed request stays ephemeral", func(t *testing.T) {
-		jsConfig := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{})
+		jsConfig, err := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{})
+		require.NoError(t, err)
 
 		assert.Empty(t, jsConfig.Name)
 		assert.Empty(t, jsConfig.Durable)
@@ -231,16 +235,30 @@ func TestConsumerCreateConversion_Durable(t *testing.T) {
 	t.Run("opt start time is parsed", func(t *testing.T) {
 		start := time.Now().UTC().Truncate(time.Second)
 
-		jsConfig := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{
+		jsConfig, err := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{
 			Name:          "replayer",
 			DeliverPolicy: entities.DeliverByStartTime,
 			OptStartTime:  start.Format(time.RFC3339),
 		})
+		require.NoError(t, err)
 
 		require.NotNil(t, jsConfig.OptStartTime)
 		assert.Equal(t, start, jsConfig.OptStartTime.UTC())
 		assert.Equal(t, "replayer", jsConfig.Durable)
 	})
+}
+
+func TestConsumerCreateConversion_InvalidOptStartTime(t *testing.T) {
+	jsConfig, err := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{
+		Name:          "replayer",
+		DeliverPolicy: entities.DeliverByStartTime,
+		OptStartTime:  "not-a-timestamp",
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, jsConfig)
+	assert.ErrorIs(t, err, errs.ErrNATSInvalidArgument)
+	assert.Contains(t, err.Error(), "not-a-timestamp")
 }
 
 // TestStreamInfoConversion verifies jetstream.StreamInfo → entities.StreamInfo (response path).

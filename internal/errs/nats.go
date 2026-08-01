@@ -53,6 +53,36 @@ var ErrWorkQueueConsumerNotAllowed = errors.New("nats: cannot create read consum
 // all configured streams.
 var ErrLiveNoSubscriptions = errors.New("nats: failed to create any live subscriptions")
 
+// ErrNATSInvalidArgument is a client-side rejection of a NATS request.
+var ErrNATSInvalidArgument = errors.New("nats: invalid argument")
+
+// NATSValidationError is the domain form of a client-side NATS validation failure.
+type NATSValidationError struct {
+	Description string
+	Cause       error
+}
+
+// Error implements the error interface.
+func (e *NATSValidationError) Error() string {
+	if e == nil || e.Description == "" {
+		return ErrNATSInvalidArgument.Error()
+	}
+	return e.Description
+}
+
+// Is reports whether target is ErrNATSInvalidArgument.
+func (e *NATSValidationError) Is(target error) bool {
+	return target == ErrNATSInvalidArgument
+}
+
+// Unwrap returns the originating error.
+func (e *NATSValidationError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
 // NATSAPIError is the [services/nats] domain form of a structured JetStream
 // API error, kept so transport never imports the SDK.
 type NATSAPIError struct {

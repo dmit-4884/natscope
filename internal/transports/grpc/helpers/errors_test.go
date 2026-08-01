@@ -96,6 +96,20 @@ func TestStatusErrorConvert(t *testing.T) {
 		{name: "ErrWorkspaceUnknownSection", err: errs.ErrWorkspaceUnknownSection, wantCode: codes.InvalidArgument, wantReason: "WORKSPACE_UNKNOWN_SECTION"},
 		{name: "WrappedErrWorkspaceUnknownSection", err: fmt.Errorf("export: %w", errs.ErrWorkspaceUnknownSection), wantCode: codes.InvalidArgument, wantReason: "WORKSPACE_UNKNOWN_SECTION"},
 
+		{name: "ErrNATSInvalidArgument", err: errs.ErrNATSInvalidArgument, wantCode: codes.InvalidArgument, wantReason: "NATS_INVALID_ARGUMENT"},
+		{
+			name:       "NATSValidationError",
+			err:        &errs.NATSValidationError{Description: `nats: invalid stream name: "bad name"`},
+			wantCode:   codes.InvalidArgument,
+			wantReason: "NATS_INVALID_ARGUMENT",
+		},
+		{
+			name:       "WrappedNATSValidationError",
+			err:        fmt.Errorf("create stream: %w", &errs.NATSValidationError{Description: "nats: invalid key"}),
+			wantCode:   codes.InvalidArgument,
+			wantReason: "NATS_INVALID_ARGUMENT",
+		},
+
 		// Structured JetStream API error (domain type, not SDK)
 		{name: "NATSAPIError_Conflict", err: &errs.NATSAPIError{Code: 409, ErrorCode: 10074, Description: "stream replication factor invalid"}, wantCode: codes.AlreadyExists, wantReason: "NATS_API_ERROR"},
 		{name: "NATSAPIError_BadRequest", err: &errs.NATSAPIError{Code: 400, ErrorCode: 10052, Description: "config validation failed"}, wantCode: codes.InvalidArgument, wantReason: "NATS_API_ERROR"},
@@ -121,6 +135,18 @@ func TestStatusErrorConvert(t *testing.T) {
 func TestStatusErrorConvert_Nil(t *testing.T) {
 	t.Parallel()
 	assert.NoError(t, StatusErrorConvert(t.Context(), nil))
+}
+
+func TestNATSValidationErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	valErr := &errs.NATSValidationError{Description: `nats: invalid stream name: "bad name"`}
+	result := StatusErrorConvert(t.Context(), valErr)
+
+	st, ok := status.FromError(result)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+	assert.Equal(t, `nats: invalid stream name: "bad name"`, st.Message())
 }
 
 // TestNATSAPIErrorMetadata verifies err_code/http_code survive in the ErrorInfo metadata.

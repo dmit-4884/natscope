@@ -51,6 +51,7 @@ var commonDomainErrors = []struct {
 	{errs.ErrNATSConnectionFailed, errorMapping{codes.Unavailable, "nats server unavailable", "NATS_CONNECTION_FAILED"}},
 	{errs.ErrNATSTimeout, errorMapping{codes.DeadlineExceeded, "nats operation timed out", "NATS_TIMEOUT"}},
 	{errs.ErrNATSPermissionViolation, errorMapping{codes.PermissionDenied, "nats permissions violation", "NATS_PERMISSION_VIOLATION"}},
+	{errs.ErrNATSInvalidArgument, errorMapping{codes.InvalidArgument, "nats: invalid argument", "NATS_INVALID_ARGUMENT"}},
 	{errs.ErrStreamNotFound, errorMapping{codes.NotFound, "stream not found", "NATS_STREAM_NOT_FOUND"}},
 	{errs.ErrStreamNameInUse, errorMapping{codes.AlreadyExists, "stream name already in use", "NATS_STREAM_NAME_IN_USE"}},
 	{errs.ErrConsumerNotFound, errorMapping{codes.NotFound, "consumer not found", "NATS_CONSUMER_NOT_FOUND"}},
@@ -87,6 +88,10 @@ var commonDomainErrors = []struct {
 func StatusErrorConvert(_ context.Context, err error) error {
 	if err == nil {
 		return nil
+	}
+
+	if valErr, ok := errors.AsType[*errs.NATSValidationError](err); ok && valErr != nil {
+		return NewStatus(codes.InvalidArgument, valErr.Error(), "NATS_INVALID_ARGUMENT")
 	}
 
 	// Per-handler errors are matched upstream; here we handle only the common set.
