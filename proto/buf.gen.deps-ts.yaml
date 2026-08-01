@@ -6,13 +6,12 @@
 # and registering the same descriptors twice panics at init.
 version: v2
 inputs:
-  # Pinned refs keep codegen reproducible; bump deliberately.
-  - module: buf.build/altessa-s/proto:v0.3.0
+  # Vendored under third_party/ (buf.build is unreachable from some networks);
+  # bump by re-vendoring deliberately.
+  - directory: third_party
     paths:
-      - io/altessa/badrequest/v1
-  - module: buf.build/googleapis/googleapis:c17df5b2beca46928cc87d5656bd5343
-    paths:
-      - google/rpc/error_details.proto
+      - third_party/io/altessa/badrequest/v1
+      - third_party/google/rpc/error_details.proto
 plugins:
   - local: ../node_modules/.bin/protoc-gen-es
     out: ../web/src/gen
