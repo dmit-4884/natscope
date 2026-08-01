@@ -51,6 +51,13 @@ export function ConsumerView({
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-content-primary">{consumer.name}</h3>
+            {!consumer.config?.durable_name && (
+              <Tooltip content="No durable name — the server removes this consumer after the inactivity threshold">
+                <Badge variant="default" size="sm">
+                  Ephemeral
+                </Badge>
+              </Tooltip>
+            )}
             {isPaused && (
               <Badge variant="warning" size="sm">
                 Paused
