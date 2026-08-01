@@ -6,6 +6,7 @@ package natsgo
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -13,6 +14,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/convcodecs"
 )
 
@@ -50,19 +52,24 @@ func toStreamInfo(info *jetstream.StreamInfo) *entities.StreamInfo {
 	return result
 }
 
-func toJetStreamConsumerConfig(config entities.ConsumerCreateRequest) *jetstream.ConsumerConfig {
+func toJetStreamConsumerConfig(config entities.ConsumerCreateRequest) (*jetstream.ConsumerConfig, error) {
 	jsConfig := converter.Convert(config, &jetstream.ConsumerConfig{},
 		converter.WithIgnoreFields("OptStartTime"),
 	)
 	jsConfig.Durable = jsConfig.Name
 
 	if config.OptStartTime != "" {
-		if t, err := time.Parse(time.RFC3339, config.OptStartTime); err == nil {
-			jsConfig.OptStartTime = &t
+		startTime, err := time.Parse(time.RFC3339, config.OptStartTime)
+		if err != nil {
+			return nil, &errs.NATSValidationError{
+				Description: fmt.Sprintf("invalid opt_start_time %q: must be RFC3339", config.OptStartTime),
+				Cause:       err,
+			}
 		}
+		jsConfig.OptStartTime = &startTime
 	}
 
-	return jsConfig
+	return jsConfig, nil
 }
 
 // toConsumerInfo uses a caller-supplied Stream since the SDK doesn't always carry
