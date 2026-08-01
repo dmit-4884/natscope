@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { NavLink, Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
-import { Code } from '@connectrpc/connect'
 import { useStreamDetail } from '@/contexts/streams'
 import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
 import {
@@ -17,13 +16,14 @@ import {
   type HeaderDraft,
 } from '@/stores/streamTabState/publishDraftStore'
 import { useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
-import { getErrorReason, isErrorCode } from '@/api/errors'
-import { Button, EmptyState, UsersIcon, WarningIcon } from '@/components/ui'
+import { UsersIcon } from '@/components/ui'
 import type { SelectedMessage } from '../messages/UnifiedMessageList'
 import { useMessageNavigation } from '../messages/unified/useMessageNavigation'
 import UnifiedMessageViewer from '../messages/UnifiedMessageViewer'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import PublishHistory from './PublishHistory'
+import StreamNotFoundState from './StreamNotFoundState'
+import { isStreamNotFound } from './streamErrors'
 import { subjectMatchesStream } from './publish/subjectPatternUtils'
 
 const RIGHT_PANEL_WIDTH_KEY = 'nats_right_panel_width'
@@ -229,8 +229,7 @@ export default function StreamView() {
   // Config and Consumers tabs use full width (no right panel)
   const isFullWidthTab = isConfigTab || isConsumersTab
 
-  const streamMissing =
-    getErrorReason(streamError) === 'NATS_STREAM_NOT_FOUND' || isErrorCode(streamError, Code.NotFound)
+  const streamMissing = isStreamNotFound(streamError)
 
   // Arrow navigation — must be called before the early return (hooks rule).
   const isMessagesTab = !isPublishTab && !isFullWidthTab
@@ -250,17 +249,7 @@ export default function StreamView() {
   if (streamMissing) {
     return (
       <main className="flex-1 flex items-center justify-center bg-surface-primary" id="main-content" role="main">
-        <EmptyState
-          size="lg"
-          icon={<WarningIcon className="w-full h-full" />}
-          title={`Stream "${decodeURIComponent(streamName)}" not found`}
-          description="It may have been deleted, or it lives on a different connection."
-          action={
-            <Button onClick={() => navigate('/streams')}>
-              Back to streams
-            </Button>
-          }
-        />
+        <StreamNotFoundState streamName={streamName} />
       </main>
     )
   }

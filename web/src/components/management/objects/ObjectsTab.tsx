@@ -354,33 +354,36 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                 {filteredObjects.map((obj: ObjectInfo) => (
                   <div
                     key={obj.nuid}
-                    className={`p-2 border-b cursor-pointer hover:bg-surface-secondary group ${
+                    className={`pr-2 border-b hover:bg-surface-secondary flex items-start justify-between group ${
                       selectedObject?.name === obj.name ? 'bg-accent-light' : ''
                     }`}
-                    onClick={() => setSelectedObject(obj)}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm truncate flex-1" title={obj.name}>{obj.name}</span>
+                    <button
+                      type="button"
+                      aria-current={selectedObject?.name === obj.name ? 'true' : undefined}
+                      className="w-full text-left p-2 flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus rounded"
+                      onClick={() => setSelectedObject(obj)}
+                    >
+                      <span className="block text-sm truncate mb-1" title={obj.name}>{obj.name}</span>
+                      <span className="text-xs text-content-tertiary flex gap-2">
+                        <span>{formatBytes(obj.size)}</span>
+                        <span>{obj.chunks} chunks</span>
+                      </span>
+                    </button>
+                    <div className="shrink-0 py-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
                       <Tooltip content="Delete object">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            requestAction({
-                              type: 'delete-object',
-                              name: obj.name,
-                              confirmText: '',
-                            })
-                          }}
-                          className="p-1 opacity-0 group-hover:opacity-100 hover:text-status-error-text"
+                          onClick={() => requestAction({
+                            type: 'delete-object',
+                            name: obj.name,
+                            confirmText: '',
+                          })}
+                          className="p-1 hover:text-status-error-text"
                           aria-label={`Delete object ${obj.name}`}
                         >
                           <CloseIcon className="w-3.5 h-3.5" />
                         </button>
                       </Tooltip>
-                    </div>
-                    <div className="text-xs text-content-tertiary flex gap-2">
-                      <span>{formatBytes(obj.size)}</span>
-                      <span>{obj.chunks} chunks</span>
                     </div>
                   </div>
                 ))}
