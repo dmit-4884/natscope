@@ -178,7 +178,7 @@ func (c *Client) GetStreamStats(ctx context.Context, streamName string) (*entiti
 func (c *Client) CreateStream(ctx context.Context, config entities.StreamCreateRequest) (*entities.StreamInfo, error) {
 	_ = normalizer.Normalize(&config) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
-	jsConfig := converter.Convert(config, &jetstream.StreamConfig{})
+	jsConfig := converter.Convert(config, &jetstream.StreamConfig{}, srcDestToJetStream)
 
 	stream, err := c.jetStream.CreateStream(ctx, *jsConfig)
 	if err != nil {
