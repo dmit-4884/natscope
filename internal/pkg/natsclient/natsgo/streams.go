@@ -86,48 +86,19 @@ func (c *Client) GetStreamConsumers(ctx context.Context, streamName string) ([]e
 		return nil, wrapErr(coreerrs.WrapOperation(err, "get stream"))
 	}
 
-	var consumerNamesList []string //nolint:prealloc
-	consumerNames := stream.ConsumerNames(ctx)
-	for name := range consumerNames.Name() {
-		consumerNamesList = append(consumerNamesList, name)
+	consumers := []entities.ConsumerInfo{}
+	consumerLister := stream.ListConsumers(ctx)
+	for info := range consumerLister.Info() {
+		if info == nil {
+			continue
+		}
+		consumers = append(consumers, *toConsumerInfo(info, streamName))
 	}
-	if err := consumerNames.Err(); err != nil {
-		return nil, wrapErr(coreerrs.WrapOperation(err, "list consumer names"))
-	}
-
-	if len(consumerNamesList) == 0 {
-		return []entities.ConsumerInfo{}, nil
-	}
-
-	// Best-effort: a consumer that errors or panics is skipped (fn returns nil,
-	// filtered below); panics.Handle covers the SDK's occasional panic.
-	consumers, collectErr := concurrency.ProcessCollect(ctx, consumerNamesList,
-		func(ctx context.Context, name string) (*entities.ConsumerInfo, error) {
-			defer panics.Handle(ctx)
-			consumer, err := stream.Consumer(ctx, name)
-			if err != nil {
-				return nil, nil //nolint:nilnil // nil skips this consumer; filtered below
-			}
-			info, err := consumer.Info(ctx)
-			if err != nil || info == nil {
-				return nil, nil //nolint:nilnil // nil skips this consumer; filtered below
-			}
-			return toConsumerInfo(info, streamName), nil
-		},
-		concurrency.WithConcurrency[string](DefaultStreamConcurrency),
-	)
-	if collectErr != nil {
-		return nil, wrapErr(collectErr)
+	if err := consumerLister.Err(); err != nil {
+		return nil, wrapErr(coreerrs.WrapOperation(err, "list consumers"))
 	}
 
-	filtered := slices.ToWithFilter(consumers,
-		func(c *entities.ConsumerInfo) bool { return c != nil },
-		func(c *entities.ConsumerInfo) entities.ConsumerInfo { return *c })
-	if len(filtered) == 0 {
-		return []entities.ConsumerInfo{}, nil
-	}
-
-	return filtered, nil
+	return consumers, nil
 }
 
 // GetAllStreamsStats returns statistics for all streams in the connection.
@@ -207,7 +178,7 @@ func (c *Client) GetStreamStats(ctx context.Context, streamName string) (*entiti
 func (c *Client) CreateStream(ctx context.Context, config entities.StreamCreateRequest) (*entities.StreamInfo, error) {
 	_ = normalizer.Normalize(&config) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
-	jsConfig := converter.Convert(config, &jetstream.StreamConfig{})
+	jsConfig := converter.Convert(config, &jetstream.StreamConfig{}, srcDestToJetStream)
 
 	stream, err := c.jetStream.CreateStream(ctx, *jsConfig)
 	if err != nil {

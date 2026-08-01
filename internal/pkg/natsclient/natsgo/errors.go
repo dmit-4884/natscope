@@ -48,6 +48,20 @@ var natsSentinelMap = []struct {
 	{jetstream.ErrMsgNotFound, errs.ErrMsgNotFound},
 }
 
+var natsValidationSentinels = []error{
+	jetstream.ErrInvalidStreamName,
+	jetstream.ErrStreamNameRequired,
+	jetstream.ErrInvalidConsumerName,
+	jetstream.ErrInvalidSubject,
+	jetstream.ErrInvalidBucketName,
+	jetstream.ErrInvalidKey,
+	jetstream.ErrInvalidStoreName,
+	jetstream.ErrNameRequired,
+	jetstream.ErrBucketRequired,
+	jetstream.ErrKeyValueConfigRequired,
+	jetstream.ErrObjectConfigRequired,
+}
+
 // wrapErr is the single place translating NATS/JetStream SDK errors into
 // domain errs sentinels; transport never sees SDK error types.
 func wrapErr(err error) error {
@@ -62,12 +76,21 @@ func wrapErr(err error) error {
 			return err
 		}
 	}
+	if valErr, ok := errors.AsType[*errs.NATSValidationError](err); ok && valErr != nil {
+		return err
+	}
 
 	for _, m := range natsSentinelMap {
 		if errors.Is(err, m.src) {
 			// Preserve original chain for debug logs; callers use errors.Is for the
 			// sentinel.
 			return errors.Join(m.dst, err)
+		}
+	}
+
+	for _, src := range natsValidationSentinels {
+		if errors.Is(err, src) {
+			return &errs.NATSValidationError{Description: err.Error(), Cause: err}
 		}
 	}
 
