@@ -108,6 +108,7 @@ export interface StreamPurgeRequest {
 export interface ConsumerCreateRequest {
   name?: string
   durable_name?: string
+  ephemeral?: boolean
   description?: string
   deliver_policy?: 'all' | 'last' | 'new' | 'by_start_sequence' | 'by_start_time' | 'last_per_subject'
   opt_start_seq?: number
@@ -152,6 +153,8 @@ export interface ConsumerUpdateRequest {
   max_bytes?: number
   max_expires?: number
   metadata?: Record<string, string>
+  filter_subject?: string
+  filter_subjects?: string[]
 }
 
 export interface ConsumerPauseResponse {
@@ -164,10 +167,9 @@ export interface ConsumerPauseResponse {
 export const CONSUMER_IMMUTABLE_FIELDS = [
   'name',
   'durable_name',
+  'ephemeral',
   'ack_policy',
   'deliver_policy',
-  'filter_subject',
-  'filter_subjects',
   'replay_policy',
   'opt_start_seq',
   'opt_start_time',
