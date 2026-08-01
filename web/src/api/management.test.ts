@@ -6,21 +6,24 @@ import { ConsumerInfoSchema } from '../gen/types/nats/nats_stream_pb'
 
 const createConsumerCall = vi.fn()
 const updateConsumerCall = vi.fn()
+const putKVKeyCall = vi.fn()
 
 vi.mock('./grpc/clients', () => ({
   streamsClient: {},
   managementClient: {
     createConsumer: createConsumerCall,
     updateConsumer: updateConsumerCall,
+    putKVKey: putKVKeyCall,
   },
 }))
 
-const { createConsumer, updateConsumer } = await import('./management')
+const { createConsumer, updateConsumer, putKVKey } = await import('./management')
 
 beforeEach(() => {
   vi.clearAllMocks()
   createConsumerCall.mockResolvedValue({ consumer: create(ConsumerInfoSchema, { name: 'worker' }) })
   updateConsumerCall.mockResolvedValue({ consumer: create(ConsumerInfoSchema, { name: 'worker' }) })
+  putKVKeyCall.mockResolvedValue({ revision: 7n })
 })
 
 describe('createConsumer', () => {
@@ -60,5 +63,20 @@ describe('updateConsumer', () => {
     await updateConsumer('conn-1', 'ORDERS', 'worker', { max_deliver: 5 })
 
     expect(updateConsumerCall.mock.calls[0][0].backOff).toEqual([])
+  })
+})
+
+describe('putKVKey', () => {
+  it('sends the loaded revision so a stale edit is rejected', async () => {
+    const result = await putKVKey('conn-1', 'config', 'greeting', 'hello', 4)
+
+    expect(putKVKeyCall.mock.calls[0][0].revision).toBe(4n)
+    expect(result).toEqual({ revision: 7 })
+  })
+
+  it('sends no expected revision when creating a key', async () => {
+    await putKVKey('conn-1', 'config', 'greeting', 'hello')
+
+    expect(putKVKeyCall.mock.calls[0][0].revision).toBe(0n)
   })
 })

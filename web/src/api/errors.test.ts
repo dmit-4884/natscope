@@ -34,6 +34,14 @@ function domainError(code: Code, message: string, reason: string): ConnectError 
   return wireError(code, message, ErrorInfoSchema, { reason })
 }
 
+function natsAPIError(message: string, errCode: string): ConnectError {
+  return wireError(Code.InvalidArgument, message, ErrorInfoSchema, {
+    reason: 'NATS_API_ERROR',
+    domain: 'nats.jetstream',
+    metadata: { err_code: errCode, http_code: '400' },
+  })
+}
+
 describe('domain reason labels', () => {
   // Guards against the table drifting from the backend, which is what let
   // CONNECTION_NAME_IN_USE sit here dead while the server sent
@@ -171,6 +179,16 @@ describe('getFieldErrors', () => {
 describe('getErrorMessage', () => {
   it('prefers the domain reason label', () => {
     expect(getErrorMessage(domainError(Code.NotFound, 'whatever', 'NATS_STREAM_NOT_FOUND'))).toBe('Stream not found')
+  })
+
+  it('renders a lost compare-and-swap as a reload prompt', () => {
+    expect(getErrorMessage(natsAPIError('wrong last sequence: 7', '10071')))
+      .toBe('The value changed since you loaded it — reload it and reapply your change')
+  })
+
+  it('keeps the server text for an unmapped JetStream error code', () => {
+    expect(getErrorMessage(natsAPIError('maximum consumers limit reached', '10026')))
+      .toBe('maximum consumers limit reached')
   })
 
   it('renders a single violation instead of the bare "Validation Failed"', () => {

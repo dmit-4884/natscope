@@ -98,6 +98,15 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   INTERNAL: 'Internal error',
 }
 
+const NATS_API_ERROR_REASON = 'NATS_API_ERROR'
+const NATS_API_ERROR_CODE_KEY = 'err_code'
+const NATS_API_ERROR_WRONG_LAST_SEQUENCE = '10071'
+
+const NATS_API_ERROR_CODE_LABELS: Record<string, string> = {
+  [NATS_API_ERROR_WRONG_LAST_SEQUENCE]:
+    'The value changed since you loaded it — reload it and reapply your change',
+}
+
 /**
  * Validation reason codes (`FieldViolation.code`) -> labels. Mirrors the catalog
  * in `internal/transports/grpc/reasoncodes`; the required family is dynamic
@@ -196,6 +205,9 @@ export function getErrorMessage(error: unknown): string {
       return DOMAIN_REASON_LABELS[reason]
     }
 
+    const apiErrorLabel = labelForNatsAPIError(error)
+    if (apiErrorLabel) return apiErrorLabel
+
     // The status message of a validation failure is always the bare
     // "Validation Failed"; the per-field detail is the only usable text.
     const violations = getValidationViolations(error)
@@ -226,6 +238,16 @@ export function stripErrorCodePrefix(message: string): string {
 /** True if error is a specific gRPC code. */
 export function isErrorCode(error: unknown, code: Code): boolean {
   return error instanceof ConnectError && error.code === code
+}
+
+function labelForNatsAPIError(error: ConnectError): string {
+  for (const info of error.findDetails(ErrorInfoSchema)) {
+    if (info.reason !== NATS_API_ERROR_REASON) continue
+
+    const code = info.metadata?.[NATS_API_ERROR_CODE_KEY]
+    if (code && code in NATS_API_ERROR_CODE_LABELS) return NATS_API_ERROR_CODE_LABELS[code]
+  }
+  return ''
 }
 
 /** The detail half of a violation: what was wrong, without naming the field. */
