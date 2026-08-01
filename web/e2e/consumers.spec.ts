@@ -16,7 +16,7 @@ test.describe('Stream consumers', () => {
     await page.getByRole('button', { name: 'Create New Consumer' }).click()
 
     const durableName = 'e2e-durable-consumer'
-    await page.getByLabel('Durable Name').fill(durableName)
+    await page.getByLabel('Name', { exact: true }).fill(durableName)
     await page.getByLabel('Filter Subject', { exact: true }).fill(`${streamName.toLowerCase()}.>`)
 
     await page.getByRole('button', { name: 'Acknowledgement' }).click()
