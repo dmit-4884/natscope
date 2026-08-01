@@ -19,7 +19,7 @@ import { ConsumerList } from './consumers/ConsumerList'
 import { ConsumerEditor } from './consumers/ConsumerEditor'
 import { ConsumerView } from './consumers/ConsumerView'
 import { ConsumerConfirmDialog, type ConsumerConfirmAction } from './consumers/ConsumerConfirmDialog'
-import { consumerToConfig, defaultConsumerConfig } from './consumers/consumerUtils'
+import { consumerToConfig, defaultConsumerConfig, toConsumerUpdateRequest } from './consumers/consumerUtils'
 
 export default function StreamConsumersTab() {
   const { scope, connectionId, streamName } = useOutletContext<StreamViewOutletContext>()
@@ -116,25 +116,11 @@ export default function StreamConsumersTab() {
   }
 
   const handleUpdate = async () => {
-    if (!selectedConsumer) return
+    if (!selectedConsumer || !originalConfig) return
     try {
       await updateConsumer.mutateAsync({
-      name: selectedConsumer.name,
-      config: {
-        description: formValue.description,
-        ack_wait: formValue.ack_wait,
-        max_deliver: formValue.max_deliver,
-        max_ack_pending: formValue.max_ack_pending,
-        max_waiting: formValue.max_waiting,
-        rate_limit_bps: formValue.rate_limit_bps,
-        sample_freq: formValue.sample_freq,
-        inactive_threshold: formValue.inactive_threshold,
-        backoff: formValue.backoff,
-        max_batch: formValue.max_batch,
-        max_bytes: formValue.max_bytes,
-        max_expires: formValue.max_expires,
-        metadata: formValue.metadata,
-      },
+        name: selectedConsumer.name,
+        config: toConsumerUpdateRequest(originalConfig, formValue),
       })
       setShowDiffModal(false)
       setEditorState({ isEditing: false, formDraft: null })
