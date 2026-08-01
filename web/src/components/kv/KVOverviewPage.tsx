@@ -65,7 +65,7 @@ export default function KVOverviewPage() {
                     <Badge variant="default" size="sm">{b.storage}</Badge>
                   </div>
                   <p className="text-xs text-content-tertiary mt-2">
-                    {plural(b.values, 'value')} · {formatBytes(b.bytes)} · history {b.history}
+                    {plural(b.values, 'key')} · {formatBytes(b.bytes)} · history {b.history}
                   </p>
                   {b.description && (
                     <p className="text-xs text-content-muted mt-1 truncate">{b.description}</p>

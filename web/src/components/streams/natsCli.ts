@@ -93,6 +93,8 @@ export function streamConfigToNatsCli({ name, subjects, config: c }: StreamCliIn
   if (c.mirror) omitted.push('mirror')
   if (c.sources && c.sources.length > 0) omitted.push('sources')
   if (c.republish) omitted.push('republish')
+  if (c.subject_transform) omitted.push('subject_transform')
+  if (c.consumer_limits) omitted.push('consumer_limits')
   if (c.metadata && Object.keys(c.metadata).length > 0) omitted.push('metadata')
   if (omitted.length > 0) {
     cmd += `\n# NOTE: omitted (set via the JSON config): ${omitted.join(', ')}`
@@ -149,6 +151,14 @@ export function consumerConfigToNatsCli(consumerName: string, streamName: string
   flags.push('--pull')
 
   let cmd = `nats consumer add ${streamName} ${consumerName} ${flags.join(' ')}`
+
+  const omitted: string[] = []
+  if (c.headers_only) omitted.push('headers_only')
+  if (c.inactive_threshold != null && c.inactive_threshold > 0) omitted.push('inactive_threshold')
+  if (c.mem_storage) omitted.push('mem_storage')
+  if (omitted.length > 0) {
+    cmd += `\n# NOTE: omitted (set via the JSON config): ${omitted.join(', ')}`
+  }
 
   // by_start_time isn't expressible as --deliver (see cliDeliver) — falls back
   // to "all", so NOTE the user.
