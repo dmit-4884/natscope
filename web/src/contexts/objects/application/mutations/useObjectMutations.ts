@@ -79,6 +79,7 @@ export function usePutObject(connectionId: string | undefined, bucket: string | 
       queryClient.invalidateQueries({ queryKey: objectKeys.list(connectionId, bucket) })
       queryClient.invalidateQueries({ queryKey: objectKeys.bucket(connectionId, bucket) })
       queryClient.invalidateQueries({ queryKey: objectKeys.object(connectionId, bucket, info.name) })
+      queryClient.invalidateQueries({ queryKey: objectKeys.buckets(connectionId) })
     },
     onError: (error: Error) => {
       toast.error(`Failed to upload object: ${getErrorMessage(error)}`)
