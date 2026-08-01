@@ -424,7 +424,8 @@ export async function putKVKey(
   connectionId: string,
   bucket: string,
   key: string,
-  value: string | Uint8Array
+  value: string | Uint8Array,
+  expectedRevision?: number
 ): Promise<RevisionResponse> {
   const base64Value =
     typeof value === 'string'
@@ -436,6 +437,7 @@ export async function putKVKey(
     bucket,
     key,
     value: base64Value,
+    revision: expectedRevision != null ? BigInt(expectedRevision) : BigInt(0),
   })
   return { revision: Number(response.revision) }
 }
