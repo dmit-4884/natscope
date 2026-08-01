@@ -4,6 +4,7 @@ import { getErrorMessage } from '@/api/errors'
 import { Alert, Spinner } from '@/components/ui'
 import { useStreamDetail, useUpdateStream, useDeleteStream, usePurgeStream, useSealStream } from '@/contexts/streams'
 import { useConfigEditorEntry } from '@/stores/streamTabState/configEditorStore'
+import type { StreamPurgeRequest } from '@/types/management'
 import { stableJson } from '@/utils/stableJson'
 import ConfigDiffModal from '../common/ConfigDiffModal'
 import type { StreamViewOutletContext } from './StreamView'
@@ -78,13 +79,13 @@ export default function StreamConfigTab() {
     refetch()
   }
 
-  const handleConfirmAction = async () => {
+  const handleConfirmAction = async (purgeOptions?: StreamPurgeRequest) => {
     if (!confirmAction) return
     if (confirmAction === 'delete') {
       await deleteStream.mutateAsync(streamName)
       navigate(`/streams`)
     } else if (confirmAction === 'purge') {
-      await purgeStream.mutateAsync({ name: streamName })
+      await purgeStream.mutateAsync({ name: streamName, options: purgeOptions })
     } else if (confirmAction === 'seal') {
       await sealStream.mutateAsync(streamName)
     }
