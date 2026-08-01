@@ -45,6 +45,27 @@ describe('createConsumer', () => {
 
     expect(createConsumerCall.mock.calls[0][0].backOff).toEqual([])
   })
+
+  it('sends the ephemeral flag when the caller asks for a non-durable consumer', async () => {
+    await createConsumer('conn-1', 'ORDERS', { name: 'worker', ephemeral: true })
+
+    expect(createConsumerCall.mock.calls[0][0].ephemeral).toBe(true)
+  })
+
+  it('defaults ephemeral to false so consumers stay durable', async () => {
+    await createConsumer('conn-1', 'ORDERS', { name: 'worker' })
+
+    expect(createConsumerCall.mock.calls[0][0].ephemeral).toBe(false)
+  })
+
+  it('still sends the filters supplied at creation time', async () => {
+    await createConsumer('conn-1', 'ORDERS', {
+      name: 'worker',
+      filter_subjects: ['orders.created', 'orders.paid'],
+    })
+
+    expect(createConsumerCall.mock.calls[0][0].filterSubjects).toEqual(['orders.created', 'orders.paid'])
+  })
 })
 
 describe('updateConsumer', () => {
@@ -63,6 +84,40 @@ describe('updateConsumer', () => {
     await updateConsumer('conn-1', 'ORDERS', 'worker', { max_deliver: 5 })
 
     expect(updateConsumerCall.mock.calls[0][0].backOff).toEqual([])
+  })
+
+  it('omits filterSubject when the caller does not provide one', async () => {
+    await updateConsumer('conn-1', 'ORDERS', 'worker', { description: 'same filters' })
+
+    expect(updateConsumerCall.mock.calls[0][0].filterSubject).toBeUndefined()
+    expect(updateConsumerCall.mock.calls[0][0].filterSubjects).toEqual([])
+  })
+
+  it('sends a provided filterSubject so the server replaces the filter', async () => {
+    await updateConsumer('conn-1', 'ORDERS', 'worker', { filter_subject: 'orders.paid' })
+
+    expect(updateConsumerCall.mock.calls[0][0].filterSubject).toBe('orders.paid')
+  })
+
+  it('sends an empty filterSubject so the server clears the filter', async () => {
+    await updateConsumer('conn-1', 'ORDERS', 'worker', { filter_subject: '' })
+
+    expect(updateConsumerCall.mock.calls[0][0].filterSubject).toBe('')
+  })
+
+  it('sends filterSubjects so the server replaces the whole list', async () => {
+    await updateConsumer('conn-1', 'ORDERS', 'worker', {
+      filter_subjects: ['orders.created', 'orders.paid'],
+    })
+
+    expect(updateConsumerCall.mock.calls[0][0].filterSubjects).toEqual(['orders.created', 'orders.paid'])
+    expect(updateConsumerCall.mock.calls[0][0].filterSubject).toBeUndefined()
+  })
+
+  it('treats an empty filterSubjects list as "keep the existing filters"', async () => {
+    await updateConsumer('conn-1', 'ORDERS', 'worker', { filter_subjects: [] })
+
+    expect(updateConsumerCall.mock.calls[0][0].filterSubjects).toEqual([])
   })
 })
 

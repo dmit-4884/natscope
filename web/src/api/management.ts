@@ -235,6 +235,7 @@ export async function createConsumer(
     deliverGroup: config.deliver_group ?? '',
     flowControl: config.flow_control ?? false,
     idleHeartbeat: config.idle_heartbeat != null ? nanosToDur(config.idle_heartbeat) : undefined,
+    ephemeral: config.ephemeral ?? false,
   })
   return toConsumerInfo(response.consumer!)
 }
@@ -262,6 +263,8 @@ export async function updateConsumer(
     inactiveThreshold: config.inactive_threshold != null ? nanosToDur(config.inactive_threshold) : undefined,
     backOff: (config.backoff ?? []).map(nanosToDur),
     metadata: config.metadata ?? {},
+    filterSubject: config.filter_subject,
+    filterSubjects: config.filter_subjects?.length ? config.filter_subjects : [],
   })
   return toConsumerInfo(response.consumer!)
 }

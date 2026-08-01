@@ -1,8 +1,9 @@
 import type { ConsumerInfo } from '@/types/nats'
-import type { ConsumerCreateRequest } from '@/types/management'
+import type { ConsumerCreateRequest, ConsumerUpdateRequest } from '@/types/management'
 
 export const defaultConsumerConfig: ConsumerCreateRequest = {
   name: '',
+  ephemeral: false,
   deliver_policy: 'all',
   ack_policy: 'explicit',
   replay_policy: 'instant',
@@ -14,6 +15,7 @@ export function consumerToConfig(consumer: ConsumerInfo): ConsumerCreateRequest 
   return {
     name: consumer.name,
     durable_name: consumer.config?.durable_name,
+    ephemeral: !consumer.config?.durable_name,
     description: consumer.config?.description || '',
     deliver_policy: (consumer.config?.deliver_policy?.toLowerCase() || 'all') as ConsumerCreateRequest['deliver_policy'],
     opt_start_seq: consumer.config?.opt_start_seq,
@@ -23,6 +25,7 @@ export function consumerToConfig(consumer: ConsumerInfo): ConsumerCreateRequest 
     max_deliver: consumer.config?.max_deliver,
     backoff: consumer.config?.backoff,
     filter_subject: consumer.config?.filter_subject,
+    filter_subjects: consumer.config?.filter_subjects,
     replay_policy: (consumer.config?.replay_policy?.toLowerCase() || 'instant') as 'instant' | 'original',
     rate_limit_bps: consumer.config?.rate_limit_bps,
     sample_freq: consumer.config?.sample_freq,
@@ -37,6 +40,51 @@ export function consumerToConfig(consumer: ConsumerInfo): ConsumerCreateRequest 
     flow_control: consumer.config?.flow_control,
     idle_heartbeat: consumer.config?.idle_heartbeat,
     metadata: consumer.config?.metadata,
+  }
+}
+
+type ConsumerFilterUpdate = Pick<ConsumerUpdateRequest, 'filter_subject' | 'filter_subjects'>
+
+function diffConsumerFilters(
+  original: ConsumerCreateRequest,
+  next: ConsumerCreateRequest,
+): ConsumerFilterUpdate {
+  const nextSubjects = (next.filter_subjects ?? []).filter((s) => s !== '')
+  const originalSubjects = (original.filter_subjects ?? []).filter((s) => s !== '')
+  const nextSubject = next.filter_subject ?? ''
+  const originalSubject = original.filter_subject ?? ''
+
+  if (nextSubjects.length > 0) {
+    const unchanged =
+      nextSubjects.length === originalSubjects.length &&
+      nextSubjects.every((s, i) => s === originalSubjects[i])
+    return unchanged ? {} : { filter_subjects: nextSubjects }
+  }
+  if (originalSubjects.length > 0 || nextSubject !== originalSubject) {
+    return { filter_subject: nextSubject }
+  }
+  return {}
+}
+
+export function toConsumerUpdateRequest(
+  original: ConsumerCreateRequest,
+  next: ConsumerCreateRequest,
+): ConsumerUpdateRequest {
+  return {
+    description: next.description,
+    ack_wait: next.ack_wait,
+    max_deliver: next.max_deliver,
+    max_ack_pending: next.max_ack_pending,
+    max_waiting: next.max_waiting,
+    rate_limit_bps: next.rate_limit_bps,
+    sample_freq: next.sample_freq,
+    inactive_threshold: next.inactive_threshold,
+    backoff: next.backoff,
+    max_batch: next.max_batch,
+    max_bytes: next.max_bytes,
+    max_expires: next.max_expires,
+    metadata: next.metadata,
+    ...diffConsumerFilters(original, next),
   }
 }
 

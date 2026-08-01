@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { parseIntOr } from '@/utils/numbers'
-import { Input, Badge, ImmutableField, Dropdown } from '@/components/ui'
+import { Input, Badge, ImmutableField, Dropdown, Toggle } from '@/components/ui'
 import { CONSUMER_IMMUTABLE_FIELDS } from '@/types/management'
 import type { ConsumerCreateRequest } from '@/types/management'
 import { SectionPanel } from './SectionPanel'
@@ -60,6 +60,9 @@ export function ConsumerFormFields({
   }
 
   const isPushConsumer = !!value.deliver_subject
+  const isEphemeral = value.ephemeral ?? false
+  const filterSubjects = value.filter_subjects ?? []
+  const singleFilterLocked = isImmutable('filter_subject') || filterSubjects.length > 0
 
   return (
     <div className="space-y-4">
@@ -76,13 +79,21 @@ export function ConsumerFormFields({
               />
             </ImmutableField>
 
-            {/* Durable Name */}
-            <ImmutableField label="Durable Name" isImmutable={isImmutable('durable_name')} helpText="If set, the consumer will be durable and survive restarts">
-              <Input
-                value={value.durable_name || ''}
-                onChange={(e) => updateField('durable_name', e.target.value)}
-                placeholder="Optional durable name"
-                disabled={isImmutable('durable_name')}
+            <ImmutableField
+              label="Ephemeral consumer"
+              isImmutable={isImmutable('ephemeral')}
+              helpText={
+                isEphemeral
+                  ? 'The server removes this consumer once it stays inactive for the inactivity threshold.'
+                  : 'Durable consumers survive restarts and stay until deleted.'
+              }
+            >
+              <Toggle
+                checked={isEphemeral}
+                onChange={(next) => updateField('ephemeral', next)}
+                disabled={isImmutable('ephemeral')}
+                label="Ephemeral consumer"
+                testId="consumer-ephemeral-toggle"
               />
             </ImmutableField>
 
@@ -98,20 +109,44 @@ export function ConsumerFormFields({
             </div>
 
             {/* Filter Subject */}
-            <ImmutableField label="Filter Subject" isImmutable={isImmutable('filter_subject')} helpText="Single subject pattern to filter messages (supports wildcards). Mutually exclusive with Filter Subjects (multiple).">
+            <ImmutableField
+              label="Filter Subject"
+              isImmutable={isImmutable('filter_subject')}
+              helpText={
+                singleFilterLocked
+                  ? 'Disabled while Filter Subjects (multiple) is in use — empty that list to go back to a single filter.'
+                  : 'Single subject pattern to filter messages (supports wildcards). Leave empty to receive every subject.'
+              }
+            >
               <Input
                 value={value.filter_subject || ''}
-                onChange={(e) => updateField('filter_subject', e.target.value)}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    filter_subject: e.target.value,
+                    filter_subjects: e.target.value ? [] : value.filter_subjects,
+                  })
+                }
                 placeholder="orders.>"
-                disabled={isImmutable('filter_subject')}
+                disabled={singleFilterLocked}
               />
             </ImmutableField>
 
             {/* Filter Subjects (NATS 2.10+) */}
-            <ImmutableField label="Filter Subjects (multiple)" isImmutable={isImmutable('filter_subjects')} helpText="List of subject patterns. Use this OR single Filter Subject — not both.">
+            <ImmutableField
+              label="Filter Subjects (multiple)"
+              isImmutable={isImmutable('filter_subjects')}
+              helpText="List of subject patterns (NATS 2.10+). Adding an entry clears the single Filter Subject — the two are mutually exclusive."
+            >
               <StringArrayInput
                 value={value.filter_subjects}
-                onChange={(next) => updateField('filter_subjects', next)}
+                onChange={(next) =>
+                  onChange({
+                    ...value,
+                    filter_subjects: next,
+                    filter_subject: next.length > 0 ? '' : value.filter_subject,
+                  })
+                }
                 placeholder="orders.created"
                 disabled={isImmutable('filter_subjects')}
               />
