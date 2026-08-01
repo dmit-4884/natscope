@@ -188,7 +188,6 @@ function toStreamConfig(c: ProtoStreamConfig | undefined): StreamConfig {
   }
 }
 
-/** Consumer limits are only meaningful when at least one default is set. */
 function toStreamConsumerLimits(l: ProtoConsumerLimits | undefined): StreamConsumerLimits | undefined {
   if (!l) return undefined
   const inactiveThreshold = durToNanos(l.inactiveThreshold) || undefined

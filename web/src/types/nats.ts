@@ -72,7 +72,6 @@ export interface StreamSubjectTransform {
 }
 
 export interface StreamConsumerLimits {
-  /** Nanoseconds; unset when the server carries no default. */
   inactive_threshold?: number
   max_ack_pending?: number
 }

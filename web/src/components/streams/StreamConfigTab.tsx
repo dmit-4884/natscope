@@ -4,13 +4,14 @@ import { getErrorMessage } from '@/api/errors'
 import { Alert, Spinner } from '@/components/ui'
 import { useStreamDetail, useUpdateStream, useDeleteStream, usePurgeStream, useSealStream } from '@/contexts/streams'
 import { useConfigEditorEntry } from '@/stores/streamTabState/configEditorStore'
+import { stableJson } from '@/utils/stableJson'
 import ConfigDiffModal from '../common/ConfigDiffModal'
 import type { StreamViewOutletContext } from './StreamView'
 import { StreamConfigEditor } from './config/StreamConfigEditor'
 import { StreamConfigView } from './config/StreamConfigView'
 import { StreamConfirmDialog, type StreamConfirmType } from './config/StreamConfirmDialog'
 import { streamToConfig } from './config/streamConfigUtils'
-import { buildStreamUpdatePayload } from './config/streamFieldDefinitions'
+import { buildStreamUpdatePayload, getIgnoredUpdateKeys } from './config/streamFieldDefinitions'
 
 export default function StreamConfigTab() {
   const { scope, connectionId, streamName } = useOutletContext<StreamViewOutletContext>()
@@ -52,18 +53,25 @@ export default function StreamConfigTab() {
     setShowDiffModal(false)
   }
 
-  const hasChanges = useMemo(() => {
-    if (!formValue || !originalConfig) return false
-    return JSON.stringify(formValue) !== JSON.stringify(originalConfig)
+  const pendingUpdate = useMemo(() => {
+    if (!formValue || !originalConfig) return null
+    const original = buildStreamUpdatePayload(originalConfig)
+    const next = buildStreamUpdatePayload(formValue)
+    return {
+      original,
+      next,
+      ignoredKeys: getIgnoredUpdateKeys(originalConfig, formValue),
+      hasEffectiveChanges: stableJson(original) !== stableJson(next),
+    }
   }, [formValue, originalConfig])
 
+  const hasChanges = !!pendingUpdate && (pendingUpdate.hasEffectiveChanges || pendingUpdate.ignoredKeys.length > 0)
+
   const handleUpdate = async () => {
-    if (!formValue) return
-    // Defense-in-depth: buildStreamUpdatePayload strips immutable fields (e.g.
-    // edited in JSON view) before send.
+    if (!pendingUpdate) return
     await updateStream.mutateAsync({
       name: streamName,
-      config: buildStreamUpdatePayload(formValue),
+      config: pendingUpdate.next,
     })
     setShowDiffModal(false)
     handleCancelEdit()
@@ -144,15 +152,24 @@ export default function StreamConfigTab() {
         />
       )}
 
-      {showDiffModal && originalConfig && formValue && (
+      {showDiffModal && pendingUpdate && (
         <ConfigDiffModal
           isOpen={showDiffModal}
           onClose={() => setShowDiffModal(false)}
           onConfirm={handleUpdate}
           title="Confirm Stream Configuration Changes"
           description={`Review the changes to the stream "${streamName}" before applying them.`}
-          originalConfig={originalConfig}
-          newConfig={formValue}
+          originalConfig={pendingUpdate.original}
+          newConfig={pendingUpdate.next}
+          notice={
+            pendingUpdate.ignoredKeys.length > 0 ? (
+              <Alert variant="warning" title="Some edits cannot be applied">
+                <span className="font-mono">{pendingUpdate.ignoredKeys.join(', ')}</span> cannot be changed on an
+                existing stream, so {pendingUpdate.ignoredKeys.length > 1 ? 'those edits are' : 'that edit is'} dropped
+                on save. Recreate the stream to apply {pendingUpdate.ignoredKeys.length > 1 ? 'them' : 'it'}.
+              </Alert>
+            ) : undefined
+          }
           isLoading={updateStream.isPending}
         />
       )}

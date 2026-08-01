@@ -5,7 +5,7 @@ import type { StreamDetail } from '@/types/nats'
 import JsonViewer from '@/components/common/JsonViewer'
 import { streamConfigToNatsCli } from '../natsCli'
 import { StatCard, ConfigRow, Flag } from './streamConfigHelpers'
-import { formatCompression, formatConfigValue, hasMetadata } from './streamConfigUtils'
+import { COMPRESSION_LABELS, formatConfigValue, hasMetadata } from './streamConfigUtils'
 
 interface Props {
   streamDetail: StreamDetail
@@ -88,7 +88,6 @@ export function StreamConfigView({
                 )}
               </div>
 
-              {/* Mirror & Sources */}
               {(mirror || sources.length > 0) && (
                 <div className="mb-4 pb-4 border-b">
                   <div className="text-xs font-medium text-content-tertiary uppercase tracking-wide mb-2">Mirror & Sources</div>
@@ -168,7 +167,10 @@ export function StreamConfigView({
                   {streamDetail.config.compression && (
                     <ConfigRow
                       label="Compression"
-                      value={formatCompression(streamDetail.config.compression)}
+                      value={
+                        COMPRESSION_LABELS[streamDetail.config.compression.toLowerCase()] ??
+                        formatConfigValue(streamDetail.config.compression)
+                      }
                       hint="Compression algorithm used for messages: S2 (Snappy) reduces storage at cost of CPU"
                     />
                   )}
@@ -240,7 +242,6 @@ export function StreamConfigView({
                 </div>
               )}
 
-              {/* Republish & Subject Transform */}
               {(republish || subjectTransform) && (
                 <div className="mb-4 pb-4 border-b">
                   <div className="text-xs font-medium text-content-tertiary uppercase tracking-wide mb-2">Republish & Transforms</div>
@@ -266,7 +267,6 @@ export function StreamConfigView({
                 </div>
               )}
 
-              {/* Consumer Limits */}
               {consumerLimits && (
                 <div className="mb-4 pb-4 border-b">
                   <div className="text-xs font-medium text-content-tertiary uppercase tracking-wide mb-2">Consumer Limits</div>

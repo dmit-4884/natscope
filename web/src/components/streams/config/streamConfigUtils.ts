@@ -1,12 +1,7 @@
-import type { StreamCreateRequest } from '@/types/management'
-import type { StreamDetail } from '@/types/nats'
+import type { StreamCreateRequest, StreamSource } from '@/types/management'
+import type { StreamDetail, StreamSourceRef } from '@/types/nats'
 
-const COMPRESSION_LABELS: Record<string, string> = { none: 'None', s2: 'S2' }
-
-/** Render a compression algorithm with the same casing the form's select uses. */
-export function formatCompression(compression: string): string {
-  return COMPRESSION_LABELS[compression.toLowerCase()] ?? formatConfigValue(compression)
-}
+export const COMPRESSION_LABELS: Record<string, string> = { none: 'None', s2: 'S2' }
 
 /** Format camelCase/PascalCase to readable text: "DiscardOld" → "Discard Old". */
 export function formatConfigValue(value: string): string {
@@ -21,23 +16,28 @@ export function hasMetadata(streamDetail: StreamDetail): boolean {
   return !!(streamDetail.config.metadata && Object.keys(streamDetail.config.metadata).length > 0)
 }
 
-/** True when the draft configures a mirror; NATS rejects mirror streams that also declare subjects. */
 export function isMirrorConfigured(value: Pick<StreamCreateRequest, 'mirror'>): boolean {
   return !!value.mirror?.name?.trim()
 }
 
-/** Subject entries that survive trimming; the form keeps an empty row for editing. */
 export function normalizeSubjects(subjects: string[] | undefined): string[] {
   return (subjects ?? []).map((s) => s.trim()).filter((s) => s !== '')
 }
 
-/**
- * Create is allowed with a name plus either subjects or a mirror — a mirror
- * stream has no subjects of its own.
- */
 export function canCreateStream(value: StreamCreateRequest): boolean {
   if (!value.name?.trim()) return false
   return isMirrorConfigured(value) || normalizeSubjects(value.subjects).length > 0
+}
+
+function toFormSource(source: StreamSourceRef): StreamSource {
+  return {
+    name: source.name,
+    opt_start_seq: source.opt_start_seq,
+    filter_subject: source.filter_subject,
+    external: source.external
+      ? { api: source.external.api_prefix, deliver: source.external.deliver_prefix }
+      : undefined,
+  }
 }
 
 /** Converts a server-side StreamDetail to the form-friendly StreamCreateRequest shape. */
@@ -67,5 +67,10 @@ export function streamToConfig(stream: StreamDetail): StreamCreateRequest {
     mirror_direct: stream.config?.mirror_direct,
     discard_new_per_subject: stream.config?.discard_new_per_subject,
     metadata: stream.config?.metadata,
+    mirror: stream.config?.mirror ? toFormSource(stream.config.mirror) : undefined,
+    sources: stream.config?.sources?.map(toFormSource),
+    republish: stream.config?.republish,
+    subject_transform: stream.config?.subject_transform,
+    consumer_limits: stream.config?.consumer_limits,
   }
 }

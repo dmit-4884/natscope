@@ -13,7 +13,6 @@ interface Props {
   mode: ConfigFieldMode
   /** When set, the connected server doesn't support this field — control is disabled and the reason shown. */
   unsupportedReason?: string
-  /** When set, another part of the config rules this field out — control is locked and the reason shown. */
   lockedReason?: string
 }
 
