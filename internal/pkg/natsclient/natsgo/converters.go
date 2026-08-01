@@ -56,7 +56,9 @@ func toJetStreamConsumerConfig(config entities.ConsumerCreateRequest) (*jetstrea
 	jsConfig := converter.Convert(config, &jetstream.ConsumerConfig{},
 		converter.WithIgnoreFields("OptStartTime"),
 	)
-	jsConfig.Durable = jsConfig.Name
+	if !config.Ephemeral {
+		jsConfig.Durable = jsConfig.Name
+	}
 
 	if config.OptStartTime != "" {
 		startTime, err := time.Parse(time.RFC3339, config.OptStartTime)
