@@ -272,6 +272,45 @@ func TestE2E(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("stream_republish_roundtrip", func(t *testing.T) {
+		const republishStream = "E2ERP"
+
+		createResp, err := env.management.CreateStream(ctx, connect.NewRequest(&managementpb.CreateStreamRequest{
+			ConnectionId: connectionID,
+			Name:         republishStream,
+			Subjects:     []string{"e2erp.>"},
+			Republish: &natstypes.RePublish{
+				Src:         "e2erp.>",
+				Dest:        "audit.e2erp.>",
+				HeadersOnly: true,
+			},
+		}))
+		require.NoError(t, err)
+
+		created := createResp.Msg.GetStream().GetConfig().GetRepublish()
+		require.NotNil(t, created, "create response must carry the republish config")
+		assert.Equal(t, "e2erp.>", created.GetSrc())
+		assert.Equal(t, "audit.e2erp.>", created.GetDest())
+		assert.True(t, created.GetHeadersOnly())
+
+		getResp, err := env.streams.GetStream(ctx, connect.NewRequest(&streamspb.GetStreamRequest{
+			ConnectionId: connectionID,
+			StreamName:   republishStream,
+		}))
+		require.NoError(t, err)
+		stored := getResp.Msg.GetStream().GetConfig().GetRepublish()
+		require.NotNil(t, stored, "the server must have stored the republish config")
+		assert.Equal(t, "e2erp.>", stored.GetSrc(), "src must round-trip instead of falling back to the server default")
+		assert.Equal(t, "audit.e2erp.>", stored.GetDest())
+		assert.True(t, stored.GetHeadersOnly())
+
+		_, err = env.management.DeleteStream(ctx, connect.NewRequest(&managementpb.DeleteStreamRequest{
+			ConnectionId: connectionID,
+			StreamName:   republishStream,
+		}))
+		require.NoError(t, err)
+	})
+
 	t.Run("messages_and_publish", func(t *testing.T) {
 		payload := `{"hello":"e2e","n":42}`
 

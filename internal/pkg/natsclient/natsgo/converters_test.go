@@ -125,6 +125,23 @@ func TestStreamCreateConversion_Mirror(t *testing.T) {
 	assert.Equal(t, uint64(75), jsConfig.Sources[1].OptStartSeq)
 }
 
+func TestStreamCreateConversion_Republish(t *testing.T) {
+	jsConfig := converter.Convert(entities.StreamCreateRequest{
+		Name:     "republish-stream",
+		Subjects: []string{"qa.complex.>"},
+		Republish: &entities.StreamRePublish{
+			Src:         "qa.complex.>",
+			Dest:        "audit.qa.>",
+			HeadersOnly: true,
+		},
+	}, &jetstream.StreamConfig{}, srcDestToJetStream)
+
+	require.NotNil(t, jsConfig.RePublish)
+	assert.Equal(t, "qa.complex.>", jsConfig.RePublish.Source)
+	assert.Equal(t, "audit.qa.>", jsConfig.RePublish.Destination)
+	assert.True(t, jsConfig.RePublish.HeadersOnly)
+}
+
 // TestConsumerCreateConversion verifies every field of ConsumerCreateRequest → jetstream.ConsumerConfig.
 func TestConsumerCreateConversion(t *testing.T) {
 	entity := entities.ConsumerCreateRequest{
