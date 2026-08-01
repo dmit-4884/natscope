@@ -202,6 +202,38 @@ func TestE2E(t *testing.T) {
 		assert.Zero(t, updCons.Msg.GetConsumer().GetConfig().GetInactiveThreshold().AsDuration(),
 			"update must not downgrade the consumer to ephemeral")
 
+		_, err = env.management.CreateConsumer(ctx, connect.NewRequest(&managementpb.CreateConsumerRequest{
+			ConnectionId:   connectionID,
+			StreamName:     streamName,
+			Name:           "e2e-push-consumer",
+			AckPolicy:      1,
+			AckWait:        durationpb.New(30 * time.Second),
+			DeliverSubject: "push.e2e.deliver",
+		}))
+		require.NoError(t, err)
+
+		listPush, err := env.management.ListConsumers(ctx, connect.NewRequest(&managementpb.ListConsumersRequest{
+			ConnectionId: connectionID,
+			StreamName:   streamName,
+		}))
+		require.NoError(t, err)
+		var listedPush *natstypes.ConsumerInfo
+		for _, c := range listPush.Msg.GetConsumers() {
+			if c.GetName() == "e2e-push-consumer" {
+				listedPush = c
+			}
+		}
+		require.NotNil(t, listedPush, "push consumer must be listed alongside pull consumers")
+		assert.Equal(t, "push.e2e.deliver", listedPush.GetConfig().GetDeliverSubject())
+		assert.Equal(t, "e2e-push-consumer", listedPush.GetConfig().GetDurable())
+
+		_, err = env.management.DeleteConsumer(ctx, connect.NewRequest(&managementpb.DeleteConsumerRequest{
+			ConnectionId: connectionID,
+			StreamName:   streamName,
+			ConsumerName: "e2e-push-consumer",
+		}))
+		require.NoError(t, err)
+
 		// Stats: stream stats, server info, health.
 		statsResp, err := env.stats.GetStreamStats(ctx, connect.NewRequest(&statspb.GetStreamStatsRequest{
 			ConnectionId: connectionID,
