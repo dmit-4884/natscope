@@ -5,7 +5,7 @@ import type { StreamDetail } from '@/types/nats'
 import JsonViewer from '@/components/common/JsonViewer'
 import { streamConfigToNatsCli } from '../natsCli'
 import { StatCard, ConfigRow, Flag } from './streamConfigHelpers'
-import { formatConfigValue, hasMetadata } from './streamConfigUtils'
+import { formatCompression, formatConfigValue, hasMetadata } from './streamConfigUtils'
 
 interface Props {
   streamDetail: StreamDetail
@@ -27,6 +27,8 @@ export function StreamConfigView({
   onDelete,
 }: Props) {
   const isSealed = streamDetail.config?.sealed
+  const { mirror, republish, subject_transform: subjectTransform, consumer_limits: consumerLimits } = streamDetail.config
+  const sources = streamDetail.config.sources ?? []
   const showFeatures =
     streamDetail.config.sealed ||
     streamDetail.config.deny_delete ||
@@ -69,14 +71,55 @@ export function StreamConfigView({
               {/* Subjects */}
               <div className="mb-4 pb-4 border-b">
                 <div className="text-xs font-medium text-content-tertiary uppercase tracking-wide mb-2">Subjects</div>
-                <div className="flex flex-wrap gap-2">
-                  {streamDetail.subjects.map((subject: string, idx: number) => (
-                    <span key={idx} className="px-2 py-1 bg-accent-light text-accent-text text-xs font-mono rounded">
-                      {subject}
-                    </span>
-                  ))}
-                </div>
+                {streamDetail.subjects.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {streamDetail.subjects.map((subject: string, idx: number) => (
+                      <span key={idx} className="px-2 py-1 bg-accent-light text-accent-text text-xs font-mono rounded">
+                        {subject}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-content-tertiary">
+                    {mirror
+                      ? 'None — a mirror stream replicates its source instead of listening on subjects.'
+                      : 'None'}
+                  </p>
+                )}
               </div>
+
+              {/* Mirror & Sources */}
+              {(mirror || sources.length > 0) && (
+                <div className="mb-4 pb-4 border-b">
+                  <div className="text-xs font-medium text-content-tertiary uppercase tracking-wide mb-2">Mirror & Sources</div>
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-1">
+                    {mirror && (
+                      <ConfigRow
+                        label="Mirror Of"
+                        value={mirror.name}
+                        hint="This stream mirrors the named stream; its messages are replicated, not published directly"
+                      />
+                    )}
+                    {mirror?.filter_subject && (
+                      <ConfigRow label="Mirror Filter" value={mirror.filter_subject} hint="Only source messages matching this subject are mirrored" />
+                    )}
+                    {mirror?.opt_start_seq != null && mirror.opt_start_seq > 0 && (
+                      <ConfigRow label="Mirror Start Seq" value={formatNumber(mirror.opt_start_seq)} hint="Source sequence the mirror started from" />
+                    )}
+                    {mirror?.external?.api_prefix && (
+                      <ConfigRow label="Mirror External API" value={mirror.external.api_prefix} hint="API prefix of the external account the source lives in" />
+                    )}
+                    {sources.map((source, idx) => (
+                      <ConfigRow
+                        key={`${source.name}-${idx}`}
+                        label={`Source ${idx + 1}`}
+                        value={source.filter_subject ? `${source.name} (${source.filter_subject})` : source.name}
+                        hint="Upstream stream aggregated into this one"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* General */}
               <div className="mb-4 pb-4 border-b">
@@ -125,7 +168,7 @@ export function StreamConfigView({
                   {streamDetail.config.compression && (
                     <ConfigRow
                       label="Compression"
-                      value={streamDetail.config.compression.toUpperCase()}
+                      value={formatCompression(streamDetail.config.compression)}
                       hint="Compression algorithm used for messages: S2 (Snappy) reduces storage at cost of CPU"
                     />
                   )}
@@ -193,6 +236,55 @@ export function StreamConfigView({
                     {streamDetail.config.allow_rollup_hdrs && <Flag label="Rollup" color="green" hint="Message rollup via Nats-Rollup header is enabled" />}
                     {streamDetail.config.allow_msg_ttl && <Flag label="Per-Msg TTL" color="green" hint="Per-message TTL via Nats-TTL header is enabled" />}
                     {streamDetail.config.allow_atomic && <Flag label="Atomic Publish" color="green" hint="Atomic batch publishing is enabled" />}
+                  </div>
+                </div>
+              )}
+
+              {/* Republish & Subject Transform */}
+              {(republish || subjectTransform) && (
+                <div className="mb-4 pb-4 border-b">
+                  <div className="text-xs font-medium text-content-tertiary uppercase tracking-wide mb-2">Republish & Transforms</div>
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-1">
+                    {republish && (
+                      <ConfigRow
+                        label="Republish"
+                        value={`${republish.src} → ${republish.dest}`}
+                        hint="Every stored message is republished from the source subject to the destination subject"
+                      />
+                    )}
+                    {republish?.headers_only && (
+                      <ConfigRow label="Republish Headers Only" value="Enabled" hint="Republished messages carry headers without the payload" />
+                    )}
+                    {subjectTransform && (
+                      <ConfigRow
+                        label="Subject Transform"
+                        value={`${subjectTransform.src} → ${subjectTransform.dest}`}
+                        hint="Subjects are rewritten with this mapping before messages are stored"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Consumer Limits */}
+              {consumerLimits && (
+                <div className="mb-4 pb-4 border-b">
+                  <div className="text-xs font-medium text-content-tertiary uppercase tracking-wide mb-2">Consumer Limits</div>
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-1">
+                    {consumerLimits.inactive_threshold != null && (
+                      <ConfigRow
+                        label="Default Inactive Threshold"
+                        value={formatNsDuration(consumerLimits.inactive_threshold)}
+                        hint="Default idle time after which consumers on this stream are removed"
+                      />
+                    )}
+                    {consumerLimits.max_ack_pending != null && (
+                      <ConfigRow
+                        label="Default Max Ack Pending"
+                        value={formatNumber(consumerLimits.max_ack_pending)}
+                        hint="Default limit on unacknowledged messages for consumers on this stream"
+                      />
+                    )}
                   </div>
                 </div>
               )}

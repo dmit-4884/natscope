@@ -1,6 +1,6 @@
 import { durToNanos, tsToMillis } from '@/utils/timestamp'
-import type { StreamInfo as ProtoStreamInfo, StreamConfig as ProtoStreamConfig, StreamState as ProtoStreamState, ConsumerInfo as ProtoConsumerInfo, ConsumerConfig as ProtoConsumerConfig, ClusterInfo as ProtoClusterInfo } from '../gen/types/nats/nats_stream_pb'
-import type { StreamInfo, StreamDetail, StreamConfig, StreamState, ConsumerInfo, ConsumerConfig, ClusterInfo } from '../types/nats'
+import type { StreamInfo as ProtoStreamInfo, StreamConfig as ProtoStreamConfig, StreamState as ProtoStreamState, ConsumerInfo as ProtoConsumerInfo, ConsumerConfig as ProtoConsumerConfig, ClusterInfo as ProtoClusterInfo, ConsumerLimits as ProtoConsumerLimits } from '../gen/types/nats/nats_stream_pb'
+import type { StreamInfo, StreamDetail, StreamConfig, StreamConsumerLimits, StreamState, ConsumerInfo, ConsumerConfig, ClusterInfo } from '../types/nats'
 import { streamsClient } from './grpc/clients'
 
 export interface GetStreamsParams {
@@ -180,7 +180,21 @@ function toStreamConfig(c: ProtoStreamConfig | undefined): StreamConfig {
       dest: c.republish.dest,
       headers_only: c.republish.headersOnly || undefined,
     } : undefined,
+    subject_transform: c.subjectTransform ? {
+      src: c.subjectTransform.source,
+      dest: c.subjectTransform.destination,
+    } : undefined,
+    consumer_limits: toStreamConsumerLimits(c.consumerLimits),
   }
+}
+
+/** Consumer limits are only meaningful when at least one default is set. */
+function toStreamConsumerLimits(l: ProtoConsumerLimits | undefined): StreamConsumerLimits | undefined {
+  if (!l) return undefined
+  const inactiveThreshold = durToNanos(l.inactiveThreshold) || undefined
+  const maxAckPending = l.maxAckPending || undefined
+  if (inactiveThreshold === undefined && maxAckPending === undefined) return undefined
+  return { inactive_threshold: inactiveThreshold, max_ack_pending: maxAckPending }
 }
 
 function toStreamState(s: ProtoStreamState | undefined): StreamState | undefined {
