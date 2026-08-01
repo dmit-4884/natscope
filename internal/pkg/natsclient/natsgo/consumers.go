@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nats-io/nats.go/jetstream"
+
 	"github.com/altessa-s/go-atlas/core/errors"
 	"github.com/altessa-s/go-atlas/core/runtime/concurrency"
 	"github.com/altessa-s/go-atlas/core/runtime/panics"
@@ -124,21 +126,56 @@ func (c *Client) UpdateConsumer(
 ) (*entities.ConsumerInfo, error) {
 	_ = normalizer.Normalize(&config) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
+	if config.FilterSubject != nil && len(config.FilterSubjects) > 0 {
+		return nil, wrapErr(&errs.NATSValidationError{Description: "filter_subject and filter_subjects are mutually exclusive"})
+	}
+
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
 		return nil, wrapErr(err)
 	}
 
-	consumer, err := stream.Consumer(ctx, consumerName)
+	subject := fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", streamName, consumerName)
+	msg, err := c.request(ctx, subject, nil)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, wrapErr(errors.WrapOperation(err, "get consumer info"))
 	}
 
-	currentInfo := consumer.CachedInfo()
-	updatedConfig := currentInfo.Config
-	converter.Convert(config, &updatedConfig, converter.WithIgnoreNilValues())
+	var infoResp struct {
+		Config *jetstream.ConsumerConfig `json:"config"`
+		Error  *struct {
+			Code        int    `json:"code"`
+			Description string `json:"description"`
+		} `json:"error,omitempty"`
+	}
+	if err = json.Unmarshal(msg.Data, &infoResp); err != nil {
+		return nil, wrapErr(errors.WrapOperation(err, "unmarshal consumer info"))
+	}
+	if infoResp.Error != nil {
+		return nil, wrapErr(&errs.NATSAPIError{
+			Code:        infoResp.Error.Code,
+			Description: infoResp.Error.Description,
+		})
+	}
+	if infoResp.Config == nil {
+		return nil, wrapErr(errs.ErrConsumerNotFound)
+	}
 
-	consumer, err = stream.UpdateConsumer(ctx, updatedConfig)
+	updatedConfig := *infoResp.Config
+	converter.Convert(config, &updatedConfig,
+		converter.WithIgnoreNilValues(),
+		converter.WithIgnoreFields("FilterSubject", "FilterSubjects"),
+	)
+	if config.FilterSubject != nil {
+		updatedConfig.FilterSubject = *config.FilterSubject
+		updatedConfig.FilterSubjects = nil
+	}
+	if len(config.FilterSubjects) > 0 {
+		updatedConfig.FilterSubjects = config.FilterSubjects
+		updatedConfig.FilterSubject = ""
+	}
+
+	consumer, err := stream.UpdateConsumer(ctx, updatedConfig)
 	if err != nil {
 		return nil, wrapErr(err)
 	}

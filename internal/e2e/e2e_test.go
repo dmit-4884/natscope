@@ -202,6 +202,17 @@ func TestE2E(t *testing.T) {
 		assert.Zero(t, updCons.Msg.GetConsumer().GetConfig().GetInactiveThreshold().AsDuration(),
 			"update must not downgrade the consumer to ephemeral")
 
+		filterSubject := "e2e.filtered"
+		updFilter, err := env.management.UpdateConsumer(ctx, connect.NewRequest(&managementpb.UpdateConsumerRequest{
+			ConnectionId:  connectionID,
+			StreamName:    streamName,
+			ConsumerName:  "e2e-consumer",
+			FilterSubject: &filterSubject,
+		}))
+		require.NoError(t, err, "changing filter_subject must be supported on NATS 2.10+")
+		assert.Equal(t, filterSubject, updFilter.Msg.GetConsumer().GetConfig().GetFilterSubject())
+		assert.Equal(t, "e2e-consumer", updFilter.Msg.GetConsumer().GetConfig().GetDurable())
+
 		_, err = env.management.CreateConsumer(ctx, connect.NewRequest(&managementpb.CreateConsumerRequest{
 			ConnectionId:   connectionID,
 			StreamName:     streamName,
@@ -227,10 +238,40 @@ func TestE2E(t *testing.T) {
 		assert.Equal(t, "push.e2e.deliver", listedPush.GetConfig().GetDeliverSubject())
 		assert.Equal(t, "e2e-push-consumer", listedPush.GetConfig().GetDurable())
 
+		pushDesc := "e2e push updated"
+		updPush, err := env.management.UpdateConsumer(ctx, connect.NewRequest(&managementpb.UpdateConsumerRequest{
+			ConnectionId: connectionID,
+			StreamName:   streamName,
+			ConsumerName: "e2e-push-consumer",
+			Description:  &pushDesc,
+		}))
+		require.NoError(t, err, "updating a push consumer must not fail on a pull-only consumer fetch")
+		assert.Equal(t, pushDesc, updPush.Msg.GetConsumer().GetConfig().GetDescription())
+		assert.Equal(t, "push.e2e.deliver", updPush.Msg.GetConsumer().GetConfig().GetDeliverSubject())
+
 		_, err = env.management.DeleteConsumer(ctx, connect.NewRequest(&managementpb.DeleteConsumerRequest{
 			ConnectionId: connectionID,
 			StreamName:   streamName,
 			ConsumerName: "e2e-push-consumer",
+		}))
+		require.NoError(t, err)
+
+		ephResp, err := env.management.CreateConsumer(ctx, connect.NewRequest(&managementpb.CreateConsumerRequest{
+			ConnectionId: connectionID,
+			StreamName:   streamName,
+			Name:         "e2e-ephemeral",
+			AckPolicy:    1,
+			Ephemeral:    true,
+		}))
+		require.NoError(t, err)
+		assert.Empty(t, ephResp.Msg.GetConsumer().GetConfig().GetDurable(), "ephemeral consumer must carry no durable name")
+		assert.Positive(t, ephResp.Msg.GetConsumer().GetConfig().GetInactiveThreshold().AsDuration(),
+			"server applies its ephemeral inactivity default")
+
+		_, err = env.management.DeleteConsumer(ctx, connect.NewRequest(&managementpb.DeleteConsumerRequest{
+			ConnectionId: connectionID,
+			StreamName:   streamName,
+			ConsumerName: "e2e-ephemeral",
 		}))
 		require.NoError(t, err)
 
