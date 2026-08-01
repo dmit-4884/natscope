@@ -26,6 +26,7 @@ export interface DestructiveConfirmProps {
   requireTypedName?: string
   /** Disables both buttons and shows the confirm button as loading. */
   isPending?: boolean
+  confirmDisabled?: boolean
   /** Extra content rendered between the description and the confirm row. */
   extra?: ReactNode
   /** Called when the dialog should close without confirming. */
@@ -53,6 +54,7 @@ export function DestructiveConfirm({
   tone = 'danger',
   requireTypedName,
   isPending,
+  confirmDisabled,
   extra,
   onCancel,
   onConfirm,
@@ -66,7 +68,7 @@ export function DestructiveConfirm({
   }, [isOpen])
 
   const typedMatches = !requireTypedName || typed === requireTypedName
-  const confirmDisabled = isPending || !typedMatches
+  const isConfirmDisabled = isPending || confirmDisabled || !typedMatches
 
   return (
     <Modal isOpen={isOpen} onClose={onCancel} title={title}>
@@ -98,7 +100,7 @@ export function DestructiveConfirm({
         <Button
           variant={tone === 'danger' ? 'danger' : 'primary'}
           onClick={onConfirm}
-          disabled={confirmDisabled}
+          disabled={isConfirmDisabled}
           loading={isPending}
         >
           {confirmLabel}

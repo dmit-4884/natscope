@@ -45,14 +45,15 @@ export interface StreamConfig {
   mirror_direct?: boolean
   metadata?: Record<string, string>
   allow_msg_ttl?: boolean
-  consumer_limits?: Record<string, unknown>
+  consumer_limits?: StreamConsumerLimits
   allow_atomic?: boolean
   mirror?: StreamSourceRef
   sources?: StreamSourceRef[]
   republish?: StreamRePublish
+  subject_transform?: StreamSubjectTransform
 }
 
-interface StreamSourceRef {
+export interface StreamSourceRef {
   name: string
   opt_start_seq?: number
   filter_subject?: string
@@ -63,6 +64,16 @@ interface StreamRePublish {
   src: string
   dest: string
   headers_only?: boolean
+}
+
+interface StreamSubjectTransform {
+  src: string
+  dest: string
+}
+
+export interface StreamConsumerLimits {
+  inactive_threshold?: number
+  max_ack_pending?: number
 }
 
 export interface StreamState {

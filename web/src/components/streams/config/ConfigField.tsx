@@ -13,11 +13,12 @@ interface Props {
   mode: ConfigFieldMode
   /** When set, the connected server doesn't support this field — control is disabled and the reason shown. */
   unsupportedReason?: string
+  lockedReason?: string
 }
 
-export function ConfigField({ def, value, onChange, mode, unsupportedReason }: Props) {
+export function ConfigField({ def, value, onChange, mode, unsupportedReason, lockedReason }: Props) {
   const isUnsupported = !!unsupportedReason
-  const isLocked = (mode === 'edit' && !def.editableOnUpdate) || isUnsupported
+  const isLocked = (mode === 'edit' && !def.editableOnUpdate) || isUnsupported || !!lockedReason
   const labelId = useId()
 
   return (
@@ -42,6 +43,8 @@ export function ConfigField({ def, value, onChange, mode, unsupportedReason }: P
 
       {isUnsupported ? (
         <p className="text-xs text-status-warning-text mt-1">{unsupportedReason}</p>
+      ) : lockedReason ? (
+        <p className="text-xs text-status-warning-text mt-1">{lockedReason}</p>
       ) : (isLocked && def.immutableReason) ? (
         <p className="text-xs text-content-tertiary mt-1">{def.immutableReason}</p>
       ) : def.helperText ? (
