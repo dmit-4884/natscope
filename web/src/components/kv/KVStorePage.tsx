@@ -182,7 +182,7 @@ export default function KVStorePage() {
               {currentConnection?.name || currentConnection?.urls[0] || 'Unknown connection'}
               {bucketInfo && (
                 <span className="ml-2">
-                  | {plural(bucketInfo.values, 'value')} | {formatBytes(bucketInfo.bytes)}
+                  | {plural(bucketInfo.values, 'key')} | {formatBytes(bucketInfo.bytes)}
                 </span>
               )}
             </p>

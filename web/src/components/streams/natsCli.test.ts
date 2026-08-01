@@ -139,13 +139,21 @@ describe('streamConfigToNatsCli', () => {
       config: streamCfg({
         mirror: { name: 'SOURCE' },
         republish: { src: 'a.>', dest: 'b.>' },
+        subject_transform: { src: 'a.>', dest: 'c.>' },
+        consumer_limits: { max_ack_pending: 100 },
         metadata: { team: 'platform' },
       }),
     })
     expect(cmd).toContain('# NOTE: omitted')
     expect(cmd).toContain('mirror')
     expect(cmd).toContain('republish')
+    expect(cmd).toContain('subject_transform')
+    expect(cmd).toContain('consumer_limits')
     expect(cmd).toContain('metadata')
+  })
+
+  it('does not append a NOTE when nothing is dropped', () => {
+    expect(streamConfigToNatsCli({ name: 'S', subjects: ['s'], config: streamCfg() })).not.toContain('# NOTE')
   })
 })
 
@@ -216,6 +224,25 @@ describe('consumerConfigToNatsCli', () => {
   it('maps by_start_sequence to the start sequence', () => {
     const cmd = consumerConfigToNatsCli('c', 'S', { deliver_policy: 'by_start_sequence', opt_start_seq: 42 })
     expect(cmd).toContain('--deliver=42')
+  })
+
+  it('appends a NOTE for consumer settings it cannot express as flags', () => {
+    const cmd = consumerConfigToNatsCli('c', 'S', {
+      deliver_policy: 'all',
+      ack_policy: 'explicit',
+      headers_only: true,
+      inactive_threshold: 30 * S,
+      mem_storage: true,
+    })
+    expect(cmd).toContain('# NOTE: omitted')
+    expect(cmd).toContain('headers_only')
+    expect(cmd).toContain('inactive_threshold')
+    expect(cmd).toContain('mem_storage')
+  })
+
+  it('does not append an omission NOTE when those settings are unset', () => {
+    const cmd = consumerConfigToNatsCli('c', 'S', { deliver_policy: 'all', ack_policy: 'explicit', inactive_threshold: 0 })
+    expect(cmd).not.toContain('# NOTE: omitted')
   })
 
   it('maps by_start_time to --deliver=all and appends a NOTE (no RFC3339 flag value)', () => {
