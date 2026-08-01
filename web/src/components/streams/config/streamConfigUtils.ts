@@ -14,6 +14,25 @@ export function hasMetadata(streamDetail: StreamDetail): boolean {
   return !!(streamDetail.config.metadata && Object.keys(streamDetail.config.metadata).length > 0)
 }
 
+/** True when the draft configures a mirror; NATS rejects mirror streams that also declare subjects. */
+export function isMirrorConfigured(value: Pick<StreamCreateRequest, 'mirror'>): boolean {
+  return !!value.mirror?.name?.trim()
+}
+
+/** Subject entries that survive trimming; the form keeps an empty row for editing. */
+export function normalizeSubjects(subjects: string[] | undefined): string[] {
+  return (subjects ?? []).map((s) => s.trim()).filter((s) => s !== '')
+}
+
+/**
+ * Create is allowed with a name plus either subjects or a mirror — a mirror
+ * stream has no subjects of its own.
+ */
+export function canCreateStream(value: StreamCreateRequest): boolean {
+  if (!value.name?.trim()) return false
+  return isMirrorConfigured(value) || normalizeSubjects(value.subjects).length > 0
+}
+
 /** Converts a server-side StreamDetail to the form-friendly StreamCreateRequest shape. */
 export function streamToConfig(stream: StreamDetail): StreamCreateRequest {
   return {

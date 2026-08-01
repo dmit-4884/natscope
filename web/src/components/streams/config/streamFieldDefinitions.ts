@@ -1,5 +1,6 @@
 import type { CapabilityKey } from '@/contexts/connection'
 import type { StreamCreateRequest, StreamUpdateRequest } from '@/types/management'
+import { isMirrorConfigured, normalizeSubjects } from './streamConfigUtils'
 
 // UI-only metadata for stream config fields (rendering + payload filtering);
 // backend is source of truth.
@@ -366,6 +367,9 @@ export function buildStreamUpdatePayload(values: StreamCreateRequest): StreamUpd
 
 /**
  * Build a create payload by picking only fields that are editable on create.
+ *
+ * Blank subject rows are dropped, and the key is omitted entirely for mirror
+ * streams — NATS rejects `stream mirrors can not contain subjects`.
  */
 export function buildStreamCreatePayload(values: StreamCreateRequest): StreamCreateRequest {
   const src = values as unknown as Record<string, unknown>
@@ -380,5 +384,10 @@ export function buildStreamCreatePayload(values: StreamCreateRequest): StreamCre
     const v = src[k as string]
     if (v !== undefined) out[k as string] = v
   }
+
+  const subjects = normalizeSubjects(values.subjects)
+  if (subjects.length === 0 || isMirrorConfigured(values)) delete out.subjects
+  else out.subjects = subjects
+
   return out as unknown as StreamCreateRequest
 }
