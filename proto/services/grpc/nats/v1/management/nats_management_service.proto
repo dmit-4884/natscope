@@ -548,6 +548,10 @@ message CreateConsumerRequest {
 
   // Optional. Idle heartbeat interval for push-based consumers.
   google.protobuf.Duration idle_heartbeat = 30;
+
+  // Optional. When true, creates an ephemeral (non-durable) consumer that the
+  // server removes after the inactivity threshold elapses.
+  bool ephemeral = 31;
 }
 
 // Defines the response message for creating a consumer.
@@ -606,6 +610,14 @@ message UpdateConsumerRequest {
 
   // Optional. Updated arbitrary key-value metadata attached to the consumer.
   map<string, string> metadata = 16;
+
+  // Optional. Updated subject filter. When set, replaces the existing filter;
+  // an empty value clears it. Requires NATS Server 2.10+.
+  optional string filter_subject = 17;
+
+  // Optional. Updated list of subject filters. A non-empty list replaces the
+  // existing filters. Mutually exclusive with filterSubject. Requires NATS Server 2.10+.
+  repeated string filter_subjects = 18;
 }
 
 // Defines the response message for updating a consumer.
