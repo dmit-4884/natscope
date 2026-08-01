@@ -1,0 +1,149 @@
+// Copyright 2026 Altessa Solutions Inc. All rights reserved.
+// Use of this source code is governed by license that can be found in
+// the LICENSE file.
+
+syntax = "proto3";
+package io.altessa.badrequest.v1;
+
+option java_package = "io.altessa.badrequest.v1";
+// Explicit outer class name: without it protoc derives it from the file
+// name (`Badrequest`), which collides with the `BadRequest` message class
+// on case-insensitive filesystems (macOS/Windows) during Java builds.
+option java_outer_classname = "BadRequestProto";
+option java_multiple_files = true;
+
+option go_package = "github.com/altessa-s/proto-gen-go/io/altessa/badrequest/v1;badrequestv1";
+
+import "google/api/field_behavior.proto";
+
+// This package is the canonical detail payload for `google.rpc.Status`
+// with `code = INVALID_ARGUMENT` across the altessa ecosystem. It is a
+// richer alternative to `google.rpc.BadRequest`: each `FieldViolation`
+// carries a structured `FieldPathComponent` list in addition to the
+// dotted string path, letting clients locate the offending field by
+// number / type / map key / repeated index without parsing strings.
+//
+// Producers SHOULD collect every detected violation into a single
+// `BadRequest` rather than failing on the first one — clients are then
+// able to render all errors at once instead of paying for a round-trip
+// per field. Order of violations is not significant (see UNORDERED_LIST
+// on `BadRequest.field_violations`).
+//
+// Wrapping pattern (Go):
+//
+//   st := status.New(codes.InvalidArgument, "validation failed")
+//   detailed, err := st.WithDetails(&badrequestv1.BadRequest{
+//       FieldViolations: violations,
+//   })
+//   return detailed.Err()
+//
+// Unwrapping pattern (Go):
+//
+//   for _, d := range status.Convert(err).Details() {
+//       if br, ok := d.(*badrequestv1.BadRequest); ok { … }
+//   }
+
+// FieldType mirrors google.protobuf.FieldDescriptorProto.Type as an open
+// proto3 enum so this schema is usable from PHP and other generators
+// that disallow proto2 closed-enum dependencies in proto3 files. Numeric
+// values intentionally match the upstream FieldDescriptorProto.Type so
+// tools can cast or round-trip without a lookup table.
+//
+// Stability (AIP-180): grows ONLY in lockstep with upstream
+// FieldDescriptorProto.Type — values are not added independently. New
+// proto wire types are exceedingly rare (the last addition was
+// `sint32` / `sint64` in 2008), so consumers can treat this enum as
+// effectively closed.
+enum FieldType {
+  FIELD_TYPE_UNSPECIFIED = 0;
+  FIELD_TYPE_DOUBLE = 1;
+  FIELD_TYPE_FLOAT = 2;
+  FIELD_TYPE_INT64 = 3;
+  FIELD_TYPE_UINT64 = 4;
+  FIELD_TYPE_INT32 = 5;
+  FIELD_TYPE_FIXED64 = 6;
+  FIELD_TYPE_FIXED32 = 7;
+  FIELD_TYPE_BOOL = 8;
+  FIELD_TYPE_STRING = 9;
+  FIELD_TYPE_GROUP = 10;
+  FIELD_TYPE_MESSAGE = 11;
+  FIELD_TYPE_BYTES = 12;
+  FIELD_TYPE_UINT32 = 13;
+  FIELD_TYPE_ENUM = 14;
+  FIELD_TYPE_SFIXED32 = 15;
+  FIELD_TYPE_SFIXED64 = 16;
+  FIELD_TYPE_SINT32 = 17;
+  FIELD_TYPE_SINT64 = 18;
+}
+
+// Defines a general error structure for requests that are malformed or contain invalid data.
+// It typically includes a list of specific field violations that caused the request to be rejected.
+// This message is often used as a detail payload for `google.rpc.Status` when the error code is `INVALID_ARGUMENT`.
+message BadRequest {
+  // A list of individual field violations that contributed to the bad request.
+  // Order is not significant — clients must not rely on a stable ordering
+  // between calls.
+  repeated FieldViolation field_violations = 1 [(google.api.field_behavior) = UNORDERED_LIST];
+}
+
+// A single field-level validation failure. Identifies the offending
+// field in both human-readable form (`field_path`) and structured form
+// (`field_path_components`), and explains the problem via `message`
+// and a stable application-specific `code`. At least one of `message`
+// / `code` SHOULD be set so consumers can either render or branch on
+// the violation.
+message FieldViolation {
+  // The dot-separated path to the field that caused the violation.
+  // For example, "user.address.street" or "items[2].name".
+  optional string field_path = 1 [(google.api.field_behavior) = OPTIONAL];
+
+  // Human-readable message describing the violation.
+  optional string message = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Application-specific error code or identifier for this type of violation.
+  optional string code = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Structured representation of the path to the field that caused the violation.
+  repeated FieldPathComponent field_path_components = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Defines a single segment in the path to a violated field.
+// It provides details about the field name, number, type, and, if applicable, its index in a repeated field or its key in a map.
+message FieldPathComponent {
+  // Field number as defined in the .proto file.
+  optional int32 number = 1 [(google.api.field_behavior) = OPTIONAL];
+
+  // Name of the field as defined in the .proto file.
+  optional string name = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Data type of the field.
+  optional FieldType type = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // For map fields, specifies the data type of the map keys.
+  optional FieldType map_key_type = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // For map fields, specifies the data type of the map values.
+  optional FieldType map_value_type = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Indicates whether the field is a repeated field (i.e., an array or list).
+  // AIP-140: boolean fields omit the `is_` prefix; `repeated` is a proto
+  // keyword, so this reads as `repeated_field`.
+  optional bool repeated_field = 6 [(google.api.field_behavior) = OPTIONAL];
+
+  // For repeated fields, the 0-based index of the element that caused the violation.
+  optional uint64 repeated_index = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // If the field is a map, this `oneof` specifies the key of the map entry that caused the violation.
+  oneof map_key {
+    // The index if the map key is treated as an array index (less common for proto maps).
+    uint64 index = 8;
+    // The map key, if its type is `bool`.
+    bool bool_key = 9;
+    // The map key, if its type is `int32`, `int64`, `sint32`, `sint64`, `sfixed32`, or `sfixed64`.
+    int64 int_key = 10;
+    // The map key, if its type is `uint32`, `uint64`, `fixed32`, or `fixed64`.
+    uint64 uint_key = 11;
+    // The map key, if its type is `string`.
+    string string_key = 12;
+  }
+}
