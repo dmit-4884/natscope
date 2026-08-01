@@ -1,6 +1,13 @@
 import type { StreamCreateRequest } from '@/types/management'
 import type { StreamDetail } from '@/types/nats'
 
+const COMPRESSION_LABELS: Record<string, string> = { none: 'None', s2: 'S2' }
+
+/** Render a compression algorithm with the same casing the form's select uses. */
+export function formatCompression(compression: string): string {
+  return COMPRESSION_LABELS[compression.toLowerCase()] ?? formatConfigValue(compression)
+}
+
 /** Format camelCase/PascalCase to readable text: "DiscardOld" → "Discard Old". */
 export function formatConfigValue(value: string): string {
   if (!value) return '-'

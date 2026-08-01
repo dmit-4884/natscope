@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { StreamCreateRequest } from '@/types/management'
-import { canCreateStream, isMirrorConfigured, normalizeSubjects } from './streamConfigUtils'
+import { canCreateStream, formatCompression, isMirrorConfigured, normalizeSubjects } from './streamConfigUtils'
 
 function draft(over: Partial<StreamCreateRequest> = {}): StreamCreateRequest {
   return { name: 'ORDERS', subjects: [''], ...over }
@@ -15,6 +15,18 @@ describe('isMirrorConfigured', () => {
 
   it('is true once the mirror names a source stream', () => {
     expect(isMirrorConfigured({ mirror: { name: 'SOURCE' } })).toBe(true)
+  })
+})
+
+describe('formatCompression', () => {
+  it('renders both algorithms with consistent casing', () => {
+    expect(formatCompression('none')).toBe('None')
+    expect(formatCompression('s2')).toBe('S2')
+    expect(formatCompression('S2')).toBe('S2')
+  })
+
+  it('falls back to the readable form for unknown values', () => {
+    expect(formatCompression('zstd')).toBe('Zstd')
   })
 })
 
