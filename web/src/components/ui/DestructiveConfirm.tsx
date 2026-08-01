@@ -26,7 +26,6 @@ export interface DestructiveConfirmProps {
   requireTypedName?: string
   /** Disables both buttons and shows the confirm button as loading. */
   isPending?: boolean
-  /** Disables confirm without the loading treatment, e.g. while `extra` holds invalid input. */
   confirmDisabled?: boolean
   /** Extra content rendered between the description and the confirm row. */
   extra?: ReactNode

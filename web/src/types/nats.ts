@@ -60,13 +60,13 @@ export interface StreamSourceRef {
   external?: { api_prefix: string; deliver_prefix: string }
 }
 
-export interface StreamRePublish {
+interface StreamRePublish {
   src: string
   dest: string
   headers_only?: boolean
 }
 
-export interface StreamSubjectTransform {
+interface StreamSubjectTransform {
   src: string
   dest: string
 }
