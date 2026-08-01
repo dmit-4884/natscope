@@ -6,6 +6,7 @@ import { Button, JsonEditor, Tabs, tabPanelProps } from '@/components/ui'
 import { StreamFormFields } from '@/components/common/forms'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import { buildStreamCreatePayload } from './config/streamFieldDefinitions'
+import { canCreateStream } from './config/streamConfigUtils'
 
 const defaultStreamConfig: StreamCreateRequest = {
   name: '',
@@ -94,11 +95,7 @@ export default function CreateStreamPage() {
         </Button>
         <Button
           onClick={handleCreate}
-          disabled={
-            createStream.isPending ||
-            !formValue.name ||
-            !formValue.subjects?.some((s) => s.trim() !== '')
-          }
+          disabled={createStream.isPending || !canCreateStream(formValue)}
         >
           {createStream.isPending ? 'Creating...' : 'Create Stream'}
         </Button>
