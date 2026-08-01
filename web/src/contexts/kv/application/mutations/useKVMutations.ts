@@ -61,9 +61,17 @@ export function useDeleteKVBucket(connectionId: string | undefined) {
 export function usePutKVKey(connectionId: string | undefined, bucket: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ key, value }: { key: string; value: string | Uint8Array }) => {
+    mutationFn: ({
+      key,
+      value,
+      expectedRevision,
+    }: {
+      key: string
+      value: string | Uint8Array
+      expectedRevision?: number
+    }) => {
       if (!connectionId || !bucket) throw new Error('No connection or bucket')
-      return api.putKVKey(connectionId, bucket, key, value)
+      return api.putKVKey(connectionId, bucket, key, value, expectedRevision)
     },
     onSuccess: (result, { key }) => {
       toast.success(`Key "${key}" saved (revision ${result.revision})`)

@@ -116,7 +116,11 @@ export default function KVStorePage() {
         setNewKeyName('')
         setNewKeyValue('')
       } else if (selectedKey) {
-        await putKey.mutateAsync({ key: selectedKey, value: editingValue })
+        await putKey.mutateAsync({
+          key: selectedKey,
+          value: editingValue,
+          expectedRevision: keyEntry?.revision,
+        })
         setValueDirty(false)
       }
       refetchKeys()

@@ -6,6 +6,8 @@ import { useStreamDetail, useUpdateStream, useDeleteStream, usePurgeStream, useS
 import { useConfigEditorEntry } from '@/stores/streamTabState/configEditorStore'
 import ConfigDiffModal from '../common/ConfigDiffModal'
 import type { StreamViewOutletContext } from './StreamView'
+import StreamNotFoundState from './StreamNotFoundState'
+import { isStreamNotFound } from './streamErrors'
 import { StreamConfigEditor } from './config/StreamConfigEditor'
 import { StreamConfigView } from './config/StreamConfigView'
 import { StreamConfirmDialog, type StreamConfirmType } from './config/StreamConfirmDialog'
@@ -84,6 +86,13 @@ export default function StreamConfigTab() {
     refetch()
   }
 
+  if (isStreamNotFound(error)) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <StreamNotFoundState streamName={streamName} />
+      </div>
+    )
+  }
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
