@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { StreamCreateRequest } from '@/types/management'
+import type { StreamCreateRequest, StreamSource } from '@/types/management'
 import { ConfigField, type ConfigFieldMode } from '@/components/streams/config/ConfigField'
 import {
   STREAM_FIELDS,
@@ -7,6 +7,7 @@ import {
   type StreamFieldDef,
   type StreamFieldSection,
 } from '@/components/streams/config/streamFieldDefinitions'
+import { isMirrorConfigured } from '@/components/streams/config/streamConfigUtils'
 import { useActiveConnection, useServerCapabilities } from '@/contexts/connection'
 import { ImmutableField } from '@/components/ui'
 import { SectionPanel } from './SectionPanel'
@@ -33,6 +34,8 @@ type ComplexSectionKey =
   | 'republish'
   | 'subjectTransform'
   | 'consumerLimits'
+
+const MIRROR_SUBJECTS_REASON = 'Mirror streams take no subjects — they replicate the source stream instead.'
 
 const COMPLEX_SECTIONS: ReadonlyArray<{ key: ComplexSectionKey; label: string; helper: string }> = [
   { key: 'placement', label: 'Placement', helper: 'Pin the stream to a specific cluster or set of server tags.' },
@@ -73,6 +76,14 @@ export function StreamFormFields({
   const setField = (key: string, next: unknown) =>
     onChange({ ...value, [key]: next } as StreamCreateRequest)
 
+  const mirrorConfigured = isMirrorConfigured(value)
+
+  const setMirror = (next: StreamSource | undefined) => {
+    const draft = { ...value, mirror: next } as StreamCreateRequest
+    if (isMirrorConfigured(draft)) draft.subjects = []
+    onChange(draft)
+  }
+
   return (
     <div className="space-y-4">
       {STREAM_SECTIONS.map((section) => {
@@ -98,6 +109,9 @@ export function StreamFormFields({
                   mode={mode}
                   unsupportedReason={
                     def.requiresCapability ? unsupportedReason(def.requiresCapability) : undefined
+                  }
+                  lockedReason={
+                    def.key === 'subjects' && mirrorConfigured ? MIRROR_SUBJECTS_REASON : undefined
                   }
                 />
               ))}
@@ -132,7 +146,7 @@ export function StreamFormFields({
             >
               <StreamSourceEditor
                 value={value.mirror}
-                onChange={(next) => setField('mirror', next)}
+                onChange={setMirror}
                 hideRemove
               />
             </ImmutableField>
