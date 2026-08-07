@@ -2,7 +2,7 @@
 
 # Natscope
 
-**A single-binary web UI for NATS JetStream — browse, decode, publish and manage your streams, with first-class Protobuf support.**
+**A single-binary web GUI for NATS JetStream — browse, decode, publish and manage your streams, with first-class Protobuf support.**
 
 [![Release](https://img.shields.io/github/v/release/dmit-4884/natscope)](https://github.com/dmit-4884/natscope/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/dmit-4884/natscope/ci.yml?branch=main&label=CI)](https://github.com/dmit-4884/natscope/actions/workflows/ci.yml)
@@ -24,7 +24,7 @@ Protobuf message → browse KV revisions.*
 
 ## What it is
 
-Natscope is a developer tool for everyday work with [NATS](https://nats.io) — a fast web interface
+Natscope is a developer tool for everyday work with [NATS](https://nats.io) — an open-source web GUI
 for seeing what actually flows through your streams, including binary Protobuf payloads.
 
 - **Single binary, zero infrastructure.** The React frontend is embedded into the Go binary; all state
