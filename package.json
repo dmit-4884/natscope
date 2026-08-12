@@ -3,6 +3,6 @@
   "private": true,
   "devDependencies": {
     "@bufbuild/protoc-gen-es": "^2.13.0",
-    "baseline-browser-mapping": "^2.11.5"
+    "baseline-browser-mapping": "^2.11.13"
   }
 }
