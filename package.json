@@ -2,7 +2,7 @@
   "name": "natscope",
   "private": true,
   "devDependencies": {
-    "@bufbuild/protoc-gen-es": "^2.13.0",
-    "baseline-browser-mapping": "^2.11.5"
+    "@bufbuild/protoc-gen-es": "^2.14.0",
+    "baseline-browser-mapping": "^2.11.14"
   }
 }
