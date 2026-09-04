@@ -42,6 +42,9 @@ func New() *cobra.Command {
 				# Start with a custom listen address
 				GRPC_WEB_ADDRESS=127.0.0.1:9090 natscope
 
+				# Show every log line instead of only warnings and errors
+				natscope --log-level info
+
 				# Show version information
 				natscope version
 
@@ -63,6 +66,10 @@ func (c *Command) configure() {
 	c.SetOut(os.Stdout)
 
 	c.PersistentFlags().StringP("config", "c", "", "path to config file")
+	c.PersistentFlags().String("log-level", "",
+		"log level: error, warning, info, debug, none (default: warning in a terminal, info otherwise)")
+	c.PersistentFlags().String("log-format", "",
+		"log format: console, text, json (default: console in a terminal, text otherwise)")
 
 	c.RunE = c.run
 

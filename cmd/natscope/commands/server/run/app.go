@@ -6,6 +6,7 @@ package run
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -26,6 +27,8 @@ import (
 	"github.com/altessa-s/go-atlas/service/id"
 
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
+	"github.com/dmit-4884/natscope/internal/pkg/logconsole"
+	"github.com/dmit-4884/natscope/internal/pkg/secrets"
 
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	slogfactory "github.com/altessa-s/go-atlas/observability/slog/factory"
@@ -50,6 +53,9 @@ type App struct {
 	sid *id.Service
 
 	dirsFallback string
+
+	logLevel  string
+	logFormat string
 }
 
 // NewApp creates a new server app.
@@ -72,6 +78,8 @@ func (srv *App) Run(cmd *cobra.Command, args []string) error {
 	if cf := appinfo.GetEnvVar("CONFIG_FILE"); cf != "" {
 		configFile = cf
 	}
+	srv.logLevel, _ = cmd.Flags().GetString("log-level")   //nolint:errcheck
+	srv.logFormat, _ = cmd.Flags().GetString("log-format") //nolint:errcheck
 
 	if configFile != "" {
 		if _, err := os.Stat(configFile); err != nil {
@@ -125,8 +133,13 @@ func envVarName(key string) string {
 
 // run performs the actual server startup.
 func (srv *App) run(ctx context.Context) error {
+	logconsole.Register()
+
 	if err := srv.loadConfig(); err != nil {
 		return errors.Wrapf(err, "failed to load config from '%s'", srv.configPath)
+	}
+	if err := applyLogFlags(srv.config.Logger, srv.logLevel, srv.logFormat); err != nil {
+		return err
 	}
 
 	// Static service ID overrides the file provider when configured.
@@ -135,6 +148,7 @@ func (srv *App) run(ctx context.Context) error {
 	}
 
 	logger, err := slogfactory.New(srv.config.Logger).
+		WithPrefixKey(slogx.ModuleKey).
 		WithServiceId(srv.sid.ID()).
 		Build()
 	if err != nil {
@@ -161,6 +175,7 @@ func (srv *App) run(ctx context.Context) error {
 	startCtx, startCancel := context.WithTimeout(ctx, startTimeout)
 	defer startCancel()
 
+	var vault secrets.Vault
 	di := fx.New(
 		fx.NopLogger,
 		fx.RecoverFromPanics(),
@@ -170,6 +185,8 @@ func (srv *App) run(ctx context.Context) error {
 		fxmodules.InfrastructureModule(),
 		fxmodules.TransportsModule(),
 		fxmodules.ServicesModule(),
+
+		fx.Populate(&vault),
 	)
 
 	if di.Err() != nil {
@@ -182,6 +199,10 @@ func (srv *App) run(ctx context.Context) error {
 
 	// Apply the soft Go heap cap (default 512 MiB) before serving.
 	configureMemoryLimit()
+
+	if logconsole.IsTerminal(os.Stdout) {
+		srv.printBanner(os.Stdout, vault)
+	}
 
 	slog.Default().Info("started")
 
@@ -205,25 +226,39 @@ func (srv *App) gracefulShutdown(ctx context.Context, di *fx.App) error {
 	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
 	defer shutdownCancel()
 
-	slog.Default().Info("shutting down")
+	slog.Default().Debug("shutting down")
 
 	if err := di.Stop(shutdownCtx); err != nil {
 		slog.Default().Error("error during graceful shutdown", slogx.Error(err))
 		return errors.Wrap(err, "graceful shutdown failed")
 	}
 
-	slog.Default().Info("stopped")
+	slog.Default().Debug("stopped")
 	return nil
 }
 
 func (srv *App) loadConfig() error {
 	var err error
-	srv.config, err = appconfig.Load(srv.configPath)
+	srv.config, err = appconfig.Load(srv.configPath, appconfig.LoggerDefaults(logconsole.IsTerminal(os.Stderr)))
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (srv *App) printBanner(w io.Writer, vault secrets.Vault) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+	renderBanner(w, banner{
+		Version: appinfo.Version,
+		Address: srv.config.GRPCWebAddress,
+		DataDir: srv.config.ResolveDataDir(),
+		Secrets: secretsLabel(vault),
+		Home:    home,
+	})
 }
 
 // defaultMemoryLimit is the soft GC cap used when GOMEMLIMIT is unset. 512 MiB
@@ -235,7 +270,7 @@ const defaultMemoryLimit int64 = 512 * 1024 * 1024
 func configureMemoryLimit() {
 	if os.Getenv("GOMEMLIMIT") != "" {
 		// Runtime already parsed it.
-		slog.Default().Info("memory limit honored from GOMEMLIMIT", slog.Int64("bytes", debug.SetMemoryLimit(-1)))
+		slog.Default().Debug("memory limit honored from GOMEMLIMIT", slog.Int64("bytes", debug.SetMemoryLimit(-1)))
 		return
 	}
 	limit := defaultMemoryLimit
@@ -246,5 +281,5 @@ func configureMemoryLimit() {
 		}
 	}
 	debug.SetMemoryLimit(limit)
-	slog.Default().Info("memory limit applied", slog.Int64("bytes", limit))
+	slog.Default().Debug("memory limit applied", slog.Int64("bytes", limit))
 }
