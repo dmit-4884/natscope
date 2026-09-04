@@ -82,7 +82,7 @@ func (s *Service) Start() error {
 
 	go s.loop(w)
 
-	s.logger.Info("filewatcher started")
+	s.logger.Debug("filewatcher started")
 	return nil
 }
 
@@ -107,7 +107,7 @@ func (s *Service) Stop() {
 		_ = s.watcher.Close()
 	}
 
-	s.logger.Info("filewatcher stopped")
+	s.logger.Debug("filewatcher stopped")
 }
 
 // Watch starts watching a directory for .proto file changes.
@@ -144,7 +144,7 @@ func (s *Service) Watch(sourceID string, dirPath string) error {
 		dirPath:  dirPath,
 	}
 
-	s.logger.Info("watching directory",
+	s.logger.Debug("watching directory",
 		slog.String("source_id", sourceID),
 		slog.String("dir", dirPath),
 		slog.Int("subdirs", len(dirs)))

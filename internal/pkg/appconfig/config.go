@@ -83,7 +83,7 @@ func (c *Config) SecretsBackend() string {
 }
 
 // Load loads the configuration from the specified file or files.
-func Load(filePath string) (*Config, error) {
+func Load(filePath string, logger *config.Logger) (*Config, error) {
 	opts := []loader.Option{
 		loader.WithEnvPrefix(appinfo.EnvPrefix),
 	}
@@ -92,21 +92,11 @@ func Load(filePath string) (*Config, error) {
 	}
 
 	cfg := loader.New(&yaml3.Backend{}, opts...)
-	if _, err := cfg.Load((*Config)(nil)); err != nil {
+	if _, err := cfg.Load(&Config{Logger: logger}); err != nil {
 		return nil, err
 	}
 
 	conf := cfg.Config().(*Config) //nolint:errcheck
-
-	// Dev-friendly logger defaults; env vars still override (LOGGER__LEVEL).
-	if conf.Logger != nil {
-		if conf.Logger.Level == config.LoggerLevelError {
-			conf.Logger.Level = config.LoggerLevelInfo
-		}
-		if conf.Logger.OutputFormat == config.LogFormatText {
-			conf.Logger.Colorized = true
-		}
-	}
 
 	if err := conf.Validate(); err != nil {
 		return nil, err

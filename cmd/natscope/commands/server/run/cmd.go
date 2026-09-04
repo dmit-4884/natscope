@@ -36,6 +36,9 @@ func New() *cobra.Command {
 
 				# Start with an explicit config file
 				natscope server run --config /path/to/config.yaml
+
+				# Debug logging in the compact terminal format
+				natscope server run --log-level debug
 			`),
 			SilenceUsage: true,
 		},

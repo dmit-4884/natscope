@@ -141,5 +141,5 @@ func (p *Pool) Close() {
 	}
 
 	p.clients = make(map[string]Client)
-	p.logger.Info("closed all NATS connections")
+	p.logger.Debug("closed all NATS connections")
 }

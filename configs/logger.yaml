@@ -6,20 +6,23 @@
 #logger:
 #  # <string> Specifies the logging level for the application.
 #  # Controls the minimum severity of messages that will be logged.
-#  # Supported values: error, warning, info, debug
-#  # Default value: info
+#  # Supported values: error, warning, info, debug, none
+#  # Default value: warning when stderr is a terminal, info otherwise.
+#  # The --log-level flag overrides both this file and LOGGER__LEVEL.
 #  level: info
 #
 #  # <string> Specifies the output destination for log messages.
 #  # Determines where log messages are written.
 #  # Supported values: stdout, stderr
-#  # Default value: stdout
-#  output: stdout
+#  # Default value: stderr
+#  output: stderr
 #
 #  # <string> Specifies the output format for log messages.
 #  # Controls the structure and formatting of log entries.
-#  # Supported values: json, text
-#  # Default value: text
+#  # Supported values: console, text, json
+#  # console: compact terminal lines (HH:MM:SS, subsystem prefix, no app metadata).
+#  # Default value: console when stderr is a terminal, text otherwise.
+#  # The --log-format flag overrides both this file and LOGGER__OUTPUT_FORMAT.
 #  outputFormat: text
 #
 #  # <bool> Enables colorized output for better readability.
