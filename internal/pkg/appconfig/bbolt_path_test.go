@@ -14,7 +14,7 @@ import (
 
 // With no config file the path falls back to the default data dir.
 func TestResolveBboltPath_Default(t *testing.T) {
-	cfg, err := appconfig.Load("")
+	cfg, err := appconfig.Load("", appconfig.LoggerDefaults(false))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestResolveBboltPath_DataDirOverride(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	cfg, err := appconfig.Load(path)
+	cfg, err := appconfig.Load(path, appconfig.LoggerDefaults(false))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
