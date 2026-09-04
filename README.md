@@ -195,6 +195,7 @@ Natscope works with zero configuration. When you need to tweak it:
 |------|-----|
 | Listen address | `GRPC_WEB_ADDRESS` (default `127.0.0.1:4280`, loopback only) |
 | Config file | `--config` flag or `CONFIG_FILE` env var (templates in `configs/`) |
+| Logging | Logs go to stderr. Level: `--log-level error\|warning\|info\|debug` or `LOGGER__LEVEL` (default `warning` in a terminal, `info` otherwise). Format: `--log-format console\|text\|json` or `LOGGER__OUTPUT_FORMAT` (default `console` in a terminal, `text` otherwise) |
 | Env overrides | any config field; nested keys use double underscores (`LOGGER__LEVEL`) |
 | Data directory | `STORAGE__LOCAL__DATA_DIR` (default `~/.natscope/data/`) |
 | Service state dirs | `LIB_DIR` / `VAR_DIR` — instance id and cert cache (default `/var/lib/natscope`; falls back to `~/.natscope/{lib,var}` automatically when the system path is not writable) |
