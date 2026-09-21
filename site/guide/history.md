@@ -5,8 +5,8 @@ description: Every publish is logged with its subject, encoding, payload and res
 
 # Publish history
 
-Natscope logs every message you publish. No setup, no opt-in. Each entry records the subject, the
-encoding, the payload and the result, so you can prove what you sent and when.
+Natscope logs every message you publish. There is nothing to set up and nothing to turn on. Each entry
+records the subject, the encoding, the payload and the result, so you can prove what you sent and when.
 
 ## Where it lives
 

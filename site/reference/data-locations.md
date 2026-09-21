@@ -5,7 +5,8 @@ description: Where Natscope keeps its database, vault and service state, and wha
 
 # Data locations
 
-Everything Natscope persists lives in a handful of local files. No external database, no cloud.
+Everything Natscope persists lives in a handful of local files. There is no external database and
+nothing in the cloud.
 
 ## Data directory
 

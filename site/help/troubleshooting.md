@@ -58,14 +58,18 @@ See [Protobuf](/guide/protobuf).
 
 ## Where the logs go
 
-Natscope logs to stdout as text. Turn up the detail with `LOGGER__LEVEL=debug`:
+Natscope logs to stderr. In a terminal the default is the compact `console` format at the `warning`
+level, so a healthy start prints the banner on stdout and nothing else. Under Docker or a service
+manager the default is `text` at `info`. Turn up the detail with the `--log-level` flag, which overrides
+both `LOGGER__LEVEL` and the config file:
 
 ```bash
-LOGGER__LEVEL=debug natscope
+natscope --log-level debug
 ```
 
-For machine-readable output, add `LOGGER__OUTPUT_FORMAT=json`. `LOGGER__OUTPUT_SOURCE=true` adds the
-file and line of each entry. Under Docker, `docker logs <container>` shows the same stream.
+For machine-readable output, pass `--log-format json` or set `LOGGER__OUTPUT_FORMAT=json`.
+`LOGGER__OUTPUT_SOURCE=true` adds the file and line of each entry. Under Docker,
+`docker logs <container>` shows the same stream.
 
 ## Health and metrics endpoints return nothing
 

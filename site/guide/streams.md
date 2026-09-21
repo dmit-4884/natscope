@@ -8,8 +8,8 @@ description: Create, inspect and edit JetStream streams from the Natscope sideba
 The sidebar lists every JetStream stream on the connected server. Selecting one opens a stream view with
 four tabs: **Messages**, **Config**, **Consumers** and **Publish**.
 
-Natscope covers the whole stream lifecycle. You can create a stream, edit its config, purge it, seal it
-and delete it without dropping to the `nats` CLI.
+You can create a stream, edit its config, purge it, seal it and delete it without dropping to the
+`nats` CLI.
 
 <Video src="/media/streams.mp4" poster="/media/streams.jpg" caption="Creating a stream and reviewing its config." />
 
@@ -50,5 +50,5 @@ other prompts. See [Settings](/guide/settings).
 ## Copy as `nats` CLI
 
 The **Config** tab has a **Copy as nats CLI** action that turns the current stream configuration into a
-ready-to-paste `nats stream add` command. Handy for scripting the same stream elsewhere or filing it in
-a repo.
+ready-to-paste `nats stream add` command. Use it to script the same stream elsewhere, or to file the
+config in a repo.

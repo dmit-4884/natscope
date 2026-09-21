@@ -28,7 +28,7 @@ Click **Filters** in the toolbar to open the filter panel:
 
 ## Read a payload
 
-The payload viewer offers several views of the same bytes:
+The payload viewer has several views of the same bytes:
 
 - **Decoded JSON** when a [Protobuf mapping](/guide/protobuf) matches the subject
 - **Raw text**
@@ -49,7 +49,7 @@ and backward from any sequence. Set the defaults for both under **Settings → P
 ## Compare two messages
 
 **Diff** turns on compare mode. Select two messages and Natscope shows a field-level diff of their
-payloads, which is useful for spotting what changed between two events on the same subject.
+payloads, so you can see what changed between two events on the same subject.
 
 ## Export
 
