@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitepress'
 
-const SITE_URL = 'https://dmit-4884.github.io/natscope/'
+const SITE_URL = 'https://natscope.app/'
 const DESCRIPTION = 'Web UI for NATS JetStream — browse, decode, publish and manage streams.'
 
 function pageUrl(relativePath) {
@@ -11,7 +11,7 @@ function pageUrl(relativePath) {
 export default defineConfig({
   title: 'Natscope',
   description: DESCRIPTION,
-  base: '/natscope/',
+  base: '/',
   lang: 'en-US',
   cleanUrls: false,
   lastUpdated: true,
@@ -19,9 +19,9 @@ export default defineConfig({
     hostname: SITE_URL
   },
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/natscope/logo.svg' }],
-    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/natscope/favicon-32.png' }],
-    ['link', { rel: 'apple-touch-icon', href: '/natscope/apple-touch-icon.png' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' }],
+    ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'Natscope' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }]
