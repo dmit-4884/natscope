@@ -5,7 +5,7 @@ description: Install Natscope with Homebrew, Docker, or a binary from GitHub Rel
 
 # Installation
 
-Natscope runs on macOS, Linux and Windows. Pick one of the three routes below, then open
+Natscope runs on macOS, Linux and Windows. Pick one of the four routes below, then open
 <http://127.0.0.1:4280>.
 
 ## Homebrew

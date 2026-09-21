@@ -5,8 +5,7 @@ description: Config file, environment variables and defaults for the Natscope se
 
 # Configuration
 
-Natscope runs with zero configuration. Every key below has a working default. Override what you need,
-and nothing else.
+Natscope runs with zero configuration. Every key below has a working default. Override only what you need.
 
 ## How settings resolve
 
@@ -66,11 +65,14 @@ See [Secrets](/reference/secrets).
 
 | Key | Env | Default | Values |
 |-----|-----|---------|--------|
-| `logger.level` | `LOGGER__LEVEL` | `info` | `error`, `warning`, `info`, `debug` |
-| `logger.output` | `LOGGER__OUTPUT` | `stdout` | `stdout`, `stderr` |
-| `logger.outputFormat` | `LOGGER__OUTPUT_FORMAT` | `text` | `json`, `text` |
-| `logger.colorized` | `LOGGER__COLORIZED` | `true` | Color for `text` format, ignored for `json` |
+| `logger.level` | `LOGGER__LEVEL` | `warning` in a terminal, `info` otherwise | `error`, `warning`, `info`, `debug`, `none` |
+| `logger.output` | `LOGGER__OUTPUT` | `stderr` | `stdout`, `stderr` |
+| `logger.outputFormat` | `LOGGER__OUTPUT_FORMAT` | `console` in a terminal, `text` otherwise | `console`, `text`, `json` |
+| `logger.colorized` | `LOGGER__COLORIZED` | `true` | Color for `console` and `text`, ignored for `json` |
 | `logger.outputSource` | `LOGGER__OUTPUT_SOURCE` | `false` | Add file and line to each entry |
+
+"In a terminal" means stderr is a TTY. The `--log-level` and `--log-format` flags override both the
+environment and the config file for those two keys.
 
 ### Service directories
 
@@ -80,8 +82,8 @@ See [Secrets](/reference/secrets).
 | `LIB_DIR` | `<VAR_DIR>/lib/natscope`, so `/var/lib/natscope` | Service instance id file and the TLS certificate cache (`<LIB_DIR>/certs`) |
 
 When neither variable is set and the system paths are not writable, Natscope falls back to
-`~/.natscope/var` and `~/.natscope/lib` on its own. Set either variable and that fallback stops: a
-failure to create the directory you named becomes a startup error.
+`~/.natscope/var` and `~/.natscope/lib` on its own. Set either variable and that fallback stops: if
+Natscope cannot create the directory you named, it fails to start.
 
 ### Internal HTTP server
 

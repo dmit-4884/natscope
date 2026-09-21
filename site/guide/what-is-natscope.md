@@ -1,6 +1,6 @@
 ---
 title: What is Natscope
-description: Natscope is a single-binary web UI for NATS JetStream with first-class Protobuf decoding.
+description: Natscope is a single-binary web UI for NATS JetStream with built-in Protobuf decoding.
 ---
 
 # What is Natscope

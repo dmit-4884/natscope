@@ -35,7 +35,7 @@ decoding after the schema changes.
 ### Live reload
 
 Local sources can be watched. Edit a `.proto` on disk and the recompiled schema reaches every connected
-browser in under half a second. Active live tails re-decode with it, no reconnect needed.
+browser in under half a second. Active live tails re-decode with it without reconnecting.
 
 ## Map subjects to types
 

@@ -7,9 +7,9 @@ description: Natscope listens on loopback. Exposing it needs ALLOW_REMOTE and ba
 
 Natscope binds `127.0.0.1:4280` by default and refuses to start on a wider bind unless you opt in.
 
-The reason is direct: the API has no authentication of its own. Stored credentials are never returned
-over it, but anyone who can reach the listener can act through your saved connections: read and publish
-messages, delete streams, purge buckets.
+The API has no authentication of its own. Stored credentials are never returned over it, but anyone who
+can reach the listener can act through your saved connections: read and publish messages, delete
+streams, purge buckets.
 
 ## Enable it
 

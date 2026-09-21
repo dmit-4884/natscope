@@ -45,6 +45,6 @@ to a sequence or timestamp.
 
 ## Where to go next
 
-- Binary payloads still showing as hex? Attach your schemas in [Protobuf](/guide/protobuf).
-- Want messages as they arrive? See [Live tail](/guide/live-tail).
-- Sending a message back? See [Publishing](/guide/publish).
+- If binary payloads still show as hex, attach your schemas in [Protobuf](/guide/protobuf).
+- To watch messages as they arrive, see [Live tail](/guide/live-tail).
+- To send a message back, see [Publishing](/guide/publish).
