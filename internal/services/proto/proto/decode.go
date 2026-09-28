@@ -51,10 +51,7 @@ func optimalDecodeConcurrency() int {
 func (s *Service) Decode(ctx context.Context, req entities.CodecRequest) (*entities.DecodeResult, error) {
 	snap, err := s.snapshotForRequest(ctx, req)
 	if err != nil {
-		return &entities.DecodeResult{
-			Success: false,
-			Error:   fmt.Sprintf("Failed to resolve snapshot: %v", err),
-		}, nil
+		return &entities.DecodeResult{Success: false, Error: snapshotError(req.SourceID, err).Error()}, nil
 	}
 
 	result := decodeWithSnapshot(snap, req.Data, req.MessageType)

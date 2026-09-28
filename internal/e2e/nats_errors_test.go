@@ -21,6 +21,7 @@ import (
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
 	messagespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/messages"
+	publishpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/publish"
 	statspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/stats"
 	streamspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/streams"
 	natstypes "github.com/dmit-4884/natscope/proto/gen/types/nats"
@@ -259,4 +260,23 @@ func errorReason(t *testing.T, err error) string {
 		}
 	}
 	return ""
+}
+
+func TestNATSErrors_PublishRequestErrors(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := createTestConnection(t, env, "publish-errors", env.natsURL, nil)
+
+	_, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
+		ConnectionId: connID, Subject: "orders.a", Data: "{}", MessageType: new("pkg.Order"),
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "%v", err)
+
+	_, err = env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
+		ConnectionId: unknownUUID, Subject: "orders.a", Data: "{}",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "%v", err)
+	assert.Equal(t, "CONNECTION_NOT_FOUND", errorReason(t, err))
 }

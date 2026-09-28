@@ -6,9 +6,8 @@ package proto
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
-
-	"github.com/altessa-s/go-atlas/core/errors"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -48,31 +47,62 @@ func encodeDynamic(msg *dynamicpb.Message) ([]byte, error) {
 	return marshalOpts.Marshal(msg)
 }
 
+// codecError carries a user-facing message while keeping the cause for
+// errors.Is checks.
+type codecError struct {
+	msg   string
+	cause error
+}
+
+func (e *codecError) Error() string { return e.msg }
+
+func (e *codecError) Unwrap() error { return e.cause }
+
+// snapshotError describes a snapshot resolution failure for sourceID.
+func snapshotError(sourceID string, err error) error {
+	var msg string
+	switch {
+	case errors.Is(err, errs.ErrMappingSourceNotFound):
+		msg = fmt.Sprintf("Proto source '%s' not found.", sourceID)
+	case errors.Is(err, errs.ErrMappingSourceDisabled):
+		msg = fmt.Sprintf("Proto source '%s' is disabled.", sourceID)
+	case errors.Is(err, errs.ErrMappingSelectionMissing):
+		msg = fmt.Sprintf("Proto source '%s' has no selected version.", sourceID)
+	default:
+		msg = fmt.Sprintf("Failed to resolve proto source '%s': %v", sourceID, err)
+	}
+	return &codecError{msg: msg, cause: err}
+}
+
+// typeNotFoundError describes a message type missing from a source snapshot.
+func typeNotFoundError(messageType, sourceID string) error {
+	return &codecError{
+		msg:   fmt.Sprintf("Proto type '%s' not found in source '%s'.", messageType, sourceID),
+		cause: errs.ErrProtoMessageNotFound,
+	}
+}
+
+// jsonConvertError describes JSON that does not fit messageType.
+func jsonConvertError(messageType string, err error) error {
+	return &codecError{msg: fmt.Sprintf("Cannot convert JSON to '%s': %v", messageType, err), cause: err}
+}
+
 // Encode converts JSON data to protobuf binary format using the resolved
 // snapshot.
 func (s *Service) Encode(ctx context.Context, req entities.CodecRequest) (*entities.EncodeResult, error) {
 	snap, err := s.snapshotForRequest(ctx, req)
 	if err != nil {
-		return &entities.EncodeResult{
-			Success: false,
-			Error:   fmt.Sprintf("Failed to resolve snapshot: %v", err),
-		}, nil
+		return &entities.EncodeResult{Success: false, Error: snapshotError(req.SourceID, err).Error()}, nil
 	}
 
 	md, ok := snap.Messages[req.MessageType]
 	if !ok {
-		return &entities.EncodeResult{
-			Success: false,
-			Error:   fmt.Sprintf("Proto type '%s' not found in source '%s'.", req.MessageType, snap.SourceID),
-		}, nil
+		return &entities.EncodeResult{Success: false, Error: typeNotFoundError(req.MessageType, snap.SourceID).Error()}, nil
 	}
 
 	msg, unmarshalErr := decodeDynamic(md, req.JSON)
 	if unmarshalErr != nil {
-		return &entities.EncodeResult{
-			Success: false,
-			Error:   fmt.Sprintf("Cannot convert JSON to '%s': %v", req.MessageType, unmarshalErr),
-		}, nil
+		return &entities.EncodeResult{Success: false, Error: jsonConvertError(req.MessageType, unmarshalErr).Error()}, nil
 	}
 
 	data, err := encodeDynamic(msg)
@@ -95,16 +125,16 @@ func (s *Service) Encode(ctx context.Context, req entities.CodecRequest) (*entit
 func (s *Service) EncodeRaw(ctx context.Context, req entities.CodecRequest) ([]byte, error) {
 	snap, err := s.snapshotForRequest(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, snapshotError(req.SourceID, err)
 	}
 	md, ok := snap.Messages[req.MessageType]
 	if !ok {
-		return nil, errs.ErrProtoMessageNotFound
+		return nil, typeNotFoundError(req.MessageType, snap.SourceID)
 	}
 
 	msg, err := decodeDynamic(md, req.JSON)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot convert JSON to '%s'", req.MessageType)
+		return nil, jsonConvertError(req.MessageType, err)
 	}
 	return encodeDynamic(msg)
 }
@@ -123,17 +153,11 @@ func (s *Service) Validate(
 
 	snap, err := s.snapshotForRequest(ctx, req)
 	if err != nil {
-		return &entities.ValidationResult{
-			Valid: false,
-			Error: fmt.Sprintf("Failed to resolve snapshot: %v", err),
-		}, nil
+		return &entities.ValidationResult{Valid: false, Error: snapshotError(req.SourceID, err).Error()}, nil
 	}
 	md, ok := snap.Messages[req.MessageType]
 	if !ok {
-		return &entities.ValidationResult{
-			Valid: false,
-			Error: fmt.Sprintf("Proto type '%s' not found in source '%s'.", req.MessageType, snap.SourceID),
-		}, nil
+		return &entities.ValidationResult{Valid: false, Error: typeNotFoundError(req.MessageType, snap.SourceID).Error()}, nil
 	}
 	return protoutils.Validate(md, data)
 }

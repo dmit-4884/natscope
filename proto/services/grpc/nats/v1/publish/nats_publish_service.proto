@@ -21,6 +21,12 @@ service PublishService {
 
 // Defines the request message for publishing a message to NATS.
 message PublishMessageRequest {
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.publish.source_id_with_message_type"
+    message: "source_id is required when message_type is set"
+    expression: "!has(this.message_type) || this.message_type == '' || (has(this.source_id) && this.source_id != '')"
+  };
+
   // Required. Identifier of the NATS connection to publish through.
   string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
@@ -55,7 +61,8 @@ message PublishMessageResponse {
   // Required. Sequence number assigned to the published message by JetStream.
   uint64 sequence = 2;
 
-  // Optional. Error message if the publish operation partially failed.
+  // Optional. Why the message was not published (encoding or publish failure);
+  // when set, stream and sequence are empty.
   optional string error = 3;
 
   // Indicates if this message was a duplicate (matched Nats-Msg-Id within the dedup window).

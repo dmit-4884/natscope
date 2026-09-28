@@ -122,6 +122,7 @@ const VALIDATION_REASON_LABELS: Record<string, string> = {
   INVALID_FORMAT_REGEX: 'Does not match the required format',
   INVALID_FORMAT_URL: 'Must be a valid URL',
   INVALID_ENUM_VALUE: 'Not one of the allowed values',
+  INVALID_RANGE: 'Outside the allowed range',
   MUTUALLY_EXCLUSIVE_FIELDS: 'These fields cannot be used together',
   REQUIRED: 'This field is required',
 }

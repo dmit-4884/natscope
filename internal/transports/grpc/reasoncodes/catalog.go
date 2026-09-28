@@ -20,5 +20,7 @@ const Prefix = "natscope."
 // Catalog maps domain (custom CEL) rule IDs to canonical reason codes.
 var Catalog = map[string]string{
 	// Message-level (cross-field) rules.
-	"natscope.nats.messages.start_seq_xor_start_time": "MUTUALLY_EXCLUSIVE_FIELDS",
+	"natscope.nats.messages.start_seq_xor_start_time":   "MUTUALLY_EXCLUSIVE_FIELDS",
+	"natscope.nats.kv.mirror_sources_exclusive":         "MUTUALLY_EXCLUSIVE_FIELDS",
+	"natscope.nats.publish.source_id_with_message_type": "SOURCE_ID_REQUIRED",
 }

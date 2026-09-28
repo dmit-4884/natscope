@@ -89,6 +89,9 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 
 	ack, err := s.natsService.PublishToStream(pubCtx, in.ConnectionID, in.Subject, data, in.Headers)
 	if err != nil {
+		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
+			return nil, err
+		}
 		errMsg := "Failed to publish message: " + err.Error()
 		s.recordHistory(ctx, in, "", 0, len(data), false, &errMsg)
 		return softFailure(errMsg), nil

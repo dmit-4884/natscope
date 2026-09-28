@@ -44,7 +44,7 @@ message KVBucketInfo {
 // Defines the configuration for creating or updating a NATS JetStream Key-Value bucket.
 message KVBucketConfig {
   option (buf.validate.message).cel = {
-    id: "kv_bucket_config.mirror_sources_exclusive"
+    id: "natscope.nats.kv.mirror_sources_exclusive"
     message: "mirror and sources are mutually exclusive"
     expression: "!(has(this.mirror) && size(this.sources) > 0)"
   };
