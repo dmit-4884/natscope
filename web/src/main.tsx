@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router-dom'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { getErrorMessage } from './api/errors'
 import { toast } from './utils/toast'
+import { shouldToastMutationError } from './utils/mutationErrorPolicy'
 import { router } from './router'
 import './index.css'
 
@@ -22,7 +23,7 @@ window.onunhandledrejection = (event) => {
 const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
-      if (mutation.options.onError) return
+      if (!shouldToastMutationError(mutation)) return
       toast.error(getErrorMessage(error))
     },
   }),

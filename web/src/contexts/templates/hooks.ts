@@ -135,6 +135,7 @@ export function useCreateTemplate() {
   return useMutation({
     mutationFn: createTemplate,
     onSuccess: () => qc.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY }),
+    meta: { silent: true },
   })
 }
 
@@ -143,6 +144,7 @@ export function useUpdateTemplate() {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: Partial<TemplateInput> }) => updateTemplate(id, patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY }),
+    meta: { silent: true },
   })
 }
 
@@ -151,6 +153,7 @@ export function useDeleteTemplate() {
   return useMutation({
     mutationFn: deleteTemplate,
     onSuccess: () => qc.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY }),
+    meta: { silent: true },
   })
 }
 
@@ -159,6 +162,7 @@ export function useBulkCreateTemplates() {
   return useMutation({
     mutationFn: bulkCreateTemplates,
     onSuccess: () => qc.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY }),
+    meta: { silent: true },
   })
 }
 
@@ -167,6 +171,7 @@ export function useDeleteAllTemplates() {
   return useMutation({
     mutationFn: deleteAllTemplates,
     onSuccess: () => qc.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY }),
+    meta: { silent: true },
   })
 }
 

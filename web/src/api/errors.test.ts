@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Code, ConnectError } from '@connectrpc/connect'
 import { create, toBinary, type DescMessage, type MessageInitShape } from '@bufbuild/protobuf'
 
+import { DomainError } from '@/shared'
 import { ErrorInfoSchema } from '../gen/google/rpc/error_details_pb'
 import { BadRequestSchema } from '../gen/io/altessa/badrequest/v1/badrequest_pb'
 import {
@@ -241,6 +242,16 @@ describe('getErrorMessage', () => {
   it('handles plain errors and unknown values', () => {
     expect(getErrorMessage(new Error('plain'))).toBe('plain')
     expect(getErrorMessage('just a string')).toBe('just a string')
+  })
+
+  it('unwraps a DomainError to the underlying ConnectError, stripping its code prefix', () => {
+    const wrapped = DomainError.wrap(new ConnectError('qa forced error 7f3a', Code.Unavailable))
+    expect(getErrorMessage(wrapped)).toBe('qa forced error 7f3a')
+  })
+
+  it('falls back to the DomainError message when it wraps a non-Error reason', () => {
+    const err = DomainError.invariant('server returned empty settings')
+    expect(getErrorMessage(err)).toBe('server returned empty settings')
   })
 })
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from '@/utils/toast'
+import { getErrorMessage } from '@/api/errors'
 import {
   useSettings,
   useUpdateSettings,
@@ -10,7 +11,7 @@ import {
   type PublishPolicyInput,
   type BehaviorPolicyInput,
 } from '@/contexts/settings'
-import { Spinner } from '@/components/ui'
+import { QueryErrorState, Spinner } from '@/components/ui'
 import { HelpModal } from './HelpModal'
 import { MessageFetchPolicySection } from './sections/MessageFetchPolicySection'
 import { LiveSubscriptionSection } from './sections/LiveSubscriptionSection'
@@ -22,9 +23,9 @@ import { SettingsSaveBar } from './SettingsSaveBar'
 type SectionId = 'messages' | 'live' | 'display' | 'publish' | 'behavior'
 
 export default function SettingsTab() {
-  const { data: settings, isLoading } = useSettings()
-  const updateSettings = useUpdateSettings()
-  const resetSettings = useResetSettings()
+  const { data: settings, isLoading, error, refetch } = useSettings()
+  const updateSettings = useUpdateSettings({ silent: true })
+  const resetSettings = useResetSettings({ silent: true })
 
   const [messages, setMessages] = useState<MessageFetchPolicyInput>({})
   const [live, setLive] = useState<LiveSubscriptionPolicyInput>({})
@@ -90,7 +91,7 @@ export default function SettingsTab() {
           setHasChanges(false)
         },
         onError: (err) => {
-          toast.error(`Failed to save settings: ${err.message}`)
+          toast.error(`Failed to save settings: ${getErrorMessage(err)}`)
         },
       },
     )
@@ -103,7 +104,7 @@ export default function SettingsTab() {
         setHasChanges(false)
       },
       onError: (err) => {
-        toast.error(`Failed to reset settings: ${err.message}`)
+        toast.error(`Failed to reset settings: ${getErrorMessage(err)}`)
       },
     })
   }
@@ -115,6 +116,10 @@ export default function SettingsTab() {
         <span className="ml-2 text-sm text-content-tertiary">Loading settings...</span>
       </div>
     )
+  }
+
+  if (error) {
+    return <QueryErrorState error={error} onRetry={() => void refetch()} />
   }
 
   return (

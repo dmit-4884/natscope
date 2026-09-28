@@ -5,8 +5,12 @@ import { UserSettings } from '../../domain/entities/UserSettings'
 import { toDomainSettings } from '../../adapters/toDomainSettings'
 import { settingsKeys } from '../queries/useSettings'
 
+interface UseResetSettingsOptions {
+  silent?: boolean
+}
+
 /** Resets user settings to server-side defaults. */
-export function useResetSettings(): UseMutationResult<UserSettings, DomainError, void> {
+export function useResetSettings(options: UseResetSettingsOptions = {}): UseMutationResult<UserSettings, DomainError, void> {
   const queryClient = useQueryClient()
   return useMutation<UserSettings, DomainError, void>({
     mutationFn: async (): Promise<UserSettings> => {
@@ -23,5 +27,6 @@ export function useResetSettings(): UseMutationResult<UserSettings, DomainError,
     onSuccess: (data) => {
       queryClient.setQueryData(settingsKeys.detail('current'), data)
     },
+    meta: { silent: options.silent },
   })
 }

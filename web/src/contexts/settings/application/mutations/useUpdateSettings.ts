@@ -6,8 +6,12 @@ import { toDomainSettings } from '../../adapters/toDomainSettings'
 import { toUpdateRequest } from '../../adapters/toUpdateRequest'
 import { settingsKeys } from '../queries/useSettings'
 
+interface UseUpdateSettingsOptions {
+  silent?: boolean
+}
+
 /** Applies a settings patch after validating via the aggregate. */
-export function useUpdateSettings(): UseMutationResult<
+export function useUpdateSettings(options: UseUpdateSettingsOptions = {}): UseMutationResult<
   UserSettings,
   DomainError,
   UserSettingsUpdate
@@ -37,5 +41,6 @@ export function useUpdateSettings(): UseMutationResult<
     onSuccess: (data) => {
       queryClient.setQueryData(settingsKeys.detail('current'), data)
     },
+    meta: { silent: options.silent },
   })
 }

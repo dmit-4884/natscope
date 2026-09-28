@@ -14,6 +14,7 @@
 
 import { ConnectError, Code } from '@connectrpc/connect'
 
+import { DomainError } from '@/shared'
 import { ErrorInfoSchema } from '../gen/google/rpc/error_details_pb'
 import { BadRequestSchema } from '../gen/io/altessa/badrequest/v1/badrequest_pb'
 
@@ -200,6 +201,10 @@ export function describeViolation(violation: ValidationViolation): string {
 
 /** Human-readable message from any error (ConnectError, Error, unknown). */
 export function getErrorMessage(error: unknown): string {
+  if (error instanceof DomainError) {
+    return getErrorMessage(error.reason ?? new Error(error.message))
+  }
+
   if (error instanceof ConnectError) {
     const reason = getErrorReason(error)
     if (reason && DOMAIN_REASON_LABELS[reason]) {
