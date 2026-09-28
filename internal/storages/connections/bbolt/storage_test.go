@@ -6,7 +6,9 @@ package bbolt_test
 import (
 	"errors"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -178,9 +180,11 @@ func TestConnections_Update(t *testing.T) {
 	if err := s.Save(ctx, in); err != nil {
 		t.Fatalf("save: %v", err)
 	}
-	in.Name = "c1-renamed"
-	in.Auth.Password = ptr.Wrap("new-pw")
-	if err := s.Update(ctx, in); err != nil {
+	if _, err := s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+		existing.Name = "c1-renamed"
+		existing.Auth.Password = ptr.Wrap("new-pw")
+		return false, false
+	}); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	got, err := s.Get(ctx, in.Id)
@@ -202,9 +206,11 @@ func TestConnections_UpdatePreservesOmittedSecret(t *testing.T) {
 	if err := s.Save(ctx, in); err != nil {
 		t.Fatalf("save: %v", err)
 	}
-	in.Name = "c1-renamed"
-	in.Auth.Password = nil // omitted on edit → must be preserved
-	if err := s.Update(ctx, in); err != nil {
+	if _, err := s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+		existing.Name = "c1-renamed"
+		existing.Auth.Password = nil // omitted on edit → must be preserved
+		return false, false
+	}); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	got, err := s.Get(ctx, in.Id)
@@ -216,6 +222,109 @@ func TestConnections_UpdatePreservesOmittedSecret(t *testing.T) {
 	}
 	if got.Auth == nil || got.Auth.Password == nil || *got.Auth.Password != "super-secret-pw" {
 		t.Fatalf("omitted password not preserved: %+v", got.Auth)
+	}
+}
+
+// TestConnections_UpdateAuthReplacePrunesStaleSecret is the QA-006 regression:
+// switching auth method (authReplaced=true) must purge the previous method's
+// vault secret, not merge it forward under the new method.
+func TestConnections_UpdateAuthReplacePrunesStaleSecret(t *testing.T) {
+	s, vault, _ := newStorage(t)
+	ctx := t.Context()
+	in := sampleConn("c1") // AUTH_METHOD_USER_PASSWORD, password="super-secret-pw"
+	if err := s.Save(ctx, in); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	// Switch to token auth: this is what ApplyUpdate produces for an update
+	// request that replaces the whole Auth subtree with a new method.
+	if _, err := s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+		existing.Auth = &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("new-token")}
+		return true, false
+	}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	got, err := s.Get(ctx, in.Id)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Auth == nil || got.Auth.Token == nil || *got.Auth.Token != "new-token" {
+		t.Fatalf("token not set: %+v", got.Auth)
+	}
+	if got.Auth.Password != nil {
+		t.Fatalf("stale password survived method switch: %+v", got.Auth)
+	}
+
+	secs, err := vault.Get(ctx, "connections", in.Id)
+	if err != nil {
+		t.Fatalf("vault get: %v", err)
+	}
+	if _, ok := secs["auth.password"]; ok {
+		t.Fatalf("stale auth.password key survived in vault: %v", secs)
+	}
+	if secs["auth.token"] != "new-token" {
+		t.Fatalf("vault missing new token: %v", secs)
+	}
+}
+
+// TestConnections_UpdateAuthReplaceToNoneClearsVault is the QA-006 repro for
+// clearing auth entirely: switching to AUTH_METHOD_UNSPECIFIED (which
+// ApplyUpdate collapses to a nil Auth) must remove every auth.* vault key.
+func TestConnections_UpdateAuthReplaceToNoneClearsVault(t *testing.T) {
+	s, vault, _ := newStorage(t)
+	ctx := t.Context()
+	in := sampleConn("c1")
+	if err := s.Save(ctx, in); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if _, err := s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+		existing.Auth = nil // mirrors SavedConnection.ApplyUpdate collapsing an empty AuthConfig
+		return true, false
+	}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	secs, err := vault.Get(ctx, "connections", in.Id)
+	if err != nil {
+		t.Fatalf("vault get: %v", err)
+	}
+	if len(secs) != 0 {
+		t.Fatalf("expected empty vault entry after clearing auth, got: %v", secs)
+	}
+}
+
+// TestConnections_UpdateTLSReplacePrunesStaleClientKey is the TLS half of
+// QA-006: replacing tls (even with an empty block) must purge the previous
+// client key rather than leaving it behind in the vault.
+func TestConnections_UpdateTLSReplacePrunesStaleClientKey(t *testing.T) {
+	s, vault, _ := newStorage(t)
+	ctx := t.Context()
+	in := sampleConn("c1")
+	in.TLS = &entities.TlsConfig{ClientCert: ptr.Wrap("cc"), ClientKey: ptr.Wrap("super-secret-key")}
+	if err := s.Save(ctx, in); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if _, err := s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+		existing.TLS = &entities.TlsConfig{SkipVerify: true} // replace with an empty-of-secrets block
+		return false, true
+	}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	secs, err := vault.Get(ctx, "connections", in.Id)
+	if err != nil {
+		t.Fatalf("vault get: %v", err)
+	}
+	if _, ok := secs["tls.clientKey"]; ok {
+		t.Fatalf("stale tls.clientKey survived: %v", secs)
+	}
+	// The unrelated auth secret from Save must be untouched (tlsReplaced only
+	// prunes tls.* keys).
+	if secs["auth.password"] != "super-secret-pw" {
+		t.Fatalf("unrelated auth secret was affected: %v", secs)
 	}
 }
 
@@ -237,6 +346,70 @@ func TestConnections_SoftDelete(t *testing.T) {
 	}
 	if err := s.Save(ctx, sampleConn("c1")); err != nil {
 		t.Fatalf("re-use soft-deleted name: %v", err)
+	}
+}
+
+// TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites is the QA-008
+// regression: three goroutines each update one field of the same connection,
+// round after round. Since Update now does its read-modify-write inside one
+// bbolt transaction, every round must leave all three fields at that round's
+// value — none may be clobbered by a stale concurrent read.
+func TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
+	s, _, _ := newStorage(t)
+	ctx := t.Context()
+	in := sampleConn("c1")
+	if err := s.Save(ctx, in); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	const rounds = 20
+	for r := 1; r <= rounds; r++ {
+		var wg sync.WaitGroup
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+				existing.Description = ptr.Wrap("d" + strconv.Itoa(r))
+				return false, false
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+				if existing.Connection == nil {
+					existing.Connection = &entities.ConnectionConfig{}
+				}
+				existing.Connection.ConnectionName = ptr.Wrap("cn" + strconv.Itoa(r))
+				return false, false
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+				if existing.Ping == nil {
+					existing.Ping = &entities.PingConfig{}
+				}
+				existing.Ping.MaxPingsOutstanding = ptr.Wrap(int32(r))
+				return false, false
+			})
+		}()
+		wg.Wait()
+
+		got, err := s.Get(ctx, in.Id)
+		if err != nil {
+			t.Fatalf("round %d get: %v", r, err)
+		}
+		wantDesc := "d" + strconv.Itoa(r)
+		wantConnName := "cn" + strconv.Itoa(r)
+		if got.Description == nil || *got.Description != wantDesc {
+			t.Fatalf("round %d: description lost, want %q got %v", r, wantDesc, got.Description)
+		}
+		if got.Connection == nil || got.Connection.ConnectionName == nil || *got.Connection.ConnectionName != wantConnName {
+			t.Fatalf("round %d: connection name lost, want %q got %+v", r, wantConnName, got.Connection)
+		}
+		if got.Ping == nil || got.Ping.MaxPingsOutstanding == nil || *got.Ping.MaxPingsOutstanding != int32(r) {
+			t.Fatalf("round %d: max pings outstanding lost, want %d got %+v", r, r, got.Ping)
+		}
 	}
 }
 

@@ -6,11 +6,13 @@ package templates
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/altessa-s/go-atlas/domain/converter"
 	"github.com/altessa-s/go-atlas/domain/normalizer"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	templatessvc "github.com/dmit-4884/natscope/internal/services/templates"
@@ -38,6 +40,12 @@ func (s *Service) Create(
 ) (*entities.MessageTemplate, error) {
 	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
+	// buf.validate min_len=1 runs on the raw request; re-check after the trim
+	// normalizer so a whitespace-only name can't persist as an empty name.
+	if strings.TrimSpace(in.Name) == "" {
+		return nil, errs.ErrMessageTemplateNameRequired
+	}
+
 	t := converter.Convert(in, entities.MessageTemplateNew())
 
 	if err := s.storage.Save(ctx, t); err != nil {
@@ -64,20 +72,22 @@ func (s *Service) Update(
 ) (*entities.MessageTemplate, error) {
 	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
-	existing, err := s.storage.Get(ctx, in.Id)
-	if err != nil {
-		return nil, err
+	// A provided name that trims to empty must be rejected (UpdateTemplate has
+	// no buf.validate min_len on name, so this is the only guard).
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return nil, errs.ErrMessageTemplateNameRequired
 	}
 
-	existing.ApplyUpdate(in)
-
-	if err := s.storage.Update(ctx, existing); err != nil {
+	updated, err := s.storage.Update(ctx, in.Id, func(existing *entities.MessageTemplate) {
+		existing.ApplyUpdate(in)
+	})
+	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to update template",
 			slog.String("id", in.Id),
 			slogx.Error(err))
 		return nil, err
 	}
-	return existing, nil
+	return updated, nil
 }
 
 // List returns templates with cursor-based pagination.
@@ -105,6 +115,9 @@ func (s *Service) BulkCreate(ctx context.Context, in []*entities.MessageTemplate
 	created := 0
 	for _, c := range in {
 		_ = normalizer.Normalize(c) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
+		if strings.TrimSpace(c.Name) == "" {
+			return created, errs.ErrMessageTemplateNameRequired
+		}
 		t := converter.Convert(c, entities.MessageTemplateNew())
 		if err := s.storage.Save(ctx, t); err != nil {
 			s.logger.ErrorContext(ctx, "bulk create: failed to save template",

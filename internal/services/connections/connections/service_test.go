@@ -30,14 +30,16 @@ type mockStorage struct {
 	updateErr  error
 	deleteErr  error
 
-	saveCalled   bool
-	saveInput    *entities.SavedConnection
-	getCalled    bool
-	getID        string
-	updateCalled bool
-	updateInput  *entities.SavedConnection
-	deleteCalled bool
-	deleteID     string
+	saveCalled         bool
+	saveInput          *entities.SavedConnection
+	getCalled          bool
+	getID              string
+	updateCalled       bool
+	updateInput        *entities.SavedConnection
+	updateAuthReplaced bool
+	updateTLSReplaced  bool
+	deleteCalled       bool
+	deleteID           string
 }
 
 func (m *mockStorage) Save(_ context.Context, in *entities.SavedConnection) error {
@@ -53,10 +55,29 @@ func (m *mockStorage) Get(_ context.Context, id string, _ ...bool) (*entities.Sa
 func (m *mockStorage) List(_ context.Context, _ *entities.SavedConnectionsList) (*entities.List[entities.SavedConnections], error) {
 	return m.listResult, m.listErr
 }
-func (m *mockStorage) Update(_ context.Context, in *entities.SavedConnection) error {
+
+// Update mirrors the real storage's atomic read-modify-write: it loads
+// getResult (simulating the transactional Get), lets mutate apply the
+// caller's change, then reports updateErr as the persist outcome.
+func (m *mockStorage) Update(
+	_ context.Context,
+	_ string,
+	mutate func(*entities.SavedConnection) (bool, bool),
+) (*entities.SavedConnection, error) {
 	m.updateCalled = true
-	m.updateInput = in
-	return m.updateErr
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	existing := m.getResult
+	if existing == nil {
+		existing = entities.SavedConnectionNew()
+	}
+	m.updateAuthReplaced, m.updateTLSReplaced = mutate(existing)
+	m.updateInput = existing
+	if m.updateErr != nil {
+		return nil, m.updateErr
+	}
+	return existing, nil
 }
 func (m *mockStorage) SoftDelete(_ context.Context, _ *entities.SoftDelete) error { return nil }
 func (m *mockStorage) Delete(_ context.Context, id string) error {

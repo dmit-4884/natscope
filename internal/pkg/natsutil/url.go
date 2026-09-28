@@ -4,6 +4,7 @@
 package natsutil
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -23,6 +24,9 @@ type URLCredentials struct {
 // SplitCredentials removes the userinfo from every URL and returns the cleaned
 // URLs plus the single credential set they carried, or nil when none did. URLs
 // embedding different credentials yield [errs.ErrConnectionURLCredentialsMixed].
+// A URL that contains "@" but cannot be parsed (even after normalizing a
+// missing scheme the way nats.go does) yields [errs.ErrConnectionURLInvalid]
+// rather than being persisted as-is with its embedded credentials in plaintext.
 func SplitCredentials(urls []string) ([]string, *URLCredentials, error) {
 	if len(urls) == 0 {
 		return urls, nil, nil
@@ -31,7 +35,10 @@ func SplitCredentials(urls []string) ([]string, *URLCredentials, error) {
 	out := make([]string, len(urls))
 	var found *URLCredentials
 	for i, raw := range urls {
-		cleaned, creds := splitOne(raw)
+		cleaned, creds, err := splitOne(raw)
+		if err != nil {
+			return nil, nil, err
+		}
 		out[i] = cleaned
 		if creds == nil {
 			continue
@@ -45,14 +52,20 @@ func SplitCredentials(urls []string) ([]string, *URLCredentials, error) {
 }
 
 // StripCredentials returns the URLs with any embedded userinfo removed. Unlike
-// [SplitCredentials] it never fails.
+// [SplitCredentials] it never fails: a URL it cannot confidently parse is
+// returned unchanged.
 func StripCredentials(urls []string) []string {
 	if len(urls) == 0 {
 		return urls
 	}
 	out := make([]string, len(urls))
 	for i, raw := range urls {
-		out[i], _ = splitOne(raw)
+		cleaned, _, err := splitOne(raw)
+		if err != nil {
+			out[i] = raw
+			continue
+		}
+		out[i] = cleaned
 	}
 	return out
 }
@@ -78,29 +91,50 @@ func MaskURLs(urls []string) string {
 	return strings.Join(masked, ",")
 }
 
-// splitOne strips the userinfo from one URL. A URL without userinfo, or one that
-// does not parse, is returned unchanged: validating URLs is the caller's job.
-func splitOne(raw string) (string, *URLCredentials) {
+// splitOne strips the userinfo from one URL. A URL without "@" is returned
+// unchanged. A URL with "@" but no scheme is parsed with a "nats://" prefix
+// added first, mirroring how nats.go itself accepts schemeless URLs — without
+// this, "user:pass@host" would fail to parse (scheme becomes "user", the rest
+// opaque) and its credentials would never be recognized as such. A URL that
+// still cannot be parsed, or that parses without userinfo despite the "@",
+// yields (raw, nil, nil): validating the URL's shape is the caller's job. A URL
+// that genuinely cannot be parsed even after normalization returns
+// [errs.ErrConnectionURLInvalid] instead of being handed back with its
+// credentials intact.
+func splitOne(raw string) (string, *URLCredentials, error) {
 	if !strings.Contains(raw, "@") {
-		return raw, nil
+		return raw, nil, nil
 	}
-	u, err := url.Parse(raw)
-	if err != nil || u.User == nil {
-		return raw, nil
+
+	target := raw
+	hasScheme := strings.Contains(raw, "://")
+	if !hasScheme {
+		target = "nats://" + raw
+	}
+
+	u, err := url.Parse(target)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: %q", errs.ErrConnectionURLInvalid, raw)
+	}
+	if u.User == nil {
+		return raw, nil, nil
 	}
 
 	username := u.User.Username()
 	password, hasPassword := u.User.Password()
 	u.User = nil
 	cleaned := u.String()
+	if !hasScheme {
+		cleaned = strings.TrimPrefix(cleaned, "nats://")
+	}
 
 	switch {
 	case hasPassword:
-		return cleaned, &URLCredentials{Username: username, Password: password}
+		return cleaned, &URLCredentials{Username: username, Password: password}, nil
 	case username != "":
-		return cleaned, &URLCredentials{Token: username}
+		return cleaned, &URLCredentials{Token: username}, nil
 	default:
-		return cleaned, nil
+		return cleaned, nil, nil
 	}
 }
 

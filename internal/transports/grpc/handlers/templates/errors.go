@@ -16,8 +16,11 @@ import (
 // StatusErrorConvert maps template-domain errors to gRPC status; unrecognized
 // ones fall through to grpchelpers.StatusErrorConvert.
 func (h *Handler) StatusErrorConvert(ctx context.Context, err error) error {
-	if errors.Is(err, errs.ErrMessageTemplateNotFound) {
+	switch {
+	case errors.Is(err, errs.ErrMessageTemplateNotFound):
 		return grpchelpers.NewStatus(codes.NotFound, "message template not found", "MESSAGE_TEMPLATE_NOT_FOUND")
+	case errors.Is(err, errs.ErrMessageTemplateNameRequired):
+		return grpchelpers.NewStatus(codes.InvalidArgument, "template name is required", "MESSAGE_TEMPLATE_NAME_REQUIRED")
 	}
 	return grpchelpers.StatusErrorConvert(ctx, err)
 }

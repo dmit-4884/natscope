@@ -40,8 +40,33 @@ func (s *Storage) Save(ctx context.Context, in *entities.MessageTemplate) error 
 	return s.store.Save(ctx, converter.Convert(in, &templateDoc{}, bbstore.Opts()...))
 }
 
-func (s *Storage) Update(ctx context.Context, in *entities.MessageTemplate) error {
-	return s.store.Update(ctx, converter.Convert(in, &templateDoc{}, bbstore.Opts()...))
+// Update atomically loads the template by id, lets mutate apply the caller's
+// change to it, and persists the result within a single storage transaction —
+// so concurrent partial updates on different fields cannot race (QA-044).
+func (s *Storage) Update(
+	ctx context.Context,
+	id string,
+	mutate func(existing *entities.MessageTemplate),
+) (*entities.MessageTemplate, error) {
+	var result *entities.MessageTemplate
+	err := s.store.WithTransaction(ctx, func(ctx context.Context) error {
+		existing, err := s.Get(ctx, id)
+		if err != nil {
+			return err
+		}
+
+		mutate(existing)
+
+		if err := s.store.Update(ctx, converter.Convert(existing, &templateDoc{}, bbstore.Opts()...)); err != nil {
+			return err
+		}
+		result = existing
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (s *Storage) Get(ctx context.Context, id string) (*entities.MessageTemplate, error) {

@@ -5,6 +5,7 @@ package bbolt_test
 
 import (
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
@@ -104,5 +105,65 @@ func TestSettings_EmptyGroupsStayNil(t *testing.T) {
 	}
 	if got.Display == nil || *got.Display.Density != "comfortable" {
 		t.Fatalf("display mismatch: %+v", got.Display)
+	}
+}
+
+// TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites is the QA-041
+// regression: three goroutines each update a different setting group, round
+// after round. Since Update now does its read-modify-write inside one bbolt
+// transaction, every round must leave all three groups at that round's value.
+func TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
+	s, err := settingsbbolt.New(t.Context(), newDB(t))
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	ctx := t.Context()
+
+	const rounds = 20
+	for r := 1; r <= rounds; r++ {
+		var wg sync.WaitGroup
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, func(existing *entities.UserSettings) {
+				if existing.Messages == nil {
+					existing.Messages = &entities.MessageSettings{}
+				}
+				existing.Messages.DefaultPageSize = ptr.Wrap(int32(r))
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, func(existing *entities.UserSettings) {
+				if existing.Publish == nil {
+					existing.Publish = &entities.PublishSettings{}
+				}
+				existing.Publish.PublishTimeoutSec = ptr.Wrap(int32(r))
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, func(existing *entities.UserSettings) {
+				if existing.Live == nil {
+					existing.Live = &entities.LiveSettings{}
+				}
+				existing.Live.MaxDisplayRate = ptr.Wrap(int32(r))
+			})
+		}()
+		wg.Wait()
+
+		got, err := s.Get(ctx)
+		if err != nil {
+			t.Fatalf("round %d get: %v", r, err)
+		}
+		if got.Messages == nil || got.Messages.DefaultPageSize == nil || *got.Messages.DefaultPageSize != int32(r) {
+			t.Fatalf("round %d: messages.defaultPageSize lost, got %+v", r, got.Messages)
+		}
+		if got.Publish == nil || got.Publish.PublishTimeoutSec == nil || *got.Publish.PublishTimeoutSec != int32(r) {
+			t.Fatalf("round %d: publish.publishTimeoutSec lost, got %+v", r, got.Publish)
+		}
+		if got.Live == nil || got.Live.MaxDisplayRate == nil || *got.Live.MaxDisplayRate != int32(r) {
+			t.Fatalf("round %d: live.maxDisplayRate lost, got %+v", r, got.Live)
+		}
 	}
 }

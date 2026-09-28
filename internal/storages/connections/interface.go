@@ -21,8 +21,19 @@ type Storage interface {
 	// List returns connections with pagination.
 	List(ctx context.Context, in *entities.SavedConnectionsList) (*entities.List[entities.SavedConnections], error)
 
-	// Update updates a connection; errs.ErrConnectionNotFound if missing.
-	Update(ctx context.Context, in *entities.SavedConnection) error
+	// Update atomically loads the connection by id, lets mutate apply the
+	// caller's change to it, and persists the result within a single storage
+	// transaction — so concurrent partial updates cannot race (QA-008).
+	// errs.ErrSavedConnectionNotFound if missing. mutate returns
+	// authReplaced/tlsReplaced: whether it explicitly replaced (rather than
+	// left untouched) the Auth/TLS subtree, so vault secrets belonging to the
+	// previous config that are not part of the new one are purged instead of
+	// merged forward (QA-006).
+	Update(
+		ctx context.Context,
+		id string,
+		mutate func(existing *entities.SavedConnection) (authReplaced, tlsReplaced bool),
+	) (*entities.SavedConnection, error)
 
 	// Delete permanently removes a connection; errs.ErrConnectionNotFound if
 	// missing.

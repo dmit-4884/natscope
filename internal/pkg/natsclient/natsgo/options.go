@@ -69,7 +69,7 @@ func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, error)
 
 	timeout := defaultConnectTimeout
 	if in.ConnectTimeout != nil {
-		timeout = *in.ConnectTimeout * time.Millisecond
+		timeout = *in.ConnectTimeout
 	}
 	opts = append(opts, nats.Timeout(timeout))
 
@@ -166,7 +166,7 @@ func buildConnectionOptions(connCfg *entities.ConnectionConfig) []nats.Option {
 	var opts []nats.Option
 
 	if connCfg.ConnectTimeout != nil {
-		opts = append(opts, nats.Timeout(*connCfg.ConnectTimeout*time.Millisecond))
+		opts = append(opts, nats.Timeout(*connCfg.ConnectTimeout))
 	}
 	if connCfg.ConnectionName != nil && *connCfg.ConnectionName != "" {
 		opts = append(opts, nats.Name(*connCfg.ConnectionName))
@@ -198,7 +198,7 @@ func buildReconnectOptions(reconnCfg *entities.ReconnectConfig) []nats.Option {
 		opts = append(opts, nats.MaxReconnects(int(*reconnCfg.MaxReconnects)))
 	}
 	if reconnCfg.ReconnectWait != nil {
-		opts = append(opts, nats.ReconnectWait(*reconnCfg.ReconnectWait*time.Millisecond))
+		opts = append(opts, nats.ReconnectWait(*reconnCfg.ReconnectWait))
 	}
 	if reconnCfg.ReconnectBufSize != nil {
 		opts = append(opts, nats.ReconnectBufSize(int(*reconnCfg.ReconnectBufSize)))
@@ -218,7 +218,7 @@ func buildPingOptions(pingCfg *entities.PingConfig) []nats.Option {
 	var opts []nats.Option
 
 	if pingCfg.PingInterval != nil {
-		opts = append(opts, nats.PingInterval(*pingCfg.PingInterval*time.Second))
+		opts = append(opts, nats.PingInterval(*pingCfg.PingInterval))
 	}
 	if pingCfg.MaxPingsOutstanding != nil {
 		opts = append(opts, nats.MaxPingsOutstanding(int(*pingCfg.MaxPingsOutstanding)))

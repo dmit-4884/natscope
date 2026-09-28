@@ -65,6 +65,17 @@ func TestCreate_NormalizesTrim(t *testing.T) {
 	assert.Equal(t, "s.x", created.Subject)
 }
 
+// TestCreate_WhitespaceOnlyNameRejected is the QA-043 regression: buf.validate
+// only checks min_len on the raw request, so a whitespace-only name passes it
+// and must be rejected again after the trim normalizer collapses it to empty.
+func TestCreate_WhitespaceOnlyNameRejected(t *testing.T) {
+	t.Parallel()
+	svc := setupService(t)
+
+	_, err := svc.Create(t.Context(), &entities.MessageTemplateCreate{Name: "   "})
+	assert.ErrorIs(t, err, errs.ErrMessageTemplateNameRequired)
+}
+
 func TestGet_NotFound(t *testing.T) {
 	t.Parallel()
 	svc := setupService(t)
@@ -130,6 +141,27 @@ func TestUpdate_NotFound(t *testing.T) {
 	assert.ErrorIs(t, err, errs.ErrMessageTemplateNotFound)
 }
 
+// TestUpdate_WhitespaceOnlyNameRejected is the QA-043 regression for
+// UpdateTemplate: no buf.validate min_len applies to the optional name field,
+// so this is the only guard against blanking a template's name.
+func TestUpdate_WhitespaceOnlyNameRejected(t *testing.T) {
+	t.Parallel()
+	svc := setupService(t)
+
+	created, err := svc.Create(t.Context(), &entities.MessageTemplateCreate{Name: "orders"})
+	require.NoError(t, err)
+
+	_, err = svc.Update(t.Context(), &entities.MessageTemplateUpdate{
+		Id:   created.Id,
+		Name: ptr.Wrap("   "),
+	})
+	require.ErrorIs(t, err, errs.ErrMessageTemplateNameRequired)
+
+	got, err := svc.Get(t.Context(), created.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "orders", got.Name, "name must survive the rejected update")
+}
+
 func TestDelete(t *testing.T) {
 	t.Parallel()
 	svc := setupService(t)
@@ -184,6 +216,19 @@ func TestBulkCreate(t *testing.T) {
 	out, err := svc.List(t.Context(), &entities.MessageTemplatesList{})
 	require.NoError(t, err)
 	assert.Len(t, out.Items, 2)
+}
+
+// TestBulkCreate_WhitespaceOnlyNameRejected is the QA-043 regression for
+// BatchCreateTemplates.
+func TestBulkCreate_WhitespaceOnlyNameRejected(t *testing.T) {
+	t.Parallel()
+	svc := setupService(t)
+
+	_, err := svc.BulkCreate(t.Context(), []*entities.MessageTemplateCreate{
+		{Name: "one"},
+		{Name: "   "},
+	})
+	assert.ErrorIs(t, err, errs.ErrMessageTemplateNameRequired)
 }
 
 func TestDeleteAll(t *testing.T) {

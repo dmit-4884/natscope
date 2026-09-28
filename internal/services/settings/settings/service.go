@@ -55,19 +55,10 @@ func (s *Service) Update(ctx context.Context, in *entities.UserSettingsUpdate) (
 		in.Messages.ExportRangeLimit = nil
 	}
 
-	existing, err := s.storage.Get(ctx)
+	updated, err := s.storage.Update(ctx, func(existing *entities.UserSettings) {
+		existing.ApplyUpdate(in)
+	})
 	if err != nil {
-		if !errors.Is(err, errs.ErrSettingsNotFound) {
-			return nil, err
-		}
-
-		// Create new settings entity
-		existing = entities.UserSettingsNew()
-	}
-
-	existing.ApplyUpdate(in)
-
-	if err := s.storage.Save(ctx, existing); err != nil {
 		s.logger.ErrorContext(ctx, "failed to save settings",
 			slogx.Error(err))
 		return nil, err
@@ -75,7 +66,7 @@ func (s *Service) Update(ctx context.Context, in *entities.UserSettingsUpdate) (
 
 	s.logger.InfoContext(ctx, "settings updated")
 
-	return existing, nil
+	return updated, nil
 }
 
 // Reset deletes settings, returning default (empty) settings.

@@ -7,6 +7,7 @@ package bbolt
 
 import (
 	"context"
+	"errors"
 
 	"github.com/altessa-s/go-atlas/domain/converter"
 
@@ -17,8 +18,10 @@ import (
 	storage "github.com/dmit-4884/natscope/internal/storages/settings"
 )
 
-// settingsID is the fixed key of the singleton settings document.
-const settingsID = "user-settings"
+// settingsID is the fixed key of the singleton settings document; matches
+// entities.UserSettingsID so a loaded document and the ephemeral default
+// share the same identity.
+const settingsID = entities.UserSettingsID
 
 // Storage is the doc-model bbolt user-settings store (a single document).
 type Storage struct {
@@ -51,6 +54,38 @@ func (s *Storage) Get(ctx context.Context) (*entities.UserSettings, error) {
 		return nil, err
 	}
 	return converter.Convert(d, &entities.UserSettings{}, bbstore.Opts()...), nil
+}
+
+// Update atomically loads settings (or a fresh default if none saved yet),
+// lets mutate apply the caller's change, and persists the result within a
+// single storage transaction, so concurrent partial updates to different
+// setting groups cannot race (QA-041).
+func (s *Storage) Update(
+	ctx context.Context,
+	mutate func(existing *entities.UserSettings),
+) (*entities.UserSettings, error) {
+	var result *entities.UserSettings
+	err := s.store.WithTransaction(ctx, func(ctx context.Context) error {
+		existing, err := s.Get(ctx)
+		if err != nil {
+			if !errors.Is(err, errs.ErrSettingsNotFound) {
+				return err
+			}
+			existing = entities.UserSettingsNew()
+		}
+
+		mutate(existing)
+
+		if err := s.Save(ctx, existing); err != nil {
+			return err
+		}
+		result = existing
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (s *Storage) Delete(ctx context.Context) error {

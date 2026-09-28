@@ -105,14 +105,16 @@ func (s *Service) Update(
 	}
 	in.URLs, in.Auth = urls, auth
 
-	existing, err := s.storage.Get(ctx, in.Id)
+	// A lifted URL credential replaces Auth even when the request didn't send
+	// one explicitly, so it must count as a replace too.
+	authReplaced := in.Auth != nil
+	tlsReplaced := in.TLS != nil
+
+	updated, err := s.storage.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
+		existing.ApplyUpdate(in)
+		return authReplaced, tlsReplaced
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	existing.ApplyUpdate(in)
-
-	if err := s.storage.Update(ctx, existing); err != nil {
 		s.logger.ErrorContext(ctx, "failed to update connection",
 			slog.String("id", in.Id),
 			slogx.Error(err))
@@ -124,7 +126,7 @@ func (s *Service) Update(
 	s.logger.InfoContext(ctx, "connection updated",
 		slog.String("id", in.Id))
 
-	return existing, nil
+	return updated, nil
 }
 
 // Delete permanently removes a connection.
@@ -219,19 +221,18 @@ func (s *Service) TestConnection(
 }
 
 // recordTestResult writes a probe result to Meta without bumping
-// timestamps/ETag (telemetry, not a config change); errors are logged.
+// timestamps/ETag (telemetry, not a config change); errors are logged. The
+// read-modify-write happens inside one storage transaction (see
+// storage.Update), so this cannot race a concurrent UpdateConnection and roll
+// back a just-saved secret.
 func (s *Service) recordTestResult(ctx context.Context, id string, result *entities.TestConnectionResult) {
-	existing, err := s.storage.Get(ctx, id)
+	_, err := s.storage.Update(ctx, id, func(existing *entities.SavedConnection) (bool, bool) {
+		existing.Meta = entities.NewConnectionMetaFromTestResult(result)
+		// Meta-only write: Auth/TLS are untouched, so existing vault secrets
+		// must be preserved, not pruned.
+		return false, false
+	})
 	if err != nil {
-		s.logger.WarnContext(ctx, "failed to load connection for test-result write",
-			slog.String("id", id),
-			slogx.Error(err))
-		return
-	}
-
-	existing.Meta = entities.NewConnectionMetaFromTestResult(result)
-
-	if err := s.storage.Update(ctx, existing); err != nil {
 		s.logger.WarnContext(ctx, "failed to persist test meta",
 			slog.String("id", id),
 			slogx.Error(err))

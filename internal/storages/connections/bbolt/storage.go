@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"strings"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
 
@@ -58,38 +59,93 @@ func (s *Storage) Save(ctx context.Context, in *entities.SavedConnection) error 
 	})
 }
 
-func (s *Storage) Update(ctx context.Context, in *entities.SavedConnection) error {
-	doc, secs, err := toDoc(in)
-	if err != nil {
-		return err
-	}
-	return s.store.WithTransaction(ctx, func(ctx context.Context) error {
+// Update atomically loads the connection, lets mutate apply the caller's
+// change to it, and persists the result — all inside one bbolt transaction, so
+// concurrent partial updates on different fields (two browser tabs, "Ping
+// all" racing an edit) serialize on bbolt's writer lock instead of one
+// clobbering the other via a stale read-modify-write (QA-008). mutate reports
+// whether it explicitly replaced the Auth/TLS subtree, so stale vault secrets
+// from the previous config are pruned rather than merged forward (QA-006).
+func (s *Storage) Update(
+	ctx context.Context,
+	id string,
+	mutate func(existing *entities.SavedConnection) (authReplaced, tlsReplaced bool),
+) (*entities.SavedConnection, error) {
+	var result *entities.SavedConnection
+	err := s.store.WithTransaction(ctx, func(ctx context.Context) error {
+		existing, err := s.Get(ctx, id)
+		if err != nil {
+			return err
+		}
+
+		authReplaced, tlsReplaced := mutate(existing)
+
+		doc, secs, err := toDoc(existing)
+		if err != nil {
+			return err
+		}
 		if err := s.store.Update(ctx, doc); err != nil {
 			return mapUnique(err)
 		}
 		// Secrets omitted from the request are preserved: the API never returns
 		// stored secret values, so an edit that leaves a secret field blank means
-		// "keep the existing one" rather than "clear it".
-		merged, err := s.mergeSecrets(ctx, in.Id, secs)
+		// "keep the existing one" rather than "clear it". But when the caller
+		// explicitly replaced the Auth/TLS subtree, stale secrets from the
+		// previous config (e.g. a password left behind after switching to
+		// token auth) must not survive the merge.
+		merged, err := s.mergeSecrets(ctx, id, secs, authReplaced, tlsReplaced)
 		if err != nil {
 			return err
 		}
-		return s.vault.Put(ctx, namespace, in.Id, merged)
+		if err := s.vault.Put(ctx, namespace, id, merged); err != nil {
+			return err
+		}
+
+		result = existing
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
-// mergeSecrets overlays the incoming secrets onto the ones already in the vault,
-// so unspecified secret fields retain their stored value on update.
-func (s *Storage) mergeSecrets(ctx context.Context, id string, incoming map[string]string) (map[string]string, error) {
+// secretPrefixes maps the subtrees that can be "explicitly replaced" on update
+// to the vault-key prefix (see the `secret:"..."` tags in entity.go) their
+// secrets live under.
+var secretPrefixes = map[string]string{
+	"auth": "auth.",
+	"tls":  "tls.",
+}
+
+// mergeSecrets overlays the incoming secrets onto the ones already in the
+// vault, so unspecified secret fields retain their stored value on update. When
+// authReplaced/tlsReplaced is set, existing secrets under that subtree's prefix
+// are dropped first: incoming (from the fresh Split of the replaced subtree) is
+// the complete truth for it, not an overlay.
+func (s *Storage) mergeSecrets(
+	ctx context.Context,
+	id string,
+	incoming map[string]string,
+	authReplaced, tlsReplaced bool,
+) (map[string]string, error) {
 	existing, err := s.vault.Get(ctx, namespace, id)
 	if err != nil {
 		return nil, err
 	}
-	if existing == nil {
-		existing = make(map[string]string, len(incoming))
+
+	base := make(map[string]string, len(existing)+len(incoming))
+	for k, v := range existing {
+		if authReplaced && strings.HasPrefix(k, secretPrefixes["auth"]) {
+			continue
+		}
+		if tlsReplaced && strings.HasPrefix(k, secretPrefixes["tls"]) {
+			continue
+		}
+		base[k] = v
 	}
-	maps.Copy(existing, incoming)
-	return existing, nil
+	maps.Copy(base, incoming)
+	return base, nil
 }
 
 func (s *Storage) Get(ctx context.Context, id string, includeDeleted ...bool) (*entities.SavedConnection, error) {

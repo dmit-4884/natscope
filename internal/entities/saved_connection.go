@@ -317,10 +317,13 @@ type SavedConnectionCreate struct {
 }
 
 // SavedConnectionUpdate is the update DTO for a saved connection.
+// Description intentionally lacks nil_on_empty (unlike the Create DTO): an
+// Update DTO must distinguish "field absent" (nil, leave unchanged) from
+// "field present and empty" (non-nil "", explicit clear) — see ApplyUpdate.
 type SavedConnectionUpdate struct {
 	Id          string  `normalize:"trim"`
 	Name        *string `normalize:"trim"`
-	Description *string `normalize:"trim,nil_on_empty"`
+	Description *string `normalize:"trim"`
 	URLs        []string
 	Auth        *AuthConfig
 	TLS         *TlsConfig

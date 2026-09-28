@@ -91,6 +91,18 @@ func TestSplitCredentials(t *testing.T) {
 			urls:     nil,
 			wantURLs: nil,
 		},
+		{
+			name:      "SchemeLessUserPassword",
+			urls:      []string{"bob:s3cr3t@localhost:4222"},
+			wantURLs:  []string{"localhost:4222"},
+			wantCreds: &URLCredentials{Username: "bob", Password: "s3cr3t"},
+		},
+		{
+			name:      "SchemeLessBareToken",
+			urls:      []string{"tok3n@localhost:4222"},
+			wantURLs:  []string{"localhost:4222"},
+			wantCreds: &URLCredentials{Token: "tok3n"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -115,6 +127,19 @@ func TestSplitCredentialsMixed(t *testing.T) {
 	})
 
 	require.ErrorIs(t, err, errs.ErrConnectionURLCredentialsMixed)
+}
+
+// TestSplitCredentialsUnparseableWithUserinfoIsRejected pins the QA-007 fix: a
+// URL that embeds "@" but cannot be parsed (e.g. an invalid percent-escape in
+// the password) must be rejected, not persisted as-is with its plaintext
+// credentials intact.
+func TestSplitCredentialsUnparseableWithUserinfoIsRejected(t *testing.T) {
+	t.Parallel()
+
+	const secret = "s3cr3t-%zz"
+	_, _, err := SplitCredentials([]string{"nats://bob:" + secret + "@h1:4222"})
+
+	require.ErrorIs(t, err, errs.ErrConnectionURLInvalid)
 }
 
 func TestSplitCredentialsDoesNotAliasInput(t *testing.T) {

@@ -6,6 +6,8 @@ package bbolt_test
 import (
 	"errors"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
@@ -68,9 +70,10 @@ func TestTemplates_Update(t *testing.T) {
 	if err := s.Save(ctx, in); err != nil {
 		t.Fatalf("save: %v", err)
 	}
-	in.Name = "renamed"
-	in.Headers = map[string]string{} // clear
-	if err := s.Update(ctx, in); err != nil {
+	if _, err := s.Update(ctx, in.Id, func(existing *entities.MessageTemplate) {
+		existing.Name = "renamed"
+		existing.Headers = map[string]string{} // clear
+	}); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	got, err := s.Get(ctx, in.Id)
@@ -80,8 +83,57 @@ func TestTemplates_Update(t *testing.T) {
 	if got.Name != "renamed" || len(got.Headers) != 0 {
 		t.Fatalf("update not applied: %+v", got)
 	}
-	if err := s.Update(ctx, sample("ghost")); !errors.Is(err, errs.ErrMessageTemplateNotFound) {
+	if _, err := s.Update(ctx, "ghost", func(*entities.MessageTemplate) {}); !errors.Is(err, errs.ErrMessageTemplateNotFound) {
 		t.Fatalf("update missing: want NotFound, got %v", err)
+	}
+}
+
+// TestTemplates_UpdateConcurrentPartialUpdatesDoNotLoseWrites is the QA-044
+// regression: three goroutines each update a different field of the same
+// template, round after round. Since Update now does its read-modify-write
+// inside one bbolt transaction, every round must leave all three fields at
+// that round's value.
+func TestTemplates_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
+	s := newStorage(t)
+	ctx := t.Context()
+	in := sample("t1")
+	if err := s.Save(ctx, in); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	const rounds = 20
+	for r := 1; r <= rounds; r++ {
+		var wg sync.WaitGroup
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, in.Id, func(existing *entities.MessageTemplate) {
+				existing.Subject = "s" + strconv.Itoa(r)
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, in.Id, func(existing *entities.MessageTemplate) {
+				existing.Data = "d" + strconv.Itoa(r)
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			_, _ = s.Update(ctx, in.Id, func(existing *entities.MessageTemplate) {
+				existing.MessageType = "m" + strconv.Itoa(r)
+			})
+		}()
+		wg.Wait()
+
+		got, err := s.Get(ctx, in.Id)
+		if err != nil {
+			t.Fatalf("round %d get: %v", r, err)
+		}
+		wantSubject, wantData, wantType := "s"+strconv.Itoa(r), "d"+strconv.Itoa(r), "m"+strconv.Itoa(r)
+		if got.Subject != wantSubject || got.Data != wantData || got.MessageType != wantType {
+			t.Fatalf("round %d: fields lost, want subject=%q data=%q type=%q got %+v",
+				r, wantSubject, wantData, wantType, got)
+		}
 	}
 }
 

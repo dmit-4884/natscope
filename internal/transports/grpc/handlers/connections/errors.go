@@ -29,6 +29,8 @@ func (h *Handler) StatusErrorConvert(ctx context.Context, err error) error {
 	case errors.Is(err, errs.ErrConnectionURLCredentialsConflict):
 		return grpchelpers.NewStatus(codes.InvalidArgument,
 			"credentials are set both in the server URL and in auth", "CONNECTION_URL_CREDENTIALS_CONFLICT")
+	case errors.Is(err, errs.ErrConnectionURLInvalid):
+		return grpchelpers.NewStatus(codes.InvalidArgument, "server URL is invalid", "CONNECTION_URL_INVALID")
 	}
 	return grpchelpers.StatusErrorConvert(ctx, err)
 }
