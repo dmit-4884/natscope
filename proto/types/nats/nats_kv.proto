@@ -43,6 +43,12 @@ message KVBucketInfo {
 
 // Defines the configuration for creating or updating a NATS JetStream Key-Value bucket.
 message KVBucketConfig {
+  option (buf.validate.message).cel = {
+    id: "kv_bucket_config.mirror_sources_exclusive"
+    message: "mirror and sources are mutually exclusive"
+    expression: "!(has(this.mirror) && size(this.sources) > 0)"
+  };
+
   // Required. Name of the Key-Value bucket.
   string bucket = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true];
 
@@ -55,8 +61,9 @@ message KVBucketConfig {
   // Optional. Maximum total size of the bucket in bytes (-1 for unlimited).
   int64 max_bytes = 4;
 
-  // Optional. Maximum number of history entries kept per key.
-  uint32 history = 5;
+  // Optional. Maximum number of history entries kept per key (1-64; the
+  // server rejects anything above 64).
+  uint32 history = 5 [(buf.validate.field).uint32.lte = 64];
 
   // Optional. Time-to-live for entries (unset for no expiry).
   google.protobuf.Duration ttl = 6;
@@ -91,7 +98,7 @@ message KVEntry {
   // Required. Key of the entry.
   string key = 2 [(google.api.field_behavior) = IDENTIFIER];
 
-  // Required. Value of the entry as a string.
+  // Required. Base64-encoded value of the entry (standard alphabet, padded).
   string value = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Required. Revision number of the entry (monotonically increasing).

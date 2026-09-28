@@ -809,7 +809,9 @@ message PutKVKeyRequest {
   // Required. Name of the key to create or update.
   string key = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
-  // Optional. String value to store for the key. Empty string stores an empty value.
+  // Optional. Base64-encoded value to store for the key (standard alphabet,
+  // padded). Empty string stores an empty value; a non-base64 string is
+  // rejected with invalid_argument rather than stored as literal text.
   string value = 4;
 
   // Optional. Expected revision number for compare-and-swap updates.
