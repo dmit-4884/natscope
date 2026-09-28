@@ -170,9 +170,9 @@ func (s *Service) parseAndSelect(payload []byte, keys []string) (entities.Worksp
 	if err := json.Unmarshal(payload, &file); err != nil || file.Sections == nil {
 		return entities.WorkspaceFile{}, nil, errs.ErrWorkspaceInvalidFile
 	}
-	// A newer-than-this-build file is rejected rather than parsed into a partial
-	// shape.
-	if file.Version > entities.WorkspaceFileVersion {
+	// A newer-than-this-build or negative/zero file version is rejected
+	// rather than parsed into a partial or nonsensical shape.
+	if file.Version < 1 || file.Version > entities.WorkspaceFileVersion {
 		return entities.WorkspaceFile{}, nil, errs.ErrWorkspaceInvalidFile
 	}
 
@@ -183,6 +183,13 @@ func (s *Service) parseAndSelect(payload []byte, keys []string) (entities.Worksp
 		}
 	} else {
 		for _, k := range keys {
+			// An unregistered key is a hard error, matching Export/
+			// selectExportKeys — a typo'd section name must not silently
+			// resolve to an empty report. A registered key simply absent
+			// from this particular file (nothing to import) is not an error.
+			if _, ok := s.sections[k]; !ok {
+				return entities.WorkspaceFile{}, nil, errs.ErrWorkspaceUnknownSection
+			}
 			if _, ok := file.Sections[k]; ok {
 				selected = append(selected, k)
 			}

@@ -142,3 +142,72 @@ func TestWorkspaceRoundtrip(t *testing.T) {
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 	})
 }
+
+// TestWorkspaceImport_DuplicateTemplateNameDeduplicates covers QA-088: two
+// items sharing a name within the same import file used to both hit the
+// Create branch (byName was only seeded from pre-existing rows, never
+// updated as items were created), leaving two rows with the same name.
+func TestWorkspaceImport_DuplicateTemplateNameDeduplicates(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+
+	payload := []byte(`{"version":1,"sections":{"templates":{"version":1,"items":[
+		{"name":"dup-tpl","subject":"s1","data":"a"},
+		{"name":"dup-tpl","subject":"s2","data":"b"}
+	]}}}`)
+
+	importResp, err := env.workspace.ImportWorkspace(ctx, connect.NewRequest(&workspacepb.ImportWorkspaceRequest{
+		Payload:  payload,
+		Strategy: workspacepb.Strategy_STRATEGY_MERGE,
+	}))
+	require.NoError(t, err)
+	require.NotEmpty(t, importResp.Msg.GetResults())
+
+	listResp, err := env.templates.ListTemplates(ctx, connect.NewRequest(&templatespb.ListTemplatesRequest{PageSize: 500}))
+	require.NoError(t, err)
+	count := 0
+	for _, tmpl := range listResp.Msg.GetTemplates() {
+		if tmpl.GetName() == "dup-tpl" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "a duplicate name within one import file must resolve to a single row (last-wins)")
+}
+
+// TestWorkspaceImport_UnknownSectionKeyRejected covers QA-135: Import/Validate
+// used to silently return an empty report for a sectionKey unknown to the
+// server, instead of the WORKSPACE_UNKNOWN_SECTION error Export already gives.
+func TestWorkspaceImport_UnknownSectionKeyRejected(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+
+	payload := []byte(`{"version":1,"sections":{"templates":{"version":1,"items":[]}}}`)
+
+	_, err := env.workspace.ImportWorkspace(ctx, connect.NewRequest(&workspacepb.ImportWorkspaceRequest{
+		Payload:     payload,
+		SectionKeys: []string{"nope"},
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+
+	_, err = env.workspace.ValidateWorkspace(ctx, connect.NewRequest(&workspacepb.ValidateWorkspaceRequest{
+		Payload:     payload,
+		SectionKeys: []string{"nope"},
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+}
+
+// TestWorkspaceValidate_RejectsInvalidVersion covers QA-136: only the upper
+// version bound was checked, so a negative (or zero) file version was
+// silently accepted as valid.
+func TestWorkspaceValidate_RejectsInvalidVersion(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+
+	_, err := env.workspace.ValidateWorkspace(ctx, connect.NewRequest(&workspacepb.ValidateWorkspaceRequest{
+		Payload: []byte(`{"version":-1,"sections":{}}`),
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+}
