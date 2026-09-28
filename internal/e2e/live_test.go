@@ -85,3 +85,64 @@ func TestLiveSubscribe(t *testing.T) {
 	}
 	assert.True(t, found, "the published message must arrive on the live subscription")
 }
+
+// TestLiveEndsWhenConnectionReplaced checks that a session whose pooled
+// connection is dropped ends with a retryable error instead of going silent.
+func TestLiveEndsWhenConnectionReplaced(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := createTestConnection(t, env, "live-replaced", env.natsURL, nil)
+
+	const subject = "live.replaced"
+	_, err := env.management.CreateStream(ctx, connect.NewRequest(&managementpb.CreateStreamRequest{
+		ConnectionId: connID, Name: "LIVE_REPLACED", Subjects: []string{subject},
+	}))
+	require.NoError(t, err)
+
+	subCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	stopPublishing := make(chan struct{})
+	defer close(stopPublishing)
+	go func() {
+		ticker := time.NewTicker(150 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopPublishing:
+				return
+			case <-subCtx.Done():
+				return
+			case <-ticker.C:
+				_, _ = env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
+					ConnectionId: connID, Subject: subject, Data: `{"live":true}`,
+				}))
+			}
+		}
+	}()
+
+	sub, err := env.live.Subscribe(subCtx, connect.NewRequest(&livepb.SubscribeRequest{
+		ConnectionId:  connID,
+		Subscriptions: []*livepb.LiveSubscription{{Subject: subject}},
+	}))
+	require.NoError(t, err)
+	defer sub.Close()
+
+	for sub.Receive() {
+		if sub.Msg().GetBatch() != nil {
+			break
+		}
+	}
+	require.NoError(t, sub.Err())
+
+	_, err = env.connections.UpdateConnection(ctx, connect.NewRequest(&connectionspb.UpdateConnectionRequest{
+		Id: connID, Description: new("replaced"),
+	}))
+	require.NoError(t, err)
+
+	for sub.Receive() {
+	}
+	require.Error(t, sub.Err())
+	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(sub.Err()), "%v", sub.Err())
+	assert.Equal(t, "LIVE_CONNECTION_LOST", errorReason(t, sub.Err()))
+}

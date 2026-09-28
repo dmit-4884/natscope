@@ -104,6 +104,7 @@ var commonDomainErrors = []struct {
 
 	// Live.
 	{errs.ErrLiveConsumerStalled, errorMapping{codes.Aborted, "live consumer stopped reading", "LIVE_CONSUMER_STALLED"}},
+	{errs.ErrLiveConnectionLost, errorMapping{codes.Unavailable, "live connection was closed or replaced", "LIVE_CONNECTION_LOST"}},
 }
 
 // StatusErrorConvert maps cross-cutting errors (common+NATS domain sentinels,

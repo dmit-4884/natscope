@@ -65,6 +65,10 @@ var ErrLiveNoSubscriptions = errors.New("nats: failed to create any live subscri
 // down instead of buffering unbounded data for it.
 var ErrLiveConsumerStalled = errors.New("nats: live consumer stopped reading, closing session")
 
+// ErrLiveConnectionLost the pooled NATS connection behind a live session was
+// closed or replaced; the client should resubscribe.
+var ErrLiveConnectionLost = errors.New("nats: live connection was closed or replaced")
+
 // ErrNATSInvalidArgument is a client-side rejection of a NATS request.
 var ErrNATSInvalidArgument = errors.New("nats: invalid argument")
 

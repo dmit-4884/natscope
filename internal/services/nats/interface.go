@@ -185,6 +185,10 @@ type Subscriber interface {
 		connectionID, streamName, subject, deliverPolicy string,
 		handler entities.MessageHandler,
 	) (entities.Subscription, error)
+
+	// OnDisconnect registers fn to run whenever a pooled connection is closed
+	// or replaced, which silently ends its subscriptions.
+	OnDisconnect(fn func(connectionID string))
 }
 
 // StatsReader reports aggregated stream/consumer statistics and server info.

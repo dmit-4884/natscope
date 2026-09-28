@@ -70,6 +70,18 @@ type sessionState struct {
 	// messagesDropped is incremented by the subscription producer (buffer full)
 	// and the runLoop rate limiter, and read by the runLoop stats emitter.
 	messagesDropped atomic.Int64
+
+	connectionID string
+	lost         chan struct{}
+	lostOnce     sync.Once
+}
+
+func newSessionState(connectionID string) *sessionState {
+	return &sessionState{connectionID: connectionID, lost: make(chan struct{})}
+}
+
+func (sess *sessionState) markLost() {
+	sess.lostOnce.Do(func() { close(sess.lost) })
 }
 
 // New creates a live Service.
@@ -79,12 +91,27 @@ func New(
 	protoService protosvc.Codec,
 	settingsService settingssvc.Service,
 ) *Service {
-	return &Service{
+	s := &Service{
 		natsService:     natsDeps{streamReader, subscriber},
 		protoService:    protoService,
 		settingsService: settingsService,
 		logger:          slog.Default().With(slogx.Module("service:live")),
 		sessions:        make(map[*sessionState]struct{}),
+	}
+	subscriber.OnDisconnect(s.endSessionsFor)
+	return s
+}
+
+// endSessionsFor ends every session subscribed through connectionID, whose
+// subscriptions died with the pooled connection.
+func (s *Service) endSessionsFor(connectionID string) {
+	s.sessionsMu.RLock()
+	defer s.sessionsMu.RUnlock()
+
+	for sess := range s.sessions {
+		if sess.connectionID == connectionID {
+			sess.markLost()
+		}
 	}
 }
 

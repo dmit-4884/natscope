@@ -29,6 +29,7 @@ type Service struct {
 	storage  storage.Storage
 	logger   *slog.Logger
 	resolver atomic.Pointer[natsutil.MappingResolver]
+	onChange atomic.Pointer[func()]
 }
 
 // New creates a new mappings service. Loads existing mappings from storage and
@@ -73,7 +74,7 @@ func (s *Service) Create(
 		slog.String("message_type", in.MessageType),
 		slog.String("source_id", in.SourceID))
 
-	s.rebuildResolver(ctx)
+	s.afterMutation(ctx)
 	return mapping, nil
 }
 
@@ -112,7 +113,7 @@ func (s *Service) Update(
 		return nil, err
 	}
 
-	s.rebuildResolver(ctx)
+	s.afterMutation(ctx)
 	return existing, nil
 }
 
@@ -143,7 +144,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	s.logger.InfoContext(ctx, "mapping deleted",
 		slog.String("id", id))
 
-	s.rebuildResolver(ctx)
+	s.afterMutation(ctx)
 	return nil
 }
 
@@ -194,7 +195,7 @@ func (s *Service) BulkSave(
 		slog.Int("updated", result.Updated),
 		slog.Int("deleted", result.Deleted))
 
-	s.rebuildResolver(ctx)
+	s.afterMutation(ctx)
 	return result, nil
 }
 
@@ -211,6 +212,19 @@ func (s *Service) Resolver(ctx context.Context) *natsutil.MappingResolver {
 	}
 	s.rebuildResolver(ctx)
 	return s.resolver.Load()
+}
+
+// SetOnChangeCallback registers cb to run after every successful mapping
+// mutation.
+func (s *Service) SetOnChangeCallback(cb func()) {
+	s.onChange.Store(&cb)
+}
+
+func (s *Service) afterMutation(ctx context.Context) {
+	s.rebuildResolver(ctx)
+	if cb := s.onChange.Load(); cb != nil {
+		(*cb)()
+	}
 }
 
 // rebuildResolver reloads all mappings and atomically swaps the cached resolver.

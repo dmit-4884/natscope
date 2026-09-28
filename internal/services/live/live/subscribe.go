@@ -26,7 +26,7 @@ func (s *Service) Subscribe(
 	}
 	targets := dedupeSubscriptionTargets(in.Subscriptions)
 
-	sess := &sessionState{}
+	sess := newSessionState(in.ConnectionId)
 	s.registerSession(sess)
 	defer s.unregisterSession(sess)
 

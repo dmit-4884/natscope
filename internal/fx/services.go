@@ -5,6 +5,7 @@ package fx
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/fx"
 
@@ -70,6 +71,16 @@ func ServicesModule() fx.Option {
 		fx.Provide(fx.Annotate(liveService.New, fx.As(new(livesvc.Service)))),
 		fx.Provide(fx.Annotate(publishService.New, fx.As(new(publishsvc.Service)))),
 		fx.Provide(fx.Annotate(messagesService.New, fx.As(new(messagessvc.Service)))),
+
+		// Mapping changes re-initialize live decoders like a proto reload does.
+		fx.Invoke(func(mappingsSvc mappingssvc.Service, liveSvc livesvc.Service) error {
+			ms, ok := mappingsSvc.(*mappingsService.Service)
+			if !ok {
+				return fmt.Errorf("mappings change wiring: Service is %T, want *mappings.Service", mappingsSvc)
+			}
+			ms.SetOnChangeCallback(liveSvc.BroadcastProtoReload)
+			return nil
+		}),
 
 		// Workspace export/import: each domain registers a Section into the
 		// "workspace-sections" group; new domain = implement Section + one line here.

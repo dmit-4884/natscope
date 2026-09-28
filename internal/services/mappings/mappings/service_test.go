@@ -6,6 +6,7 @@ package mappings
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -336,4 +337,26 @@ func TestService_GetAll(t *testing.T) {
 		_, err := svc.GetAll(t.Context())
 		assert.Error(t, err)
 	})
+}
+
+func TestService_OnChangeCallback(t *testing.T) {
+	t.Parallel()
+
+	store := &mockStorage{}
+	svc := New(store)
+	var calls atomic.Int32
+	svc.SetOnChangeCallback(func() { calls.Add(1) })
+
+	_, err := svc.Create(t.Context(), &entities.SubjectMappingCreate{
+		Pattern:     "orders.*",
+		MessageType: "api.v1.Order",
+		SourceID:    "src-1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), calls.Load(), "a mutation must notify")
+
+	_, err = svc.Create(t.Context(), &entities.SubjectMappingCreate{Pattern: "a..b", MessageType: "t", SourceID: "src-1"})
+	require.Error(t, err)
+	svc.Resolver(t.Context())
+	assert.Equal(t, int32(1), calls.Load(), "failed mutations and reads must not notify")
 }

@@ -68,6 +68,11 @@ func (s *Service) SubscribeJetStream(
 	return c.SubscribeJetStream(ctx, streamName, subject, deliverPolicy, handler)
 }
 
+// OnDisconnect registers fn to run whenever the pool drops a connection.
+func (s *Service) OnDisconnect(fn func(connectionID string)) {
+	s.pool.OnDisconnect(fn)
+}
+
 // TestConnection tests a NATS connection without saving it, dialing ad hoc
 // through the pool's dialer.
 func (s *Service) TestConnection(

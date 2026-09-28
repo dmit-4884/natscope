@@ -164,6 +164,10 @@ func (s *Service) runLoop(
 			_ = flush() //nolint:errcheck // best-effort flush during shutdown; peer disconnect is expected
 			return nil
 
+		case <-sess.lost:
+			_ = flush() //nolint:errcheck // best-effort flush before ending the session
+			return errs.ErrLiveConnectionLost
+
 		case <-statsTicker.C:
 			if err := resetDecoderIfDirty(); err != nil {
 				return err
