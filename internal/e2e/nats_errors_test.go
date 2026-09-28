@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
+	messagespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/messages"
 	statspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/stats"
 	streamspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/streams"
 	natstypes "github.com/dmit-4884/natscope/proto/gen/types/nats"
@@ -166,6 +168,26 @@ func TestNATSErrors_ServerErrorClasses(t *testing.T) {
 			assert.Equal(t, tc.wantCode, connect.CodeOf(err), "%v", err)
 		})
 	}
+}
+
+func TestNATSErrors_OversizedSubjectKeepsConnection(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := createTestConnection(t, env, "oversized", env.natsURL, nil)
+
+	_, err := env.streams.ListStreams(ctx, connect.NewRequest(&streamspb.ListStreamsRequest{ConnectionId: connID}))
+	require.NoError(t, err)
+
+	_, err = env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
+		ConnectionId:  connID,
+		StreamName:    "S",
+		SubjectFilter: new(strings.Repeat("a", 5000)),
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "%v", err)
+
+	_, err = env.streams.ListStreams(ctx, connect.NewRequest(&streamspb.ListStreamsRequest{ConnectionId: connID}))
+	require.NoError(t, err, "the shared connection must survive an oversized subject")
 }
 
 func TestNATSErrors_HealthWhileReconnecting(t *testing.T) {

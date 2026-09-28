@@ -23,7 +23,7 @@ func (c *Client) GetMessages(
 	if err := validateNATSNameLength("stream name", streamName); err != nil {
 		return nil, wrapErr(err)
 	}
-	if err := validateNATSNameLength("subject filter", opts.SubjectFilter); err != nil {
+	if err := validateNATSSubjectLength("subject filter", opts.SubjectFilter); err != nil {
 		return nil, wrapErr(err)
 	}
 
@@ -92,7 +92,7 @@ func (c *Client) PublishToStream(
 	data []byte,
 	headers map[string]string,
 ) (*entities.PubAck, error) {
-	if err := validateNATSNameLength("subject", subject); err != nil {
+	if err := validateNATSSubjectLength("subject", subject); err != nil {
 		return nil, wrapErr(err)
 	}
 

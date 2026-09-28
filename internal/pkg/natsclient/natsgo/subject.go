@@ -12,33 +12,39 @@ import (
 	"github.com/dmit-4884/natscope/internal/errs"
 )
 
-// MaxNATSNameLength bounds any stream/consumer name, KV key, object name,
-// filter subject, or publish/live subject natscope embeds into a JetStream
-// API subject or a core NATS PUB control line. nats-server caps a single
-// protocol line at max_control_line (4096 bytes by default); a name anywhere
-// near that blows the limit once wrapped in "PUB <subject> ..." or
-// "$JS.API...<name>", and the server responds by closing the whole shared
-// connection ("maximum control line exceeded") — taking every other request
-// and live subscription on that connection down with it. 255 matches NATS's
-// own documented stream/consumer name limit and leaves a wide safety margin
-// for longer subjects/filters.
-const MaxNATSNameLength = 255
+// Length caps keep user input embedded in a JetStream API subject or a PUB
+// line under nats-server's max_control_line (4096 bytes by default); a longer
+// line makes the server close the whole shared connection.
+const (
+	// MaxNATSNameLength is NATS's own stream/consumer name limit.
+	MaxNATSNameLength = 255
+	// MaxNATSSubjectLength bounds subjects, filters, KV keys and object names.
+	MaxNATSSubjectLength = 1024
+)
 
-// validateNATSNameLength rejects a name/subject/filter longer than
-// MaxNATSNameLength before it is embedded in a JetStream API subject or PUB
-// line. kind identifies the offending field in the returned error.
+// validateNATSNameLength rejects a stream or consumer name longer than
+// MaxNATSNameLength; kind names the field in the error.
 func validateNATSNameLength(kind, value string) error {
-	if len(value) > MaxNATSNameLength {
+	return validateLength(kind, value, MaxNATSNameLength)
+}
+
+// validateNATSSubjectLength rejects a subject, filter, KV key or object name
+// longer than MaxNATSSubjectLength; kind names the field in the error.
+func validateNATSSubjectLength(kind, value string) error {
+	return validateLength(kind, value, MaxNATSSubjectLength)
+}
+
+func validateLength(kind, value string, limit int) error {
+	if len(value) > limit {
 		return &errs.NATSValidationError{
-			Description: fmt.Sprintf("%s exceeds the maximum length of %d characters", kind, MaxNATSNameLength),
+			Description: fmt.Sprintf("%s exceeds the maximum length of %d characters", kind, limit),
 		}
 	}
 	return nil
 }
 
 // validateConsumerRequestLengths checks the stream name, consumer name, and
-// filter subject(s) of a consumer create/update request against
-// MaxNATSNameLength (QA-014).
+// filter subject(s) of a consumer create/update request.
 func validateConsumerRequestLengths(streamName, consumerName, filterSubject string, filterSubjects []string) error {
 	if err := validateNATSNameLength("stream name", streamName); err != nil {
 		return err
@@ -46,11 +52,11 @@ func validateConsumerRequestLengths(streamName, consumerName, filterSubject stri
 	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
 		return err
 	}
-	if err := validateNATSNameLength("filter subject", filterSubject); err != nil {
+	if err := validateNATSSubjectLength("filter subject", filterSubject); err != nil {
 		return err
 	}
 	for _, s := range filterSubjects {
-		if err := validateNATSNameLength("filter subject", s); err != nil {
+		if err := validateNATSSubjectLength("filter subject", s); err != nil {
 			return err
 		}
 	}

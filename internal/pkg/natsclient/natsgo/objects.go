@@ -200,7 +200,7 @@ func (c *Client) ListObjects(ctx context.Context, bucket string) ([]*entities.Ob
 // consistent for links (see QA-072); a link to an entire bucket has no
 // single object to read and is rejected instead.
 func (c *Client) GetObject(ctx context.Context, bucket string, name string) ([]byte, *entities.ObjectInfo, error) {
-	if err := validateNATSNameLength("object name", name); err != nil {
+	if err := validateNATSSubjectLength("object name", name); err != nil {
 		return nil, nil, wrapErr(err)
 	}
 
@@ -282,7 +282,7 @@ func (c *Client) PutObject(
 	meta entities.ObjectMeta,
 	data []byte,
 ) (*entities.ObjectInfo, error) {
-	if err := validateNATSNameLength("object name", meta.Name); err != nil {
+	if err := validateNATSSubjectLength("object name", meta.Name); err != nil {
 		return nil, wrapErr(err)
 	}
 
@@ -325,7 +325,7 @@ func (c *Client) lockObjectPut(bucket, name string) (unlock func()) {
 
 // DeleteObject deletes an object from an Object Store bucket.
 func (c *Client) DeleteObject(ctx context.Context, bucket string, name string) error {
-	if err := validateNATSNameLength("object name", name); err != nil {
+	if err := validateNATSSubjectLength("object name", name); err != nil {
 		return wrapErr(err)
 	}
 

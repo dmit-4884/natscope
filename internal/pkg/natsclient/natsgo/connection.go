@@ -36,7 +36,7 @@ func (c *Client) Subscribe(
 	subject string,
 	handler entities.MessageHandler,
 ) (entities.Subscription, error) {
-	if err := validateNATSNameLength("subject", subject); err != nil {
+	if err := validateNATSSubjectLength("subject", subject); err != nil {
 		return nil, wrapErr(err)
 	}
 
@@ -90,7 +90,7 @@ func (c *Client) SubscribeJetStream(
 	if err := validateNATSNameLength("stream name", streamName); err != nil {
 		return nil, wrapErr(err)
 	}
-	if err := validateNATSNameLength("subject", subject); err != nil {
+	if err := validateNATSSubjectLength("subject", subject); err != nil {
 		return nil, wrapErr(err)
 	}
 

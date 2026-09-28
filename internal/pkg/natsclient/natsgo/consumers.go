@@ -155,12 +155,12 @@ func (c *Client) UpdateConsumer(
 		return nil, wrapErr(err)
 	}
 	if config.FilterSubject != nil {
-		if err := validateNATSNameLength("filter subject", *config.FilterSubject); err != nil {
+		if err := validateNATSSubjectLength("filter subject", *config.FilterSubject); err != nil {
 			return nil, wrapErr(err)
 		}
 	}
 	for _, s := range config.FilterSubjects {
-		if err := validateNATSNameLength("filter subject", s); err != nil {
+		if err := validateNATSSubjectLength("filter subject", s); err != nil {
 			return nil, wrapErr(err)
 		}
 	}
