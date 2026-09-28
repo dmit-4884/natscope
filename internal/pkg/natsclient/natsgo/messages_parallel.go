@@ -56,14 +56,19 @@ func (c *Client) getMessagesParallel(
 		} else {
 			startSeq = info.State.FirstSeq
 		}
+	} else if direction == DefaultDirection {
+		// Backward: clamp a huge/overflowed startSeq down to LastSeq instead of
+		// walking entirely above it and returning an empty page instead of the
+		// newest messages (QA-120).
+		startSeq = min(startSeq, info.State.LastSeq)
 	} else {
-		// Clamp an out-of-range startSeq into the live range instead of walking
-		// entirely below FirstSeq (e.g. after a purge — forward pagination would
-		// query only already-purged sequences, find nothing, and report
-		// hasMore=true with nextSeq=1, looping forever, QA-019) or above LastSeq
-		// (backward with a huge/overflowed startSeq returning an empty page
-		// instead of the newest messages, QA-120).
-		startSeq = min(max(startSeq, info.State.FirstSeq), info.State.LastSeq)
+		// Forward: clamp a startSeq below FirstSeq (e.g. after a purge) up to
+		// FirstSeq instead of walking entirely below it and reporting
+		// hasMore=true with nextSeq=1, looping forever (QA-019). A startSeq
+		// above LastSeq is left alone: buildSequenceList already turns that into
+		// a correctly empty page (e.g. a jump-to-time resolved past the last
+		// message must return nothing, not the last message again).
+		startSeq = max(startSeq, info.State.FirstSeq)
 	}
 
 	t0 := time.Now()
