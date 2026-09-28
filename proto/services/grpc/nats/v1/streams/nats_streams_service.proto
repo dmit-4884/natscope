@@ -18,7 +18,7 @@ service StreamsService {
 // Defines the request message for listing JetStream streams.
 message ListStreamsRequest {
   // Required. Identifier of the NATS connection to query streams from.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 }
 
 // Defines the response message for listing JetStream streams.
@@ -30,7 +30,7 @@ message ListStreamsResponse {
 // Defines the request message for getting a single JetStream stream.
 message GetStreamRequest {
   // Required. Identifier of the NATS connection to query.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the JetStream stream to retrieve.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];

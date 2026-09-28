@@ -41,7 +41,7 @@ message ListMessagesRequest {
   };
 
   // Required. Identifier of the NATS connection to read messages from.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the JetStream stream to read messages from.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -92,7 +92,7 @@ message ListMessagesResponse {
 // Defines the request message for getting a single JetStream message.
 message GetMessageRequest {
   // Required. Identifier of the NATS connection to read the message from.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the JetStream stream containing the message.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];

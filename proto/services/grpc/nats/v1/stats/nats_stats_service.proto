@@ -27,7 +27,7 @@ service StatsService {
 // Defines the request message for retrieving statistics for all streams.
 message GetAllStreamsStatsRequest {
   // Required. Identifier of the NATS connection to query statistics from.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 }
 
 // Defines the response message for retrieving statistics for all streams.
@@ -39,7 +39,7 @@ message GetAllStreamsStatsResponse {
 // Defines the request message for retrieving statistics for a single stream.
 message GetStreamStatsRequest {
   // Required. Identifier of the NATS connection to query.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the JetStream stream to retrieve statistics for.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -54,7 +54,7 @@ message GetStreamStatsResponse {
 // Defines the request message for retrieving all consumer statistics.
 message GetAllConsumersRequest {
   // Required. Identifier of the NATS connection to query consumers from.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 }
 
 // Defines the response message for retrieving all consumer statistics.
@@ -66,7 +66,7 @@ message GetAllConsumersResponse {
 // Defines the request message for checking NATS connection health.
 message GetHealthRequest {
   // Required. Identifier of the NATS connection to check health for.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 }
 
 // Defines the response message for checking NATS connection health.
@@ -78,7 +78,7 @@ message GetHealthResponse {
 // Defines the request message for retrieving NATS server information.
 message GetServerInfoRequest {
   // Required. Identifier of the NATS connection to query server info from.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 }
 
 // Defines the response message for retrieving NATS server information.

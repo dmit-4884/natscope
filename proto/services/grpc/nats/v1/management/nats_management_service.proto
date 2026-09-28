@@ -123,7 +123,7 @@ service ManagementService {
 // Defines the request message for creating a new JetStream stream.
 message CreateStreamRequest {
   // Required. Identifier of the NATS connection to create the stream on.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Unique name for the stream within the JetStream context.
   string name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -236,7 +236,7 @@ message CreateStreamResponse {
 // Defines the request message for updating an existing JetStream stream.
 message UpdateStreamRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream to update.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -316,7 +316,7 @@ message UpdateStreamResponse {
 // Defines the request message for deleting a JetStream stream.
 message DeleteStreamRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream to delete.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -328,7 +328,7 @@ message DeleteStreamResponse {}
 // Defines the request message for purging messages from a JetStream stream.
 message PurgeStreamRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream to purge messages from.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -352,7 +352,7 @@ message PurgeStreamResponse {
 // Defines the request message for sealing a JetStream stream.
 message SealStreamRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream to seal.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -367,7 +367,7 @@ message SealStreamResponse {
 // Defines the request message for deleting a single message from a stream.
 message DeleteMessageRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream the message belongs to.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -439,7 +439,7 @@ message SubjectTransform {
 // Defines the request message for listing consumers on a JetStream stream.
 message ListConsumersRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream whose consumers to list.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -454,7 +454,7 @@ message ListConsumersResponse {
 // Defines the request message for creating a new consumer on a JetStream stream.
 message CreateConsumerRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream to create the consumer on.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -563,7 +563,7 @@ message CreateConsumerResponse {
 // Defines the request message for updating an existing consumer on a JetStream stream.
 message UpdateConsumerRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream the consumer belongs to.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -629,7 +629,7 @@ message UpdateConsumerResponse {
 // Defines the request message for deleting a consumer from a JetStream stream.
 message DeleteConsumerRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream the consumer belongs to.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -644,7 +644,7 @@ message DeleteConsumerResponse {}
 // Defines the request message for pausing a consumer on a JetStream stream.
 message PauseConsumerRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream the consumer belongs to.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -673,7 +673,7 @@ message PauseConsumerResponse {
 // Defines the request message for resuming a paused consumer.
 message ResumeConsumerRequest {
   // Required. Identifier of the NATS connection the stream belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the stream the consumer belongs to.
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -695,7 +695,7 @@ message ResumeConsumerResponse {
 // Defines the request message for listing all KeyValue buckets.
 message ListKVBucketsRequest {
   // Required. Identifier of the NATS connection to list KeyValue buckets from.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 }
 
 // Defines the response message for listing all KeyValue buckets.
@@ -707,7 +707,7 @@ message ListKVBucketsResponse {
 // Defines the request message for creating a new KeyValue bucket.
 message CreateKVBucketRequest {
   // Required. Identifier of the NATS connection to create the bucket on.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Configuration for the new KeyValue bucket including name, TTL, and storage settings.
   .natscope.types.nats.KVBucketConfig config = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true];
@@ -722,7 +722,7 @@ message CreateKVBucketResponse {
 // Defines the request message for retrieving a specific KeyValue bucket.
 message GetKVBucketRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the KeyValue bucket to retrieve.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -737,7 +737,7 @@ message GetKVBucketResponse {
 // Defines the request message for deleting a KeyValue bucket.
 message DeleteKVBucketRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the KeyValue bucket to delete.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -749,7 +749,7 @@ message DeleteKVBucketResponse {}
 // Defines the request message for listing all keys in a KeyValue bucket.
 message ListKVKeysRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the KeyValue bucket to list keys from.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -764,7 +764,7 @@ message ListKVKeysResponse {
 // Defines the request message for retrieving a specific key from a KeyValue bucket.
 message GetKVKeyRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the KeyValue bucket containing the key.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -782,7 +782,7 @@ message GetKVKeyResponse {
 // Defines the request message for retrieving a key's revision history.
 message GetKVKeyHistoryRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the KeyValue bucket containing the key.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -801,7 +801,7 @@ message GetKVKeyHistoryResponse {
 // Defines the request message for creating or updating a key-value entry.
 message PutKVKeyRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the KeyValue bucket to store the entry in.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -828,7 +828,7 @@ message PutKVKeyResponse {
 // Defines the request message for deleting a key from a KeyValue bucket.
 message DeleteKVKeyRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the KeyValue bucket containing the key.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -843,7 +843,7 @@ message DeleteKVKeyResponse {}
 // Defines the request message for purging all revisions of a key from a KeyValue bucket.
 message PurgeKVKeyRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the KeyValue bucket containing the key.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -862,7 +862,7 @@ message PurgeKVKeyResponse {}
 // Defines the request message for listing all Object Store buckets.
 message ListObjectBucketsRequest {
   // Required. Identifier of the NATS connection to list Object Store buckets from.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 }
 
 // Defines the response message for listing all Object Store buckets.
@@ -874,7 +874,7 @@ message ListObjectBucketsResponse {
 // Defines the request message for creating a new Object Store bucket.
 message CreateObjectBucketRequest {
   // Required. Identifier of the NATS connection to create the bucket on.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Configuration for the new Object Store bucket including name and storage settings.
   .natscope.types.nats.ObjectBucketConfig config = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true];
@@ -889,7 +889,7 @@ message CreateObjectBucketResponse {
 // Defines the request message for retrieving a specific Object Store bucket.
 message GetObjectBucketRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the Object Store bucket to retrieve.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -904,7 +904,7 @@ message GetObjectBucketResponse {
 // Defines the request message for deleting an Object Store bucket.
 message DeleteObjectBucketRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the Object Store bucket to delete.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -916,7 +916,7 @@ message DeleteObjectBucketResponse {}
 // Defines the request message for sealing an Object Store bucket.
 message SealObjectBucketRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the Object Store bucket to seal.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -928,7 +928,7 @@ message SealObjectBucketResponse {}
 // Defines the request message for listing all objects in an Object Store bucket.
 message ListObjectsRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the Object Store bucket to list objects from.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -943,7 +943,7 @@ message ListObjectsResponse {
 // Defines the request message for retrieving an object from an Object Store bucket.
 message GetObjectRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the Object Store bucket containing the object.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -964,7 +964,7 @@ message GetObjectResponse {
 // Defines the request message for creating or updating an object in an Object Store bucket.
 message PutObjectRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the Object Store bucket to store the object in.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
@@ -991,7 +991,7 @@ message PutObjectResponse {
 // Defines the request message for deleting an object from an Object Store bucket.
 message DeleteObjectRequest {
   // Required. Identifier of the NATS connection the bucket belongs to.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name of the Object Store bucket containing the object.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];

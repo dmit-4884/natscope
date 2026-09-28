@@ -15,7 +15,7 @@ service LiveService {
 // Defines the request message for subscribing to live NATS messages.
 message SubscribeRequest {
   // Required. Identifier of the NATS connection to subscribe through.
-  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. List of subscriptions to activate. At least one subscription must be provided.
   // Capped so a single request cannot open an unbounded number of NATS
