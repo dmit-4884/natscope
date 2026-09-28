@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -129,6 +130,9 @@ func (srv *App) ensureServiceDirs() error {
 	mkErr := appinfo.MakeAllDirs()
 	if mkErr == nil {
 		return nil
+	}
+	if pathErr, ok := stderrors.AsType[*fs.PathError](mkErr); ok {
+		mkErr = pathErr
 	}
 
 	if appinfo.GetEnvVar("LIB_DIR") != "" || appinfo.GetEnvVar("VAR_DIR") != "" {

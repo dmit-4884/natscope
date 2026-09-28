@@ -42,8 +42,7 @@ func describeOpenError(err error, path string) error {
 	switch {
 	case errors.Is(err, berrors.ErrTimeout):
 		return fmt.Errorf(
-			"database file %s is locked — is another natscope instance already running? "+
-				"Stop it (or remove a stale lock left by a killed process) and try again: %w",
+			"database file %s is locked by another running natscope instance; stop it and try again: %w",
 			path, err)
 	case errors.Is(err, berrors.ErrInvalid),
 		errors.Is(err, berrors.ErrVersionMismatch),
@@ -51,7 +50,7 @@ func describeOpenError(err error, path string) error {
 		return fmt.Errorf(
 			"database file %s appears to be corrupted: %w. "+
 				"Move the file aside to start fresh — saved connections, proto sources "+
-				"and settings will be lost (secrets stay in the OS keychain)",
+				"and settings will be lost (secrets are kept separately and survive)",
 			path, err)
 	default:
 		return fmt.Errorf("open bbolt database %s: %w", path, err)
