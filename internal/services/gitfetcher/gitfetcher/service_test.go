@@ -4,6 +4,8 @@
 package gitfetcher
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 )
 
 func entryPathsGF(in []entities.ProtoFileEntry) []string {
@@ -237,6 +240,42 @@ func TestValidateRepository_NonExistent(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestValidateRepository_DoesNotLeakResponseBody is the QA-027 regression: a
+// non-git HTTP server's response body (e.g. an internal service's banner)
+// must never appear in the error returned to the (unauthenticated) caller.
+func TestValidateRepository_DoesNotLeakResponseBody(t *testing.T) {
+	t.Parallel()
+	const secretBanner = "server_id=SECRET-BANNER-7f3a xkey=leaked-key"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(secretBanner))
+	}))
+	defer srv.Close()
+
+	svc := New()
+	err := svc.ValidateRepository(t.Context(), srv.URL)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), secretBanner)
+	assert.NotContains(t, err.Error(), "SECRET-BANNER")
+}
+
+// TestListTags_DoesNotLeakResponseBody covers the same oracle on ListTags.
+func TestListTags_DoesNotLeakResponseBody(t *testing.T) {
+	t.Parallel()
+	const secretBanner = "server_id=SECRET-BANNER-7f3a xkey=leaked-key"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(secretBanner))
+	}))
+	defer srv.Close()
+
+	svc := New()
+	_, err := svc.ListTags(t.Context(), srv.URL)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), secretBanner)
+	assert.NotContains(t, err.Error(), "SECRET-BANNER")
+}
+
 func TestFetchVersion_LoadsProtoFile(t *testing.T) {
 	t.Parallel()
 	repoURL := makeRepo(t, []string{"v1.0.0"})
@@ -257,6 +296,8 @@ func TestFetchVersion_UnknownTag(t *testing.T) {
 
 	_, err := svc.FetchVersion(t.Context(), repoURL, "v2.0.0")
 	require.Error(t, err)
+	// QA-075: an unknown tag must classify as not-found, not internal.
+	assert.ErrorIs(t, err, errs.ErrProtoVersionNotFound)
 }
 
 func TestFetchVersion_SkipsLargeProtoFile(t *testing.T) {

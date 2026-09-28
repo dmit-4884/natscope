@@ -5,6 +5,7 @@ package gitfetcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -15,9 +16,8 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
-
-	"github.com/altessa-s/go-atlas/core/errors"
 
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
@@ -25,6 +25,7 @@ import (
 	"golang.org/x/mod/semver"
 
 	corecontext "github.com/altessa-s/go-atlas/core/context"
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	gitfetchersvc "github.com/dmit-4884/natscope/internal/services/gitfetcher"
 	gitconfig "github.com/go-git/go-git/v5/config"
@@ -84,9 +85,8 @@ func (s *Service) ListTags(ctx context.Context, repositoryURL string) ([]string,
 		Auth: auth,
 	})
 	if err != nil {
-		err = scrubURLErr(err)
-		s.logger.Error("ls-remote failed", slog.String("error", err.Error()))
-		return nil, errors.WrapOperation(err, "list remote refs")
+		s.logger.Error("ls-remote failed", slog.String("url", maskURL(repositoryURL)), slogx.Error(err))
+		return nil, fmt.Errorf("list remote refs: %s", classifyGitErr(err))
 	}
 	s.logger.Debug("ls-remote completed", slog.Int("refs_count", len(refs)))
 
@@ -124,7 +124,7 @@ func (s *Service) FetchVersion(ctx context.Context, repositoryURL, tag string) (
 	// Create temp directory for cloning
 	tempDir, err := os.MkdirTemp(s.tempDir, TempDirPrefix)
 	if err != nil {
-		return nil, errors.WrapOperation(err, "create temp dir")
+		return nil, coreerrs.WrapOperation(err, "create temp dir")
 	}
 	defer os.RemoveAll(tempDir)
 
@@ -143,12 +143,17 @@ func (s *Service) FetchVersion(ctx context.Context, repositoryURL, tag string) (
 		Tags:          git.NoTags,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(scrubURLErr(err), "failed to clone repository at tag %s", tag)
+		s.logger.Error("clone failed",
+			slog.String("url", maskURL(repositoryURL)), slog.String("tag", tag), slogx.Error(err))
+		if errors.Is(err, plumbing.ErrReferenceNotFound) || errors.Is(err, git.NoMatchingRefSpecError{}) {
+			return nil, fmt.Errorf("%w: tag %q", errs.ErrProtoVersionNotFound, tag)
+		}
+		return nil, fmt.Errorf("clone repository at tag %q: %s", tag, classifyGitErr(err))
 	}
 
 	walk, err := protoutils.WalkProtoTree(tempDir, protoutils.WalkOptions{CollectConfigs: true, MaxFileSize: MaxFileSize})
 	if err != nil {
-		return nil, errors.WrapOperation(err, "walk repository")
+		return nil, coreerrs.WrapOperation(err, "walk repository")
 	}
 	for _, sk := range walk.Skipped {
 		s.logger.Warn("fetch: skipped repository entry",
@@ -180,7 +185,7 @@ func (s *Service) ValidateRepository(ctx context.Context, repositoryURL string) 
 	// Create temp directory
 	tempDir, err := os.MkdirTemp(s.tempDir, TempDirPrefix)
 	if err != nil {
-		return errors.WrapOperation(err, "create temp dir")
+		return coreerrs.WrapOperation(err, "create temp dir")
 	}
 	defer os.RemoveAll(tempDir)
 
@@ -194,7 +199,8 @@ func (s *Service) ValidateRepository(ctx context.Context, repositoryURL string) 
 		Tags:       git.NoTags,
 	})
 	if err != nil {
-		return errors.Wrap(scrubURLErr(err), "repository not accessible")
+		s.logger.Error("validate repository failed", slog.String("url", maskURL(repositoryURL)), slogx.Error(err))
+		return fmt.Errorf("repository not accessible: %s", classifyGitErr(err))
 	}
 
 	return nil
@@ -316,13 +322,28 @@ func maskQueryValue(s, key string) string {
 	return out
 }
 
-// scrubURLErr masks embedded credentials in an error message. Drops the chain:
-// go-git errors carry no sentinel to match and only their text leaks the token.
-func scrubURLErr(err error) error {
-	if err == nil {
-		return nil
+// classifyGitErr turns a git transport error into one of a small set of
+// fixed, bounded messages — never the underlying err.Error() text. go-git's
+// HTTP transport embeds the target server's raw response body (unbounded)
+// into errors for several status codes; when repositoryURL points at
+// something other than a git server, that body is echoed back verbatim to an
+// unauthenticated caller (SSRF response-body oracle — e.g. a NATS server's
+// INFO banner). The full error is only ever logged server-side, never
+// returned. Classification uses errors.Is against go-git's own sentinels, so
+// it survives wrapping even though the message text is discarded.
+func classifyGitErr(err error) string {
+	switch {
+	case errors.Is(err, transport.ErrRepositoryNotFound):
+		return "repository not found"
+	case errors.Is(err, transport.ErrEmptyRemoteRepository):
+		return "remote repository is empty"
+	case errors.Is(err, transport.ErrAuthenticationRequired), errors.Is(err, transport.ErrAuthorizationFailed):
+		return "authentication required or access denied"
+	case errors.Is(err, plumbing.ErrReferenceNotFound), errors.Is(err, git.NoMatchingRefSpecError{}):
+		return "tag or reference not found"
+	default:
+		return "repository not accessible or not a git server"
 	}
-	return fmt.Errorf("%s", maskURL(err.Error()))
 }
 
 // compareSemVer compares tags via x/mod/semver (-1/0/1). Semver tags rank above
