@@ -55,9 +55,18 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   NATS_OBJECT_NOT_FOUND: 'Object not found',
   NATS_OBJECT_EXISTS: 'Object already exists',
   NATS_NO_OBJECTS: 'No objects found',
+  NATS_STREAM_PURGE_DENIED: 'Purging is disabled on this stream',
+  NATS_BUCKET_TYPE_MISMATCH: 'This stream is not a KV or Object Store bucket',
+  NATS_OBJECT_BUCKET_CAPACITY_EXCEEDED: "The object does not fit within the bucket's size limit",
+  NATS_OBJECT_TOO_LARGE: 'The object is too large to download here',
+  NATS_OBJECT_LINK_TO_BUCKET: 'This entry links to a whole bucket, not a single object',
+  LIVE_CONNECTION_LOST: 'The NATS connection was replaced; reconnecting the live stream',
+  LIVE_CONSUMER_STALLED: 'The live stream stopped because the page stopped reading it',
   // Connections
   CONNECTION_NOT_FOUND: 'Connection not found',
   CONNECTION_NAME_ALREADY_IN_USE: 'Connection name already in use',
+  CONNECTION_NAME_REQUIRED: 'Connection name is required',
+  CONNECTION_URL_INVALID: 'A server URL is invalid',
   CONNECTION_URL_CREDENTIALS_MIXED:
     'Server URLs embed different credentials — use one set, or move them to the auth fields',
   CONNECTION_URL_CREDENTIALS_CONFLICT:
@@ -81,8 +90,12 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   MAPPING_SOURCE_ID_REQUIRED: 'Mapping source is required',
   MAPPING_SELECTION_MISSING: 'Mapping selection is missing',
   MAPPING_DESCRIPTOR_MISSING: 'Mapping descriptor is missing',
+  MAPPING_PATTERN_REQUIRED: 'Subject pattern is required',
+  MAPPING_MESSAGE_TYPE_REQUIRED: 'Message type is required',
+  MAPPING_DUPLICATE_IN_BATCH: 'The same pattern and source appear more than once',
   // Templates, settings, live, workspace
   MESSAGE_TEMPLATE_NOT_FOUND: 'Message template not found',
+  MESSAGE_TEMPLATE_NAME_REQUIRED: 'Template name is required',
   SETTINGS_NOT_FOUND: 'Settings not found',
   LIVE_NO_SUBSCRIPTIONS: 'No live subscriptions could be created',
   WORKSPACE_INVALID_FILE: 'Invalid workspace file',
