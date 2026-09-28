@@ -1,4 +1,4 @@
-import { Button, Badge, Spinner, EmptyState, SearchInput, PlusIcon, RefreshIcon, UsersIcon } from '@/components/ui'
+import { Button, Badge, Spinner, EmptyState, QueryErrorState, SearchInput, PlusIcon, RefreshIcon, UsersIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import { plural } from '@/utils/plural'
 import type { ConsumerInfo } from '@/types/nats'
@@ -12,6 +12,7 @@ interface Props {
   onSearchChange: (value: string) => void
   isLoading: boolean
   isFetching: boolean
+  error?: unknown
   onRefetch: () => void
   onSelect: (consumer: ConsumerInfo) => void
   onCreate: () => void
@@ -24,6 +25,7 @@ export function ConsumerList({
   onSearchChange,
   isLoading,
   isFetching,
+  error,
   onRefetch,
   onSelect,
   onCreate,
@@ -64,6 +66,8 @@ export function ConsumerList({
           <div className="flex items-center justify-center p-4">
             <Spinner size="sm" />
           </div>
+        ) : error ? (
+          <QueryErrorState error={error} onRetry={onRefetch} />
         ) : (
           filtered.map((consumer) => (
             <button
@@ -109,7 +113,7 @@ export function ConsumerList({
           ))
         )}
 
-        {!isLoading && filtered.length === 0 && (
+        {!isLoading && !error && filtered.length === 0 && (
           <EmptyState
             size="sm"
             icon={CONSUMER_ICON}

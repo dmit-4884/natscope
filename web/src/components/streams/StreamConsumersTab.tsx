@@ -32,7 +32,7 @@ export default function StreamConsumersTab() {
   const [showDiffModal, setShowDiffModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ConsumerConfirmAction | null>(null)
 
-  const { data: consumers = [], isLoading, refetch, isFetching } = useConsumers(connectionId, streamName)
+  const { data: consumers = [], isLoading, error: consumersError, refetch, isFetching } = useConsumers(connectionId, streamName)
 
   const createConsumer = useCreateConsumer(connectionId, streamName)
   const updateConsumer = useUpdateConsumer(connectionId, streamName)
@@ -141,7 +141,7 @@ export default function StreamConsumersTab() {
       }
     } else if (confirmAction.type === 'pause') {
       const pauseUntil = new Date()
-      pauseUntil.setMinutes(pauseUntil.getMinutes() + (confirmAction.pauseMinutes || 5))
+      pauseUntil.setMinutes(pauseUntil.getMinutes() + (confirmAction.pauseMinutes ?? 5))
       try {
         await pauseConsumer.mutateAsync({
           name: confirmAction.consumer.name,
@@ -171,6 +171,7 @@ export default function StreamConsumersTab() {
         onSearchChange={(q) => setEditorState({ searchQuery: q })}
         isLoading={isLoading}
         isFetching={isFetching}
+        error={consumersError}
         onRefetch={() => refetch()}
         onSelect={(consumer) => {
           setEditorState({

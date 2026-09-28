@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { usePublishHistory, type PublishHistoryEntry } from '@/contexts/messages'
 import JsonTreeViewer from '@/components/messages/JsonTreeViewer'
-import { CopyIcon, SearchIcon } from '@/components/ui'
+import { CopyIcon, QueryErrorState, SearchIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import { formatBytes, formatMonthDay, formatTime } from '@/utils/formatters'
 import { toast } from '@/utils/toast'
@@ -106,7 +106,7 @@ export default function PublishHistory({ streamName, connectionId, connectionUrl
     }
   }, [streamName])
 
-  const { data: history = [], isLoading } = usePublishHistory(connectionId, connectionUrl || undefined, {
+  const { data: history = [], isLoading, error, refetch } = usePublishHistory(connectionId, connectionUrl || undefined, {
     pageSize: HISTORY_PAGE_SIZE,
   })
 
@@ -214,6 +214,8 @@ export default function PublishHistory({ streamName, connectionId, connectionUrl
       <div className="flex-1 overflow-auto min-h-0">
         {isLoading ? (
           <div className="p-4 text-center text-content-tertiary text-sm">Loading...</div>
+        ) : error ? (
+          <QueryErrorState error={error} onRetry={() => void refetch()} />
         ) : filteredHistory.length === 0 ? (
           <div className="p-4 text-center text-content-tertiary text-sm">
             {searchTerm ? 'No matching entries' : 'No publish history yet'}

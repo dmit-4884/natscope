@@ -16,7 +16,7 @@ import { toast } from '@/utils/toast'
 import { plural } from '@/utils/plural'
 import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { useConfirmation } from '@/contexts/settings'
-import { Button, Modal, Input, Badge, Alert, Spinner, JsonEditor, CloseIcon, Tabs, tabPanelProps, OverflowMenu } from '@/components/ui'
+import { Button, Modal, Input, Badge, Alert, QueryErrorState, Spinner, JsonEditor, CloseIcon, Tabs, tabPanelProps, OverflowMenu } from '@/components/ui'
 import type { ConnectionOutletContext } from '@/components/common/ConnectedLayout'
 import Tooltip from '@/components/common/Tooltip'
 import { ObjectBucketFormFields } from './ObjectBucketFormFields'
@@ -59,10 +59,12 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
     : null
 
   // Fetch objects for selected bucket
-  const { data: objects = [], isLoading: objectsLoading, refetch: refetchObjects } = useObjects(
-    connectionId,
-    bucketName
-  )
+  const {
+    data: objects = [],
+    isLoading: objectsLoading,
+    error: objectsError,
+    refetch: refetchObjects,
+  } = useObjects(connectionId, bucketName)
 
   // Fetch selected object data
   const { data: objectData, isLoading: objectLoading } = useObject(
@@ -349,6 +351,8 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
               <div className="flex items-center justify-center p-4">
                 <Spinner size="sm" />
               </div>
+            ) : objectsError ? (
+              <QueryErrorState error={objectsError} onRetry={() => void refetchObjects()} />
             ) : (
               <>
                 {filteredObjects.map((obj: ObjectInfo) => (

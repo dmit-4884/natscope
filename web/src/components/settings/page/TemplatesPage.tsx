@@ -9,8 +9,10 @@ import {
   DataTable,
   DestructiveConfirm,
   EmptyState,
+  QueryErrorState,
   RowActionButton,
   SearchInput,
+  SkeletonRows,
   DocumentIcon,
   type DataTableColumn,
 } from '@/components/ui'
@@ -50,7 +52,7 @@ function headerCount(h?: Record<string, string>): number {
 }
 
 export default function TemplatesPage() {
-  const { data: templates = [], isFetched: templatesLoaded } = useTemplates()
+  const { data: templates = [], isFetched: templatesLoaded, isLoading, error, refetch } = useTemplates()
   const createMutation = useCreateTemplate()
   const updateMutation = useUpdateTemplate()
   const deleteMutation = useDeleteTemplate()
@@ -279,7 +281,11 @@ export default function TemplatesPage() {
     {
       key: 'name',
       header: 'Name',
-      render: (t) => <span className="font-medium text-gray-800">{t.name}</span>,
+      render: (t) => (
+        <span className="block font-medium text-gray-800 truncate max-w-[240px]" title={t.name}>
+          {t.name}
+        </span>
+      ),
     },
     {
       key: 'subject',
@@ -360,7 +366,11 @@ export default function TemplatesPage() {
       </div>
 
       <div className="flex-1 overflow-auto rounded-lg border border-border bg-surface-primary">
-        {total === 0 ? (
+        {isLoading ? (
+          <SkeletonRows className="p-4" />
+        ) : error ? (
+          <QueryErrorState error={error} onRetry={() => void refetch()} />
+        ) : total === 0 ? (
           <TemplatesEmptyState onCreate={() => setModal({ kind: 'create', initial: {} })} />
         ) : visible === 0 ? (
           <EmptyState

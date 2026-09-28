@@ -7,7 +7,7 @@ import {
   useProtoMessageEntities,
   groupMessagesByPackage,
 } from '@/contexts/proto'
-import { Spinner, Button, EmptyState } from '@/components/ui'
+import { Spinner, Button, EmptyState, QueryErrorState } from '@/components/ui'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import type { ProtoSource } from '@/api/protoSources'
 import ProtoSourceCard from './ProtoSourceCard'
@@ -45,7 +45,7 @@ export default function ProtoManager() {
   const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set())
   const [messagesExpanded, setMessagesExpanded] = useState(false)
 
-  const { data: sources = [], isLoading: isLoadingSources } = useProtoSources()
+  const { data: sources = [], isLoading: isLoadingSources, error: sourcesError, refetch: refetchSources } = useProtoSources()
   const { data: selections = [], isLoading: isLoadingSelections } = useProtoSelections()
   const { messages, packages, isLoading: isLoadingMessages } = useProtoMessageEntities()
 
@@ -113,6 +113,8 @@ export default function ProtoManager() {
             <Spinner size="sm" />
             <span>Loading repositories...</span>
           </div>
+        ) : sourcesError ? (
+          <QueryErrorState error={sourcesError} onRetry={() => void refetchSources()} />
         ) : sources.length > 0 ? (
           <div className="space-y-3">
             {sources.map((source) => (

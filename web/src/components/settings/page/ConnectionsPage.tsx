@@ -4,7 +4,18 @@ import { toast } from '@/utils/toast'
 import { mapWithLimit } from '@/utils/async'
 import { plural } from '@/utils/plural'
 import { getErrorMessage, stripErrorCodePrefix } from '@/api/errors'
-import { Button, DestructiveConfirm, EmptyState, RefreshIcon, PlusIcon, UploadIcon, DownloadIcon, BoltIcon } from '@/components/ui'
+import {
+  Button,
+  DestructiveConfirm,
+  EmptyState,
+  QueryErrorState,
+  RefreshIcon,
+  PlusIcon,
+  SkeletonRows,
+  UploadIcon,
+  DownloadIcon,
+  BoltIcon,
+} from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import type { SavedConnection } from '@/api/connections'
 import {
@@ -27,7 +38,7 @@ export default function ConnectionsPage() {
   const ctx = useOutletContext<ConnectionOutletContext | undefined>()
   const activeConnectionId = ctx?.currentConnection?.id
 
-  const { data: connections = [] } = useConnections()
+  const { data: connections = [], isLoading: connectionsLoading, error: connectionsError, refetch: refetchConnections } = useConnections()
   const createConnectionMutation = useCreateConnection()
   const deleteConnectionMutation = useDeleteConnection()
   const duplicateConnectionMutation = useDuplicateConnection()
@@ -184,7 +195,11 @@ export default function ConnectionsPage() {
         </>
       }
     >
-      {connections.length === 0 ? (
+      {connectionsLoading ? (
+        <SkeletonRows className="p-4" />
+      ) : connectionsError ? (
+        <QueryErrorState error={connectionsError} onRetry={() => void refetchConnections()} />
+      ) : connections.length === 0 ? (
         <EmptyState
           icon={<BoltIcon className="w-full h-full" />}
           title="No saved connections yet"

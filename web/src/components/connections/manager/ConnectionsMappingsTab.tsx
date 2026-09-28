@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Button, Dropdown, SearchInput, DestructiveConfirm, PlusIcon } from '@/components/ui'
+import { Button, Dropdown, SearchInput, DestructiveConfirm, PlusIcon, QueryErrorState, SkeletonRows } from '@/components/ui'
 import { toast } from '@/utils/toast'
 import { useStreamEntities } from '@/contexts/streams'
 import {
@@ -37,7 +37,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
   const createMappingMutation = useCreateMapping()
   const deleteMappingMutation = useDeleteMapping()
   const updateMappingMutation = useUpdateMapping()
-  const { data: items = [] } = useMappingItems()
+  const { data: items = [], isLoading: itemsLoading, error: itemsError, refetch: refetchItems } = useMappingItems()
   const { data: sources = [] } = useProtoSources()
   const { streams } = useStreamEntities(connectionId)
 
@@ -201,15 +201,21 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
       )}
 
       <div className="flex-1 overflow-auto rounded-lg border border-border bg-surface-primary">
-        <MappingTable
-          items={visibleItems}
-          healthById={healthById}
-          sourceNamesById={sourceNamesById}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onAdd={showAddForm ? undefined : () => setShowAddForm(true)}
-          searchFilter={searchFilter}
-        />
+        {itemsLoading ? (
+          <SkeletonRows className="p-4" />
+        ) : itemsError ? (
+          <QueryErrorState error={itemsError} onRetry={() => void refetchItems()} />
+        ) : (
+          <MappingTable
+            items={visibleItems}
+            healthById={healthById}
+            sourceNamesById={sourceNamesById}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onAdd={showAddForm ? undefined : () => setShowAddForm(true)}
+            searchFilter={searchFilter}
+          />
+        )}
       </div>
 
       <DestructiveConfirm
