@@ -4,6 +4,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	settingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/settings/v1/settings"
 	templatespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/templates/v1/templates"
 	workspacepb "github.com/dmit-4884/natscope/proto/gen/services/grpc/workspace/v1/workspace"
+	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
 	settingstypes "github.com/dmit-4884/natscope/proto/gen/types/settings"
 )
 
@@ -264,9 +266,47 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
+			// QA-128: NUL/BEL control characters in the name must be rejected,
+			// not written verbatim to logs.
+			"sources.CreateSource name with control characters",
+			func() error {
+				_, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
+					Name:       "a\u0007\u0000b",
+					SourceType: protopb.SourceType_SOURCE_TYPE_GIT,
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		{
+			// QA-128: no upper bound on name length previously.
+			"sources.CreateSource name too long",
+			func() error {
+				_, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
+					Name:       strings.Repeat("n", 300),
+					SourceType: protopb.SourceType_SOURCE_TYPE_GIT,
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		{
 			"sources.GetSource non-uuid id",
 			func() error {
 				_, err := env.sources.GetSource(ctx, connect.NewRequest(&sourcespb.GetSourceRequest{Id: "nope"}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		{
+			// QA-128: an unrecognized source_type number must not silently
+			// become git.
+			"sources.CreateSource unknown source_type",
+			func() error {
+				_, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
+					Name:       "qa-128-unknown-type",
+					SourceType: protopb.SourceType(99),
+				}))
 				return err
 			},
 			connect.CodeInvalidArgument,

@@ -59,8 +59,15 @@ service SourcesService {
 // --- Create ---
 
 message CreateSourceRequest {
-  // Required. Human-readable display name.
-  string name = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+  // Required. Human-readable display name. No control characters (the name is
+  // written to logs verbatim); capped well below any storage/UI limit.
+  string name = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 200,
+    (buf.validate.field).string.pattern = "^[^\\x00-\\x1f\\x7f]+$",
+    (google.api.field_behavior) = REQUIRED
+  ];
 
   // Required. Source type.
   .natscope.types.proto.SourceType source_type = 2 [(buf.validate.field).required = true, (google.api.field_behavior) = REQUIRED];
@@ -128,7 +135,12 @@ message ListSourcesResponse {
 
 message UpdateSourceRequest {
   string id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
-  optional string name = 2;
+  // Optional. New display name, same constraints as CreateSourceRequest.name.
+  optional string name = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 200,
+    (buf.validate.field).string.pattern = "^[^\\x00-\\x1f\\x7f]+$"
+  ];
   optional string repository = 3;
   optional string token = 4;
   optional string local_path = 5;

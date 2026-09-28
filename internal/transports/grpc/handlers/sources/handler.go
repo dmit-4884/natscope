@@ -5,6 +5,7 @@ package sources
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"connectrpc.com/connect"
@@ -14,6 +15,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
 
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
@@ -60,14 +62,19 @@ func sourceTypeToProto(st entities.SourceType) protopb.SourceType {
 	}
 }
 
-func sourceTypeFromProto(st protopb.SourceType) entities.SourceType {
+// sourceTypeFromProto maps a wire SourceType to the domain type. ok is false
+// for SOURCE_TYPE_UNSPECIFIED or any unrecognized enum number (QA-128): an
+// unknown value must be rejected, not silently treated as git.
+func sourceTypeFromProto(st protopb.SourceType) (_ entities.SourceType, ok bool) {
 	switch st {
+	case protopb.SourceType_SOURCE_TYPE_GIT:
+		return entities.SourceTypeGit, true
 	case protopb.SourceType_SOURCE_TYPE_LOCAL:
-		return entities.SourceTypeLocal
+		return entities.SourceTypeLocal, true
 	case protopb.SourceType_SOURCE_TYPE_FILES:
-		return entities.SourceTypeFiles
+		return entities.SourceTypeFiles, true
 	default:
-		return entities.SourceTypeGit
+		return "", false
 	}
 }
 
@@ -85,10 +92,14 @@ func (h *Handler) CreateSource(
 	req *connect.Request[sourcespb.CreateSourceRequest],
 ) (*connect.Response[sourcespb.CreateSourceResponse], error) {
 	in := req.Msg
+	sourceType, ok := sourceTypeFromProto(in.SourceType)
+	if !ok {
+		return nil, fmt.Errorf("%w: unrecognized source_type", errs.ErrInvalidRequest)
+	}
 	createReq := converter.Convert(in, &entities.ProtoSourceCreate{},
 		converter.WithIgnoreFields("SourceType"),
 	)
-	createReq.SourceType = sourceTypeFromProto(in.SourceType)
+	createReq.SourceType = sourceType
 
 	source, err := h.protoService.CreateSource(ctx, createReq)
 	if err != nil {

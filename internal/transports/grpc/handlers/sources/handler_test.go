@@ -17,6 +17,7 @@ import (
 
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	sourcespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/sources"
+	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
 )
 
 // --- Mocks ---
@@ -123,7 +124,10 @@ func TestHandler_CreateSource(t *testing.T) {
 		})}
 		handler := New(svc)
 
-		resp, err := handler.CreateSource(t.Context(), connect.NewRequest(&sourcespb.CreateSourceRequest{Name: "my-src"}))
+		resp, err := handler.CreateSource(t.Context(), connect.NewRequest(&sourcespb.CreateSourceRequest{
+			Name:       "my-src",
+			SourceType: protopb.SourceType_SOURCE_TYPE_GIT,
+		}))
 		require.NoError(t, err)
 		require.NotNil(t, resp.Msg.Source)
 	})
@@ -133,8 +137,34 @@ func TestHandler_CreateSource(t *testing.T) {
 		svc := &mockProtoService{createErr: errs.ErrProtoSourceNameAlreadyInUse}
 		handler := New(svc)
 
-		_, err := handler.CreateSource(t.Context(), connect.NewRequest(&sourcespb.CreateSourceRequest{Name: "dup"}))
+		_, err := handler.CreateSource(t.Context(), connect.NewRequest(&sourcespb.CreateSourceRequest{
+			Name:       "dup",
+			SourceType: protopb.SourceType_SOURCE_TYPE_GIT,
+		}))
 		assert.ErrorIs(t, err, errs.ErrProtoSourceNameAlreadyInUse)
+	})
+
+	// QA-128: an unspecified/unrecognized source_type must be rejected, not
+	// silently treated as git.
+	t.Run("UnknownSourceType", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockProtoService{}
+		handler := New(svc)
+
+		_, err := handler.CreateSource(t.Context(), connect.NewRequest(&sourcespb.CreateSourceRequest{
+			Name:       "my-src",
+			SourceType: protopb.SourceType(99),
+		}))
+		assert.ErrorIs(t, err, errs.ErrInvalidRequest)
+	})
+
+	t.Run("UnspecifiedSourceType", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockProtoService{}
+		handler := New(svc)
+
+		_, err := handler.CreateSource(t.Context(), connect.NewRequest(&sourcespb.CreateSourceRequest{Name: "my-src"}))
+		assert.ErrorIs(t, err, errs.ErrInvalidRequest)
 	})
 }
 
