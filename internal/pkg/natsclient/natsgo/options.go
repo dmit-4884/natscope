@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -32,7 +33,11 @@ const (
 func buildOptions(saved *entities.SavedConnection) ([]nats.Option, error) {
 	var opts []nats.Option
 
-	opts = append(opts, buildAuthOptions(saved.Auth)...)
+	authOpts, err := buildAuthOptions(saved.Auth)
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, authOpts...)
 	tlsOpts, err := buildTLSOptions(saved.TLS)
 	if err != nil {
 		return nil, err
@@ -60,7 +65,11 @@ func buildOptions(saved *entities.SavedConnection) ([]nats.Option, error) {
 func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, error) {
 	var opts []nats.Option //nolint:prealloc // fan-in from variadic helpers; final size unknown
 
-	opts = append(opts, buildAuthOptions(in.Auth)...)
+	authOpts, err := buildAuthOptions(in.Auth)
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, authOpts...)
 	tlsOpts, err := buildTLSOptions(in.TLS)
 	if err != nil {
 		return nil, err
@@ -76,9 +85,13 @@ func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, error)
 	return opts, nil
 }
 
-func buildAuthOptions(auth *entities.AuthConfig) []nats.Option {
+// buildAuthOptions translates the auth config into nats.Options. An NKey seed
+// that fails to parse is a hard error rather than a silently-dropped option:
+// swallowing it used to make the connection fall back to anonymous auth while
+// TestConnection still reported success.
+func buildAuthOptions(auth *entities.AuthConfig) ([]nats.Option, error) {
 	if auth == nil {
-		return nil
+		return nil, nil
 	}
 
 	var opts []nats.Option
@@ -94,11 +107,15 @@ func buildAuthOptions(auth *entities.AuthConfig) []nats.Option {
 		}
 	case entities.AuthMethodNKey:
 		if auth.NkeySeed != nil && *auth.NkeySeed != "" {
-			if kp, err := nkeys.FromSeed([]byte(*auth.NkeySeed)); err == nil {
-				if pub, pubErr := kp.PublicKey(); pubErr == nil {
-					opts = append(opts, nats.Nkey(pub, kp.Sign))
-				}
+			kp, err := nkeys.FromSeed([]byte(*auth.NkeySeed))
+			if err != nil {
+				return nil, coreerrs.Wrap(err, "invalid nkey seed")
 			}
+			pub, err := kp.PublicKey()
+			if err != nil {
+				return nil, coreerrs.Wrap(err, "invalid nkey seed")
+			}
+			opts = append(opts, nats.Nkey(pub, kp.Sign))
 		}
 	case entities.AuthMethodCredentials:
 		if auth.Credentials != nil && *auth.Credentials != "" {
@@ -108,9 +125,11 @@ func buildAuthOptions(auth *entities.AuthConfig) []nats.Option {
 		}
 	case entities.AuthMethodNone:
 		// No auth; explicit case for exhaustiveness.
+	default:
+		return nil, fmt.Errorf("unsupported auth method: %d", auth.Method)
 	}
 
-	return opts
+	return opts, nil
 }
 
 func buildTLSOptions(tlsCfg *entities.TlsConfig) ([]nats.Option, error) {
