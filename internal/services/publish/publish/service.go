@@ -5,6 +5,7 @@ package publish
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"time"
@@ -78,9 +79,7 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 
 	data, encErr := s.resolvePayload(ctx, in)
 	if encErr != nil {
-		// Encode failures are as real an attempt as a publish failure — history
-		// must record both the same way, or it under-reports failures (QA-131).
-		s.recordHistory(ctx, in, "", 0, len(data), false, encErr)
+		s.recordHistory(ctx, in, nil, len(data), encErr)
 		return softFailure(*encErr), nil
 	}
 
@@ -93,11 +92,11 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 			return nil, err
 		}
 		errMsg := "Failed to publish message: " + err.Error()
-		s.recordHistory(ctx, in, "", 0, len(data), false, &errMsg)
+		s.recordHistory(ctx, in, nil, len(data), &errMsg)
 		return softFailure(errMsg), nil
 	}
 
-	s.recordHistory(ctx, in, ack.Stream, ack.Sequence, len(data), true, nil)
+	s.recordHistory(ctx, in, ack, len(data), nil)
 	return &entities.PublishResult{
 		Stream:    ack.Stream,
 		Sequence:  ack.Sequence,
@@ -143,22 +142,23 @@ func (s *Service) publishTimeout(ctx context.Context) time.Duration {
 	return time.Duration(*cfg.Publish.PublishTimeoutSec) * time.Second
 }
 
-// recordHistory persists one publish attempt; history errors are best-effort
-// since the publish has already settled.
+// recordHistory persists one publish attempt: ack is nil and errMsg set when it
+// failed. History errors are best-effort since the publish has already settled.
 func (s *Service) recordHistory(
 	ctx context.Context,
 	in *entities.PublishRequest,
-	stream string,
-	sequence uint64,
+	ack *entities.PubAck,
 	payloadSize int,
-	success bool,
 	errMsg *string,
 ) {
 	encoding := entities.EncodingTypeJSON
 	var msgType string
-	if in.MessageType != nil && *in.MessageType != "" {
+	switch {
+	case in.MessageType != nil && *in.MessageType != "":
 		msgType = *in.MessageType
 		encoding = entities.EncodingTypeProtobuf
+	case !json.Valid([]byte(in.Data)):
+		encoding = entities.EncodingTypeText
 	}
 
 	connURL, urlErr := s.natsService.GetConnectionURL(ctx, in.ConnectionID)
@@ -172,18 +172,22 @@ func (s *Service) recordHistory(
 	create := &entities.PublishHistoryCreate{
 		ConnectionID:   &in.ConnectionID,
 		ConnectionURL:  connURL,
-		Stream:         stream,
 		Subject:        in.Subject,
 		SubjectPattern: in.SubjectPattern,
 		EncodingType:   encoding,
 		MessageType:    msgType,
 		PayloadJSON:    in.Data,
 		PayloadSize:    payloadSize,
-		Success:        success,
+		Success:        errMsg == nil,
+		Headers:        in.Headers,
 		Error:          errMsg,
 	}
-	if sequence > 0 {
-		create.Sequence = &sequence
+	if ack != nil {
+		create.Stream = ack.Stream
+		create.Duplicate = ack.Duplicate
+		if ack.Sequence > 0 {
+			create.Sequence = &ack.Sequence
+		}
 	}
 
 	if _, err := s.historyService.Record(ctx, create); err != nil {

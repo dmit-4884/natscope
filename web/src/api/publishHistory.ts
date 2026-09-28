@@ -15,6 +15,8 @@ export interface PublishHistoryEntry {
   payload_size: number
   sequence?: number
   success: boolean
+  duplicate: boolean
+  headers: Record<string, string>
   error?: string
   created_at: number
 }
@@ -51,6 +53,8 @@ export async function getPublishHistory(
     payload_size: item.payloadSize,
     sequence: item.sequence != null ? Number(item.sequence) : undefined,
     success: item.success,
+    duplicate: item.duplicate,
+    headers: item.headers,
     error: item.error,
     created_at: tsToMillis(item.createdAt),
   }))

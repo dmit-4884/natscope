@@ -19,7 +19,7 @@ message PublishHistory {
   string subject = 5;
   // Optional. Subject pattern used for publishing.
   optional string subject_pattern = 6;
-  // Required. Encoding type used for publishing: "json" or "protobuf".
+  // Required. Encoding type used for publishing: "json", "protobuf" or "text".
   string encoding_type = 7;
   // Optional. Fully-qualified protobuf message type. Empty for raw JSON publishes.
   optional string message_type = 8;
@@ -40,4 +40,8 @@ message PublishHistory {
   // Required. Whether payload_json was truncated from the original payload
   // (see payload_size for the original length).
   bool payload_truncated = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Whether JetStream deduplicated the message (matched Nats-Msg-Id).
+  bool duplicate = 17;
+  // Optional. NATS headers sent with the message.
+  map<string, string> headers = 18;
 }

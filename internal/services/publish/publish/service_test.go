@@ -359,3 +359,30 @@ func TestPublish_SkipsHistoryForUnknownConnection(t *testing.T) {
 	defer hist.mu.Unlock()
 	assert.Equal(t, 0, hist.called, "no history row should be written for an unknown connection id")
 }
+
+func TestPublish_HistoryKeepsTextEncodingHeadersAndDuplicate(t *testing.T) {
+	t.Parallel()
+
+	hist := &recordedHistory{}
+	natsm := &mockNATSService{
+		publishFn: func(_ context.Context, _, _ string, _ []byte, _ map[string]string) (*entities.PubAck, error) {
+			return &entities.PubAck{Stream: "ORDERS", Sequence: 7, Duplicate: true}, nil
+		},
+	}
+	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+
+	_, err := s.Publish(t.Context(), &entities.PublishRequest{
+		ConnectionID: "conn-1",
+		Subject:      "orders.created",
+		Data:         "plain text",
+		Headers:      map[string]string{"Nats-Msg-Id": "m-1"},
+	})
+	require.NoError(t, err)
+
+	hist.mu.Lock()
+	defer hist.mu.Unlock()
+	require.NotNil(t, hist.last)
+	assert.Equal(t, entities.EncodingTypeText, hist.last.EncodingType)
+	assert.True(t, hist.last.Duplicate)
+	assert.Equal(t, map[string]string{"Nats-Msg-Id": "m-1"}, hist.last.Headers)
+}

@@ -214,3 +214,29 @@ func TestReset(t *testing.T) {
 	assert.Nil(t, got.Messages)
 	assert.Nil(t, got.Live)
 }
+
+func TestGet_CachedUntilUpdateOrReset(t *testing.T) {
+	t.Parallel()
+	svc := setupService(t)
+
+	first, err := svc.Get(t.Context())
+	require.NoError(t, err)
+	again, err := svc.Get(t.Context())
+	require.NoError(t, err)
+	assert.Same(t, first, again, "repeated reads are served from memory")
+
+	_, err = svc.Update(t.Context(), &entities.UserSettingsUpdate{
+		Messages: &entities.MessageSettings{DefaultPageSize: ptr.Wrap(int32(75))},
+	})
+	require.NoError(t, err)
+	afterUpdate, err := svc.Get(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, afterUpdate.Messages)
+	assert.Equal(t, int32(75), *afterUpdate.Messages.DefaultPageSize)
+
+	_, err = svc.Reset(t.Context())
+	require.NoError(t, err)
+	afterReset, err := svc.Get(t.Context())
+	require.NoError(t, err)
+	assert.Nil(t, afterReset.Messages)
+}

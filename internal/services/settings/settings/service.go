@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 
 	"github.com/altessa-s/go-atlas/domain/normalizer"
 
@@ -18,10 +19,15 @@ import (
 	storage "github.com/dmit-4884/natscope/internal/storages/settings"
 )
 
-// Service implements settings.Service.
+// Service implements settings.Service. Settings are read on every publish,
+// message list and live session, so the current value is cached in memory
+// and refreshed by Update and Reset.
 type Service struct {
 	storage storage.Storage
 	logger  *slog.Logger
+
+	mu     sync.Mutex
+	cached *entities.UserSettings
 }
 
 // New creates a new settings service.
@@ -32,16 +38,23 @@ func New(storage storage.Storage) *Service {
 	}
 }
 
-// Get returns settings. Returns default (empty) settings if none saved.
+// Get returns settings, or default (empty) settings if none are saved. The
+// result is shared and must not be modified.
 func (s *Service) Get(ctx context.Context) (*entities.UserSettings, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.cached != nil {
+		return s.cached, nil
+	}
 	result, err := s.storage.Get(ctx)
 	if err != nil {
-		if errors.Is(err, errs.ErrSettingsNotFound) {
-			return entities.UserSettingsNew(), nil
+		if !errors.Is(err, errs.ErrSettingsNotFound) {
+			return nil, err
 		}
-		return nil, err
+		result = entities.UserSettingsNew()
 	}
-
+	s.cached = result
 	return result, nil
 }
 
@@ -55,6 +68,9 @@ func (s *Service) Update(ctx context.Context, in *entities.UserSettingsUpdate) (
 		in.Messages.ExportRangeLimit = nil
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	updated, err := s.storage.Update(ctx, func(existing *entities.UserSettings) {
 		existing.ApplyUpdate(in)
 	})
@@ -63,6 +79,7 @@ func (s *Service) Update(ctx context.Context, in *entities.UserSettingsUpdate) (
 			slogx.Error(err))
 		return nil, err
 	}
+	s.cached = updated
 
 	s.logger.InfoContext(ctx, "settings updated")
 
@@ -71,6 +88,10 @@ func (s *Service) Update(ctx context.Context, in *entities.UserSettingsUpdate) (
 
 // Reset deletes settings, returning default (empty) settings.
 func (s *Service) Reset(ctx context.Context) (*entities.UserSettings, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.cached = nil
 	if err := s.storage.Delete(ctx); err != nil {
 		if !errors.Is(err, errs.ErrSettingsNotFound) {
 			s.logger.ErrorContext(ctx, "failed to delete settings",

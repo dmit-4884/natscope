@@ -9,17 +9,19 @@ import "github.com/dmit-4884/natscope/internal/pkg/bbstore"
 type historyDoc struct {
 	bbstore.Base
 
-	ConnectionID     *string `json:"connectionId,omitempty"`
-	ConnectionURL    string  `json:"connectionUrl"`
-	Stream           string  `json:"stream,omitempty"`
-	Subject          string  `json:"subject"`
-	SubjectPattern   *string `json:"subjectPattern,omitempty"`
-	EncodingType     string  `json:"encodingType,omitempty"`
-	MessageType      string  `json:"messageType,omitempty"`
-	PayloadJSON      string  `json:"payloadJson,omitempty"`
-	PayloadTruncated bool    `json:"payloadTruncated,omitempty"`
-	PayloadSize      int     `json:"payloadSize,omitempty"`
-	Sequence         *uint64 `json:"sequence,omitempty"`
-	Success          bool    `json:"success,omitempty"`
-	Error            *string `json:"error,omitempty"`
+	ConnectionID     *string           `json:"connectionId,omitempty"`
+	ConnectionURL    string            `json:"connectionUrl"`
+	Stream           string            `json:"stream,omitempty"`
+	Subject          string            `json:"subject"`
+	SubjectPattern   *string           `json:"subjectPattern,omitempty"`
+	EncodingType     string            `json:"encodingType,omitempty"`
+	MessageType      string            `json:"messageType,omitempty"`
+	PayloadJSON      string            `json:"payloadJson,omitempty"`
+	PayloadTruncated bool              `json:"payloadTruncated,omitempty"`
+	PayloadSize      int               `json:"payloadSize,omitempty"`
+	Sequence         *uint64           `json:"sequence,omitempty"`
+	Success          bool              `json:"success,omitempty"`
+	Duplicate        bool              `json:"duplicate,omitempty"`
+	Headers          map[string]string `json:"headers,omitempty"`
+	Error            *string           `json:"error,omitempty"`
 }

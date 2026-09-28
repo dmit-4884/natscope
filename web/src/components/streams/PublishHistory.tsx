@@ -13,6 +13,12 @@ import { extractWildcardValues, countWildcards } from './publish/subjectPatternU
 // large page so the per-stream filter has enough rows.
 const HISTORY_PAGE_SIZE = 500
 
+const ENCODING_LABELS: Record<string, string> = {
+  json: 'JSON',
+  protobuf: 'Protobuf',
+  text: 'Text',
+}
+
 interface PublishHistoryProps {
   streamName: string | null
   connectionId: string | null
@@ -166,7 +172,8 @@ export default function PublishHistory({ streamName, connectionId, connectionUrl
         ? extractWildcardValues(entry.subject_pattern, entry.subject)
         : []
       setLastPattern(scope, entry.subject_pattern)
-      setPatternDraft(scope, entry.subject_pattern, { messageJson: body, wildcards })
+      const headers = Object.entries(entry.headers).map(([key, value]) => ({ key, value }))
+      setPatternDraft(scope, entry.subject_pattern, { messageJson: body, wildcards, headers })
       toast.success('Loaded into publish form')
     },
     [streamName, connectionUrl],
@@ -282,8 +289,13 @@ export default function PublishHistory({ streamName, connectionId, connectionUrl
                             ? 'bg-accent-muted text-accent-text'
                             : 'bg-status-warning-light text-amber-700'
                         }`}>
-                          {entry.encoding_type === 'protobuf' ? 'Protobuf' : 'JSON'}
+                          {ENCODING_LABELS[entry.encoding_type] ?? 'JSON'}
                         </span>
+                        {entry.duplicate && (
+                          <span className="px-1.5 py-0.5 rounded text-2xs font-medium bg-surface-tertiary text-content-secondary">
+                            Duplicate
+                          </span>
+                        )}
                         {entry.message_type && (
                           <span className="truncate font-mono" title={entry.message_type}>
                             {entry.message_type}

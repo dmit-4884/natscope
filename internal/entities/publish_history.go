@@ -20,6 +20,7 @@ type EncodingType string
 const (
 	EncodingTypeJSON     EncodingType = "json"
 	EncodingTypeProtobuf EncodingType = "protobuf"
+	EncodingTypeText     EncodingType = "text"
 )
 
 // PublishHistory is a published message entry in history.
@@ -63,6 +64,12 @@ type PublishHistory struct {
 
 	// Success indicates if the publish was successful.
 	Success bool
+
+	// Duplicate is true when JetStream deduplicated the message (Nats-Msg-Id).
+	Duplicate bool
+
+	// Headers are the NATS headers sent with the message.
+	Headers map[string]string
 
 	// Error is the failure message, nil on success.
 	Error *string
@@ -109,5 +116,7 @@ type PublishHistoryCreate struct {
 	PayloadSize    int
 	Sequence       *uint64
 	Success        bool
+	Duplicate      bool
+	Headers        map[string]string
 	Error          *string
 }
