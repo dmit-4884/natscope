@@ -8,6 +8,7 @@ export function BookmarkButton({
   subject,
   dataPreview,
   className = '',
+  tabIndex,
 }: {
   connectionId: string
   streamName: string
@@ -15,6 +16,7 @@ export function BookmarkButton({
   subject: string
   dataPreview?: string
   className?: string
+  tabIndex?: number
 }) {
   const addBookmark = useBookmarkStore((s) => s.addBookmark)
   const removeBookmark = useBookmarkStore((s) => s.removeBookmark)
@@ -46,6 +48,7 @@ export function BookmarkButton({
   return (
     <button
       onClick={handleClick}
+      tabIndex={tabIndex}
       className={`p-1 rounded transition-colors ${
         bookmarked
           ? 'text-yellow-500 hover:text-yellow-600'

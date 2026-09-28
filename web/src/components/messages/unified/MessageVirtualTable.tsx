@@ -4,6 +4,7 @@ import type { Message } from '@/types/nats'
 import { formatBytes, formatTimeWithMs, formatTimestamp } from '@/utils/formatters'
 import { getSubjectColor } from '@/utils/subjectColors'
 import { CheckIcon } from '@/components/ui'
+import { useBookmarkStore } from '@/stores/bookmarkStore'
 import { BookmarkButton } from '../Bookmarks'
 import { getPayloadPreview, type LiveMessage, type ViewMode } from './messageListUtils'
 
@@ -78,6 +79,18 @@ const MessageRow = memo(function MessageRow({
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onActivateIndex(index)
+      return
+    }
+    if ((e.key === 'b' || e.key === 'B') && showBookmark) {
+      e.preventDefault()
+      const seq = (msg as Message).sequence
+      const store = useBookmarkStore.getState()
+      const existing = store.getBookmark(connectionId!, streamName, seq)
+      if (existing) {
+        store.removeBookmark(existing.id)
+      } else {
+        store.addBookmark({ connectionId: connectionId!, streamName, sequence: seq, subject: msg.subject, dataPreview: payloadPreview })
+      }
     }
   }
 
@@ -131,6 +144,7 @@ const MessageRow = memo(function MessageRow({
             sequence={(msg as Message).sequence}
             subject={msg.subject}
             dataPreview={payloadPreview}
+            tabIndex={-1}
           />
         ) : null}
       </div>
