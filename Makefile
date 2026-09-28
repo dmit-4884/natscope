@@ -32,13 +32,19 @@ ifeq (Darwin,$(UNAME))
 LDFLAGS := $(LDFLAGS) -extldflags=-Wl,-ld_classic
 endif
 
+APP_BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
 # Shared appinfo -X flags: every build target must set these, or the binary
 # reports Version 0.0.0 / an empty env prefix regardless of what APP_VERSION
 # etc. were set to (this bit build-backend, and the Docker image it feeds).
+# BuildTime specifically: unset, appinfo falls back to the vcs.time build
+# info (the HEAD commit's time), which `version --full` then mislabels as
+# "Build Time" even though the binary was built well after that commit.
 LDFLAGS_X = \
 	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Name=${APP_NAME} \
 	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Project=${APP_PROJECT} \
 	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.EnvPrefix=${APP_ENV_PREFIX} \
+	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.BuildTime=${APP_BUILD_TIME} \
 	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Version=${APP_VERSION} \
 	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Commit=${APP_VERSION_COMMIT}
 
