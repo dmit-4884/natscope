@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -30,10 +31,11 @@ type Pool struct {
 	mu    sync.RWMutex
 	group singleflight.Group
 
-	clients map[string]Client
-	dialer  Dialer
-	source  ConfigSource
-	logger  *slog.Logger
+	clients   map[string]Client
+	dialer    Dialer
+	source    ConfigSource
+	logger    *slog.Logger
+	listeners []func(connectionID string)
 }
 
 // NewPool creates a pool dialing via dialer with configurations resolved
@@ -124,21 +126,36 @@ func (p *Pool) Pooled(connectionID string) (Client, bool) {
 	return c, ok
 }
 
-// Disconnect closes and removes a live client from the pool.
+// OnDisconnect registers fn to run, outside the pool lock, whenever a
+// connection is dropped from the pool (explicit Disconnect or eviction of a
+// dead connection).
+func (p *Pool) OnDisconnect(fn func(connectionID string)) {
+	p.mu.Lock()
+	p.listeners = append(p.listeners, fn)
+	p.mu.Unlock()
+}
+
+// Disconnect closes and removes a live client from the pool, then notifies
+// any OnDisconnect listeners.
 func (p *Pool) Disconnect(connectionID string) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	c, ok := p.clients[connectionID]
 	if !ok {
+		p.mu.Unlock()
 		return
 	}
 
 	c.Close()
 	delete(p.clients, connectionID)
+	listeners := slices.Clone(p.listeners)
+	p.mu.Unlock()
 
 	p.logger.Info("disconnected from NATS pool",
 		slogx.String("connection_id", connectionID))
+
+	for _, fn := range listeners {
+		fn(connectionID)
+	}
 }
 
 // Close closes all clients and clears the pool.

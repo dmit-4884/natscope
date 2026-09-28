@@ -60,6 +60,11 @@ var ErrWorkQueueConsumerNotAllowed = errors.New("nats: cannot create read consum
 // all configured streams.
 var ErrLiveNoSubscriptions = errors.New("nats: failed to create any live subscriptions")
 
+// ErrLiveConsumerStalled a live session's client stopped reading the stream
+// (a Send blocked past the session's send deadline); the session is torn
+// down instead of buffering unbounded data for it.
+var ErrLiveConsumerStalled = errors.New("nats: live consumer stopped reading, closing session")
+
 // ErrNATSInvalidArgument is a client-side rejection of a NATS request.
 var ErrNATSInvalidArgument = errors.New("nats: invalid argument")
 

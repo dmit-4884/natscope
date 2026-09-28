@@ -9,7 +9,10 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/altessa-s/go-atlas/core/runtime/panics"
+
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 )
 
 // truncateLiveMessage caps the raw byte payload to maxBytes and drops any
@@ -34,6 +37,13 @@ func truncateLiveMessage(lm *entities.LiveMessage, maxBytes int) {
 const (
 	livePreviewLines = 20
 	livePreviewBytes = 2 * 1024
+
+	// emitStallTimeout bounds a single emit (stream.Send) call. A client that
+	// stopped reading TCP would otherwise block the loop indefinitely, letting
+	// msgChan back up with full-size, undecoded payloads (QA-029). The
+	// underlying send typically unblocks shortly after via request-context
+	// cancellation once this ends the session.
+	emitStallTimeout = 10 * time.Second
 )
 
 // buildLivePreviewText returns a JSON-encoded text preview so the live
@@ -76,6 +86,23 @@ func nthLineIndex(s string, n int) int {
 	return -1
 }
 
+// emitWithDeadline runs emit on a goroutine and gives up after
+// emitStallTimeout, so a peer that stopped reading ends the session instead
+// of holding the loop (and the upstream message buffer) open forever.
+func emitWithDeadline(ctx context.Context, emit func(*entities.LiveEvent) error, ev *entities.LiveEvent) error {
+	done := make(chan error, 1)
+	go func() {
+		defer panics.Handle(ctx)
+		done <- emit(ev)
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(emitStallTimeout):
+		return errs.ErrLiveConsumerStalled
+	}
+}
+
 // runLoop is the core event loop; it rate-limits, decodes, and batches
 // messages. ctx cancellation triggers a final flush before returning.
 func (s *Service) runLoop(
@@ -93,7 +120,6 @@ func (s *Service) runLoop(
 
 	batch := make([]*entities.LiveMessage, 0, maxBatchSize)
 
-	var totalMessages int64
 	var lastMsgCount int64
 	lastTime := time.Now()
 	warmup := true // skip first stats tick to avoid burst spike
@@ -116,7 +142,20 @@ func (s *Service) runLoop(
 		}
 		ev := &entities.LiveEvent{Batch: &entities.LiveBatch{Messages: batch}}
 		batch = make([]*entities.LiveMessage, 0, maxBatchSize)
-		return emit(ev)
+		return emitWithDeadline(ctx, emit, ev)
+	}
+
+	// resetDecoderIfDirty re-initializes the decoder after a proto reload and
+	// tells the client so (QA-080/QA-081); checked both on a timer and per
+	// message so a quiet session still finds out within one stats tick.
+	resetDecoderIfDirty := func() error {
+		if !sess.decoderDirty.CompareAndSwap(1, 0) {
+			return nil
+		}
+		decoder.Reset()
+		// The live decoder doesn't expose a registry message count from this
+		// layer; the client already refetches proto/mapping state on this event.
+		return emitWithDeadline(ctx, emit, &entities.LiveEvent{ProtoReload: &entities.LiveProtoReload{}})
 	}
 
 	for {
@@ -126,8 +165,12 @@ func (s *Service) runLoop(
 			return nil
 
 		case <-statsTicker.C:
+			if err := resetDecoderIfDirty(); err != nil {
+				return err
+			}
+
 			now := time.Now()
-			current := totalMessages
+			current := sess.totalMessages.Load()
 
 			if warmup {
 				warmup = false
@@ -152,7 +195,7 @@ func (s *Service) runLoop(
 					MessagesDropped:   sess.messagesDropped.Load(),
 				},
 			}
-			if err := emit(ev); err != nil {
+			if err := emitWithDeadline(ctx, emit, ev); err != nil {
 				return err
 			}
 
@@ -162,7 +205,6 @@ func (s *Service) runLoop(
 			}
 
 		case msg := <-msgChan:
-			totalMessages++
 			if _, tracked := subjectCounts[msg.Subject]; tracked || len(subjectCounts) < maxSubjectCardinality {
 				subjectCounts[msg.Subject]++
 			}
@@ -187,8 +229,8 @@ func (s *Service) runLoop(
 			// so wire DataSize reflects what was published, not the truncated slice.
 			lm := &entities.LiveMessage{NatsMessage: *msg, OriginalSize: len(msg.Data)}
 
-			if sess.decoderDirty.CompareAndSwap(1, 0) {
-				decoder.Reset()
+			if err := resetDecoderIfDirty(); err != nil {
+				return err
 			}
 			if !decoder.Ready() {
 				decoder.Init(ctx)

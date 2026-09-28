@@ -101,6 +101,9 @@ var commonDomainErrors = []struct {
 	{errs.ErrMappingSourceNotFound, errorMapping{codes.NotFound, "proto source not found", "MAPPING_SOURCE_NOT_FOUND"}},
 	{errs.ErrMappingSourceDisabled, errorMapping{codes.FailedPrecondition, "proto source disabled", "MAPPING_SOURCE_DISABLED"}},
 	{errs.ErrMappingSelectionMissing, errorMapping{codes.FailedPrecondition, "no version selected for source", "MAPPING_SELECTION_MISSING"}},
+
+	// Live.
+	{errs.ErrLiveConsumerStalled, errorMapping{codes.Aborted, "live consumer stopped reading", "LIVE_CONSUMER_STALLED"}},
 }
 
 // StatusErrorConvert maps cross-cutting errors (common+NATS domain sentinels,

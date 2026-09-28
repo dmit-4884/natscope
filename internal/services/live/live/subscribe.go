@@ -5,7 +5,9 @@ package live
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -19,19 +21,26 @@ func (s *Service) Subscribe(
 	in *entities.LiveSubscribeRequest,
 	emit func(*entities.LiveEvent) error,
 ) error {
+	if err := validateSubscriptionTargets(in.Subscriptions); err != nil {
+		return err
+	}
+	targets := dedupeSubscriptionTargets(in.Subscriptions)
+
 	sess := &sessionState{}
 	s.registerSession(sess)
 	defer s.unregisterSession(sess)
 
 	mode, maxDisplayRate, payloadCap := s.resolveSettings(ctx)
-	// Request-level override has highest precedence over the user setting.
-	if in.MaxPayloadBytes != nil {
+	// Request-level override has highest precedence over the user setting, but
+	// only when it actually requests a cap: 0 means "omitted" per the proto
+	// doc, not "unlimited" (QA-132). protovalidate already rejects negative.
+	if in.MaxPayloadBytes != nil && *in.MaxPayloadBytes > 0 {
 		payloadCap = *in.MaxPayloadBytes
 	}
 
 	msgChan := make(chan *entities.NatsMessage, messageBufferSize)
 
-	subscriptions, setupErr := s.startSubscriptions(ctx, in, mode, msgChan, sess)
+	subscriptions, partialErrs, setupErr := s.startSubscriptions(ctx, in.ConnectionId, targets, mode, msgChan, sess)
 	defer func() {
 		for _, sub := range subscriptions {
 			if sub != nil {
@@ -43,7 +52,98 @@ func (s *Service) Subscribe(
 		return setupErr
 	}
 
+	// Some targets failed to subscribe but at least one succeeded: tell the
+	// client which targets are missing instead of silently under-delivering.
+	for _, pe := range partialErrs {
+		if err := emit(&entities.LiveEvent{
+			Error: &entities.LiveError{Code: "SUBSCRIBE_TARGET_FAILED", Message: pe.Error()},
+		}); err != nil {
+			return err
+		}
+	}
+
 	return s.runLoop(ctx, sess, msgChan, maxDisplayRate, payloadCap, emit)
+}
+
+// validateSubscriptionTargets rejects a malformed subject pattern before any
+// NATS work happens: an invalid pattern (e.g. "a.>.b") reaches the server as
+// a raw SUB and gets the whole shared pool connection closed (QA-028/QA-030).
+func validateSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) error {
+	for _, target := range targets {
+		if target == nil {
+			continue
+		}
+		if err := natsutil.ValidateSubjectPattern(target.Subject); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// dedupeSubscriptionTargets removes exact (subject, streamName) duplicates
+// and, within the same stream grouping, drops a literal subject already
+// covered by another target's wildcard pattern — otherwise a message on that
+// subject is delivered to the session once per matching subscription
+// (QA-085).
+func dedupeSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) []*entities.LiveSubscriptionTarget {
+	type targetKey struct {
+		subject    string
+		streamName string
+	}
+
+	seen := make(map[targetKey]bool, len(targets))
+	out := make([]*entities.LiveSubscriptionTarget, 0, len(targets))
+	for _, t := range targets {
+		if t == nil || t.Subject == "" {
+			continue
+		}
+		key := targetKey{subject: t.Subject, streamName: streamNameOf(t)}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, t)
+	}
+
+	covered := make([]bool, len(out))
+	for i, a := range out {
+		if isLiteralSubject(a.Subject) {
+			continue // only a wildcard pattern can cover another target
+		}
+		for j, b := range out {
+			if i == j || covered[j] || !isLiteralSubject(b.Subject) {
+				continue
+			}
+			if streamNameOf(a) != streamNameOf(b) {
+				continue
+			}
+			if natsutil.MatchSubject(a.Subject, b.Subject) {
+				covered[j] = true
+			}
+		}
+	}
+
+	result := make([]*entities.LiveSubscriptionTarget, 0, len(out))
+	for i, t := range out {
+		if !covered[i] {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+func streamNameOf(t *entities.LiveSubscriptionTarget) string {
+	if t == nil || t.StreamName == nil {
+		return ""
+	}
+	return *t.StreamName
+}
+
+// isLiteralSubject reports whether subject contains no wildcard tokens.
+// Subjects reaching here already passed ValidateSubjectPattern, so "*"/">"
+// only occur as whole tokens.
+func isLiteralSubject(subject string) bool {
+	return !strings.ContainsAny(subject, "*>")
 }
 
 // resolveSettings reads SubscriptionMode, MaxDisplayRate, and payload cap
@@ -70,18 +170,57 @@ func (s *Service) resolveSettings(ctx context.Context) (mode string, maxDisplayR
 }
 
 // startSubscriptions resolves every target into concrete NATS subscriptions;
-// per-target failures are tolerated as long as at least one succeeds.
+// per-target failures are tolerated as long as at least one target succeeds,
+// and are returned alongside so the caller can surface them as LiveError
+// events instead of dropping them (QA-080).
 func (s *Service) startSubscriptions(
 	ctx context.Context,
-	in *entities.LiveSubscribeRequest,
+	connectionID string,
+	targets []*entities.LiveSubscriptionTarget,
 	mode string,
 	msgChan chan<- *entities.NatsMessage,
 	sess *sessionState,
-) ([]entities.Subscription, error) {
-	handler := func(msg *entities.NatsMessage) {
-		if natsutil.IsInternalSubject(msg.Subject) {
+) ([]entities.Subscription, []error, error) {
+	var subs []entities.Subscription
+	var partialErrs []error
+	for _, target := range targets {
+		handler := s.buildMessageHandler(target.Subject, msgChan, sess)
+		targetSubs, err := s.subscribeTarget(ctx, connectionID, target, mode, handler)
+		if err != nil {
+			partialErrs = append(partialErrs, fmt.Errorf("subject %q: %w", target.Subject, err))
+			continue
+		}
+		subs = append(subs, targetSubs...)
+	}
+
+	if len(subs) == 0 {
+		if len(partialErrs) > 0 {
+			return nil, nil, partialErrs[len(partialErrs)-1]
+		}
+		return nil, nil, errs.ErrLiveNoSubscriptions
+	}
+	return subs, partialErrs, nil
+}
+
+// buildMessageHandler builds the per-target delivery callback. allowInternal
+// is derived from the user's own subject pattern (not the delivered
+// message): a subscription explicitly targeting "$KV.>" or "_myapp.>" must
+// receive matching messages, while a broad ">" subscription keeps filtering
+// internal namespaces out to avoid an accidental firehose (QA-083).
+func (s *Service) buildMessageHandler(
+	targetSubject string,
+	msgChan chan<- *entities.NatsMessage,
+	sess *sessionState,
+) entities.MessageHandler {
+	allowInternal := natsutil.IsInternalSubject(targetSubject)
+	return func(msg *entities.NatsMessage) {
+		if !allowInternal && natsutil.IsInternalSubject(msg.Subject) {
 			return
 		}
+		// Counted at arrival so LiveStats.TotalMessages means the same thing
+		// regardless of which stage later drops the message (buffer-full here,
+		// or rate-limited in runLoop) — QA-133.
+		sess.totalMessages.Add(1)
 		select {
 		case msgChan <- msg:
 		default:
@@ -89,28 +228,6 @@ func (s *Service) startSubscriptions(
 			sess.messagesDropped.Add(1)
 		}
 	}
-
-	var subs []entities.Subscription
-	var lastErr error
-	for _, target := range in.Subscriptions {
-		if target == nil || target.Subject == "" {
-			continue
-		}
-		targetSubs, err := s.subscribeTarget(ctx, in.ConnectionId, target, mode, handler)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		subs = append(subs, targetSubs...)
-	}
-
-	if len(subs) == 0 {
-		if lastErr != nil {
-			return nil, lastErr
-		}
-		return nil, errs.ErrLiveNoSubscriptions
-	}
-	return subs, nil
 }
 
 // subscribeTarget resolves a target into subscriptions: JetStream-ordered +
@@ -122,10 +239,7 @@ func (s *Service) subscribeTarget(
 	mode string,
 	handler entities.MessageHandler,
 ) ([]entities.Subscription, error) {
-	streamName := ""
-	if target.StreamName != nil {
-		streamName = *target.StreamName
-	}
+	streamName := streamNameOf(target)
 
 	effectiveMode := s.resolveEffectiveMode(ctx, connectionID, streamName, mode)
 

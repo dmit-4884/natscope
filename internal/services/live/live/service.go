@@ -61,6 +61,12 @@ type Service struct {
 type sessionState struct {
 	decoderDirty atomic.Int32
 
+	// totalMessages is incremented once per message as it arrives from NATS
+	// (in the subscription producer), independent of whether it is later
+	// dropped for a full buffer or rate limiting — so LiveStats.TotalMessages
+	// means the same thing regardless of which stage drops the message.
+	totalMessages atomic.Int64
+
 	// messagesDropped is incremented by the subscription producer (buffer full)
 	// and the runLoop rate limiter, and read by the runLoop stats emitter.
 	messagesDropped atomic.Int64

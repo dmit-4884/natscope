@@ -18,20 +18,26 @@ message SubscribeRequest {
   string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
   // Required. List of subscriptions to activate. At least one subscription must be provided.
-  repeated LiveSubscription subscriptions = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).repeated.min_items = 1];
+  // Capped so a single request cannot open an unbounded number of NATS
+  // subscriptions (each spawns its own goroutine server-side).
+  repeated LiveSubscription subscriptions = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.max_items = 100
+  ];
 
   // Optional. Per-message payload cap in bytes. When > 0, each delivered
   // message has its `data` and `decoded` truncated to this many bytes and
   // `truncated` is set; the UI uses MessagesService.Get(sequence) to load
-  // the full payload on demand. When 0 or omitted, falls back to user
-  // settings (Messages.maxPayloadBytesInList).
-  optional int32 max_payload_bytes = 3;
+  // the full payload on demand. Zero or omitted falls back to user settings
+  // (Messages.maxPayloadBytesInList). Negative values are rejected.
+  optional int32 max_payload_bytes = 3 [(buf.validate.field).int32.gte = 0];
 }
 
 // Defines a single subscription target for live message delivery.
 message LiveSubscription {
   // Required. NATS subject pattern to subscribe to. Supports wildcards (* and >).
-  string subject = 1;
+  string subject = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).string.min_len = 1];
 
   // Optional. JetStream stream name to bind the subscription to. If omitted, a core NATS subscription is used.
   optional string stream_name = 2;

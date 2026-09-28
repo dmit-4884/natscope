@@ -41,10 +41,15 @@ func (c *Client) Subscribe(
 	}
 
 	natsHandler := func(msg *nats.Msg) {
+		// Set at delivery, not later when the live loop converts the message
+		// to proto: that conversion can trail receipt by up to one batch
+		// interval, and every message in a batch would otherwise share the
+		// batch's conversion time instead of its own (QA-133).
 		handler(&entities.NatsMessage{
-			Subject: msg.Subject,
-			Data:    msg.Data,
-			Header:  maps.Clone(msg.Header),
+			Subject:   msg.Subject,
+			Data:      msg.Data,
+			Header:    maps.Clone(msg.Header),
+			Timestamp: time.Now(),
 		})
 	}
 
