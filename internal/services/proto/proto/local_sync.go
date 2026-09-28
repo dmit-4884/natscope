@@ -17,27 +17,29 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 )
 
+// localPathInvalidMessage is returned for every ValidateLocalPath failure
+// mode (missing path, not a directory, permission denied, or a directory
+// with no .proto files). Collapsing these into one message prevents an
+// unauthenticated caller from using ValidateLocalPath as a filesystem oracle
+// that distinguishes existence/type/permissions of arbitrary paths.
+const localPathInvalidMessage = "no .proto files found at this path"
+
 // ValidateLocalPath probes a filesystem root, counting only includable
 // .proto files (skips .git/node_modules); error means a genuine internal failure.
 func (s *Service) ValidateLocalPath(_ context.Context, dirPath string) (*entities.LocalPathValidation, error) {
-	failure := func(msg string) (*entities.LocalPathValidation, error) {
+	invalid := func() (*entities.LocalPathValidation, error) {
+		msg := localPathInvalidMessage
 		return &entities.LocalPathValidation{Valid: false, Error: &msg}, nil
 	}
 
 	info, err := os.Stat(dirPath)
-	if err != nil {
-		return failure("path not accessible: " + err.Error())
-	}
-	if !info.IsDir() {
-		return failure("path is not a directory")
+	if err != nil || !info.IsDir() {
+		return invalid()
 	}
 
 	walk, err := protoutils.WalkProtoTree(dirPath, protoutils.WalkOptions{})
-	if err != nil {
-		return failure("path not accessible: " + err.Error())
-	}
-	if len(walk.Files) == 0 {
-		return failure("no .proto files found in directory")
+	if err != nil || len(walk.Files) == 0 {
+		return invalid()
 	}
 	return &entities.LocalPathValidation{Valid: true, ProtoFileCount: len(walk.Files)}, nil
 }

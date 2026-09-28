@@ -51,6 +51,29 @@ func TestReadFilesFromPaths_RejectsMissing(t *testing.T) {
 	assert.Contains(t, diags[0].Message, "not accessible")
 }
 
+// TestReadFilesFromPaths_RejectsSymlink is the QA-076 regression: a
+// *.proto-named symlink must not be followed, matching WalkProtoTree's
+// no-follow-symlink policy — otherwise the target's content (e.g. /etc/passwd)
+// is read and can leak through compile diagnostics.
+func TestReadFilesFromPaths_RejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "secret.txt")
+	require.NoError(t, os.WriteFile(target, []byte("top secret content"), 0o644))
+
+	link := filepath.Join(dir, "leak.proto")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks not supported on this platform: %v", err)
+	}
+
+	entries, diags := ReadFilesFromPaths([]string{link})
+	assert.Empty(t, entries, "symlinked .proto must not be read")
+	require.Len(t, diags, 1)
+	assert.Contains(t, diags[0].Message, "symlink")
+	for _, d := range diags {
+		assert.NotContains(t, d.Message, "top secret content")
+	}
+}
+
 func TestReadFilesFromPaths_DuplicateBasename(t *testing.T) {
 	dir := t.TempDir()
 	a := writeProto(t, filepath.Join(dir, "x"), "foo.proto", `syntax = "proto3"; package x;`)

@@ -7,7 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/bufbuild/protocompile"
@@ -55,9 +59,7 @@ func compileFiles(
 	memResolver := &protocompile.SourceResolver{
 		Accessor: protocompile.SourceAccessorFromMap(srcs),
 	}
-	diskResolver := &protocompile.SourceResolver{
-		ImportPaths: includeDirs,
-	}
+	diskResolver := newSafeDiskResolver(includeDirs)
 	resolver := protocompile.CompositeResolver{
 		memResolver,
 		diskResolver,
@@ -237,4 +239,68 @@ func (s *Service) CompileFiles(
 		MessageTypes:    len(messageTypes),
 		FileDescriptors: len(fds),
 	}, allDiag, nil
+}
+
+// safeDiskResolver wraps protocompile.SourceResolver so imports resolved via
+// Include Directories can only reach relative ".proto" paths that stay under
+// the configured directories and never cross a symlink — otherwise an
+// unauthenticated import statement (e.g. "passwd" with includeDirs=["/etc"],
+// or an absolute "/etc/passwd") could read and echo back arbitrary files.
+type safeDiskResolver struct {
+	inner *protocompile.SourceResolver
+}
+
+// newSafeDiskResolver builds the Include Directories resolver used by
+// compileFiles.
+func newSafeDiskResolver(includeDirs []string) protocompile.Resolver {
+	return &safeDiskResolver{inner: &protocompile.SourceResolver{
+		ImportPaths: includeDirs,
+		Accessor:    safeDiskAccessor,
+	}}
+}
+
+// FindFileByPath validates the raw import path before delegating to the
+// wrapped resolver, which only ever sees paths that already passed the checks.
+func (r *safeDiskResolver) FindFileByPath(path string) (protocompile.SearchResult, error) {
+	if err := validateImportPath(path); err != nil {
+		return protocompile.SearchResult{}, err
+	}
+	return r.inner.FindFileByPath(path)
+}
+
+// validateImportPath rejects import paths that are not a relative ".proto"
+// path confined to the include directory: absolute paths, non-.proto
+// extensions, and "../" traversal are all refused.
+func validateImportPath(p string) error {
+	if p == "" {
+		return errors.New("empty import path")
+	}
+	if filepath.IsAbs(p) {
+		return fmt.Errorf("file not found: %s", p)
+	}
+	if !strings.HasSuffix(strings.ToLower(p), ".proto") {
+		return fmt.Errorf("file not found: %s", p)
+	}
+	clean := filepath.ToSlash(filepath.Clean(p))
+	if clean == ".." || strings.HasPrefix(clean, "../") {
+		return fmt.Errorf("file not found: %s", p)
+	}
+	return nil
+}
+
+// safeDiskAccessor opens path (already joined with an include directory) but
+// refuses to follow a symlink — matching WalkProtoTree's no-follow-symlink
+// policy — and refuses directories.
+func safeDiskAccessor(path string) (io.ReadCloser, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("file not found: %s", path)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("file not found: %s", path)
+	}
+	return os.Open(path) //nolint:gosec // path is joined+validated by safeDiskResolver/SourceResolver
 }

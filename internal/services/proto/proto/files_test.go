@@ -157,6 +157,89 @@ message Common { string s = 1; }
 	assert.NotEmpty(t, fds, "should compile with include dirs satisfying the import")
 }
 
+// TestCompileFiles_IncludeDirs_RejectsArbitraryFileRead is the QA-026
+// regression: an import naming a non-".proto" file under an Include
+// Directory (e.g. "passwd" with includeDirs=["/etc"]) must not be read, and
+// its content must never appear in the returned diagnostics.
+func TestCompileFiles_IncludeDirs_RejectsArbitraryFileRead(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "passwd"), []byte("root:x:0:0:root:/root:/bin/bash"), 0o644))
+
+	p := writeProto(t, dir, "main.proto", `
+syntax = "proto3";
+package imp;
+import "passwd";
+message M {}
+`)
+
+	entries, diags := protoutils.ReadFilesFromPaths([]string{p})
+	require.Empty(t, diags)
+
+	fds, compileDiags, err := compileFiles(t.Context(), entries, []string{dir})
+	require.NoError(t, err)
+	assert.Empty(t, fds)
+	require.NotEmpty(t, compileDiags)
+	for _, d := range compileDiags {
+		assert.NotContains(t, d.Message, "root:x:0:0")
+	}
+}
+
+// TestCompileFiles_IncludeDirs_RejectsAbsoluteImport covers the second QA-026
+// repro: an absolute import path must not be resolved directly off the
+// filesystem, even with no Include Directories configured.
+func TestCompileFiles_IncludeDirs_RejectsAbsoluteImport(t *testing.T) {
+	dir := t.TempDir()
+	secret := filepath.Join(dir, "secret.proto")
+	require.NoError(t, os.WriteFile(secret, []byte(`syntax = "proto3"; message Secret { string leaked = 1; }`), 0o644))
+
+	p := writeProto(t, dir, "main.proto", `
+syntax = "proto3";
+package imp;
+import "`+secret+`";
+message M {}
+`)
+
+	entries, diags := protoutils.ReadFilesFromPaths([]string{p})
+	require.Empty(t, diags)
+
+	fds, compileDiags, err := compileFiles(t.Context(), entries, nil)
+	require.NoError(t, err)
+	assert.Empty(t, fds)
+	require.NotEmpty(t, compileDiags)
+	for _, d := range compileDiags {
+		assert.NotContains(t, d.Message, "leaked")
+	}
+}
+
+// TestCompileFiles_IncludeDirs_RejectsSymlink is the QA-076 regression on the
+// compile path: a symlink under an Include Directory must not be followed.
+func TestCompileFiles_IncludeDirs_RejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "secret.txt")
+	require.NoError(t, os.WriteFile(target, []byte("top secret content"), 0o644))
+	link := filepath.Join(dir, "shared.proto")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks not supported on this platform: %v", err)
+	}
+
+	p := writeProto(t, dir, "main.proto", `
+syntax = "proto3";
+package imp;
+import "shared.proto";
+message M {}
+`)
+
+	entries, diags := protoutils.ReadFilesFromPaths([]string{p})
+	require.Empty(t, diags)
+
+	fds, compileDiags, err := compileFiles(t.Context(), entries, []string{dir})
+	require.NoError(t, err)
+	assert.Empty(t, fds)
+	for _, d := range compileDiags {
+		assert.NotContains(t, d.Message, "top secret content")
+	}
+}
+
 // --- ValidateFiles (inline path; no storage needed) ---
 
 func TestService_ValidateFiles_Inline_Success(t *testing.T) {

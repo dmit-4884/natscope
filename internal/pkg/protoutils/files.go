@@ -52,12 +52,22 @@ func ReadFilesFromPaths(paths []string) ([]entities.ProtoFileEntry, []entities.C
 			continue
 		}
 
-		info, err := os.Stat(p)
+		info, err := os.Lstat(p)
 		if err != nil {
 			diags = append(diags, entities.CompileDiagnostic{
 				Severity: entities.DiagnosticError,
 				File:     p,
 				Message:  fmt.Sprintf("file not accessible: %v", err),
+			})
+			continue
+		}
+		// Never read through symlinks, matching WalkProtoTree: a *.proto symlink
+		// could otherwise exfiltrate an arbitrary file and dodge the size cap.
+		if info.Mode()&os.ModeSymlink != 0 {
+			diags = append(diags, entities.CompileDiagnostic{
+				Severity: entities.DiagnosticError,
+				File:     p,
+				Message:  "symlink skipped",
 			})
 			continue
 		}

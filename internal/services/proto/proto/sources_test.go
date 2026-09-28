@@ -600,7 +600,7 @@ func TestValidateLocalPath(t *testing.T) {
 		require.NotNil(t, result)
 		assert.False(t, result.Valid)
 		require.NotNil(t, result.Error)
-		assert.Contains(t, *result.Error, "not accessible")
+		assert.Equal(t, localPathInvalidMessage, *result.Error)
 	})
 
 	t.Run("EmptyDirectory_NoProtoFiles", func(t *testing.T) {
@@ -615,7 +615,7 @@ func TestValidateLocalPath(t *testing.T) {
 		require.NotNil(t, result)
 		assert.False(t, result.Valid)
 		require.NotNil(t, result.Error)
-		assert.Contains(t, *result.Error, "no .proto files")
+		assert.Equal(t, localPathInvalidMessage, *result.Error)
 	})
 
 	t.Run("FileInsteadOfDirectory", func(t *testing.T) {
@@ -632,7 +632,32 @@ func TestValidateLocalPath(t *testing.T) {
 		require.NotNil(t, result)
 		assert.False(t, result.Valid)
 		require.NotNil(t, result.Error)
-		assert.Contains(t, *result.Error, "not a directory")
+		assert.Equal(t, localPathInvalidMessage, *result.Error)
+	})
+
+	// QA-073: nonexistent path, permission-denied, not-a-directory, and an
+	// existing directory with no .proto files must all be indistinguishable —
+	// otherwise ValidateLocalPath is an unauthenticated filesystem oracle.
+	t.Run("QA073_IndistinguishableFailureModes", func(t *testing.T) {
+		t.Parallel()
+		emptyDir := t.TempDir()
+		filePath := filepath.Join(t.TempDir(), "not-a-dir.proto")
+		require.NoError(t, os.WriteFile(filePath, []byte(`syntax = "proto3";`), 0o644))
+
+		svc := newTestService(nil, nil, nil, nil, nil)
+
+		missing, err := svc.ValidateLocalPath(t.Context(), "/nonexistent/path/xyz")
+		require.NoError(t, err)
+		empty, err := svc.ValidateLocalPath(t.Context(), emptyDir)
+		require.NoError(t, err)
+		notDir, err := svc.ValidateLocalPath(t.Context(), filePath)
+		require.NoError(t, err)
+
+		require.NotNil(t, missing.Error)
+		require.NotNil(t, empty.Error)
+		require.NotNil(t, notDir.Error)
+		assert.Equal(t, *missing.Error, *empty.Error)
+		assert.Equal(t, *missing.Error, *notDir.Error)
 	})
 
 	t.Run("NestedProtoFiles", func(t *testing.T) {
