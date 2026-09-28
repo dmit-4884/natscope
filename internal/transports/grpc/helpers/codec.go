@@ -7,11 +7,16 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 	"github.com/altessa-s/go-atlas/domain/converter/codec/durpb"
 	"github.com/altessa-s/go-atlas/domain/converter/codec/tspb"
+
+	"github.com/dmit-4884/natscope/internal/pkg/convcodecs"
 )
 
 // ProtoCodecs bridges converter gaps: time.Time<->tspb, time.Duration<->durpb.
 // WithIgnoreZero keeps zero values nil per proto3 presence semantics.
+// convcodecs.DurationSaturating runs before durpb so a Duration.AsDuration()
+// overflow saturates instead of silently wrapping (see its doc comment).
 var ProtoCodecs = converter.WithCodecs(
 	tspb.New(tspb.WithIgnoreZero()),
+	convcodecs.DurationSaturating,
 	durpb.New(durpb.WithIgnoreZero()),
 )
