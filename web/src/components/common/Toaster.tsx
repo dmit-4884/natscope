@@ -7,7 +7,8 @@ import { Toaster as SonnerToaster } from 'sonner'
 export default function Toaster() {
   return (
     <SonnerToaster
-      position="bottom-right"
+      position="top-right"
+      offset={{ top: 64 }}
       toastOptions={{
         duration: 3000,
         classNames: {
