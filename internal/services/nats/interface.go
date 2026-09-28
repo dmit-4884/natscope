@@ -137,7 +137,7 @@ type ConsumerManager interface {
 	) error
 
 	// PauseConsumer pauses until the RFC3339 pauseUntil; non-RFC3339 yields
-	// errs.ErrInvalidRequest.
+	// errs.NATSValidationError.
 	PauseConsumer(
 		ctx context.Context,
 		connectionID string,
@@ -146,13 +146,14 @@ type ConsumerManager interface {
 		pauseUntil string,
 	) (*entities.ConsumerPauseResponse, error)
 
-	// ResumeConsumer resumes a paused consumer immediately.
+	// ResumeConsumer resumes a paused consumer immediately, returning the
+	// server's actual post-resume state.
 	ResumeConsumer(
 		ctx context.Context,
 		connectionID string,
 		streamName string,
 		consumerName string,
-	) error
+	) (*entities.ConsumerPauseResponse, error)
 }
 
 // Publisher publishes messages to JetStream streams.

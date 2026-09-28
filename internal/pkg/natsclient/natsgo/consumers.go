@@ -258,7 +258,14 @@ func (c *Client) PauseConsumer(
 
 	pauseUntilTime, err := time.Parse(time.RFC3339, pauseUntil)
 	if err != nil {
-		return nil, wrapErr(fmt.Errorf("%w: invalid pause_until (must be RFC3339): %v", errs.ErrInvalidRequest, err))
+		// NATSValidationError (not the generic errs.ErrInvalidRequest) so the
+		// field-specific "must be RFC3339" message reaches the caller instead
+		// of being overwritten by ErrInvalidRequest's static "invalid request"
+		// mapping (QA-119).
+		return nil, wrapErr(&errs.NATSValidationError{
+			Description: fmt.Sprintf("invalid pause_until %q: must be RFC3339", pauseUntil),
+			Cause:       err,
+		})
 	}
 
 	// stream.PauseConsumer validates the consumer name client-side (rejecting
@@ -285,13 +292,15 @@ func (c *Client) PauseConsumer(
 	}, nil
 }
 
-// ResumeConsumer resumes a paused consumer immediately.
-func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumerName string) error {
+// ResumeConsumer resumes a paused consumer immediately, returning the
+// server's actual post-resume state (Paused is reported by NATS, not assumed
+// — see QA-119).
+func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumerName string) (*entities.ConsumerPauseResponse, error) {
 	if err := validateNATSNameLength("stream name", streamName); err != nil {
-		return wrapErr(err)
+		return nil, wrapErr(err)
 	}
 	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
-		return wrapErr(err)
+		return nil, wrapErr(err)
 	}
 
 	// See PauseConsumer: the SDK method validates the consumer name and maps
@@ -300,12 +309,17 @@ func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumer
 	// did not.
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
-		return wrapErr(err)
+		return nil, wrapErr(err)
 	}
 
-	if _, err := stream.ResumeConsumer(ctx, consumerName); err != nil {
-		return wrapErr(err)
+	resp, err := stream.ResumeConsumer(ctx, consumerName)
+	if err != nil {
+		return nil, wrapErr(err)
 	}
 
-	return nil
+	return &entities.ConsumerPauseResponse{
+		Paused:         resp.Paused,
+		PauseUntil:     &resp.PauseUntil,
+		PauseRemaining: resp.PauseRemaining,
+	}, nil
 }

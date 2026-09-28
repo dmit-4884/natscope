@@ -114,7 +114,10 @@ func (h *Handler) PauseConsumer(
 		PauseRemaining: durationpb.New(resp.PauseRemaining),
 	}
 	if resp.PauseUntil != nil {
-		s := resp.PauseUntil.Format(time.RFC3339)
+		// RFC3339Nano (not RFC3339): the plain form truncates fractional
+		// seconds, silently rounding down a pauseUntil like "...:00.5Z" to
+		// "...:00Z" in the response (QA-119).
+		s := resp.PauseUntil.Format(time.RFC3339Nano)
 		pbResp.PauseUntil = &s
 	}
 	return connect.NewResponse(pbResp), nil
@@ -126,13 +129,17 @@ func (h *Handler) ResumeConsumer(
 	req *connect.Request[managementpb.ResumeConsumerRequest],
 ) (*connect.Response[managementpb.ResumeConsumerResponse], error) {
 	in := req.Msg
-	if err := h.natsService.ResumeConsumer(
+	resp, err := h.natsService.ResumeConsumer(
 		ctx,
 		in.GetConnectionId(),
 		in.GetStreamName(),
 		in.GetConsumerName(),
-	); err != nil {
+	)
+	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&managementpb.ResumeConsumerResponse{Paused: false}), nil
+	// Report the server's actual post-resume state instead of a hardcoded
+	// false, which used to claim "not paused" even when the resume itself
+	// failed to take effect (QA-119).
+	return connect.NewResponse(&managementpb.ResumeConsumerResponse{Paused: resp.Paused}), nil
 }

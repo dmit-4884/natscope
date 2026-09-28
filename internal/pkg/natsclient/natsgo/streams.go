@@ -162,10 +162,19 @@ func (c *Client) GetStreamStats(ctx context.Context, streamName string) (*entiti
 
 // CreateStream creates a new JetStream stream with the given configuration.
 func (c *Client) CreateStream(ctx context.Context, config entities.StreamCreateRequest) (*entities.StreamInfo, error) {
+	rawName := config.Name
 	_ = normalizer.Normalize(&config) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
 	if err := validateNATSNameLength("stream name", config.Name); err != nil {
 		return nil, wrapErr(err)
+	}
+	// GetStream/DeleteStream/UpdateStream don't trim, so a padded name here
+	// created a stream the caller could never look up again with the exact
+	// string they sent — reject instead of silently trimming (QA-117).
+	if rawName != config.Name {
+		return nil, wrapErr(&errs.NATSValidationError{
+			Description: fmt.Sprintf("stream name %q must not have leading/trailing whitespace", rawName),
+		})
 	}
 	// ListStreams/GetAllStreamsStats hide "$"-prefixed names (reserved for
 	// system streams); creating one there would make it invisible in the UI
