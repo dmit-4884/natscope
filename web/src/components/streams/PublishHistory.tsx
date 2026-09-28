@@ -106,18 +106,38 @@ export default function PublishHistory({ streamName, connectionId, connectionUrl
     }
   }, [streamName])
 
-  const { data: history = [], isLoading, error, refetch } = usePublishHistory(connectionId, connectionUrl || undefined, {
+  const {
+    data: history = [],
+    isLoading: isLoadingAll,
+    error: allError,
+    refetch: refetchAll,
+  } = usePublishHistory(connectionId, connectionUrl || undefined, {
     pageSize: HISTORY_PAGE_SIZE,
   })
+  const {
+    data: historyForStream = [],
+    isLoading: isLoadingStream,
+    error: streamError,
+    refetch: refetchStream,
+  } = usePublishHistory(connectionId, connectionUrl || undefined, {
+    pageSize: HISTORY_PAGE_SIZE,
+    stream: !showAllStreams && streamName ? streamName : undefined,
+  })
+  const isLoading = showAllStreams ? isLoadingAll : isLoadingAll || isLoadingStream
+  const error = allError ?? (showAllStreams ? null : streamError)
+  const refetch = () => Promise.all([refetchAll(), refetchStream()])
 
   const streamHistory = useMemo(() => {
     if (showAllStreams || !streamName) return history
-    return history.filter(
-      (entry) =>
-        entry.stream === streamName ||
-        (!entry.success && !entry.stream && !!entry.subject_pattern && subjects.includes(entry.subject_pattern)),
-    )
-  }, [history, showAllStreams, streamName, subjects])
+    const byId = new Map<string, PublishHistoryEntry>()
+    for (const entry of historyForStream) byId.set(entry.id, entry)
+    for (const entry of history) {
+      if (!entry.success && !entry.stream && !!entry.subject_pattern && subjects.includes(entry.subject_pattern)) {
+        byId.set(entry.id, entry)
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) => b.created_at - a.created_at)
+  }, [history, historyForStream, showAllStreams, streamName, subjects])
 
   const filteredHistory = useMemo(() => {
     if (!searchTerm) return streamHistory

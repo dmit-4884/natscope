@@ -14,8 +14,8 @@ export function usePublishHistory(
   { stream, pageSize }: PublishHistoryOptions = {},
 ) {
   return useConnectionQuery({
-    key: ['publishHistory', connectionUrl ?? null, stream ?? null],
+    key: ['publishHistory', connectionId ?? null, connectionUrl ?? null, stream ?? null],
     connectionId: connectionId ?? null,
-    fetcher: (signal) => getPublishHistory(connectionUrl, stream, signal, pageSize),
+    fetcher: (signal) => getPublishHistory(connectionId ?? undefined, connectionUrl, stream, signal, pageSize),
   })
 }

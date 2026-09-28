@@ -232,7 +232,7 @@ export default function ConnectionEditPage({ mode }: Props) {
             name,
             description,
             urls,
-            auth: toApiAuthConfig(buildAuth({ explicit: true })),
+            auth: toApiAuthConfig(buildAuth({ explicit: true }), { explicit: true }),
             tls: toApiTlsConfig(form.tls, { explicit: true }),
           },
         })

@@ -198,9 +198,18 @@ function toSavedConnection(proto: ProtoSavedConnection): SavedConnection {
   return result
 }
 
+// Walks every page (B-3): a single pageSize:500 request silently dropped
+// connections past the 500th, since the server caps page_size at 500 and the
+// caller never followed next_page_token.
 export async function getConnections(): Promise<SavedConnection[]> {
-  const response = await connectionsClient.listConnections({ pageSize: 500, pageToken: '' })
-  return (response.connections || []).map(toSavedConnection)
+  const all: SavedConnection[] = []
+  let pageToken = ''
+  do {
+    const response = await connectionsClient.listConnections({ pageSize: 500, pageToken })
+    all.push(...(response.connections || []).map(toSavedConnection))
+    pageToken = response.nextPageToken || ''
+  } while (pageToken)
+  return all
 }
 
 export async function createConnection(req: CreateConnectionRequest): Promise<SavedConnection> {
