@@ -1,6 +1,7 @@
 import { getHealth } from '@/api/stats'
 import { useConnectionQuery } from '@/hooks/useConnectionQuery'
 import { resolveConnectionStatus, type ConnectionStatus } from '../../domain/value-objects/ConnectionStatus'
+import { isTransientHealthError } from './connectionHealthError'
 
 const HEALTH_POLL_INTERVAL_MS = 5_000
 
@@ -19,6 +20,7 @@ export function useConnectionHealth(connectionId: string | null) {
     reported: health?.status,
     isPending: !!connectionId && isPending,
     hasError: !!error,
+    isTransientError: isTransientHealthError(error),
   })
 
   return {

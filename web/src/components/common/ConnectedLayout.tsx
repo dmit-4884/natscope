@@ -91,28 +91,39 @@ export default function ConnectedLayout() {
     }
   }, [connectionId, navigate])
 
-  const handleDisconnect = useCallback(async () => {
-    setCurrentConnection(null)
-    setConnectionId(null)
-    clearActiveConnection()
-    resetAllStores()
+  const dropConnectionQueries = useCallback(async () => {
     // Every connection-scoped query lives under [CONNECTION_QUERY_PREFIX, ...],
     // so cancel+removeQueries on that prefix drops them all; global list stays.
     const filter = { queryKey: [CONNECTION_QUERY_PREFIX] }
     await queryClient.cancelQueries(filter)
     queryClient.removeQueries(filter)
-    navigate('/', { replace: true })
-  }, [queryClient, navigate])
+  }, [queryClient])
 
-  // Handle invalid connection (lazy connect failed on backend). This layout
-  // unmounts as part of the disconnect, so the notice has to be a toast.
-  const handleInvalidConnection = useCallback((error: unknown) => {
+  const handleDisconnect = useCallback(async () => {
+    setCurrentConnection(null)
+    setConnectionId(null)
+    clearActiveConnection()
+    resetAllStores()
+    await dropConnectionQueries()
+    navigate('/', { replace: true })
+  }, [dropConnectionQueries, navigate])
+
+  // Handle invalid connection (lazy connect failed on backend, or the
+  // connection stayed unreachable long enough to give up). This is a forced
+  // disconnect, not a user-initiated one — session drafts stay put, so a
+  // reconnect (to this or another connection) doesn't lose unsaved work.
+  const handleInvalidConnection = useCallback(async (error: unknown) => {
     logger.warn('Connection is no longer valid, disconnecting...')
     const name = currentConnection?.name
     const detail = getErrorMessage(error)
-    toast.error(name ? `Disconnected from "${name}": ${detail}` : `Disconnected: ${detail}`)
-    handleDisconnect()
-  }, [currentConnection?.name, handleDisconnect])
+    const message = name ? `Disconnected from "${name}": ${detail}` : `Disconnected: ${detail}`
+    toast.error(message)
+    setCurrentConnection(null)
+    setConnectionId(null)
+    clearActiveConnection()
+    await dropConnectionQueries()
+    navigate('/', { replace: true, state: { disconnectReason: message } })
+  }, [currentConnection?.name, dropConnectionQueries, navigate])
 
   useConnectionValidation(connectionId, handleInvalidConnection)
 

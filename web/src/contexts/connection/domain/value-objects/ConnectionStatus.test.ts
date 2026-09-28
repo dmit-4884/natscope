@@ -31,4 +31,10 @@ describe('resolveConnectionStatus', () => {
   it('falls back to disconnected when the query is idle with no data', () => {
     expect(resolveConnectionStatus({ isPending: false, hasError: false })).toBe('disconnected')
   })
+
+  it('reports reconnecting, not disconnected, for a transient health error', () => {
+    expect(
+      resolveConnectionStatus({ isPending: false, hasError: true, isTransientError: true }),
+    ).toBe('reconnecting')
+  })
 })

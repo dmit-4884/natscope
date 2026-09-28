@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from '@/utils/toast'
 import { getErrorMessage, stripErrorCodePrefix } from '@/api/errors'
 import { useRowKeys } from '@/hooks/useRowKeys'
@@ -18,20 +18,28 @@ import {
   useTestConnection,
   type AuthMethod,
 } from '@/contexts/connection'
-import { BoltIcon, CloseIcon, EyeIcon, EyeOffIcon, Input, PlusIcon, Spinner } from '@/components/ui'
+import { Alert, BoltIcon, CloseIcon, EyeIcon, EyeOffIcon, Input, PlusIcon, QueryErrorState, Spinner } from '@/components/ui'
 import { AUTH_LABELS } from './manager/connectionFormData'
 
 type AuthMethodTab = AuthMethod
 
 export default function ConnectionSelector() {
   const navigate = useNavigate()
-  const { data: savedConnections = [], isLoading: loadingConnections } = useConnections()
+  const location = useLocation()
+  const {
+    data: savedConnections = [],
+    isLoading: loadingConnections,
+    error: connectionsError,
+    refetch: refetchConnections,
+  } = useConnections()
   const createConnectionMutation = useCreateConnection()
   const testConnectionMutation = useTestConnection()
 
   const [showNewForm, setShowNewForm] = useState(false)
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const [error, setError] = useState<{ id: string; message: string } | null>(null)
+  const disconnectReason = (location.state as { disconnectReason?: string } | null)?.disconnectReason
+  const [dismissedDisconnectReason, setDismissedDisconnectReason] = useState(false)
 
   // New connection form state
   const [newName, setNewName] = useState('')
@@ -51,7 +59,7 @@ export default function ConnectionSelector() {
   // Auto-reconnect
   const hasCheckedRef = useRef(false)
   useEffect(() => {
-    if (hasCheckedRef.current || loadingConnections) return
+    if (hasCheckedRef.current || loadingConnections || connectionsError) return
     hasCheckedRef.current = true
 
     const activeConnId = getActiveConnectionId()
@@ -64,7 +72,7 @@ export default function ConnectionSelector() {
     }
 
     navigate('/streams')
-  }, [loadingConnections, savedConnections, navigate])
+  }, [loadingConnections, connectionsError, savedConnections, navigate])
 
   // Probe the server before entering the app: a dead server used to be
   // discovered only after navigating, which bounced the user back silently.
@@ -210,6 +218,17 @@ export default function ConnectionSelector() {
   return (
     <div className="flex-1 flex items-center justify-center bg-surface-secondary">
       <div className="max-w-lg w-full mx-4">
+        {disconnectReason && !dismissedDisconnectReason && (
+          <Alert
+            variant="warning"
+            dismissible
+            onDismiss={() => setDismissedDisconnectReason(true)}
+            className="mb-4"
+          >
+            {disconnectReason}
+          </Alert>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg mb-4">
@@ -230,6 +249,12 @@ export default function ConnectionSelector() {
                 </svg>
                 Loading connections...
               </div>
+            ) : connectionsError ? (
+              <QueryErrorState
+                error={connectionsError}
+                onRetry={() => void refetchConnections()}
+                className="bg-surface-primary rounded-lg shadow-sm border border-border mb-4"
+              />
             ) : savedConnections.length > 0 ? (
               <div className="bg-surface-primary rounded-lg shadow-sm border border-border overflow-hidden mb-4">
                 <div className="px-4 py-3 bg-surface-secondary border-b border-border">
