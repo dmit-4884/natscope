@@ -18,6 +18,15 @@ Two sources, environment wins:
 Nested YAML keys map to environment variables with double underscores. `logger.level` becomes
 `LOGGER__LEVEL`, `storage.local.dataDir` becomes `STORAGE__LOCAL__DATA_DIR`.
 
+The config file must end in `.yaml` or `.yml`, and an unknown or misspelled key fails the load. An
+environment variable set to an empty string counts as unset. Boolean values accept `true`/`false`,
+`yes`/`no`, `on`/`off` and `y`/`n` in both sources.
+
+A `$NAME` inside the file is replaced with that environment variable, and a reference to an undefined
+variable fails the load. Write a literal `$` (for example in a password) as `$$`.
+
+A `.env` file in the working directory is loaded only when `NATSCOPE_DOTENV=1` is set.
+
 ```bash
 natscope --config /etc/natscope/config.yaml
 CONFIG_FILE=/etc/natscope/config.yaml natscope
@@ -28,7 +37,8 @@ in the repository.
 
 ::: tip Env prefix
 Environment keys carry a prefix that is set at build time. Released binaries ship with no prefix, so the
-names below are used as written. Run `natscope version --full` to print the active prefix.
+names below are used as written. A build with prefix `QA` reads `QA_GRPC_WEB_ADDRESS`, `QA_LIB_DIR` and
+so on. Run `natscope version --full` to print the active prefix.
 :::
 
 ## Keys
@@ -40,6 +50,7 @@ names below are used as written. Run `natscope version --full` to print the acti
 | `grpcWebAddress` | `GRPC_WEB_ADDRESS` | `127.0.0.1:4280` | Address serving the API and the embedded UI |
 | `allowRemote` | `ALLOW_REMOTE` | `false` | Permit a non-loopback bind |
 | `allowInsecure` | `ALLOW_INSECURE` | `false` | Permit a non-loopback bind with no basic auth |
+| `allowedHosts` | `ALLOWED_HOSTS` | unset | Comma-separated host names accepted in the `Host` header besides `localhost` and IP addresses |
 | `webAuth.username` | `WEB_AUTH__USERNAME` | unset | HTTP basic auth username for the whole listener |
 | `webAuth.password` | `WEB_AUTH__PASSWORD` | unset | HTTP basic auth password |
 
@@ -97,8 +108,15 @@ http:
     enabled: true
 ```
 
-Keep it on loopback. These endpoints expose runtime internals and carry no authentication. A
-non-loopback bind here needs `ALLOW_INSECURE=true`.
+Keep it on loopback (`127.0.0.1:port` or `[::1]:port`). These endpoints expose runtime internals and carry
+no authentication. A non-loopback bind here, including a bare `:port`, needs both `ALLOW_REMOTE=true` and
+`ALLOW_INSECURE=true`, and pprof stays off on it regardless of configuration.
+
+### Memory
+
+| Env | Default | What it does |
+|-----|---------|--------------|
+| `NATSCOPE_MEMORY_LIMIT_BYTES` | 512 MiB | Soft heap limit; a byte count or a `256MiB`/`1GiB` value. `GOMEMLIMIT` wins when set |
 
 ## Example
 

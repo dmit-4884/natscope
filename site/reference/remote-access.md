@@ -34,7 +34,14 @@ prominent warning and leaves the API open to anyone who can route to it. The pub
 it, because the container binds all its interfaces for `-p` mapping to work; that is why the run command
 publishes on `127.0.0.1`.
 
-The same flag gates a non-loopback bind for the optional internal HTTP server (health, metrics, pprof).
+The optional internal HTTP server (health, metrics, pprof) needs both `ALLOW_REMOTE=true` and
+`ALLOW_INSECURE=true` for a non-loopback bind, and pprof stays off there.
+
+## Host names
+
+Every request's `Host` header is checked against DNS rebinding. `localhost` and IP addresses always work.
+To reach Natscope through a host name, such as a reverse proxy's public name, list it in `allowedHosts`
+(`ALLOWED_HOSTS=natscope.example.com`). With basic auth on and the list empty, any host name is accepted.
 
 ## There is no TLS
 
