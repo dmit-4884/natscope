@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Button, CloseIcon, PlusIcon } from '@/components/ui'
 import { useRowKeys } from '@/hooks/useRowKeys'
+import { isValidHeaderName } from './headerValidation'
 
 export interface HeaderEntry {
   key: string
@@ -83,8 +84,10 @@ export function HeadersEditor({ headers, onAdd, onRemove, onUpdate }: Props) {
       {headers.length > 0 && (
         <div className="space-y-2">
           {headers.map((header, index) => {
-            const known = KNOWN_HEADERS[header.key.trim()]
-            const isDuplicate = duplicateKeys.has(header.key.trim().toLowerCase())
+            const trimmedKey = header.key.trim()
+            const known = KNOWN_HEADERS[trimmedKey]
+            const isDuplicate = duplicateKeys.has(trimmedKey.toLowerCase())
+            const isInvalid = trimmedKey.length > 0 && !isValidHeaderName(trimmedKey)
             return (
               <div key={rowKeys.keys[index]}>
                 <div className="flex items-center gap-2">
@@ -93,10 +96,13 @@ export function HeadersEditor({ headers, onAdd, onRemove, onUpdate }: Props) {
                     onChange={(e) => onUpdate(index, 'key', e.target.value)}
                     placeholder="Key"
                     list={DATALIST_ID}
+                    aria-invalid={isInvalid}
                     className={`flex-1 rounded-md border px-3 py-2 text-sm focus:ring-1 focus:outline-none ${
-                      isDuplicate
-                        ? 'border-amber-400 bg-status-warning-bg focus:border-status-warning-border focus:ring-status-warning-border'
-                        : 'border-border-strong focus:border-border-focus focus:ring-border-focus'
+                      isInvalid
+                        ? 'border-status-error-border bg-status-error-bg focus:border-status-error-border focus:ring-status-error-border'
+                        : isDuplicate
+                          ? 'border-amber-400 bg-status-warning-bg focus:border-status-warning-border focus:ring-status-warning-border'
+                          : 'border-border-strong focus:border-border-focus focus:ring-border-focus'
                     }`}
                   />
                   <input
@@ -114,12 +120,17 @@ export function HeadersEditor({ headers, onAdd, onRemove, onUpdate }: Props) {
                     <CloseIcon className="w-4 h-4 text-content-muted hover:text-red-500" />
                   </Button>
                 </div>
-                {isDuplicate && (
+                {isInvalid && (
+                  <p className="mt-0.5 text-xs text-status-error-text" data-testid="header-invalid-name">
+                    Invalid header name — letters, digits, and {"!#$%&'*+-.^_`|~"} only. It would be dropped, not sent.
+                  </p>
+                )}
+                {isDuplicate && !isInvalid && (
                   <p className="mt-0.5 text-xs text-status-warning-text" data-testid="header-duplicate-warning">
                     Duplicate key — only one value will be sent.
                   </p>
                 )}
-                {known && !isDuplicate && (
+                {known && !isDuplicate && !isInvalid && (
                   <p className="mt-0.5 text-xs text-content-muted" data-testid="header-hint">
                     {known.hint}
                   </p>

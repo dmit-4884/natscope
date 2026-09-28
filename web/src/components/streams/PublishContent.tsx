@@ -16,6 +16,7 @@ import { plural } from '@/utils/plural'
 import { SubjectDropdown } from './publish/SubjectDropdown'
 import { EditableSubject } from './publish/EditableSubject'
 import { HeadersEditor, type HeaderEntry } from './publish/HeadersEditor'
+import { isValidHeaderName } from './publish/headerValidation'
 import { EncodingModeSelector, type EncodingMode } from './publish/EncodingModeSelector'
 import { ValidationResultDisplay } from './publish/ValidationResultDisplay'
 import { TemplateMenu } from './publish/TemplateMenu'
@@ -268,13 +269,22 @@ export default function PublishContent({
     return missing
   }, [subjectPattern, wildcardValues])
 
+  const hasInvalidHeaderName = useMemo(
+    () => headers.some((h) => h.key.trim().length > 0 && !isValidHeaderName(h.key.trim())),
+    [headers],
+  )
+
   const publishDisabledReason = useMemo(() => {
     if (!subjectPattern) return 'Select a subject pattern'
     if (unfilledWildcards > 0) return `Fill ${plural(unfilledWildcards, 'wildcard slot')}`
     if (!messageJson.trim()) return 'Message body is empty'
     if (jsonError) return 'Fix the JSON syntax error below'
+    // A header name outside RFC 7230's token grammar is silently dropped on
+    // encode — publishing anyway would look like success while losing data
+    // the user believes they sent (QA-162).
+    if (hasInvalidHeaderName) return 'Fix the invalid header name below'
     return null
-  }, [subjectPattern, unfilledWildcards, messageJson, jsonError])
+  }, [subjectPattern, unfilledWildcards, messageJson, jsonError, hasInvalidHeaderName])
 
   const canPublish = publishDisabledReason === null
 

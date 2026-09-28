@@ -61,11 +61,19 @@ vi.mock('@/components/common/editor/JsonCodeMirror', () => ({
   ),
 }))
 
-function Harness({ initialPattern = 'orders.created', initialJson = '{}' }) {
+function Harness({
+  initialPattern = 'orders.created',
+  initialJson = '{}',
+  initialHeaders = [],
+}: {
+  initialPattern?: string
+  initialJson?: string
+  initialHeaders?: HeaderEntry[]
+}) {
   const [subjectPattern, setSubjectPattern] = useState(initialPattern)
   const [wildcardValues, setWildcardValues] = useState<string[]>([])
   const [messageJson, setMessageJson] = useState(initialJson)
-  const [headers, setHeaders] = useState<HeaderEntry[]>([])
+  const [headers, setHeaders] = useState<HeaderEntry[]>(initialHeaders)
 
   return (
     <PublishContent
@@ -182,5 +190,25 @@ describe('PublishContent template loading', () => {
     expect(screen.getByTestId('json-editor')).toHaveValue('{ broken')
     expect(publishButton()).toBeDisabled()
     expect(screen.getByTestId('publish-disabled-reason')).toBeInTheDocument()
+  })
+})
+
+// QA-162: a header key outside the RFC 7230 token grammar is silently
+// dropped on encode, so Publish must block on it with a visible reason
+// instead of reporting a false "success".
+describe('PublishContent header name validation', () => {
+  it('blocks publishing when a header key is not a valid header name', async () => {
+    await renderPublish({ initialHeaders: [{ key: 'Bad Key', value: 'v' }] })
+
+    expect(publishButton()).toBeDisabled()
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent(/header name/i)
+    expect(screen.getByTestId('header-invalid-name')).toBeInTheDocument()
+  })
+
+  it('allows publishing once the invalid header key is fixed', async () => {
+    await renderPublish({ initialHeaders: [{ key: 'X-Ok', value: 'v' }] })
+
+    expect(screen.queryByTestId('header-invalid-name')).toBeNull()
+    expect(publishButton()).toBeEnabled()
   })
 })
