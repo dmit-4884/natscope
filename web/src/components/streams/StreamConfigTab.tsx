@@ -72,27 +72,35 @@ export default function StreamConfigTab() {
 
   const handleUpdate = async () => {
     if (!pendingUpdate) return
-    await updateStream.mutateAsync({
-      name: streamName,
-      config: pendingUpdate.next,
-    })
-    setShowDiffModal(false)
-    handleCancelEdit()
-    refetch()
+    try {
+      await updateStream.mutateAsync({
+        name: streamName,
+        config: pendingUpdate.next,
+      })
+      setShowDiffModal(false)
+      handleCancelEdit()
+      refetch()
+    } catch {
+      /* toasted by the mutation hook; keep the diff modal open */
+    }
   }
 
   const handleConfirmAction = async (purgeOptions?: StreamPurgeRequest) => {
     if (!confirmAction) return
-    if (confirmAction === 'delete') {
-      await deleteStream.mutateAsync(streamName)
-      navigate(`/streams`)
-    } else if (confirmAction === 'purge') {
-      await purgeStream.mutateAsync({ name: streamName, options: purgeOptions })
-    } else if (confirmAction === 'seal') {
-      await sealStream.mutateAsync(streamName)
+    try {
+      if (confirmAction === 'delete') {
+        await deleteStream.mutateAsync(streamName)
+        navigate(`/streams`)
+      } else if (confirmAction === 'purge') {
+        await purgeStream.mutateAsync({ name: streamName, options: purgeOptions })
+      } else if (confirmAction === 'seal') {
+        await sealStream.mutateAsync(streamName)
+      }
+      setConfirmAction(null)
+      refetch()
+    } catch {
+      /* toasted by the mutation hook; keep the confirm dialog open */
     }
-    setConfirmAction(null)
-    refetch()
   }
 
   if (isStreamNotFound(error)) {
