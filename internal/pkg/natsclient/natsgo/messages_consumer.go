@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -23,11 +24,21 @@ import (
 // browse consumer alive if our defer DeleteConsumer gets killed mid-flight.
 const browseConsumerInactiveThreshold = 10 * time.Second
 
-// backwardFetchMultiplier widens the fetch when paginating backward, since
-// consumers can't address by sequence (over-pull and trim client-side).
+// backwardFetchMultiplier sizes the initial backward browse window
+// (limit*backwardFetchMultiplier sequences), since consumers can't address by
+// sequence directly (over-pull and trim client-side).
 const backwardFetchMultiplier = 2
 
-// getMessagesViaConsumer fetches via an ordered consumer (best for
+// backwardWidenFactor grows the backward browse window on each retry when a
+// deletion gap leaves fewer than limit+1 live messages in it.
+const backwardWidenFactor = 4
+
+// backwardWidenAttempts bounds how many times the window widens — enough to
+// bridge realistic deletion gaps (each retry ×4's the window) without
+// unbounded ephemeral-consumer churn on a pathological stream.
+const backwardWidenAttempts = 6
+
+// getMessagesViaConsumer fetches via an ephemeral consumer (best for
 // filtered/sparse streams); rejects WorkQueue since AckNone would drain it.
 func (c *Client) getMessagesViaConsumer(
 	ctx context.Context,
@@ -43,50 +54,87 @@ func (c *Client) getMessagesViaConsumer(
 	}
 
 	info := stream.CachedInfo()
-
 	if info != nil && info.Config.Retention == jetstream.WorkQueuePolicy {
 		return nil, errs.ErrWorkQueueConsumerNotAllowed
 	}
+	// A never-written stream has no valid start sequence for
+	// DeliverByStartSequencePolicy; the server rejects that with a confusing
+	// "optional start sequence is not set" instead of an empty page (QA-059).
+	if info != nil && info.State.Msgs == 0 {
+		return &entities.MessagesResponse{Messages: []*entities.Message{}, HasMore: false}, nil
+	}
 
-	deliverPolicy := jetstream.DeliverByStartSequencePolicy
 	var filterSubjects []string
 	if subjectFilter != "" {
 		filterSubjects = []string{subjectFilter}
 	}
 
-	var optStartSeq uint64
-
 	if direction == "forward" {
-		if startSeq > 0 {
-			optStartSeq = startSeq
-		} else {
+		optStartSeq := startSeq
+		if optStartSeq == 0 {
 			optStartSeq = info.State.FirstSeq
 		}
-	} else {
-		endSeq := startSeq
-		if endSeq == 0 {
-			endSeq = info.State.LastSeq
-		}
+		return c.consumeBrowseBatch(ctx, stream, info, optStartSeq, startSeq, filterSubjects, limit, direction)
+	}
 
+	endSeq := startSeq
+	if endSeq == 0 {
+		endSeq = info.State.LastSeq
+	}
+
+	window := uint64(limit+1) * backwardFetchMultiplier
+
+	var resp *entities.MessagesResponse
+	for attempt := 0; attempt < backwardWidenAttempts; attempt++ {
 		fetchStart := uint64(1)
-		if endSeq > uint64(limit)*backwardFetchMultiplier {
-			fetchStart = endSeq - uint64(limit)*backwardFetchMultiplier
+		if endSeq > window {
+			fetchStart = endSeq - window
 		}
 		if fetchStart < info.State.FirstSeq {
 			fetchStart = info.State.FirstSeq
 		}
 
-		optStartSeq = fetchStart
+		resp, err = c.consumeBrowseBatch(ctx, stream, info, fetchStart, startSeq, filterSubjects, limit, direction)
+		if err != nil {
+			return nil, err
+		}
+
+		// Enough live/matching messages, or the window already reaches the
+		// true start of the stream — widening further can't surface more
+		// (QA-016, QA-017: a deletion gap or sparse subject filter previously
+		// left the browse window undersized, and "found fewer than the window
+		// implies" was wrongly read as "reached the start of the stream").
+		if len(resp.Messages) > limit || fetchStart <= info.State.FirstSeq {
+			break
+		}
+		window *= backwardWidenFactor
 	}
 
+	return resp, nil
+}
+
+// consumeBrowseBatch creates a short-lived ephemeral consumer starting at
+// optStartSeq, pulls one window's worth of messages, and shapes the result
+// for direction (reversing + trimming to limit for backward). startSeq is the
+// original request's upper bound (0 = the stream's current LastSeq); for
+// backward direction, anything delivered past it is discarded.
+func (c *Client) consumeBrowseBatch(
+	ctx context.Context,
+	stream jetstream.Stream,
+	info *jetstream.StreamInfo,
+	optStartSeq uint64,
+	startSeq uint64,
+	filterSubjects []string,
+	limit int,
+	direction string,
+) (*entities.MessagesResponse, error) {
 	ephCfg := jetstream.ConsumerConfig{
-		DeliverPolicy:     deliverPolicy,
+		DeliverPolicy:     jetstream.DeliverByStartSequencePolicy,
 		OptStartSeq:       optStartSeq,
 		AckPolicy:         jetstream.AckNonePolicy,
 		InactiveThreshold: browseConsumerInactiveThreshold,
 		Name:              fmt.Sprintf("natscope-browse-%s", nats.NewInbox()[7:]),
 	}
-
 	if len(filterSubjects) == 1 {
 		ephCfg.FilterSubject = filterSubjects[0]
 	} else if len(filterSubjects) > 1 {
@@ -101,10 +149,22 @@ func (c *Client) getMessagesViaConsumer(
 		_ = stream.DeleteConsumer(ctx, ephCfg.Name) //nolint:errcheck // best-effort cleanup
 	}()
 
+	endSeq := startSeq
 	fetchLimit := limit + 1 // +1 for hasMore detection
 	if direction == DefaultDirection {
-		// For backward, over-fetch to collect enough messages up to startSeq.
-		fetchLimit = (limit + 1) * backwardFetchMultiplier
+		if endSeq == 0 {
+			endSeq = info.State.LastSeq
+		}
+		// Cover the whole requested window (endSeq-optStartSeq), not just
+		// limit*2: a widened window (see getMessagesViaConsumer) needs a
+		// matching fetch cap, or the consumer exhausts its budget delivering
+		// the oldest messages in the window before ever reaching the newer
+		// ones near endSeq that the caller actually asked for.
+		if endSeq >= optStartSeq {
+			span := endSeq - optStartSeq + 1
+			fetchLimit = int(min(span, uint64(DefaultSearchRange)))
+		}
+		fetchLimit = max(fetchLimit, limit+1)
 	}
 
 	batch, err := consumer.FetchNoWait(fetchLimit)
@@ -112,22 +172,24 @@ func (c *Client) getMessagesViaConsumer(
 		return nil, wrapErr(coreerrs.Wrap(err, "fetch messages"))
 	}
 
-	messages := make([]*entities.Message, 0, fetchLimit)
+	messages := make([]*entities.Message, 0, min(fetchLimit, limit+1))
 	for msg := range batch.Messages() {
 		meta, metaErr := msg.Metadata()
 		if metaErr != nil || meta == nil {
 			continue
 		}
 
-		// For backward direction, skip messages after startSeq.
-		if direction == DefaultDirection && startSeq > 0 && meta.Sequence.Stream > startSeq {
+		// For backward direction, skip messages after the requested upper
+		// bound.
+		if direction == DefaultDirection && endSeq > 0 && meta.Sequence.Stream > endSeq {
 			continue
 		}
 
 		headers := make(map[string]string)
 		hdrs := msg.Headers()
-		for k := range hdrs {
-			headers[k] = hdrs.Get(k)
+		for k, v := range hdrs {
+			// Join every value instead of keeping only the first (QA-057).
+			headers[k] = strings.Join(v, ", ")
 		}
 
 		messages = append(messages, &entities.Message{

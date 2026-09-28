@@ -5,6 +5,7 @@ package natsgo
 
 import (
 	"context"
+	"errors"
 
 	"github.com/nats-io/nats.go/jetstream"
 
@@ -15,6 +16,12 @@ import (
 // exactSubjectScanRange bounds the backward probe for exact-subject matches on
 // huge streams.
 const exactSubjectScanRange = 1000
+
+// wildcardFetchBatch is the sequence-window size per wildcard-filter fetch
+// pass; keeps the in-memory RawStreamMsg set proportional to what's actually
+// needed instead of always pulling up to DefaultSearchRange messages
+// regardless of limit (QA-021).
+const wildcardFetchBatch = 200
 
 // getMessagesWithSubjectFilter dispatches exact subjects to the per-subject
 // helper, wildcards to a range walk with client-side filter.
@@ -27,15 +34,75 @@ func (c *Client) getMessagesWithSubjectFilter(
 	limit int,
 	direction string,
 ) (*entities.MessagesResponse, error) {
+	// A never-written stream has no live sequence range to search; without
+	// this, both the exact and wildcard paths below build seq-based requests
+	// off State.FirstSeq/LastSeq that the server rejects as "bad request"
+	// instead of returning an empty page (QA-059).
+	if info.State.Msgs == 0 {
+		return &entities.MessagesResponse{Messages: []*entities.Message{}, HasMore: false}, nil
+	}
+
 	if !containsWildcard(subjectFilter) {
-		return c.getMessagesForExactSubject(ctx, stream, info, subjectFilter, startSeq, limit)
+		if direction == "forward" {
+			return c.getMessagesForExactSubjectForward(ctx, stream, info, subjectFilter, startSeq, limit)
+		}
+		return c.getMessagesForExactSubjectBackward(ctx, stream, info, subjectFilter, startSeq, limit)
 	}
 	return c.getMessagesForWildcardSubject(ctx, stream, info, subjectFilter, startSeq, limit, direction)
 }
 
-// getMessagesForExactSubject walks backward from the latest match, fetching by
-// sequence and rejecting mismatches, capped at exactSubjectScanRange.
-func (c *Client) getMessagesForExactSubject(
+// getMessagesForExactSubjectForward walks forward using JetStream's
+// server-side subject index (next_by_subj) instead of a client-side scan, so
+// it — unlike the previous single "backward from newest" implementation that
+// ignored direction entirely — actually returns the oldest matches first
+// (QA-020).
+func (c *Client) getMessagesForExactSubjectForward(
+	ctx context.Context,
+	stream jetstream.Stream,
+	info *jetstream.StreamInfo,
+	subjectFilter string,
+	startSeq uint64,
+	limit int,
+) (*entities.MessagesResponse, error) {
+	cursor := startSeq
+	if cursor == 0 {
+		cursor = info.State.FirstSeq
+	}
+
+	messages := make([]*entities.Message, 0, limit)
+	lastSeq := cursor
+	for len(messages) < limit+1 {
+		msg, err := stream.GetMsg(ctx, cursor, jetstream.WithGetMsgSubject(subjectFilter))
+		if err != nil {
+			if errors.Is(err, jetstream.ErrMsgNotFound) {
+				break
+			}
+			return nil, wrapErr(err)
+		}
+		messages = append(messages, toMessage(msg))
+		lastSeq = msg.Sequence
+		cursor = msg.Sequence + 1
+	}
+
+	hasMore := len(messages) > limit
+	if hasMore {
+		messages = messages[:limit]
+		lastSeq = messages[limit-1].Sequence
+	}
+
+	nextSeq := calculateNextSeq(hasMore, "forward", lastSeq, info)
+
+	return &entities.MessagesResponse{
+		Messages: messages,
+		HasMore:  hasMore,
+		NextSeq:  nextSeq,
+	}, nil
+}
+
+// getMessagesForExactSubjectBackward walks backward from the latest match,
+// fetching by sequence and rejecting mismatches, capped at
+// exactSubjectScanRange.
+func (c *Client) getMessagesForExactSubjectBackward(
 	ctx context.Context,
 	stream jetstream.Stream,
 	info *jetstream.StreamInfo,
@@ -48,10 +115,16 @@ func (c *Client) getMessagesForExactSubject(
 	if startSeq == 0 {
 		lastMsg, err := stream.GetLastMsgForSubject(ctx, subjectFilter)
 		if err != nil {
-			return &entities.MessagesResponse{
-				Messages: []*entities.Message{},
-				HasMore:  false,
-			}, nil
+			// No message on this subject is expected (empty result), but any
+			// other failure (permissions, transient, ...) must not be silently
+			// swallowed into a successful empty response (QA-020).
+			if errors.Is(err, jetstream.ErrMsgNotFound) {
+				return &entities.MessagesResponse{
+					Messages: []*entities.Message{},
+					HasMore:  false,
+				}, nil
+			}
+			return nil, wrapErr(err)
 		}
 		startSeq = lastMsg.Sequence
 		messages = append(messages, toMessage(lastMsg))
@@ -78,8 +151,15 @@ func (c *Client) getMessagesForExactSubject(
 
 	hasMore := startSeq >= info.State.FirstSeq && (scanned >= exactSubjectScanRange || len(messages) >= limit)
 	var nextSeq uint64
-	if len(messages) > 0 {
+	switch {
+	case len(messages) > 0:
 		nextSeq = messages[len(messages)-1].Sequence - 1
+	case hasMore:
+		// Nothing matched in this window, but the scan cap was hit before
+		// reaching FirstSeq — resume just past where we stopped instead of
+		// leaving nextSeq at its zero value, which the client reads as
+		// "restart from the newest message" and loops forever (QA-020).
+		nextSeq = startSeq + 1
 	}
 
 	return &entities.MessagesResponse{
@@ -89,8 +169,12 @@ func (c *Client) getMessagesForExactSubject(
 	}, nil
 }
 
-// getMessagesForWildcardSubject parallel-fetches a sequence list, then filters
-// per-message by NATS wildcard match.
+// getMessagesForWildcardSubject scans in bounded batches (not the whole
+// DefaultSearchRange window in one shot, QA-021), fetching matches until
+// enough are found or the scan cap / stream boundary is reached. Without
+// startSeq it now starts from the boundary matching direction — forward from
+// FirstSeq, backward from LastSeq — instead of always LastSeq, which made a
+// forward search return at most one (the newest) message (QA-020).
 func (c *Client) getMessagesForWildcardSubject(
 	ctx context.Context,
 	stream jetstream.Stream,
@@ -101,46 +185,76 @@ func (c *Client) getMessagesForWildcardSubject(
 	direction string,
 ) (*entities.MessagesResponse, error) {
 	if startSeq == 0 {
-		startSeq = info.State.LastSeq
-	}
-
-	seqsToFetch := buildSequenceList(startSeq, info, direction, DefaultSearchRange)
-	if len(seqsToFetch) == 0 {
-		return &entities.MessagesResponse{
-			Messages: []*entities.Message{},
-			HasMore:  false,
-		}, nil
-	}
-
-	msgMap, err := c.fetchMessagesParallel(ctx, stream, seqsToFetch)
-	if err != nil {
-		return nil, wrapErr(err)
+		if direction == DefaultDirection {
+			startSeq = info.State.LastSeq
+		} else {
+			startSeq = info.State.FirstSeq
+		}
 	}
 
 	var messages []*entities.Message //nolint:prealloc
 	var lastProcessedSeq uint64
 	hasMore := false
+	cursor := startSeq
 
-	for _, seq := range seqsToFetch {
-		if len(messages) >= limit {
-			hasMore = true
+	for scanned := 0; scanned < DefaultSearchRange; {
+		batchSize := min(wildcardFetchBatch, DefaultSearchRange-scanned)
+		seqsToFetch := buildSequenceList(cursor, info, direction, batchSize)
+		if len(seqsToFetch) == 0 {
+			break
+		}
+		scanned += len(seqsToFetch)
+
+		msgMap, err := c.fetchMessagesParallel(ctx, stream, seqsToFetch)
+		if err != nil {
+			return nil, wrapErr(err)
+		}
+
+		for _, seq := range seqsToFetch {
+			if len(messages) >= limit {
+				hasMore = true
+				break
+			}
+			msg, ok := msgMap[seq]
+			if !ok {
+				continue
+			}
+			if !natsutil.MatchSubject(subjectFilter, msg.Subject) {
+				continue
+			}
+			messages = append(messages, toMessage(msg))
+			lastProcessedSeq = seq
+		}
+		if hasMore {
 			break
 		}
 
-		msg, ok := msgMap[seq]
-		if !ok {
-			continue
+		last := seqsToFetch[len(seqsToFetch)-1]
+		lastProcessedSeq = last
+		if len(seqsToFetch) < batchSize {
+			// Batch came up short of what we asked for: buildSequenceList hit
+			// FirstSeq/LastSeq, so the whole stream in this direction has been
+			// scanned.
+			break
 		}
-
-		if !natsutil.MatchSubject(subjectFilter, msg.Subject) {
-			continue
+		if direction == DefaultDirection {
+			if last == 0 {
+				break
+			}
+			cursor = last - 1
+		} else {
+			cursor = last + 1
 		}
-
-		messages = append(messages, toMessage(msg))
-		lastProcessedSeq = seq
 	}
 
-	nextSeq := calculateNextSeq(hasMore, direction, lastProcessedSeq, info)
+	cursorSeq := lastProcessedSeq
+	if len(messages) > 0 {
+		cursorSeq = messages[len(messages)-1].Sequence
+	}
+	if !hasMore {
+		hasMore = hasMoreMessages(direction, cursorSeq, info)
+	}
+	nextSeq := calculateNextSeq(hasMore, direction, cursorSeq, info)
 
 	return &entities.MessagesResponse{
 		Messages: messages,

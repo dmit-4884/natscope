@@ -159,6 +159,17 @@ func (c *Client) resolveSeqByTimeConsumer(
 		return 0, errs.ErrWorkQueueConsumerNotAllowed
 	}
 
+	// Short-circuit instead of sending an arbitrarily-far-future target to the
+	// server: time.Time.UnixNano() overflows int64 well before year 9999, and
+	// nats-server computing the consumer's start time from that overflowed
+	// value can wrap to a time before every message in the stream — the
+	// consumer then delivers from the very beginning instead of finding
+	// nothing (QA-058). Any target after the last known message trivially has
+	// no match.
+	if !info.State.LastTime.IsZero() && target.After(info.State.LastTime) {
+		return info.State.LastSeq + 1, nil
+	}
+
 	startTime := target
 	ephCfg := jetstream.ConsumerConfig{
 		DeliverPolicy:     jetstream.DeliverByStartTimePolicy,

@@ -56,6 +56,14 @@ func (c *Client) getMessagesParallel(
 		} else {
 			startSeq = info.State.FirstSeq
 		}
+	} else {
+		// Clamp an out-of-range startSeq into the live range instead of walking
+		// entirely below FirstSeq (e.g. after a purge — forward pagination would
+		// query only already-purged sequences, find nothing, and report
+		// hasMore=true with nextSeq=1, looping forever, QA-019) or above LastSeq
+		// (backward with a huge/overflowed startSeq returning an empty page
+		// instead of the newest messages, QA-120).
+		startSeq = min(max(startSeq, info.State.FirstSeq), info.State.LastSeq)
 	}
 
 	t0 := time.Now()
@@ -93,11 +101,9 @@ func (c *Client) getMessagesParallel(
 
 	var messages []*entities.Message //nolint:prealloc
 	var lastProcessedSeq uint64
-	hasMore := false
 
 	for _, seq := range seqsToFetch {
 		if len(messages) >= needed {
-			hasMore = true
 			break
 		}
 
@@ -110,21 +116,34 @@ func (c *Client) getMessagesParallel(
 		lastProcessedSeq = seq
 	}
 
-	// If we consumed all fetched seqs but didn't find enough, check if there's
-	// more in the stream.
-	if !hasMore && len(seqsToFetch) == fetchCount {
-		hasMore = hasMoreMessages(direction, lastProcessedSeq, info)
-	}
+	// hasMore reflects whether the +1 probe message was actually collected —
+	// deriving it only from the early-break flag above missed the case where
+	// the probe was the very last entry in seqsToFetch (a stream of exactly
+	// limit+1 messages), silently losing that last message (QA-018).
+	hasMore := len(messages) > limit
 
 	// Trim the extra +1 message used for hasMore detection.
-	if len(messages) > limit {
+	if hasMore {
 		messages = messages[:limit]
 	}
 
-	// Cursor from the last kept message, not the trimmed +1 probe.
+	// Cursor from the last kept message; if the window came back empty (an
+	// interior gap wider than the fetch window, or nothing but holes to the
+	// stream boundary), resume from the end of the queried window instead of
+	// falling back to 0 — which wraps nextSeq to 1 and loops forever (QA-019).
 	cursorSeq := lastProcessedSeq
-	if len(messages) > 0 {
+	switch {
+	case len(messages) > 0:
 		cursorSeq = messages[len(messages)-1].Sequence
+	case len(seqsToFetch) > 0:
+		cursorSeq = seqsToFetch[len(seqsToFetch)-1]
+	}
+
+	// The fetch window may have stopped short of the stream boundary (sized by
+	// fetchCount, not FirstSeq/LastSeq) without collecting `needed` messages —
+	// there can still be more beyond it.
+	if !hasMore {
+		hasMore = hasMoreMessages(direction, cursorSeq, info)
 	}
 
 	nextSeq := calculateNextSeq(hasMore, direction, cursorSeq, info)
