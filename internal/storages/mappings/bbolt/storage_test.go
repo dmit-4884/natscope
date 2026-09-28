@@ -4,12 +4,14 @@
 package bbolt_test
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
 
 	mappingsbbolt "github.com/dmit-4884/natscope/internal/storages/mappings/bbolt"
@@ -242,5 +244,150 @@ func TestMappings_BulkSaveDeletesAbsent(t *testing.T) {
 		if m.Pattern == "drop.>" {
 			t.Fatalf("drop.> must have been deleted by the replace, found: %+v", m)
 		}
+	}
+}
+
+// TestMappings_BulkSavePreservesPinsWhenUnset is the QA-031 regression: a
+// BatchSaveMappings item that omits pinned_tag/pinned_fingerprint for an
+// existing (pattern, sourceId) must not silently clear the pin.
+func TestMappings_BulkSavePreservesPinsWhenUnset(t *testing.T) {
+	s := newStorage(t)
+	ctx := t.Context()
+
+	pinned := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+		m.Pattern = "pin.me"
+		m.SourceID = "src1"
+		m.MessageType = "T"
+		m.PinnedTag = ptr.Wrap("local")
+		m.PinnedFingerprint = ptr.Wrap("deadbeef")
+	})
+	if err := s.Save(ctx, pinned); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	// A bulk item for the same key with no pin fields set (nil, as the
+	// converter leaves them when the caller doesn't supply them).
+	unset := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+		m.Pattern = "pin.me"
+		m.SourceID = "src1"
+		m.MessageType = "T"
+	})
+	if _, err := s.BulkSave(ctx, entities.SubjectMappings{unset}); err != nil {
+		t.Fatalf("bulk: %v", err)
+	}
+
+	got, err := s.Get(ctx, pinned.Id)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.PinnedTag == nil || *got.PinnedTag != "local" {
+		t.Fatalf("pinned tag was cleared by an unrelated batch save: %v", got.PinnedTag)
+	}
+	if got.PinnedFingerprint == nil || *got.PinnedFingerprint != "deadbeef" {
+		t.Fatalf("pinned fingerprint was cleared by an unrelated batch save: %v", got.PinnedFingerprint)
+	}
+}
+
+// TestMappings_BulkSaveExplicitPinOverridesPrevious verifies a bulk item that
+// DOES set a pin field still updates it (preservation only applies when the
+// field is left unset).
+func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
+	s := newStorage(t)
+	ctx := t.Context()
+
+	pinned := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+		m.Pattern = "pin.me"
+		m.SourceID = "src1"
+		m.MessageType = "T"
+		m.PinnedTag = ptr.Wrap("v1")
+	})
+	if err := s.Save(ctx, pinned); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	repinned := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+		m.Pattern = "pin.me"
+		m.SourceID = "src1"
+		m.MessageType = "T"
+		m.PinnedTag = ptr.Wrap("v2")
+	})
+	if _, err := s.BulkSave(ctx, entities.SubjectMappings{repinned}); err != nil {
+		t.Fatalf("bulk: %v", err)
+	}
+
+	got, err := s.Get(ctx, pinned.Id)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.PinnedTag == nil || *got.PinnedTag != "v2" {
+		t.Fatalf("explicit pin update was ignored: %v", got.PinnedTag)
+	}
+}
+
+// TestMappings_BulkSaveRejectsDuplicateKeyInBatch is the QA-134 regression: a
+// batch with two items sharing the same (pattern, sourceId) must be rejected,
+// instead of one silently overwriting the other with a misleading count.
+func TestMappings_BulkSaveRejectsDuplicateKeyInBatch(t *testing.T) {
+	s := newStorage(t)
+	ctx := t.Context()
+
+	a := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+		m.Pattern = "dd.x"
+		m.SourceID = "src1"
+		m.MessageType = "T1"
+	})
+	b := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+		m.Pattern = "dd.x"
+		m.SourceID = "src1"
+		m.MessageType = "T2"
+	})
+
+	_, err := s.BulkSave(ctx, entities.SubjectMappings{a, b})
+	if err == nil {
+		t.Fatal("expected an error for a duplicate (pattern, sourceId) within the batch")
+	}
+	if !errors.Is(err, errs.ErrMappingDuplicateInBatch) {
+		t.Fatalf("want ErrMappingDuplicateInBatch, got %v", err)
+	}
+
+	all, listErr := s.ListAll(ctx)
+	if listErr != nil {
+		t.Fatalf("list all: %v", listErr)
+	}
+	if len(all) != 0 {
+		t.Fatalf("a rejected batch must not partially apply, found %d mappings", len(all))
+	}
+}
+
+// TestMappings_BulkSaveEmptyListDeletesAll is the QA-134 regression for the
+// other direction: BatchSaveMappings with zero items is a deliberate "replace
+// all with nothing", not a request that should be rejected.
+func TestMappings_BulkSaveEmptyListDeletesAll(t *testing.T) {
+	s := newStorage(t)
+	ctx := t.Context()
+
+	existing := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+		m.Pattern = "a.>"
+		m.SourceID = "src1"
+		m.MessageType = "T"
+	})
+	if err := s.Save(ctx, existing); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	result, err := s.BulkSave(ctx, entities.SubjectMappings{})
+	if err != nil {
+		t.Fatalf("bulk with empty list: %v", err)
+	}
+	if result.Deleted != 1 {
+		t.Fatalf("want deleted=1, got %+v", result)
+	}
+
+	all, err := s.ListAll(ctx)
+	if err != nil {
+		t.Fatalf("list all: %v", err)
+	}
+	if len(all) != 0 {
+		t.Fatalf("want 0 mappings after an empty replace, got %d", len(all))
 	}
 }

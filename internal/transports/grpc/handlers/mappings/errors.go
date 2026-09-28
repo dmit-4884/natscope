@@ -33,6 +33,12 @@ func (h *Handler) StatusErrorConvert(ctx context.Context, err error) error {
 		return grpchelpers.NewStatus(codes.FailedPrecondition, "mapping descriptor missing", "MAPPING_DESCRIPTOR_MISSING")
 	case errors.Is(err, errs.ErrMessageTypeNotInSource):
 		return grpchelpers.NewStatus(codes.FailedPrecondition, "message type not in source", "MESSAGE_TYPE_NOT_IN_SOURCE")
+	case errors.Is(err, errs.ErrMappingPatternRequired):
+		return grpchelpers.NewStatus(codes.InvalidArgument, "pattern is required", "MAPPING_PATTERN_REQUIRED")
+	case errors.Is(err, errs.ErrMappingMessageTypeRequired):
+		return grpchelpers.NewStatus(codes.InvalidArgument, "message_type is required", "MAPPING_MESSAGE_TYPE_REQUIRED")
+	case errors.Is(err, errs.ErrMappingDuplicateInBatch):
+		return grpchelpers.NewStatus(codes.InvalidArgument, "duplicate mapping in batch", "MAPPING_DUPLICATE_IN_BATCH")
 	}
 	return grpchelpers.StatusErrorConvert(ctx, err)
 }

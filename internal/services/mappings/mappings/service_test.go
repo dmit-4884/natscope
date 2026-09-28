@@ -116,6 +116,51 @@ func TestService_Create(t *testing.T) {
 		})
 		assert.ErrorIs(t, err, errs.ErrMappingSourceIDRequired)
 	})
+
+	// QA-086: a whitespace-only pattern passes proto's min_len:1 but trims to
+	// empty; it must be rejected, not saved as a mapping that can never match.
+	t.Run("WhitespaceOnlyPattern", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStorage{}
+		svc := New(store)
+
+		_, err := svc.Create(t.Context(), &entities.SubjectMappingCreate{
+			Pattern:     "   ",
+			MessageType: "api.v1.Order",
+			SourceID:    "src-1",
+		})
+		assert.ErrorIs(t, err, errs.ErrMappingPatternRequired)
+		assert.False(t, store.saveCalled)
+	})
+
+	t.Run("WhitespaceOnlyMessageType", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStorage{}
+		svc := New(store)
+
+		_, err := svc.Create(t.Context(), &entities.SubjectMappingCreate{
+			Pattern:     "orders.*",
+			MessageType: "   ",
+			SourceID:    "src-1",
+		})
+		assert.ErrorIs(t, err, errs.ErrMappingMessageTypeRequired)
+		assert.False(t, store.saveCalled)
+	})
+
+	// QA-086/QA-101: "a.>.b" passes min_len:1 but ">" must be the last token.
+	t.Run("InvalidPatternSyntax", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStorage{}
+		svc := New(store)
+
+		_, err := svc.Create(t.Context(), &entities.SubjectMappingCreate{
+			Pattern:     "a.>.b",
+			MessageType: "api.v1.Order",
+			SourceID:    "src-1",
+		})
+		require.Error(t, err)
+		assert.False(t, store.saveCalled)
+	})
 }
 
 func TestService_Get(t *testing.T) {
@@ -214,6 +259,46 @@ func TestService_BulkSave(t *testing.T) {
 			{Pattern: "a.*", MessageType: "TypeA"},
 		})
 		assert.ErrorIs(t, err, errs.ErrMappingSourceIDRequired)
+	})
+
+	// QA-086: BatchSaveMappings must trim and validate exactly like Create,
+	// instead of accepting "  " where Create would reject it.
+	t.Run("TrimsAndRejectsWhitespaceOnlySourceID", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStorage{}
+		svc := New(store)
+
+		_, err := svc.BulkSave(t.Context(), entities.SubjectMappings{
+			{Pattern: " sp.x ", MessageType: " api.v1.Order ", SourceID: "  "},
+		})
+		assert.ErrorIs(t, err, errs.ErrMappingSourceIDRequired)
+		assert.False(t, store.bulkSaveCalled)
+	})
+
+	t.Run("RejectsWhitespaceOnlyPattern", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStorage{}
+		svc := New(store)
+
+		_, err := svc.BulkSave(t.Context(), entities.SubjectMappings{
+			{Pattern: "   ", MessageType: "api.v1.Order", SourceID: "src-1"},
+		})
+		assert.ErrorIs(t, err, errs.ErrMappingPatternRequired)
+	})
+
+	t.Run("TrimsPatternBeforeStorage", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStorage{}
+		svc := New(store)
+
+		_, err := svc.BulkSave(t.Context(), entities.SubjectMappings{
+			{Pattern: " sp.x ", MessageType: " api.v1.Order ", SourceID: " src-1 "},
+		})
+		require.NoError(t, err)
+		require.Len(t, store.bulkSaveItems, 1)
+		assert.Equal(t, "sp.x", store.bulkSaveItems[0].Pattern)
+		assert.Equal(t, "api.v1.Order", store.bulkSaveItems[0].MessageType)
+		assert.Equal(t, "src-1", store.bulkSaveItems[0].SourceID)
 	})
 
 	t.Run("StorageError", func(t *testing.T) {

@@ -5,7 +5,9 @@ package mappings
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -51,6 +53,9 @@ func (s *Service) Create(
 	if in.SourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
+	if err := validatePatternAndType(in.Pattern, in.MessageType); err != nil {
+		return nil, err
+	}
 
 	mapping := converter.Convert(in, entities.SubjectMappingNew())
 
@@ -91,9 +96,13 @@ func (s *Service) Update(
 
 	existing.ApplyUpdate(in)
 
-	// Validate after merge: SourceID must remain non-empty.
+	// Validate after merge: SourceID/pattern/messageType must remain non-empty
+	// and the pattern must stay a syntactically valid subject pattern.
 	if existing.SourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
+	}
+	if err := validatePatternAndType(existing.Pattern, existing.MessageType); err != nil {
+		return nil, err
 	}
 
 	if err := s.storage.Save(ctx, existing); err != nil {
@@ -118,9 +127,16 @@ func (s *Service) List(
 // Delete deletes a mapping.
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if err := s.storage.Delete(ctx, id); err != nil {
-		s.logger.ErrorContext(ctx, "failed to delete mapping",
-			slog.String("id", id),
-			slogx.Error(err))
+		// A caller deleting an already-gone (or never-existing) id is a normal
+		// client-side race, not a server fault — don't log it at ERROR.
+		if errors.Is(err, errs.ErrMappingNotFound) {
+			s.logger.DebugContext(ctx, "delete mapping: not found",
+				slog.String("id", id))
+		} else {
+			s.logger.ErrorContext(ctx, "failed to delete mapping",
+				slog.String("id", id),
+				slogx.Error(err))
+		}
 		return err
 	}
 
@@ -141,10 +157,21 @@ func (s *Service) BulkSave(
 
 	prepared := make(entities.SubjectMappings, len(mappings))
 	for i, m := range mappings {
-		if m.SourceID == "" {
+		cp := *m
+		// BatchSaveMappings skips the CreateMappingRequest DTO (no normalize
+		// tags on the raw entity), so trim explicitly to match Create's
+		// behavior — otherwise "  " sails through here while Create rejects it.
+		cp.Pattern = strings.TrimSpace(cp.Pattern)
+		cp.MessageType = strings.TrimSpace(cp.MessageType)
+		cp.SourceID = strings.TrimSpace(cp.SourceID)
+
+		if cp.SourceID == "" {
 			return nil, errs.ErrMappingSourceIDRequired
 		}
-		cp := *m
+		if err := validatePatternAndType(cp.Pattern, cp.MessageType); err != nil {
+			return nil, err
+		}
+
 		if cp.Id == "" {
 			cp.BaseEntity = *entities.New()
 		}
@@ -198,6 +225,20 @@ func (s *Service) rebuildResolver(ctx context.Context) {
 		return
 	}
 	s.resolver.Store(natsutil.NewMappingResolver(all))
+}
+
+// validatePatternAndType rejects a pattern/messageType that is empty (or
+// whitespace-only, since callers trim first) and a pattern that isn't a
+// syntactically valid NATS subject pattern (QA-086/QA-101): min_len:1 alone
+// lets "   " through, and it trims to a mapping that can never match.
+func validatePatternAndType(pattern, messageType string) error {
+	if pattern == "" {
+		return errs.ErrMappingPatternRequired
+	}
+	if messageType == "" {
+		return errs.ErrMappingMessageTypeRequired
+	}
+	return natsutil.ValidateSubjectPattern(pattern)
 }
 
 // Compile-time interface check.

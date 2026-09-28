@@ -29,4 +29,16 @@ var (
 
 	// ErrMessageTypeNotInSource is returned when a message type is not present in the active snapshot of the mapping's source.
 	ErrMessageTypeNotInSource = errors.New("mapping: message type not in source snapshot")
+
+	// ErrMappingPatternRequired is returned when pattern is empty, or becomes
+	// empty after trimming whitespace.
+	ErrMappingPatternRequired = errors.New("mapping: pattern is required")
+
+	// ErrMappingMessageTypeRequired is returned when message_type is empty, or
+	// becomes empty after trimming whitespace.
+	ErrMappingMessageTypeRequired = errors.New("mapping: message_type is required")
+
+	// ErrMappingDuplicateInBatch is returned when a BatchSaveMappings request
+	// contains two items with the same (pattern, source_id) key.
+	ErrMappingDuplicateInBatch = errors.New("mapping: duplicate (pattern, source_id) in batch")
 )

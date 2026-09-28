@@ -7,6 +7,7 @@ package bbolt
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
@@ -89,11 +90,18 @@ func (s *Storage) Exists(ctx context.Context, id string) (bool, error) {
 }
 
 // BulkSave replaces the full (pattern, sourceId) set atomically: merges by
-// key (keeps id/created_at), then deletes rows absent from the new set.
+// key (keeps id/created_at, preserves pinned_tag/pinned_fingerprint when the
+// incoming item leaves them unset), then deletes rows absent from the new
+// set. Rejects a request with two items sharing the same (pattern, sourceId)
+// key — one would silently overwrite the other and miscount created/updated.
 func (s *Storage) BulkSave(
 	ctx context.Context,
 	mappings entities.SubjectMappings,
 ) (*entities.SubjectMappingBulkSaveResult, error) {
+	if dupKey, ok := firstDuplicateKey(mappings); ok {
+		return nil, fmt.Errorf("%w: pattern %q, source %q", errs.ErrMappingDuplicateInBatch, dupKey.pattern, dupKey.sourceID)
+	}
+
 	result := &entities.SubjectMappingBulkSaveResult{}
 	err := s.store.WithTransaction(ctx, func(ctx context.Context) error {
 		existing, err := s.store.ListAll(ctx)
@@ -115,6 +123,12 @@ func (s *Storage) BulkSave(
 			if prev, ok := byKey[key]; ok {
 				d.ID = prev.ID
 				d.CreatedAt = prev.CreatedAt
+				if d.PinnedTag == nil {
+					d.PinnedTag = prev.PinnedTag
+				}
+				if d.PinnedFingerprint == nil {
+					d.PinnedFingerprint = prev.PinnedFingerprint
+				}
 				result.Updated++
 			} else {
 				result.Created++
@@ -140,6 +154,25 @@ func (s *Storage) BulkSave(
 		return nil, err
 	}
 	return result, nil
+}
+
+type patternSourcePair struct {
+	pattern  string
+	sourceID string
+}
+
+// firstDuplicateKey returns the first (pattern, sourceId) key that appears
+// more than once in mappings, in input order.
+func firstDuplicateKey(mappings entities.SubjectMappings) (patternSourcePair, bool) {
+	seen := make(map[string]bool, len(mappings))
+	for _, m := range mappings {
+		key := patternSourceKey(m.Pattern, m.SourceID)
+		if seen[key] {
+			return patternSourcePair{pattern: m.Pattern, sourceID: m.SourceID}, true
+		}
+		seen[key] = true
+	}
+	return patternSourcePair{}, false
 }
 
 // patternSourceKey is the (pattern, sourceId) uniqueness key.

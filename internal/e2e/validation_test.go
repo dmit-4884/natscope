@@ -109,14 +109,6 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			"mappings.BatchSave empty list",
-			func() error {
-				_, err := env.mappings.BatchSaveMappings(ctx, connect.NewRequest(&mappingspb.BatchSaveMappingsRequest{}))
-				return err
-			},
-			connect.CodeInvalidArgument,
-		},
-		{
 			"templates.Create missing name",
 			func() error {
 				_, err := env.templates.CreateTemplate(ctx, connect.NewRequest(&templatespb.CreateTemplateRequest{
