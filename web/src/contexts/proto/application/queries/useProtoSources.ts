@@ -9,6 +9,7 @@ import {
   setWatcher,
   compileLocal,
   validateLocalPath,
+  validateRepository,
   compileFiles,
   getProtoSourceTags,
   getProtoSelections,
@@ -121,6 +122,13 @@ export function useCompileLocal() {
 export function useValidateLocalPath() {
   return useMutation({
     mutationFn: ({ path }: { path: string }) => validateLocalPath(path),
+  })
+}
+
+export function useValidateRepository() {
+  return useMutation({
+    mutationFn: ({ repository, token }: { repository: string; token?: string }) =>
+      validateRepository(repository, token),
   })
 }
 

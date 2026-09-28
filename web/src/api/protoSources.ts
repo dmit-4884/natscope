@@ -286,6 +286,19 @@ export async function validateLocalPath(path: string): Promise<{ valid: boolean;
   }
 }
 
+// Validate repository
+
+export async function validateRepository(
+  repository: string,
+  token?: string,
+): Promise<{ valid: boolean; error?: string }> {
+  const response = await sourcesClient.validateRepository({ repository, token })
+  return {
+    valid: response.valid,
+    error: response.error,
+  }
+}
+
 // Tags and Versions
 
 export async function getProtoSourceTags(sourceId: string): Promise<string[]> {

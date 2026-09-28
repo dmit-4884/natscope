@@ -12,6 +12,8 @@ interface Props {
   onRemoveSelection: () => void
   tags: string[]
   isLoadingTags: boolean
+  tagsError?: Error | null
+  onRetryTags?: () => void
   isSelecting: boolean
   selectError?: Error | null
   onSelectTag: (tag: string) => void
@@ -25,6 +27,8 @@ export function ProtoSourceGitFooter({
   onRemoveSelection,
   tags,
   isLoadingTags,
+  tagsError,
+  onRetryTags,
   isSelecting,
   selectError,
   onSelectTag,
@@ -75,6 +79,18 @@ export function ProtoSourceGitFooter({
             <div className="flex items-center gap-2 text-xs text-content-secondary py-2 px-3 bg-accent-light rounded-md">
               <Spinner size="sm" />
               <span>Fetching and loading proto files...</span>
+            </div>
+          ) : tagsError ? (
+            <div className="flex items-center justify-between gap-2">
+              <ErrorAlert compact message={`Failed to load versions: ${getErrorMessage(tagsError)}`} />
+              {onRetryTags && (
+                <button
+                  onClick={onRetryTags}
+                  className="shrink-0 text-xs font-medium text-accent hover:text-blue-800 transition-colors"
+                >
+                  Retry
+                </button>
+              )}
             </div>
           ) : (
             <Dropdown

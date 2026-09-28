@@ -49,9 +49,12 @@ export default function ProtoSourceCard({
   const watcherMutation = useSetWatcher()
   const compileMutation = useCompileLocal()
   const compileFilesMutation = useCompileFiles()
-  const { data: tags = [], isLoading: isLoadingTags } = useProtoSourceTags(
-    showTagSelector && source.sourceType === 'git' ? source.id : null,
-  )
+  const {
+    data: tags = [],
+    isLoading: isLoadingTags,
+    error: tagsError,
+    refetch: refetchTags,
+  } = useProtoSourceTags(showTagSelector && source.sourceType === 'git' ? source.id : null)
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -212,6 +215,8 @@ export default function ProtoSourceCard({
               onRemoveSelection={handleRemoveSelection}
               tags={tags}
               isLoadingTags={isLoadingTags}
+              tagsError={tagsError as Error | null}
+              onRetryTags={() => void refetchTags()}
               isSelecting={selectMutation.isPending}
               selectError={selectMutation.isError ? (selectMutation.error as Error) : null}
               onSelectTag={handleSelectTag}

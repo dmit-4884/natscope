@@ -7,6 +7,7 @@ import {
   useCreateProtoSource,
   useUpdateProtoSource,
   useValidateLocalPath,
+  useValidateRepository,
   useProtoSource,
   useCompileLocal,
   useCompileFiles,
@@ -84,6 +85,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
 
   const [error, setError] = useState<string | null>(null)
   const [localValidate, setLocalValidate] = useState<{ valid: boolean; protoFileCount: number; error?: string } | null>(null)
+  const [gitValidate, setGitValidate] = useState<{ valid: boolean; error?: string } | null>(null)
   // Inline compile result so the user can "Save & Compile" right here and see
   // the outcome (counts + diagnostics) without bouncing back to the card.
   const [compileOut, setCompileOut] = useState<CompileOutcome | null>(null)
@@ -92,9 +94,11 @@ export default function ProtoSourceEditPage({ mode }: Props) {
   const createMutation = useCreateProtoSource()
   const updateMutation = useUpdateProtoSource()
   const validateLocal = useValidateLocalPath()
+  const validateRepo = useValidateRepository()
   const compileLocalMutation = useCompileLocal()
   const compileFilesMutation = useCompileFiles()
   const isCompiling = compileLocalMutation.isPending || compileFilesMutation.isPending
+  const isValidating = validateLocal.isPending || validateRepo.isPending
 
   const lastHydratedFor = useRef<string | null>(null)
   useEffect(() => {
@@ -121,20 +125,60 @@ export default function ProtoSourceEditPage({ mode }: Props) {
   const isLoading = createMutation.isPending || updateMutation.isPending
   const saveDisabled =
     isLoading ||
+    isValidating ||
     !name.trim() ||
     (sourceType === 'git' && !repository.trim()) ||
     (sourceType === 'local' && !localPath.trim()) ||
     (sourceType === 'files' && cleanedFiles.length === 0)
 
   const handleValidateLocalPath = async () => {
-    if (!localPath.trim()) return
+    if (!localPath.trim()) return null
     setLocalValidate(null)
     try {
       const r = await validateLocal.mutateAsync({ path: localPath.trim() })
       setLocalValidate(r)
+      return r
     } catch (err) {
-      setLocalValidate({ valid: false, protoFileCount: 0, error: getErrorMessage(err) })
+      const r = { valid: false, protoFileCount: 0, error: getErrorMessage(err) }
+      setLocalValidate(r)
+      return r
     }
+  }
+
+  const handleValidateRepository = async () => {
+    if (!repository.trim()) return null
+    setGitValidate(null)
+    try {
+      const r = await validateRepo.mutateAsync({ repository: repository.trim(), token: token || undefined })
+      setGitValidate(r)
+      return r
+    } catch (err) {
+      const r = { valid: false, error: getErrorMessage(err) }
+      setGitValidate(r)
+      return r
+    }
+  }
+
+  // QA-165: block Save on an unvalidated path/URL so a source can never be
+  // created (or repointed) in a state that will never compile. Only checked
+  // when the path/URL is new or changed — editing unrelated fields on an
+  // already-valid source doesn't re-pay the round trip.
+  const pathOrRepoChanged =
+    !isEdit ||
+    (sourceType === 'local' && localPath !== (existing?.localPath || '')) ||
+    (sourceType === 'git' && repository !== (existing?.repository || ''))
+
+  const validateBeforeSave = async (): Promise<boolean> => {
+    if (!pathOrRepoChanged) return true
+    if (sourceType === 'local') {
+      const result = await handleValidateLocalPath()
+      return result?.valid ?? false
+    }
+    if (sourceType === 'git') {
+      const result = await handleValidateRepository()
+      return result?.valid ?? false
+    }
+    return true
   }
 
   const createdIdRef = useRef<string | null>(null)
@@ -199,6 +243,15 @@ export default function ProtoSourceEditPage({ mode }: Props) {
 
   const handleSave = async () => {
     setError(null)
+    const ok = await validateBeforeSave()
+    if (!ok) {
+      setError(
+        sourceType === 'local'
+          ? 'Directory path is not valid — see the error below.'
+          : 'Repository is not accessible — see the error below.',
+      )
+      return
+    }
     try {
       await persist()
       navigate('/settings/proto')
@@ -213,6 +266,15 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     setError(null)
     setCompileErr(null)
     setCompileOut(null)
+    const ok = await validateBeforeSave()
+    if (!ok) {
+      setError(
+        sourceType === 'local'
+          ? 'Directory path is not valid — see the error below.'
+          : 'Repository is not accessible — see the error below.',
+      )
+      return
+    }
     try {
       const sourceId = await persist()
       if (!sourceId) return
@@ -299,13 +361,37 @@ export default function ProtoSourceEditPage({ mode }: Props) {
         <>
           <div>
             <label htmlFor="repository" className="block text-sm font-medium text-gray-700 mb-2">Repository URL *</label>
-            <Input
-              id="repository"
-              value={repository}
-              onChange={(e) => setRepository(e.target.value)}
-              placeholder="https://gitlab.com/org/proto.git"
-              disabled={isLoading}
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  id="repository"
+                  value={repository}
+                  onChange={(e) => {
+                    setRepository(e.target.value)
+                    setGitValidate(null)
+                  }}
+                  placeholder="https://gitlab.com/org/proto.git"
+                  disabled={isLoading}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleValidateRepository}
+                loading={validateRepo.isPending}
+                disabled={!repository.trim() || isLoading}
+              >
+                Validate
+              </Button>
+            </div>
+            {gitValidate && (
+              <div className={`mt-2 text-xs px-3 py-2 rounded ${
+                gitValidate.valid ? 'bg-status-success-bg text-green-700' : 'bg-status-error-bg text-red-700'
+              }`}>
+                {gitValidate.valid ? 'Repository is accessible' : gitValidate.error || 'Repository not accessible'}
+              </div>
+            )}
           </div>
           <div>
             <label htmlFor="token" className="block text-sm font-medium text-gray-700 mb-2">

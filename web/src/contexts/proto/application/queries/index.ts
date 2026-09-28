@@ -14,6 +14,7 @@ export {
   useSetWatcher,
   useCompileLocal,
   useValidateLocalPath,
+  useValidateRepository,
   useCompileFiles,
   useProtoSourceTags,
   useProtoSelections,
