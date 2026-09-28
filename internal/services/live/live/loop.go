@@ -22,7 +22,7 @@ func truncateLiveMessage(lm *entities.LiveMessage, maxBytes int) {
 		return
 	}
 	if len(lm.NatsMessage.Data) > maxBytes {
-		lm.NatsMessage.Data = lm.NatsMessage.Data[:maxBytes]
+		lm.NatsMessage.Data = bytes.Clone(lm.NatsMessage.Data[:maxBytes])
 		lm.Truncated = true
 	}
 	if lm.Decoded != nil && len(*lm.Decoded) > maxBytes {
@@ -209,6 +209,7 @@ func (s *Service) runLoop(
 			}
 
 		case msg := <-msgChan:
+			sess.bufferedBytes.Add(-int64(len(msg.Data)))
 			if _, tracked := subjectCounts[msg.Subject]; tracked || len(subjectCounts) < maxSubjectCardinality {
 				subjectCounts[msg.Subject]++
 			}

@@ -119,3 +119,37 @@ func TestTruncateLiveMessage_DecodedNilSafe(t *testing.T) {
 		t.Fatal("Decoded should remain nil")
 	}
 }
+
+// TestTruncateLiveMessage_ReleasesFullPayload checks the capped payload no
+// longer pins the original backing array.
+func TestTruncateLiveMessage_ReleasesFullPayload(t *testing.T) {
+	t.Parallel()
+
+	lm := &entities.LiveMessage{NatsMessage: entities.NatsMessage{Subject: "s", Data: make([]byte, 1<<20)}}
+	truncateLiveMessage(lm, 1024)
+
+	if c := cap(lm.NatsMessage.Data); c > 1024 {
+		t.Fatalf("truncated Data cap=%d, want <= 1024", c)
+	}
+}
+
+// TestMessageHandler_BoundsBufferedBytes checks the producer drops payloads
+// once the session's buffered volume would exceed maxBufferedBytes.
+func TestMessageHandler_BoundsBufferedBytes(t *testing.T) {
+	t.Parallel()
+
+	svc := &Service{}
+	sess := newSessionState("conn")
+	ch := make(chan *entities.NatsMessage, 10)
+	handle := svc.buildMessageHandler(">", ch, sess)
+
+	handle(&entities.NatsMessage{Subject: "big", Data: make([]byte, maxBufferedBytes+1)})
+	if len(ch) != 0 || sess.messagesDropped.Load() != 1 {
+		t.Fatalf("oversized payload: buffered=%d dropped=%d, want 0 and 1", len(ch), sess.messagesDropped.Load())
+	}
+
+	handle(&entities.NatsMessage{Subject: "small", Data: make([]byte, 100)})
+	if len(ch) != 1 || sess.bufferedBytes.Load() != 100 {
+		t.Fatalf("small payload: buffered=%d bytes=%d, want 1 and 100", len(ch), sess.bufferedBytes.Load())
+	}
+}

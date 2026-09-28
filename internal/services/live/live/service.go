@@ -24,6 +24,7 @@ const (
 	messageBufferSize     = 100
 	statsInterval         = 5 * time.Second
 	maxSubjectCardinality = 1000
+	maxBufferedBytes      = 16 << 20
 
 	// defaultDeliverPolicy avoids replaying history implicitly; "see backlog"
 	// is an explicit action elsewhere.
@@ -70,6 +71,10 @@ type sessionState struct {
 	// messagesDropped is incremented by the subscription producer (buffer full)
 	// and the runLoop rate limiter, and read by the runLoop stats emitter.
 	messagesDropped atomic.Int64
+
+	// bufferedBytes is the payload volume waiting in the message buffer; the
+	// producer drops messages that would push it past maxBufferedBytes.
+	bufferedBytes atomic.Int64
 
 	connectionID string
 	lost         chan struct{}

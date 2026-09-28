@@ -221,10 +221,16 @@ func (s *Service) buildMessageHandler(
 		// regardless of which stage later drops the message (buffer-full here,
 		// or rate-limited in runLoop) — QA-133.
 		sess.totalMessages.Add(1)
+		size := int64(len(msg.Data))
+		if sess.bufferedBytes.Add(size) > maxBufferedBytes {
+			sess.bufferedBytes.Add(-size)
+			sess.messagesDropped.Add(1)
+			return
+		}
 		select {
 		case msgChan <- msg:
 		default:
-			// Buffer full — drop the message and count it in LiveStats.MessagesDropped.
+			sess.bufferedBytes.Add(-size)
 			sess.messagesDropped.Add(1)
 		}
 	}
