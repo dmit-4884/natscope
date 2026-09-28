@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { useRowKeys } from '@/hooks/useRowKeys'
 import { Input, Select, Badge, CloseIcon, LockClosedIcon } from '@/components/ui'
 import { cn } from '@/utils/cn'
+import { clampInt32, INT32_MAX, INT32_MIN } from '@/utils/numbers'
 import type { StreamFieldDef } from './streamFieldDefinitions'
 
 export type ConfigFieldMode = 'create' | 'edit'
@@ -81,6 +82,8 @@ function FieldControl({ def, value, onChange, isLocked, labelId }: ControlProps)
       return (
         <Input
           type="number"
+          min={def.int32 ? INT32_MIN : undefined}
+          max={def.int32 ? INT32_MAX : undefined}
           value={value == null ? fallback : Number(value)}
           readOnly={isLocked}
           onChange={
@@ -93,7 +96,11 @@ function FieldControl({ def, value, onChange, isLocked, labelId }: ControlProps)
                     return
                   }
                   const n = parseInt(raw, 10)
-                  onChange(Number.isNaN(n) ? fallback : n)
+                  if (Number.isNaN(n)) {
+                    onChange(fallback)
+                    return
+                  }
+                  onChange(def.int32 ? clampInt32(n) : n)
                 }
           }
           aria-labelledby={labelId}
@@ -187,6 +194,7 @@ function SubjectsInput({ value, readOnly, onChange }: SubjectsInputProps) {
               value={subject}
               readOnly={readOnly}
               placeholder="orders.>"
+              aria-label={`Subject ${index + 1}`}
               onChange={readOnly ? undefined : (e) => update(index, e.target.value)}
             />
           </div>

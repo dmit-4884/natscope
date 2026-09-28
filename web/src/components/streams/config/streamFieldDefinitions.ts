@@ -49,6 +49,8 @@ export interface StreamFieldDef {
   defaultValue?: unknown
   /** Server capability required to use this field; resolved by the form via useServerCapabilities. */
   requiresCapability?: CapabilityKey
+  /** Number/duration field backed by a proto int32 — value is clamped to the int32 range. */
+  int32?: boolean
 }
 
 export const STREAM_SECTIONS: ReadonlyArray<{ key: StreamFieldSection; label: string }> = [
@@ -139,6 +141,7 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
     editableOnUpdate: false,
     immutableReason: 'Replica count cannot be changed via this form.',
     defaultValue: 1,
+    int32: true,
   },
   {
     key: 'max_msgs',
@@ -179,6 +182,7 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
     editableOnUpdate: true,
     helperText: '-1 for unlimited.',
     defaultValue: -1,
+    int32: true,
   },
   {
     key: 'max_msgs_per_subject',
@@ -317,6 +321,7 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
     editableOnUpdate: true,
     helperText: '-1 for unlimited.',
     defaultValue: -1,
+    int32: true,
   },
 ]
 
