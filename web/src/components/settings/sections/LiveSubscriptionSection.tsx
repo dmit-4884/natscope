@@ -34,6 +34,7 @@ export function LiveSubscriptionSection({ value, onChange, isOpen, onToggle, onH
         <div className="relative">
           <input
             type="number"
+            aria-label="Max display rate"
             className={`${numberClass} ${value.maxDisplayRate != null && value.maxDisplayRate > 0 ? 'pr-9' : ''}`}
             placeholder="0"
             min={0}

@@ -95,7 +95,7 @@ export default function AdvancedFilters({
       <div className="p-4 space-y-4">
         {/* Subject Filter */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="filter-subject" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
             <svg className="w-4 h-4 text-content-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
@@ -104,6 +104,7 @@ export default function AdvancedFilters({
           <div className="relative">
             <input
               ref={subjectInputRef}
+              id="filter-subject"
               type="text"
               value={localFilters.subject}
               onChange={(e) => setLocalFilters({ ...localFilters, subject: e.target.value })}
@@ -153,11 +154,12 @@ export default function AdvancedFilters({
 
         {/* Content Filter (payload search) */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="filter-payload" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
             <SearchIcon className="w-4 h-4 text-content-muted" />
             Payload Search
           </label>
           <input
+            id="filter-payload"
             type="text"
             value={localFilters.contentFilter}
             onChange={(e) => setLocalFilters({ ...localFilters, contentFilter: e.target.value })}
@@ -169,13 +171,14 @@ export default function AdvancedFilters({
 
         {/* Start Sequence Filter */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="filter-start-sequence" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
             <svg className="w-4 h-4 text-content-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
             </svg>
             Start Sequence
           </label>
           <input
+            id="filter-start-sequence"
             type="number"
             value={localFilters.startSequence ?? ''}
             onChange={(e) =>
@@ -191,15 +194,17 @@ export default function AdvancedFilters({
 
         {/* Start Date Filter */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+          <span className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
             <svg className="w-4 h-4 text-content-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             Start Date & Time
-          </label>
+          </span>
           <div className="flex gap-2">
             <div className="flex-1">
+              <label htmlFor="filter-start-date" className="sr-only">Start date</label>
               <input
+                id="filter-start-date"
                 type="date"
                 value={localFilters.startDate?.split('T')[0] ?? ''}
                 onChange={(e) => {
@@ -213,11 +218,13 @@ export default function AdvancedFilters({
               />
             </div>
             <div className="w-24">
+              <label htmlFor="filter-start-time" className="sr-only">Start time</label>
               <input
+                id="filter-start-time"
                 type="time"
                 value={localFilters.startDate?.split('T')[1] ?? ''}
                 onChange={(e) => {
-                  const date = localFilters.startDate?.split('T')[0] || new Date().toISOString().split('T')[0]
+                  const date = localFilters.startDate?.split('T')[0] || toDatetimeLocal(new Date()).split('T')[0]
                   setLocalFilters({
                     ...localFilters,
                     startDate: e.target.value ? `${date}T${e.target.value}` : localFilters.startDate,
