@@ -114,6 +114,12 @@ func TestStatusErrorConvert(t *testing.T) {
 		{name: "ErrWorkspaceUnknownSection", err: errs.ErrWorkspaceUnknownSection, wantCode: codes.InvalidArgument, wantReason: "WORKSPACE_UNKNOWN_SECTION"},
 		{name: "WrappedErrWorkspaceUnknownSection", err: fmt.Errorf("export: %w", errs.ErrWorkspaceUnknownSection), wantCode: codes.InvalidArgument, wantReason: "WORKSPACE_UNKNOWN_SECTION"},
 
+		// QA-075: proto snapshot resolution errors (registry/codec have no
+		// per-handler converter for these).
+		{name: "ErrMappingSourceNotFound", err: errs.ErrMappingSourceNotFound, wantCode: codes.NotFound, wantReason: "MAPPING_SOURCE_NOT_FOUND"},
+		{name: "ErrMappingSourceDisabled", err: errs.ErrMappingSourceDisabled, wantCode: codes.FailedPrecondition, wantReason: "MAPPING_SOURCE_DISABLED"},
+		{name: "ErrMappingSelectionMissing", err: errs.ErrMappingSelectionMissing, wantCode: codes.FailedPrecondition, wantReason: "MAPPING_SELECTION_MISSING"},
+
 		{name: "ErrNATSInvalidArgument", err: errs.ErrNATSInvalidArgument, wantCode: codes.InvalidArgument, wantReason: "NATS_INVALID_ARGUMENT"},
 		{
 			name:       "NATSValidationError",

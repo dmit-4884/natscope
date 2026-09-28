@@ -84,7 +84,7 @@ var commonDomainErrors = []struct {
 	{errs.ErrWorkspaceSectionInvalid, errorMapping{codes.InvalidArgument, "invalid workspace section payload", "WORKSPACE_SECTION_INVALID"}},
 	{errs.ErrWorkspaceUnknownSection, errorMapping{codes.InvalidArgument, "unknown workspace section key", "WORKSPACE_UNKNOWN_SECTION"}},
 
-	// KV/Object store — narrow guards added alongside natsgo (QA-002, QA-066, QA-071).
+	// KV/Object store.
 	{errs.ErrNotAKVOrObjectBucket, errorMapping{
 		codes.FailedPrecondition, "stream is not a valid KV/Object bucket", "NATS_BUCKET_TYPE_MISMATCH",
 	}},
@@ -95,6 +95,11 @@ var commonDomainErrors = []struct {
 		codes.ResourceExhausted, "object exceeds maximum retrievable size", "NATS_OBJECT_TOO_LARGE",
 	}},
 	{errs.ErrObjectLinkToBucket, errorMapping{codes.FailedPrecondition, "object is a link to a bucket", "NATS_OBJECT_LINK_TO_BUCKET"}},
+
+	// Proto snapshot resolution (registry/codec have no per-handler converter).
+	{errs.ErrMappingSourceNotFound, errorMapping{codes.NotFound, "proto source not found", "MAPPING_SOURCE_NOT_FOUND"}},
+	{errs.ErrMappingSourceDisabled, errorMapping{codes.FailedPrecondition, "proto source disabled", "MAPPING_SOURCE_DISABLED"}},
+	{errs.ErrMappingSelectionMissing, errorMapping{codes.FailedPrecondition, "no version selected for source", "MAPPING_SELECTION_MISSING"}},
 }
 
 // StatusErrorConvert maps cross-cutting errors (common+NATS domain sentinels,

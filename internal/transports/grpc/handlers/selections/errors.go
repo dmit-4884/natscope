@@ -21,6 +21,8 @@ func (h *Handler) StatusErrorConvert(ctx context.Context, err error) error {
 		return grpchelpers.NewStatus(codes.NotFound, "proto selection not found", "PROTO_SELECTION_NOT_FOUND")
 	case errors.Is(err, errs.ErrProtoDescriptorNotFound):
 		return grpchelpers.NewStatus(codes.NotFound, "proto descriptor not found", "PROTO_DESCRIPTOR_NOT_FOUND")
+	case errors.Is(err, errs.ErrProtoSourceNotFound):
+		return grpchelpers.NewStatus(codes.NotFound, "proto source not found", "PROTO_SOURCE_NOT_FOUND")
 	}
 	return grpchelpers.StatusErrorConvert(ctx, err)
 }
