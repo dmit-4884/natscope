@@ -4,6 +4,7 @@ import type { KVBucketConfig } from '@/types/management'
 import { useCreateKVBucket } from '@/contexts/kv'
 import { Button, JsonEditor, Tabs, tabPanelProps } from '@/components/ui'
 import { KVBucketFormFields } from '@/components/management/kv/KVBucketFormFields'
+import { isKVHistoryValid } from '@/components/management/kv/kvHistory'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 
 const defaultBucketConfig: KVBucketConfig = {
@@ -21,6 +22,7 @@ export default function CreateKVPage() {
   const [editorMode, setEditorMode] = useState<'form' | 'json'>('form')
 
   const createBucket = useCreateKVBucket(connectionId || undefined)
+  const isFormValid = isKVHistoryValid(formValue.history)
 
   const handleCreate = async () => {
     try {
@@ -87,7 +89,7 @@ export default function CreateKVPage() {
         </Button>
         <Button
           onClick={handleCreate}
-          disabled={createBucket.isPending || !formValue.bucket}
+          disabled={createBucket.isPending || !formValue.bucket || !isFormValid}
         >
           {createBucket.isPending ? 'Creating...' : 'Create KV Store'}
         </Button>

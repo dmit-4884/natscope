@@ -8,6 +8,7 @@ import { RePublishEditor } from '@/components/common/forms/editors/RePublishEdit
 import { StreamSourceEditor } from '@/components/common/forms/editors/StreamSourceEditor'
 import { StreamSourcesArrayEditor } from '@/components/common/forms/editors/StreamSourcesArrayEditor'
 import { KeyValueInput } from '@/components/common/forms/inputs/KeyValueInput'
+import { KV_HISTORY_MIN, KV_HISTORY_MAX, isKVHistoryValid } from './kvHistory'
 
 interface KVBucketFormFieldsProps {
   value: KVBucketConfig
@@ -74,13 +75,19 @@ export function KVBucketFormFields({
             <Input
               id="kv-history"
               type="number"
-              min={1}
-              max={64}
+              min={KV_HISTORY_MIN}
+              max={KV_HISTORY_MAX}
               value={value.history ?? 1}
               onChange={(e) => updateField('history', parseIntOr(e.target.value, 1))}
+              error={!isKVHistoryValid(value.history)}
+              errorMessage={
+                isKVHistoryValid(value.history)
+                  ? undefined
+                  : `History must be between ${KV_HISTORY_MIN} and ${KV_HISTORY_MAX}`
+              }
             />
             <p className="text-xs text-content-tertiary mt-1">
-              Number of historical values to keep per key (1-64)
+              Number of historical values to keep per key ({KV_HISTORY_MIN}-{KV_HISTORY_MAX})
             </p>
           </div>
         </div>
