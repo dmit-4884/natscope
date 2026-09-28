@@ -12,7 +12,7 @@ async function openProtoPublish(page: Page) {
   await expect(page.locator('#main-content').getByText('Subject Pattern', { exact: true })).toBeVisible()
   const trigger = page.locator('#main-content button', { hasText: /Select Subject Pattern|e2e\./ }).first()
   await trigger.click()
-  await page.getByRole('button', { name: PROTO_PATTERN, exact: true }).click()
+  await page.getByRole('option', { name: PROTO_PATTERN, exact: true }).click()
   // Mappings load async — wait until the mode resolves to Protobuf.
   await expect(page.locator('#main-content').getByText(PROTO_MESSAGE_TYPE)).toBeVisible()
 }

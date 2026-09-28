@@ -12,7 +12,7 @@ async function openPublish(page: Page) {
 async function selectPattern(page: Page, pattern: string) {
   const trigger = page.locator('#main-content button', { hasText: /Select Subject Pattern|e2e\./ }).first()
   await trigger.click()
-  await page.getByRole('button', { name: pattern, exact: true }).click()
+  await page.getByRole('option', { name: pattern, exact: true }).click()
 }
 
 function editor(page: Page) {
