@@ -57,6 +57,13 @@ func TestNew(t *testing.T) {
 				assert.InDelta(t, now, e.CreatedAt.UnixMilli(), 1000, "CreatedAt should be within 1s of now")
 			},
 		},
+		{
+			name: "TimestampsHaveStoragePrecision",
+			check: func(t *testing.T, e *BaseEntity) {
+				assert.True(t, e.CreatedAt.Equal(e.CreatedAt.Truncate(time.Millisecond)))
+				assert.True(t, e.UpdatedAt.Equal(e.UpdatedAt.Truncate(time.Millisecond)))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -167,7 +174,7 @@ func TestBaseEntity_UpdateEtag(t *testing.T) {
 func TestBaseEntity_Restore(t *testing.T) {
 	t.Parallel()
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Millisecond)
 	deletedAt := now.Add(-1 * time.Second)
 	e := &BaseEntity{
 		Id:        uuid.New().String(),

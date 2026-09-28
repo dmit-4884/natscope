@@ -29,7 +29,7 @@ type BaseEntity struct {
 // New returns a BaseEntity with a unique Id, fresh ETag, and current
 // timestamps.
 func New() *BaseEntity {
-	now := time.Now().UTC()
+	now := storedNow()
 	return &BaseEntity{
 		Id:        uuid.New().String(),
 		Etag:      generateEtag(),
@@ -46,7 +46,7 @@ func (e *BaseEntity) IsDeleted() bool {
 // UpdateTimestamps refreshes UpdatedAt; CreatedAt set only if zero (preserves
 // original).
 func (e *BaseEntity) UpdateTimestamps() {
-	now := time.Now().UTC()
+	now := storedNow()
 	e.UpdatedAt = now
 
 	if e.CreatedAt.IsZero() {
@@ -99,6 +99,12 @@ func (e *BaseEntity) Equal(other *BaseEntity) bool {
 	default:
 		return e.DeletedAt.Equal(*other.DeletedAt)
 	}
+}
+
+// storedNow is the current UTC time at the millisecond precision storage keeps,
+// so a freshly written entity equals the one read back.
+func storedNow() time.Time {
+	return time.Now().UTC().Truncate(time.Millisecond)
 }
 
 // generateEtag returns a fresh opaque ETag: UUIDv4 without hyphens (32 hex
