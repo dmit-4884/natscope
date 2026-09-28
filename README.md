@@ -196,10 +196,17 @@ Natscope works with zero configuration. When you need to tweak it:
 | Listen address | `GRPC_WEB_ADDRESS` (default `127.0.0.1:4280`, loopback only) |
 | Config file | `--config` flag or `CONFIG_FILE` env var (templates in `configs/`) |
 | Logging | Logs go to stderr. Level: `--log-level error\|warning\|info\|debug` or `LOGGER__LEVEL` (default `warning` in a terminal, `info` otherwise). Format: `--log-format console\|text\|json` or `LOGGER__OUTPUT_FORMAT` (default `console` in a terminal, `text` otherwise) |
-| Env overrides | any config field; nested keys use double underscores (`LOGGER__LEVEL`) |
-| Data directory | `STORAGE__LOCAL__DATA_DIR` (default `~/.natscope/data/`) |
+| Env overrides | any config field; nested keys use double underscores (`LOGGER__LEVEL`); an env var explicitly set to the empty string is treated as unset, not as an override |
+| Data directory | `STORAGE__LOCAL__DATA_DIR` (default `~/.natscope/data/`; a leading `~` is expanded) |
 | Service state dirs | `LIB_DIR` / `VAR_DIR` — instance id and cert cache (default `/var/lib/natscope`; falls back to `~/.natscope/{lib,var}` automatically when the system path is not writable) |
 | Secret vault | `SECRETS__BACKEND=auto\|keyring\|file`; for `file`, supply `SECRETS__FILE_KEY` (64 hex chars, AES-256) out-of-band |
+| Memory limit | `NATSCOPE_MEMORY_LIMIT_BYTES` (default 512 MiB); accepts a plain byte count or a `256MiB`/`1GiB`-style value; `GOMEMLIMIT` takes priority when set |
+| `.env` file | Not loaded by default. Set `NATSCOPE_DOTENV=1` to load `.env` from the current working directory (via `godotenv`) before any other config source |
+
+Any string value in the config file or environment that contains a literal `$` is treated as an
+environment-variable reference (`$NAME` / `${NAME}`) and substituted — a `$` in, say, a generated
+password must be escaped as `$$`, or the load fails outright naming the undefined variable rather than
+silently truncating the value.
 
 ## Remote access
 
@@ -215,8 +222,16 @@ WEB_AUTH__USERNAME=admin WEB_AUTH__PASSWORD=change-me natscope
 loopback. Without it Natscope refuses to start on a non-loopback bind; `ALLOW_INSECURE=true` overrides
 that and accepts the risk (with a prominent warning in the log).
 
+Every request's `Host` header is also checked against an allowlist (defense against DNS rebinding): on
+loopback, only `127.0.0.1`/`[::1]`/`localhost` at the bound port; on a wide bind, `grpcWebAddress` itself
+plus anything listed in `allowedHosts` (env `ALLOWED_HOSTS`, comma-separated).
+
 The listener itself has **no TLS** — it speaks cleartext h2c, so credentials and API responses travel
 unencrypted. Any remote exposure must sit behind a TLS-terminating reverse proxy (nginx, caddy, traefik).
+
+The optional internal HTTP server (`http:` section — health/metrics/pprof, see `configs/http.yaml`) is
+gated the same way: a non-loopback `listenAddress` needs both `allowRemote` and `allowInsecure`, and
+pprof stays disabled on any non-loopback bind regardless of configuration.
 
 ## Where it came from
 

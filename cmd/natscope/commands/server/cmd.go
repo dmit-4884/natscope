@@ -23,8 +23,9 @@ func New() *cobra.Command {
 				Server commands provide control over the natscope service lifecycle.
 
 				The server runs a web interface for browsing NATS JetStream messages
-				with protobuf decoding support. It embeds a React frontend and provides
-				a REST API for interacting with NATS streams.
+				with protobuf decoding support. It embeds a React frontend and serves
+				a Connect-RPC API (Connect, gRPC, and gRPC-Web) for interacting with
+				NATS streams.
 			`),
 			Example: heredoc.Doc(`
 				# Start the server with default settings
@@ -49,4 +50,14 @@ func New() *cobra.Command {
 
 func (c *Command) configure() {
 	c.AddCommand(run.New())
+
+	// "server" has no positional args of its own; an unresolved subcommand
+	// name (e.g. "server bogus") falls through here and must be rejected
+	// instead of printing help with a misleadingly successful exit code.
+	// This requires an explicit RunE — cobra only reaches Args validation
+	// for a command that is Runnable.
+	c.Args = cobra.NoArgs
+	c.RunE = func(cmd *cobra.Command, _ []string) error {
+		return cmd.Help()
+	}
 }

@@ -20,8 +20,9 @@ func New() *cobra.Command {
 			Long: heredoc.Doc(`
 				Start the natscope server.
 
-				Reads config from ~/.natscope/ (or --config), then serves the browser UI
-				and Connect-RPC API on the configured address. Stops on SIGTERM or SIGINT.
+				Reads configuration from --config (or the CONFIG_FILE env var) plus
+				environment overrides, then serves the browser UI and Connect-RPC API
+				on the configured address. Stops on SIGTERM, SIGINT, or SIGHUP.
 			`),
 			Example: heredoc.Doc(`
 				# Start the server with default settings (http://127.0.0.1:4280)
@@ -50,6 +51,7 @@ func New() *cobra.Command {
 
 func (c *Command) configure() {
 	c.RunE = c.run
+	c.Args = cobra.NoArgs
 }
 
 func (c *Command) run(cmd *cobra.Command, args []string) error {

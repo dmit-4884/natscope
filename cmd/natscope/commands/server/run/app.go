@@ -30,6 +30,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/logconsole"
 	"github.com/dmit-4884/natscope/internal/pkg/secrets"
 
+	stderrors "errors"
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	slogfactory "github.com/altessa-s/go-atlas/observability/slog/factory"
 	fxmodules "github.com/dmit-4884/natscope/internal/fx"
@@ -40,6 +41,11 @@ const (
 	startTimeout = 30 * time.Second
 	// shutdownTimeout bounds graceful shutdown.
 	shutdownTimeout = 30 * time.Second
+	// sigChanBuffer holds the first shutdown signal plus one more so a
+	// second signal during shutdown is never missed by the force-exit watch
+	// in gracefulShutdown, even if it arrives before that goroutine starts
+	// reading.
+	sigChanBuffer = 2
 )
 
 type App struct {
@@ -51,11 +57,21 @@ type App struct {
 
 	// Service instance ID.
 	sid *id.Service
+	// sidFile is the file-backed provider behind sid, kept to check
+	// PersistenceError after the first ID() call; nil once a static
+	// Node.Id override replaces sid.
+	sidFile *id.File
 
 	dirsFallback string
 
 	logLevel  string
 	logFormat string
+
+	// sigChan is armed at the very start of Run, before any startup work
+	// (service-dir creation, bbolt lock wait, dependency construction), so a
+	// signal that arrives mid-startup is queued instead of lost — by the
+	// time gracefulShutdown reads it, it may already be waiting.
+	sigChan chan os.Signal
 }
 
 // NewApp creates a new server app.
@@ -67,14 +83,32 @@ func NewApp() *App {
 
 // Run resolves the config path (flag or CONFIG_FILE env) and starts the server.
 func (srv *App) Run(cmd *cobra.Command, args []string) error {
+	// Armed before ensureServiceDirs/dependency startup so a signal that
+	// arrives mid-startup (bbolt lock wait, internal HTTP server bind, …) is
+	// queued rather than terminating the process with no stop hooks run; see
+	// gracefulShutdown.
+	srv.sigChan = make(chan os.Signal, sigChanBuffer)
+	signal.Notify(srv.sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
 	if err := srv.ensureServiceDirs(); err != nil {
 		return err
 	}
-	srv.sid = id.MustNewWithFileProvider(
-		path.Join(appinfo.LibDir(), strings.ToLower(appinfo.Name)+".sid"),
-	)
+
+	fileProvider, err := id.NewFile(path.Join(appinfo.LibDir(), strings.ToLower(appinfo.Name)+".sid"))
+	if err != nil {
+		return errors.WrapOperation(err, "create service id provider")
+	}
+	srv.sidFile = fileProvider
+	if srv.sid, err = id.NewWithProvider(fileProvider); err != nil {
+		return errors.WrapOperation(err, "create service id")
+	}
 
 	configFile, _ := cmd.Flags().GetString("config") //nolint:errcheck
+	if configFile != "" {
+		// GetEnvVar already expands a leading "~" for CONFIG_FILE; do the
+		// same for --config so the two sources behave identically.
+		configFile = appinfo.ExpandPath(configFile)
+	}
 	if cf := appinfo.GetEnvVar("CONFIG_FILE"); cf != "" {
 		configFile = cf
 	}
@@ -145,6 +179,7 @@ func (srv *App) run(ctx context.Context) error {
 	// Static service ID overrides the file provider when configured.
 	if srv.config.Node != nil && srv.config.Node.Id != nil {
 		srv.sid = id.MustNewStaticProvider(*srv.config.Node.Id)
+		srv.sidFile = nil
 	}
 
 	logger, err := slogfactory.New(srv.config.Logger).
@@ -156,13 +191,22 @@ func (srv *App) run(ctx context.Context) error {
 	}
 	slog.SetDefault(logger)
 
+	// PersistenceError is only populated once ID() above has attempted the
+	// lazy write; a read-only LIB_DIR would otherwise silently mint a fresh
+	// sid on every restart with nothing in the log to explain why.
+	if srv.sidFile != nil {
+		if perr := srv.sidFile.PersistenceError(); perr != nil {
+			slog.Default().Warn("service id could not be persisted; a new id will be generated on next start",
+				slogx.Error(perr))
+		}
+	}
+
+	// name/version/sid are omitted here: slogfactory.Build already attaches
+	// them as the "app" group (via WithServiceId) on every line from this
+	// logger, so repeating them as top-level fields just duplicated the
+	// values under two different keys.
 	slog.Default().Info("starting",
-		slog.String("service", appinfo.Name),
-		slog.String("version", appinfo.Version),
-		slog.String("sid", srv.sid.ID()),
 		slog.Group("dirs",
-			"bin", appinfo.BinDir(),
-			"etc", appinfo.EtcDir(),
 			"lib", appinfo.LibDir(),
 			"var", appinfo.VarDir(),
 		),
@@ -190,11 +234,11 @@ func (srv *App) run(ctx context.Context) error {
 	)
 
 	if di.Err() != nil {
-		return errors.WrapOperation(di.Err(), "initialize dependencies")
+		return rootCause(di.Err())
 	}
 
 	if err := di.Start(startCtx); err != nil {
-		return errors.WrapOperation(err, "start dependencies")
+		return rootCause(err)
 	}
 
 	// Apply the soft Go heap cap (default 512 MiB) before serving.
@@ -209,17 +253,25 @@ func (srv *App) run(ctx context.Context) error {
 	return srv.gracefulShutdown(ctx, di)
 }
 
-// gracefulShutdown waits for a signal (or fx error) then stops cleanly.
+// gracefulShutdown waits for a signal (or fx error) then stops cleanly. A
+// second signal received while shutdown is in progress forces an immediate
+// exit — otherwise an operator whose first Ctrl+C appears to hang (a
+// streaming handler still draining, a slow stop hook) has no way to insist.
 func (srv *App) gracefulShutdown(ctx context.Context, di *fx.App) error {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
 	select {
-	case sig := <-sigChan:
+	case sig := <-srv.sigChan:
 		slog.Default().Info("received shutdown signal", slog.String("signal", sig.String()))
 	case <-di.Wait():
 		slog.Default().Info("application stopped unexpectedly")
 	}
+
+	go func() {
+		if sig, ok := <-srv.sigChan; ok {
+			slog.Default().Warn("received a second shutdown signal, exiting immediately",
+				slog.String("signal", sig.String()))
+			os.Exit(1)
+		}
+	}()
 
 	srv.healthCoordinator.BroadcastStatus(health.StatusNotServing)
 
@@ -235,6 +287,21 @@ func (srv *App) gracefulShutdown(ctx context.Context, di *fx.App) error {
 
 	slog.Default().Debug("stopped")
 	return nil
+}
+
+// rootCause peels an error chain down to its innermost cause. fx wraps
+// constructor/config failures several layers deep (could not build
+// arguments for function "reflect".makeFuncStub: could not build value
+// group …: received non-nil error from function …), and the DI graph
+// internals in that chain hide the one line an operator needs.
+func rootCause(err error) error {
+	for {
+		next := stderrors.Unwrap(err)
+		if next == nil {
+			return err
+		}
+		err = next
+	}
 }
 
 func (srv *App) loadConfig() error {
@@ -265,8 +332,14 @@ func (srv *App) printBanner(w io.Writer, vault secrets.Vault) {
 // bounds arena growth when a multi-MB message decode spikes the heap.
 const defaultMemoryLimit int64 = 512 * 1024 * 1024
 
+// minMemoryLimit rejects a NATSCOPE_MEMORY_LIMIT_BYTES value low enough that
+// the GC would run continuously (e.g. a stray "1").
+const minMemoryLimit int64 = 16 * 1024 * 1024
+
 // configureMemoryLimit applies the soft heap cap, honoring GOMEMLIMIT or
-// NATSCOPE_MEMORY_LIMIT_BYTES when set, otherwise defaultMemoryLimit.
+// NATSCOPE_MEMORY_LIMIT_BYTES when set, otherwise defaultMemoryLimit. An
+// unparsable or unreasonably low NATSCOPE_MEMORY_LIMIT_BYTES is rejected
+// with a WARN instead of silently falling back with no trace in the log.
 func configureMemoryLimit() {
 	if os.Getenv("GOMEMLIMIT") != "" {
 		// Runtime already parsed it.
@@ -275,11 +348,51 @@ func configureMemoryLimit() {
 	}
 	limit := defaultMemoryLimit
 	if v := os.Getenv("NATSCOPE_MEMORY_LIMIT_BYTES"); v != "" {
-		parsed, err := strconv.ParseInt(v, 10, 64)
-		if err == nil && parsed > 0 {
+		switch parsed, err := parseMemoryLimit(v); {
+		case err != nil:
+			slog.Default().Warn("ignoring invalid NATSCOPE_MEMORY_LIMIT_BYTES, using the default",
+				slog.String("value", v), slogx.Error(err), slog.Int64("default_bytes", defaultMemoryLimit))
+		case parsed < minMemoryLimit:
+			slog.Default().Warn("NATSCOPE_MEMORY_LIMIT_BYTES is below the minimum, using the default",
+				slog.String("value", v), slog.Int64("min_bytes", minMemoryLimit), slog.Int64("default_bytes", defaultMemoryLimit))
+		default:
 			limit = parsed
 		}
 	}
 	debug.SetMemoryLimit(limit)
 	slog.Default().Debug("memory limit applied", slog.Int64("bytes", limit))
+}
+
+// memoryLimitUnits mirrors the suffixes accepted by the Go runtime's own
+// GOMEMLIMIT, largest first so e.g. "MiB" isn't shadowed by a "B" match.
+var memoryLimitUnits = []struct {
+	suffix string
+	mult   int64
+}{
+	{"GiB", 1 << 30},
+	{"MiB", 1 << 20},
+	{"KiB", 1 << 10},
+	{"B", 1},
+}
+
+// parseMemoryLimit accepts a plain byte count or a GOMEMLIMIT-style value
+// with a B/KiB/MiB/GiB suffix (e.g. "256MiB").
+func parseMemoryLimit(v string) (int64, error) {
+	v = strings.TrimSpace(v)
+	for _, u := range memoryLimitUnits {
+		rest, ok := strings.CutSuffix(v, u.suffix)
+		if !ok {
+			continue
+		}
+		n, err := strconv.ParseInt(strings.TrimSpace(rest), 10, 64)
+		if err != nil || n <= 0 {
+			return 0, fmt.Errorf("invalid memory limit %q", v)
+		}
+		return n * u.mult, nil
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("invalid memory limit %q", v)
+	}
+	return n, nil
 }

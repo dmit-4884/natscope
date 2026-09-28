@@ -72,6 +72,10 @@ func (c *Command) configure() {
 		"log format: console, text, json (default: console in a terminal, text otherwise)")
 
 	c.RunE = c.run
+	// Bare "natscope" starts the server (no positional args expected); a
+	// stray argument is far more likely a typo'd subcommand than intentional
+	// — reject it instead of silently starting the server anyway.
+	c.Args = cobra.NoArgs
 
 	c.SuggestionsMinimumDistance = 1
 	c.SilenceUsage = true

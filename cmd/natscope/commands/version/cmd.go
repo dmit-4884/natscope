@@ -56,6 +56,7 @@ func (c *Command) configure() {
 
 	c.PersistentPreRunE = c.preRun
 	c.RunE = c.run
+	c.Args = cobra.NoArgs
 }
 
 // preRun validates the --output flag.
