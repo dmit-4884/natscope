@@ -83,6 +83,18 @@ var commonDomainErrors = []struct {
 	{errs.ErrWorkspaceInvalidFile, errorMapping{codes.InvalidArgument, "invalid workspace file", "WORKSPACE_INVALID_FILE"}},
 	{errs.ErrWorkspaceSectionInvalid, errorMapping{codes.InvalidArgument, "invalid workspace section payload", "WORKSPACE_SECTION_INVALID"}},
 	{errs.ErrWorkspaceUnknownSection, errorMapping{codes.InvalidArgument, "unknown workspace section key", "WORKSPACE_UNKNOWN_SECTION"}},
+
+	// KV/Object store — narrow guards added alongside natsgo (QA-002, QA-066, QA-071).
+	{errs.ErrNotAKVOrObjectBucket, errorMapping{
+		codes.FailedPrecondition, "stream is not a valid KV/Object bucket", "NATS_BUCKET_TYPE_MISMATCH",
+	}},
+	{errs.ErrObjectBucketCapacityExceeded, errorMapping{
+		codes.ResourceExhausted, "object write would exceed bucket max_bytes", "NATS_OBJECT_BUCKET_CAPACITY_EXCEEDED",
+	}},
+	{errs.ErrObjectTooLargeToRetrieve, errorMapping{
+		codes.ResourceExhausted, "object exceeds maximum retrievable size", "NATS_OBJECT_TOO_LARGE",
+	}},
+	{errs.ErrObjectLinkToBucket, errorMapping{codes.FailedPrecondition, "object is a link to a bucket", "NATS_OBJECT_LINK_TO_BUCKET"}},
 }
 
 // StatusErrorConvert maps cross-cutting errors (common+NATS domain sentinels,

@@ -13,6 +13,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
 	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
@@ -143,7 +144,11 @@ func (h *Handler) GetKVKeyHistory(
 	}), nil
 }
 
-// PutKVKey puts a key in a KeyValue bucket.
+// PutKVKey puts a key in a KeyValue bucket. value must be base64-encoded: a
+// silent "not base64, so store as plain text" fallback used to corrupt any
+// value that happened to also be valid base64 (e.g. "true", "1234") into
+// decoded garbage bytes instead — Put/Get now agree on the wire format
+// symmetrically (see QA-022).
 func (h *Handler) PutKVKey(
 	ctx context.Context,
 	req *connect.Request[managementpb.PutKVKeyRequest],
@@ -151,8 +156,7 @@ func (h *Handler) PutKVKey(
 	in := req.Msg
 	value, err := base64.StdEncoding.DecodeString(in.GetValue())
 	if err != nil {
-		// Treat as plain text if not valid base64.
-		value = []byte(in.GetValue())
+		return nil, &errs.NATSValidationError{Description: "value must be base64-encoded", Cause: err}
 	}
 
 	revision, err := h.natsService.PutKVKey(ctx, in.GetConnectionId(), in.GetBucket(), in.GetKey(), value, in.GetRevision())
