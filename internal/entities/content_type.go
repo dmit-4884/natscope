@@ -38,7 +38,7 @@ const detectScanLimit = 4 * 1024
 // detectScanLimit bytes (heuristic, not a validator).
 func DetectContentType(data []byte) ContentType {
 	if len(data) == 0 {
-		return ContentTypeBinary
+		return ContentTypeText
 	}
 
 	truncated := len(data) > detectScanLimit

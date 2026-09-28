@@ -101,8 +101,6 @@ func toConsumerInfo(info *jetstream.ConsumerInfo, streamName string) *entities.C
 
 // rawMessageOpts maps jetstream.RawStreamMsg → entities.Message. IgnoreZeroValues
 // preserves nil-header→nil-map; DataSize/ContentType/DataRawHex set explicitly.
-// StringSliceJoin (not StringSliceFirst) keeps every value of a repeated
-// header instead of silently dropping all but the first (QA-057).
 var rawMessageOpts = []converter.Option{
 	converter.WithCodecs(
 		convcodecs.BytesBase64,

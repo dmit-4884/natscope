@@ -44,8 +44,8 @@ func TestDetectContentType(t *testing.T) {
 		data []byte
 		want ContentType
 	}{
-		{name: "EmptyData", data: []byte{}, want: ContentTypeBinary},
-		{name: "NilData", data: nil, want: ContentTypeBinary},
+		{name: "EmptyData", data: []byte{}, want: ContentTypeText},
+		{name: "NilData", data: nil, want: ContentTypeText},
 		{name: "ValidJSONObject", data: []byte(`{"key": "value"}`), want: ContentTypeJSON},
 		{name: "ValidJSONArray", data: []byte(`[1, 2, 3]`), want: ContentTypeJSON},
 		{name: "JSONWithLeadingWhitespace", data: []byte(`  { "a": 1 }`), want: ContentTypeJSON},

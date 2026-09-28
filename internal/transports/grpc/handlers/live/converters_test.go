@@ -40,10 +40,9 @@ func TestToProtoLiveMessage_AllFields(t *testing.T) {
 	require.NotNil(t, pb.Stream)
 	assert.Equal(t, "ORDERS", *pb.Stream, "primitive ptr-init string → *string")
 
-	// StringSliceFirst codec: takes first element of each header value list.
 	require.Len(t, pb.Headers, 2)
 	assert.Equal(t, "abc-123", pb.Headers["X-Trace"])
-	assert.Equal(t, "api", pb.Headers["X-Source"])
+	assert.Equal(t, "api, secondary", pb.Headers["X-Source"], "every value of a repeated header is kept")
 }
 
 func TestToProtoLiveMessage_TimestampFallback(t *testing.T) {

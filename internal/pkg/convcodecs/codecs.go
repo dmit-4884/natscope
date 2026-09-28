@@ -27,21 +27,8 @@ var BytesBase64 convcodec.Codec = func(fieldName string, src, dst reflect.Value,
 	next(fieldName, src, dst)
 }
 
-// StringSliceFirst reduces []string to its first element (zero value if
-// empty). Every key lands in dest map; callers must skip empty entries.
-var StringSliceFirst convcodec.Codec = func(fieldName string, src, dst reflect.Value, next convcodec.CodecHandler) {
-	if src.Kind() == reflect.Slice && src.Type().Elem().Kind() == reflect.String && dst.Kind() == reflect.String {
-		if src.Len() > 0 {
-			dst.SetString(src.Index(0).String())
-		}
-		return
-	}
-	next(fieldName, src, dst)
-}
-
 // StringSliceJoin reduces []string to a single comma-separated string,
-// preserving every value instead of discarding all but the first (unlike
-// StringSliceFirst). Used where a header/value can legitimately repeat.
+// preserving every value; used where a header value can repeat.
 var StringSliceJoin convcodec.Codec = func(fieldName string, src, dst reflect.Value, next convcodec.CodecHandler) {
 	if src.Kind() == reflect.Slice && src.Type().Elem().Kind() == reflect.String && dst.Kind() == reflect.String {
 		if src.Len() > 0 {

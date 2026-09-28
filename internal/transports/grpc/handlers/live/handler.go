@@ -31,7 +31,7 @@ import (
 // WithIgnoreZeroValues keeps empty Stream nil: codecs bypass the primitive registry.
 var liveMessageOpts = []converter.Option{
 	grpchelpers.ProtoCodecs,
-	converter.WithCodecs(convcodecs.BytesBase64, convcodecs.StringSliceFirst),
+	converter.WithCodecs(convcodecs.BytesBase64, convcodecs.StringSliceJoin),
 	converter.WithFieldMappings(map[string]string{
 		"Data":   "DataBase64",
 		"Header": "Headers",
