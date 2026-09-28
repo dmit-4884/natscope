@@ -413,6 +413,44 @@ func (s *Store[M, PM]) DeleteBy(ctx context.Context, path string, val any) (int6
 	return n, nil
 }
 
+// TrimOldest deletes the oldest documents (by the store's sort field) once the
+// bucket holds more than limit+slack of them, leaving the newest limit, and
+// returns how many were removed.
+func (s *Store[M, PM]) TrimOldest(ctx context.Context, limit, slack int) (int64, error) {
+	var n int64
+	err := s.db.update(ctx, func(tx *bbolt.Tx) error {
+		b := tx.Bucket(s.bucket)
+		if b == nil || b.Stats().KeyN <= limit+slack {
+			return nil
+		}
+		var all []PM
+		if err := s.scan(tx, func(_ []byte, m PM) (bool, error) {
+			all = append(all, m)
+			return true, nil
+		}); err != nil {
+			return err
+		}
+		sort.Slice(all, func(i, j int) bool {
+			si, sj := s.sortValue(all[i]), s.sortValue(all[j])
+			if si != sj {
+				return si < sj
+			}
+			return all[i].DocBase().ID < all[j].DocBase().ID
+		})
+		for _, m := range all[:len(all)-limit] {
+			if err := b.Delete([]byte(m.DocBase().ID)); err != nil {
+				return err
+			}
+			n++
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, errors.WrapOperation(err, "trim "+string(s.bucket))
+	}
+	return n, nil
+}
+
 // WithTransaction runs fn in one transaction; a transaction already on ctx is
 // reused.
 func (s *Store[M, PM]) WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error {

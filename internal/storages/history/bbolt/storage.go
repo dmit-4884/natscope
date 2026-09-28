@@ -71,4 +71,8 @@ func (s *Storage) List(
 	return out, nil
 }
 
+func (s *Storage) Prune(ctx context.Context, limit, slack int) (int64, error) {
+	return s.store.TrimOldest(ctx, limit, slack)
+}
+
 var _ storage.Storage = (*Storage)(nil)

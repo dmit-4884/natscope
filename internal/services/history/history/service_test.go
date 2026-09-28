@@ -23,6 +23,14 @@ type mockStorage struct {
 
 	saveCalled bool
 	saveInput  *entities.PublishHistory
+
+	pruneLimit int
+	pruneSlack int
+}
+
+func (m *mockStorage) Prune(_ context.Context, limit, slack int) (int64, error) {
+	m.pruneLimit, m.pruneSlack = limit, slack
+	return 0, nil
 }
 
 func (m *mockStorage) Save(_ context.Context, in *entities.PublishHistory) error {
@@ -86,6 +94,8 @@ func TestService_Record(t *testing.T) {
 				require.NotNil(t, result)
 				assert.NotEmpty(t, result.Id)
 				assert.True(t, store.saveCalled)
+				assert.Equal(t, entities.HistoryMaxEntries, store.pruneLimit)
+				assert.Equal(t, entities.HistoryPruneSlack, store.pruneSlack)
 			}
 		})
 	}

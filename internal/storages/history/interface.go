@@ -17,4 +17,8 @@ type Storage interface {
 
 	// List returns history entries with pagination.
 	List(ctx context.Context, in *entities.PublishHistoryList) (*entities.List[entities.PublishHistories], error)
+
+	// Prune keeps the newest limit entries once more than limit+slack exist and
+	// returns how many were removed.
+	Prune(ctx context.Context, limit, slack int) (int64, error)
 }

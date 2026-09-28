@@ -7,6 +7,13 @@ package entities
 // size kept in PayloadSize/PayloadTruncated.
 const HistoryPayloadPreviewBytes = 4 * 1024
 
+// HistoryMaxEntries is how many of the newest publish history entries are
+// retained; HistoryPruneSlack is how far the count may overshoot before a prune.
+const (
+	HistoryMaxEntries = 1000
+	HistoryPruneSlack = 100
+)
+
 // EncodingType is how the message was encoded for publishing.
 type EncodingType string
 

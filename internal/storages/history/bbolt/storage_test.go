@@ -6,6 +6,7 @@ package bbolt_test
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
 
@@ -161,5 +162,52 @@ func TestHistory_PaginationNewestFirst(t *testing.T) {
 	}
 	if len(seen) != 5 {
 		t.Fatalf("saw %d records across pages, want 5", len(seen))
+	}
+}
+
+func TestHistory_PruneKeepsNewest(t *testing.T) {
+	s := newHistStore(t)
+	ctx := t.Context()
+
+	base := time.Now().Truncate(time.Second)
+	save := func(i int) {
+		e := entry("nats://a:4222", "S", "s.x")
+		e.CreatedAt = base.Add(time.Duration(i) * time.Second)
+		if err := s.Save(ctx, e); err != nil {
+			t.Fatalf("save: %v", err)
+		}
+	}
+	for i := range 12 {
+		save(i)
+	}
+
+	removed, err := s.Prune(ctx, 5, 2)
+	if err != nil {
+		t.Fatalf("prune: %v", err)
+	}
+	if removed != 7 {
+		t.Fatalf("removed = %d, want 7", removed)
+	}
+
+	page, err := s.List(ctx, &entities.PublishHistoryList{ListBase: entities.ListBase{IncludeTotalCount: true}})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if page.Total == nil || *page.Total != 5 {
+		t.Fatalf("total = %v, want 5", page.Total)
+	}
+	oldest := page.Items[len(page.Items)-1].CreatedAt
+	if oldest.Before(base.Add(7 * time.Second)) {
+		t.Fatalf("oldest kept entry %v is older than the newest five", oldest)
+	}
+
+	save(12)
+	save(13)
+	if removed, err = s.Prune(ctx, 5, 2); err != nil || removed != 0 {
+		t.Fatalf("prune within slack: removed=%d err=%v, want 0", removed, err)
+	}
+	save(14)
+	if removed, err = s.Prune(ctx, 5, 2); err != nil || removed != 3 {
+		t.Fatalf("prune over slack: removed=%d err=%v, want 3", removed, err)
 	}
 }

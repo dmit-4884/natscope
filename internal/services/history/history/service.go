@@ -57,6 +57,12 @@ func (s *Service) Record(
 		return nil, err
 	}
 
+	if pruned, err := s.storage.Prune(ctx, entities.HistoryMaxEntries, entities.HistoryPruneSlack); err != nil {
+		s.logger.WarnContext(ctx, "failed to prune history", slogx.Error(err))
+	} else if pruned > 0 {
+		s.logger.DebugContext(ctx, "history pruned", slog.Int64("removed", pruned))
+	}
+
 	s.logger.DebugContext(ctx, "history entry recorded",
 		slog.String("id", entry.Id),
 		slog.String("subject", in.Subject),
