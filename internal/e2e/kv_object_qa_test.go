@@ -1,0 +1,403 @@
+// Copyright 2026 The Natscope Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package e2e
+
+import (
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
+	"sync"
+	"testing"
+
+	"connectrpc.com/connect"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
+	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
+	natstypes "github.com/dmit-4884/natscope/proto/gen/types/nats"
+)
+
+// kvObjTestConn creates a saved connection for the KV/Object regression
+// suite and returns its id.
+func kvObjTestConn(t *testing.T, env *e2eEnv, name string) string {
+	t.Helper()
+	resp, err := env.connections.CreateConnection(t.Context(), connect.NewRequest(&connectionspb.CreateConnectionRequest{
+		Name: name, Urls: []string{env.natsURL},
+	}))
+	require.NoError(t, err)
+	return resp.Msg.GetConnection().GetId()
+}
+
+// TestQAKVBucketHistoryRejectsOutOfRange covers QA-023: history above 64 used
+// to be silently truncated (uint32 -> uint8) instead of rejected, producing a
+// bucket with a different history depth than requested.
+func TestQAKVBucketHistoryRejectsOutOfRange(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kv-history")
+
+	for _, history := range []uint32{65, 256, 300} {
+		t.Run(fmt.Sprintf("history=%d", history), func(t *testing.T) {
+			_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+				ConnectionId: connID,
+				Config:       &natstypes.KVBucketConfig{Bucket: fmt.Sprintf("h%d", history), History: history},
+			}))
+			require.Error(t, err, "history above 64 must be rejected, not truncated")
+			assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+		})
+	}
+
+	// 64 is still the accepted maximum.
+	created, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "hmax", History: 64},
+	}))
+	require.NoError(t, err)
+	assert.EqualValues(t, 64, created.Msg.GetBucket().GetHistory())
+}
+
+// TestQAKVBucketDescriptionRoundTrips covers QA-060: description was saved
+// correctly on the server but Create/Get/List never returned it.
+func TestQAKVBucketDescriptionRoundTrips(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kv-desc")
+
+	created, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID,
+		Config:       &natstypes.KVBucketConfig{Bucket: "kvd", Description: "qa desc kv1"},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, "qa desc kv1", created.Msg.GetBucket().GetDescription())
+
+	got, err := env.management.GetKVBucket(ctx, connect.NewRequest(&managementpb.GetKVBucketRequest{
+		ConnectionId: connID, Bucket: "kvd",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, "qa desc kv1", got.Msg.GetBucket().GetDescription())
+}
+
+// TestQAKVKeyValidation covers QA-062 (a key with an empty path segment such
+// as "a..b" passes nats.go's own validation but is invalid as a subject,
+// previously surfacing as Internal on all five key RPCs) and QA-064
+// (GetKVKeyHistory's Watch-based validator uniquely let wildcards through).
+func TestQAKVKeyValidation(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kv-keys")
+
+	_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "keys1"},
+	}))
+	require.NoError(t, err)
+
+	value := base64.StdEncoding.EncodeToString([]byte("x"))
+
+	t.Run("empty path segment is rejected on every key RPC", func(t *testing.T) {
+		const badKey = "a..b"
+
+		_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+			ConnectionId: connID, Bucket: "keys1", Key: badKey, Value: value,
+		}))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "PutKVKey")
+
+		_, err = env.management.GetKVKey(ctx, connect.NewRequest(&managementpb.GetKVKeyRequest{
+			ConnectionId: connID, Bucket: "keys1", Key: badKey,
+		}))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "GetKVKey")
+
+		_, err = env.management.DeleteKVKey(ctx, connect.NewRequest(&managementpb.DeleteKVKeyRequest{
+			ConnectionId: connID, Bucket: "keys1", Key: badKey,
+		}))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "DeleteKVKey")
+
+		_, err = env.management.PurgeKVKey(ctx, connect.NewRequest(&managementpb.PurgeKVKeyRequest{
+			ConnectionId: connID, Bucket: "keys1", Key: badKey,
+		}))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "PurgeKVKey")
+
+		_, err = env.management.GetKVKeyHistory(ctx, connect.NewRequest(&managementpb.GetKVKeyHistoryRequest{
+			ConnectionId: connID, Bucket: "keys1", Key: badKey,
+		}))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "GetKVKeyHistory")
+	})
+
+	t.Run("GetKVKeyHistory rejects wildcards like every other key RPC", func(t *testing.T) {
+		for _, k := range []string{"a.1", "a.2", "b.1"} {
+			_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+				ConnectionId: connID, Bucket: "keys1", Key: k, Value: value,
+			}))
+			require.NoError(t, err)
+		}
+
+		for _, wildcard := range []string{"*", ">", "a.*"} {
+			_, err := env.management.GetKVKeyHistory(ctx, connect.NewRequest(&managementpb.GetKVKeyHistoryRequest{
+				ConnectionId: connID, Bucket: "keys1", Key: wildcard,
+			}))
+			require.Error(t, err, "wildcard %q must be rejected", wildcard)
+			assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+		}
+	})
+}
+
+// TestQAEmptyBucketsReturnEmptyList covers QA-065: an empty bucket used to
+// surface as not_found instead of an empty list, unlike every other
+// empty-collection response in this API (including List*Buckets itself).
+func TestQAEmptyBucketsReturnEmptyList(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-empty")
+
+	_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "emptykv"},
+	}))
+	require.NoError(t, err)
+	keys, err := env.management.ListKVKeys(ctx, connect.NewRequest(&managementpb.ListKVKeysRequest{
+		ConnectionId: connID, Bucket: "emptykv",
+	}))
+	require.NoError(t, err)
+	assert.Empty(t, keys.Msg.GetKeys())
+
+	_, err = env.management.CreateObjectBucket(ctx, connect.NewRequest(&managementpb.CreateObjectBucketRequest{
+		ConnectionId: connID, Config: &natstypes.ObjectBucketConfig{Bucket: "emptyob"},
+	}))
+	require.NoError(t, err)
+	objs, err := env.management.ListObjects(ctx, connect.NewRequest(&managementpb.ListObjectsRequest{
+		ConnectionId: connID, Bucket: "emptyob",
+	}))
+	require.NoError(t, err)
+	assert.Empty(t, objs.Msg.GetObjects())
+}
+
+// TestQABucketDeleteSealRefusesPlainStream covers QA-066: Delete/Seal never
+// checked that the stream behind a KV_/OBJ_-named bucket is actually shaped
+// like one, so a plain stream that merely shared the name was deleted or
+// sealed outright.
+func TestQABucketDeleteSealRefusesPlainStream(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-badbucket")
+
+	nc, err := nats.Connect(env.natsURL)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+
+	t.Run("DeleteKVBucket refuses a plain stream named KV_<bucket>", func(t *testing.T) {
+		_, err := js.CreateStream(ctx, jetstream.StreamConfig{
+			Name: "KV_plain", Subjects: []string{"plain.>"},
+		})
+		require.NoError(t, err)
+
+		_, err = env.management.DeleteKVBucket(ctx, connect.NewRequest(&managementpb.DeleteKVBucketRequest{
+			ConnectionId: connID, Bucket: "plain",
+		}))
+		require.Error(t, err, "a plain stream must not be deleted as if it were a KV bucket")
+
+		_, infoErr := js.Stream(ctx, "KV_plain")
+		require.NoError(t, infoErr, "the plain stream must still exist")
+	})
+
+	t.Run("SealObjectBucket refuses a plain stream named OBJ_<bucket>", func(t *testing.T) {
+		_, err := js.CreateStream(ctx, jetstream.StreamConfig{
+			Name: "OBJ_plainobj", Subjects: []string{"plainobj.>"},
+		})
+		require.NoError(t, err)
+
+		_, err = env.management.SealObjectBucket(ctx, connect.NewRequest(&managementpb.SealObjectBucketRequest{
+			ConnectionId: connID, Bucket: "plainobj",
+		}))
+		require.Error(t, err, "a plain stream must not be sealed as if it were an object bucket")
+
+		info, infoErr := js.Stream(ctx, "OBJ_plainobj")
+		require.NoError(t, infoErr)
+		streamInfo, infoErr := info.Info(ctx)
+		require.NoError(t, infoErr)
+		assert.False(t, streamInfo.Config.Sealed, "the plain stream must not have been sealed")
+	})
+}
+
+// TestQAPutObjectCapacityGuardPreservesOriginal covers QA-002: an overwrite
+// that fails because it would exceed the bucket's max_bytes used to destroy
+// the original object — nats.go's Put publishes the rollup meta and the data
+// chunks independently, so a failed write left the previous version
+// unreachable. The capacity precheck now refuses the write up front instead.
+func TestQAPutObjectCapacityGuardPreservesOriginal(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-obj-capacity")
+
+	_, err := env.management.CreateObjectBucket(ctx, connect.NewRequest(&managementpb.CreateObjectBucketRequest{
+		ConnectionId: connID, Config: &natstypes.ObjectBucketConfig{Bucket: "qow", MaxBytes: 100_000},
+	}))
+	require.NoError(t, err)
+
+	original := make([]byte, 50_000)
+	for i := range original {
+		original[i] = byte(i)
+	}
+	putResp, err := env.management.PutObject(ctx, connect.NewRequest(&managementpb.PutObjectRequest{
+		ConnectionId: connID, Bucket: "qow", Name: "doc", Data: original,
+	}))
+	require.NoError(t, err)
+	originalDigest := putResp.Msg.GetInfo().GetDigest()
+
+	oversized := make([]byte, 300_000)
+	_, err = env.management.PutObject(ctx, connect.NewRequest(&managementpb.PutObjectRequest{
+		ConnectionId: connID, Bucket: "qow", Name: "doc", Data: oversized,
+	}))
+	require.Error(t, err, "an overwrite that would exceed max_bytes must be rejected")
+	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err))
+
+	getResp, err := env.management.GetObject(ctx, connect.NewRequest(&managementpb.GetObjectRequest{
+		ConnectionId: connID, Bucket: "qow", Name: "doc",
+	}))
+	require.NoError(t, err, "the original object must still be readable after the rejected overwrite")
+	assert.Equal(t, original, getResp.Msg.GetData())
+	assert.Equal(t, originalDigest, getResp.Msg.GetInfo().GetDigest())
+}
+
+// TestQAConcurrentPutObjectSameName covers QA-069 (GetObject must never
+// return data from one Put paired with metadata from another) and QA-070
+// (concurrent writers of the same name must not leave the stream full of
+// orphaned chunks from writers that "lost" the race).
+func TestQAConcurrentPutObjectSameName(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-obj-concurrent")
+
+	_, err := env.management.CreateObjectBucket(ctx, connect.NewRequest(&managementpb.CreateObjectBucketRequest{
+		ConnectionId: connID, Config: &natstypes.ObjectBucketConfig{Bucket: "orph"},
+	}))
+	require.NoError(t, err)
+
+	const (
+		writers         = 12
+		objSize         = 64 * 1024
+		maxOrphanFactor = 3 // the final object must not be paired with a stream full of stale chunks
+	)
+
+	var wg sync.WaitGroup
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			data := make([]byte, objSize)
+			for j := range data {
+				data[j] = byte(i)
+			}
+			_, err := env.management.PutObject(ctx, connect.NewRequest(&managementpb.PutObjectRequest{
+				ConnectionId: connID, Bucket: "orph", Name: "same", Data: data,
+			}))
+			assert.NoError(t, err)
+		}(i)
+	}
+	wg.Wait()
+
+	getResp, err := env.management.GetObject(ctx, connect.NewRequest(&managementpb.GetObjectRequest{
+		ConnectionId: connID, Bucket: "orph", Name: "same",
+	}))
+	require.NoError(t, err)
+	sum := sha256.Sum256(getResp.Msg.GetData())
+	assert.Equal(t, fmt.Sprintf("SHA-256=%s", base64.URLEncoding.EncodeToString(sum[:])), getResp.Msg.GetInfo().GetDigest(),
+		"GetObject's info must describe the data it actually returned")
+	assert.EqualValues(t, objSize, getResp.Msg.GetInfo().GetSize())
+
+	nc, err := nats.Connect(env.natsURL)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+	stream, err := js.Stream(ctx, "OBJ_orph")
+	require.NoError(t, err)
+	streamInfo, err := stream.Info(ctx)
+	require.NoError(t, err)
+	assert.Less(t, streamInfo.State.Bytes, uint64(objSize*maxOrphanFactor),
+		"serialized PutObject must not leave the stream full of orphaned chunks from losing writers")
+}
+
+// TestQAObjectLinkReflectedInAPI covers QA-072: an object link
+// (jetstream AddLink) was invisible in ObjectInfo, and GetObject on a link
+// returned the target's data paired with the link's own (empty) info.
+func TestQAObjectLinkReflectedInAPI(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-obj-link")
+
+	_, err := env.management.CreateObjectBucket(ctx, connect.NewRequest(&managementpb.CreateObjectBucketRequest{
+		ConnectionId: connID, Config: &natstypes.ObjectBucketConfig{Bucket: "qa_lb"},
+	}))
+	require.NoError(t, err)
+
+	nc, err := nats.Connect(env.natsURL)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+	obs, err := js.ObjectStore(ctx, "qa_lb")
+	require.NoError(t, err)
+
+	targetInfo, err := obs.PutBytes(ctx, "target", []byte("target-data-123"))
+	require.NoError(t, err)
+	_, err = obs.AddLink(ctx, "lnk", targetInfo)
+	require.NoError(t, err)
+
+	listResp, err := env.management.ListObjects(ctx, connect.NewRequest(&managementpb.ListObjectsRequest{
+		ConnectionId: connID, Bucket: "qa_lb",
+	}))
+	require.NoError(t, err)
+	var link *natstypes.ObjectInfo
+	for _, o := range listResp.Msg.GetObjects() {
+		if o.GetName() == "lnk" {
+			link = o
+		}
+	}
+	require.NotNil(t, link, "the link must appear in ListObjects")
+	require.NotNil(t, link.GetLink(), "the link must be flagged as a link, not shown as an empty object")
+	assert.Equal(t, "target", link.GetLink().GetName())
+	assert.Equal(t, "qa_lb", link.GetLink().GetBucket())
+
+	getResp, err := env.management.GetObject(ctx, connect.NewRequest(&managementpb.GetObjectRequest{
+		ConnectionId: connID, Bucket: "qa_lb", Name: "lnk",
+	}))
+	require.NoError(t, err, "GetObject on a link must follow it to the target")
+	assert.Equal(t, "target-data-123", string(getResp.Msg.GetData()))
+	assert.EqualValues(t, len("target-data-123"), getResp.Msg.GetInfo().GetSize(),
+		"info must describe the data actually returned, not the link's own (empty) meta")
+}
+
+// TestQAKVBucketMirrorSourcesMutuallyExclusive covers QA-126: mirror and
+// sources set together used to be accepted with sources silently dropped
+// (nats.go's CreateKeyValue ignores Sources when Mirror is set).
+func TestQAKVBucketMirrorSourcesMutuallyExclusive(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kv-mirror-sources")
+
+	_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "kvbase"},
+	}))
+	require.NoError(t, err)
+
+	_, err = env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID,
+		Config: &natstypes.KVBucketConfig{
+			Bucket: "mirsrc2",
+			Mirror: &natstypes.StreamSourceRef{Name: "kvbase"},
+			Sources: []*natstypes.StreamSourceRef{
+				{Name: "cas"},
+			},
+		},
+	}))
+	require.Error(t, err, "mirror and sources together must be rejected")
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+}

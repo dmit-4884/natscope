@@ -417,7 +417,7 @@ func TestE2E(t *testing.T) {
 			ConnectionId: connectionID,
 			Bucket:       bucket,
 			Key:          "greeting",
-			Value:        "hello-kv",
+			Value:        base64.StdEncoding.EncodeToString([]byte("hello-kv")),
 		}))
 		require.NoError(t, err)
 		assert.Greater(t, putResp.Msg.GetRevision(), uint64(0))
@@ -425,16 +425,19 @@ func TestE2E(t *testing.T) {
 		// Regression: PutKVKey used to ignore the CAS `revision` field (always
 		// kv.Put). A wrong expected revision must now fail; the current one succeeds.
 		casPut, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
-			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key", Value: "v1",
+			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key",
+			Value: base64.StdEncoding.EncodeToString([]byte("v1")),
 		}))
 		require.NoError(t, err)
 		casRev := casPut.Msg.GetRevision()
 		_, casErr := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
-			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key", Value: "stale", Revision: casRev + 99,
+			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key",
+			Value: base64.StdEncoding.EncodeToString([]byte("stale")), Revision: casRev + 99,
 		}))
 		require.Error(t, casErr, "CAS put with a wrong expected revision must be rejected")
 		casOK, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
-			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key", Value: "v2", Revision: casRev,
+			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key",
+			Value: base64.StdEncoding.EncodeToString([]byte("v2")), Revision: casRev,
 		}))
 		require.NoError(t, err)
 		assert.Equal(t, casRev+1, casOK.Msg.GetRevision())
@@ -446,8 +449,8 @@ func TestE2E(t *testing.T) {
 		}))
 		require.NoError(t, err)
 		require.NotNil(t, getResp.Msg.GetEntry())
-		// KV entry values come back base64-encoded on the wire; the put side
-		// stored plaintext, but reads always base64-encode the stored bytes.
+		// KV entry values are base64 on the wire both ways: Put decodes it,
+		// Get encodes it back, so the round trip is symmetric (see QA-022).
 		decoded, err := base64.StdEncoding.DecodeString(getResp.Msg.GetEntry().GetValue())
 		require.NoError(t, err)
 		assert.Equal(t, "hello-kv", string(decoded))
