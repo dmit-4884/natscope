@@ -189,6 +189,9 @@ func (c *Client) ListKVKeys(ctx context.Context, bucket string) ([]string, error
 
 // GetKVKey returns the value and metadata for a key in a KeyValue bucket.
 func (c *Client) GetKVKey(ctx context.Context, bucket string, key string) (*entities.KVEntry, error) {
+	if err := validateNATSNameLength("key", key); err != nil {
+		return nil, wrapErr(err)
+	}
 	if err := validateKVKey(key); err != nil {
 		return nil, err
 	}
@@ -214,6 +217,9 @@ func (c *Client) GetKVKey(ctx context.Context, bucket string, key string) (*enti
 // bounded by the bucket's history depth. History() creates an ephemeral
 // consumer, so a missing CONSUMER.CREATE perm surfaces only as a timeout.
 func (c *Client) GetKVKeyHistory(ctx context.Context, bucket string, key string) ([]entities.KVEntry, error) {
+	if err := validateNATSNameLength("key", key); err != nil {
+		return nil, wrapErr(err)
+	}
 	if err := validateKVKey(key); err != nil {
 		return nil, err
 	}
@@ -270,6 +276,9 @@ func toKVEntry(bucket string, entry jetstream.KeyValueEntry) entities.KVEntry {
 // is non-zero the write is a compare-and-swap: it fails unless the key's current
 // revision matches, so concurrent writers can't silently clobber each other.
 func (c *Client) PutKVKey(ctx context.Context, bucket string, key string, value []byte, expectedRevision uint64) (uint64, error) {
+	if err := validateNATSNameLength("key", key); err != nil {
+		return 0, wrapErr(err)
+	}
 	if err := validateKVKey(key); err != nil {
 		return 0, err
 	}
@@ -297,6 +306,9 @@ func (c *Client) PutKVKey(ctx context.Context, bucket string, key string, value 
 
 // DeleteKVKey deletes a key from a KeyValue bucket.
 func (c *Client) DeleteKVKey(ctx context.Context, bucket string, key string) error {
+	if err := validateNATSNameLength("key", key); err != nil {
+		return wrapErr(err)
+	}
 	if err := validateKVKey(key); err != nil {
 		return err
 	}
@@ -318,6 +330,9 @@ func (c *Client) DeleteKVKey(ctx context.Context, bucket string, key string) err
 
 // PurgeKVKey purges all revisions of a key from a KeyValue bucket.
 func (c *Client) PurgeKVKey(ctx context.Context, bucket string, key string) error {
+	if err := validateNATSNameLength("key", key); err != nil {
+		return wrapErr(err)
+	}
 	if err := validateKVKey(key); err != nil {
 		return err
 	}

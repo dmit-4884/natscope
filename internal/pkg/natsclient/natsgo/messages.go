@@ -20,6 +20,13 @@ func (c *Client) GetMessages(
 	streamName string,
 	opts entities.GetMessagesOptions,
 ) (*entities.MessagesResponse, error) {
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return nil, wrapErr(err)
+	}
+	if err := validateNATSNameLength("subject filter", opts.SubjectFilter); err != nil {
+		return nil, wrapErr(err)
+	}
+
 	limit := opts.Limit
 	if limit <= 0 {
 		limit = DefaultMessageLimit
@@ -61,6 +68,10 @@ func (c *Client) GetMessages(
 
 // GetMessage fetches a single message by sequence number.
 func (c *Client) GetMessage(ctx context.Context, streamName string, sequence uint64) (*entities.Message, error) {
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return nil, wrapErr(err)
+	}
+
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
 		return nil, wrapErr(errors.WrapOperation(err, "get stream"))
@@ -81,6 +92,10 @@ func (c *Client) PublishToStream(
 	data []byte,
 	headers map[string]string,
 ) (*entities.PubAck, error) {
+	if err := validateNATSNameLength("subject", subject); err != nil {
+		return nil, wrapErr(err)
+	}
+
 	msg := &nats.Msg{
 		Subject: subject,
 		Data:    data,

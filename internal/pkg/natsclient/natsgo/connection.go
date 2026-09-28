@@ -36,6 +36,10 @@ func (c *Client) Subscribe(
 	subject string,
 	handler entities.MessageHandler,
 ) (entities.Subscription, error) {
+	if err := validateNATSNameLength("subject", subject); err != nil {
+		return nil, wrapErr(err)
+	}
+
 	natsHandler := func(msg *nats.Msg) {
 		handler(&entities.NatsMessage{
 			Subject: msg.Subject,
@@ -83,6 +87,13 @@ func (c *Client) SubscribeJetStream(
 	streamName, subject, deliverPolicy string,
 	handler entities.MessageHandler,
 ) (entities.Subscription, error) {
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return nil, wrapErr(err)
+	}
+	if err := validateNATSNameLength("subject", subject); err != nil {
+		return nil, wrapErr(err)
+	}
+
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
 		return nil, wrapErr(errors.Wrapf(err, "failed to get stream %q", streamName))
