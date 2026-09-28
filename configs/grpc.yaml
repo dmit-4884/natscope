@@ -13,6 +13,17 @@
 # Env: ALLOW_REMOTE=true
 # allowRemote: false   # (default: false)
 
+# <string> Comma-separated Host header allowlist, defense against DNS
+# rebinding (a page whose hostname resolves to a loopback/allowed address
+# sending same-origin requests the browser itself would never let through
+# cross-origin). On a loopback bind this is ignored — only 127.0.0.1,
+# [::1], and localhost at the bound port are ever accepted. On a
+# non-loopback bind, grpcWebAddress itself is always accepted; add any
+# additional hostnames (e.g. a reverse-proxy's public name) here. An entry
+# with no port is matched at the bound port.
+# Env: ALLOWED_HOSTS=example.com,other.example:8443
+# allowedHosts: ""   # (default: none — only grpcWebAddress itself)
+
 # HTTP basic auth protecting the whole listener (UI + API). The browser shows
 # its native credentials prompt; API clients pass an Authorization header.
 # Strongly recommended together with allowRemote.

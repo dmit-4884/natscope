@@ -33,16 +33,19 @@ type Handler interface {
 // Transport owns the long-lived HTTP listener and mux; lifecycle managed by fx
 // Start/Stop hooks.
 type Transport struct {
-	server     *http.Server
-	listener   net.Listener
-	mux        *http.ServeMux
-	logger     *slog.Logger
-	address    string
-	frontendFS fs.FS
-	csrf       *http.CrossOriginProtection
-	connectOpt []connect.HandlerOption
-	authUser   string
-	authPass   string
+	server       *http.Server
+	listener     net.Listener
+	mux          *http.ServeMux
+	logger       *slog.Logger
+	address      string
+	frontendFS   fs.FS
+	csrf         *http.CrossOriginProtection
+	connectOpt   []connect.HandlerOption
+	authUser     string
+	authPass     string
+	allowedHosts map[string]struct{}
+	baseCtx      context.Context //nolint:containedctx // canceled from GracefulStop to unblock in-flight streaming handlers; see Listen.
+	cancelBase   context.CancelFunc
 }
 
 // Server hardening limits. Read/Write timeouts are deliberately absent — live
@@ -62,18 +65,22 @@ var devTrustedOrigins = []string{
 }
 
 // New creates a Connect transport; frontendFS may be nil when built without an
-// embedded UI.
+// embedded UI. loopback selects the Host-header allowlist: on a loopback bind
+// only 127.0.0.1/[::1]/localhost at the bound port are accepted, regardless
+// of extraHosts; on a non-loopback bind, address itself plus extraHosts are
+// accepted.
 func New(
 	address string,
 	frontendFS fs.FS,
 	logger *slog.Logger,
-	trustDevOrigins bool,
+	loopback bool,
+	extraHosts []string,
 	connectOpts ...connect.HandlerOption,
 ) (*Transport, error) {
 	csrf := http.NewCrossOriginProtection()
 	// The Vite dev server (:5173) is only relevant to a loopback dev setup; a
 	// remote deployment must not trust it for cross-origin state changes.
-	if trustDevOrigins {
+	if loopback {
 		for _, o := range devTrustedOrigins {
 			if err := csrf.AddTrustedOrigin(o); err != nil {
 				logger.Warn("invalid trusted origin for CSRF protection",
@@ -83,14 +90,69 @@ func New(
 	}
 
 	t := &Transport{
-		mux:        http.NewServeMux(),
-		logger:     logger,
-		address:    address,
-		frontendFS: frontendFS,
-		csrf:       csrf,
-		connectOpt: connectOpts,
+		mux:          http.NewServeMux(),
+		logger:       logger,
+		address:      address,
+		frontendFS:   frontendFS,
+		csrf:         csrf,
+		connectOpt:   connectOpts,
+		allowedHosts: buildAllowedHosts(address, loopback, extraHosts),
 	}
 	return t, nil
+}
+
+// loopbackHostNames are the Host header names accepted on a loopback bind,
+// in addition to the bound port.
+var loopbackHostNames = []string{"127.0.0.1", "[::1]", "localhost"}
+
+// buildAllowedHosts computes the Host header allowlist for a bind. This is
+// the DNS-rebinding defense: without it, a page whose hostname resolves to
+// 127.0.0.1 can send same-origin requests (same Sec-Fetch-Site, matching
+// Origin/Host) that http.CrossOriginProtection alone does not reject.
+func buildAllowedHosts(address string, loopback bool, extraHosts []string) map[string]struct{} {
+	allowed := make(map[string]struct{})
+	_, port, err := net.SplitHostPort(address)
+
+	if loopback {
+		if err != nil {
+			return allowed // no port to pin the allowlist to; reject everything (fail-closed).
+		}
+		for _, host := range loopbackHostNames {
+			allowed[strings.ToLower(host+":"+port)] = struct{}{}
+		}
+		return allowed
+	}
+
+	allowed[strings.ToLower(address)] = struct{}{}
+	for _, host := range extraHosts {
+		host = strings.ToLower(strings.TrimSpace(host))
+		if host == "" {
+			continue
+		}
+		if !strings.Contains(host, ":") && err == nil {
+			host += ":" + port
+		}
+		allowed[host] = struct{}{}
+	}
+	return allowed
+}
+
+// checkHost rejects a request whose Host header is not in the allowlist,
+// before it reaches CSRF protection or basic auth — a same-origin request
+// crafted via DNS rebinding presents a Host/Origin that CSRF checks alone
+// accept.
+func (t *Transport) checkHost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := t.allowedHosts[strings.ToLower(r.Host)]; !ok {
+			t.logger.Warn("rejected request with untrusted Host header",
+				slog.String("host", r.Host),
+				slog.String("remote", r.RemoteAddr),
+				slog.String("path", r.URL.Path))
+			http.Error(w, "invalid host", http.StatusMisdirectedRequest)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // RegisterHandlers mounts every Connect handler then installs the SPA fallback
@@ -103,9 +165,21 @@ func (t *Transport) RegisterHandlers(handlers []Handler) {
 	t.mux.HandleFunc("/", t.serveSPA)
 }
 
-// serveSPA serves embedded files as-is; unknown paths fall through to
-// index.html (404 if no dist embedded).
+// assetsPrefix holds Vite's content-hashed, immutable build output. A miss
+// under it is a deployment error (stale link, partial upload), not a client
+// route — it must 404, not silently return index.html.
+const assetsPrefix = "/assets/"
+
+// serveSPA serves embedded files as-is; unknown "route" paths fall through to
+// index.html (404 if no dist embedded). Only GET/HEAD are served; static
+// content has no other meaningful method.
 func (t *Transport) serveSPA(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	if t.frontendFS == nil {
 		http.NotFound(w, r)
 		return
@@ -118,16 +192,23 @@ func (t *Transport) serveSPA(w http.ResponseWriter, r *http.Request) {
 		path = path[1:]
 	}
 
+	isAsset := strings.HasPrefix(r.URL.Path, assetsPrefix)
+
 	if f, err := t.frontendFS.Open(path); err == nil {
 		_ = f.Close()
 		// Vite emits content-hashed filenames under /assets, so they can be
 		// cached indefinitely; everything else is revalidated.
-		if strings.HasPrefix(r.URL.Path, "/assets/") {
+		if isAsset {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
 		http.FileServer(http.FS(t.frontendFS)).ServeHTTP(w, r)
+		return
+	}
+
+	if isAsset {
+		http.NotFound(w, r)
 		return
 	}
 
@@ -144,6 +225,8 @@ func (t *Transport) serveSPA(w http.ResponseWriter, r *http.Request) {
 
 // Listen binds the TCP socket and builds the http.Server; split from Serve so a
 // port-in-use error fails fx startup synchronously instead of on a goroutine.
+//
+//nolint:contextcheck // baseCtx is deliberately rooted in Background, not ctx — see its construction below.
 func (t *Transport) Listen(ctx context.Context) error {
 	if t.listener != nil {
 		return nil // already listening (idempotent)
@@ -163,9 +246,24 @@ func (t *Transport) Listen(ctx context.Context) error {
 	if t.authUser != "" {
 		handler = t.basicAuth(handler)
 	}
+	handler = t.checkHost(handler)
+
+	// baseCtx is the parent of every request context. GracefulStop cancels
+	// it before calling Shutdown, so a long-lived streaming handler (Live
+	// Subscribe) observes ctx.Done() and returns instead of holding the
+	// connection open until the shutdown deadline.
+	// Deliberately rooted in Background, not Listen's own ctx: this must
+	// outlive the Listen call (which only bounds the initial bind) for the
+	// server's entire run — it is canceled explicitly by GracefulStop, not
+	// by Listen's caller.
+	t.baseCtx, t.cancelBase = context.WithCancel(context.Background())
+	baseCtx := t.baseCtx
 	t.server = &http.Server{
 		Handler:   handler,
 		Protocols: &protocols,
+		BaseContext: func(net.Listener) context.Context {
+			return baseCtx
+		},
 		// Read/Write timeouts stay zero on purpose: live subscriptions are
 		// long-lived streams. Header limits still bound slow-header clients.
 		ReadHeaderTimeout: readHeaderTimeout,
@@ -225,10 +323,16 @@ func (t *Transport) Serve() error {
 }
 
 // GracefulStop shuts the HTTP server down, returning when in-flight requests
-// complete or ctx fires.
+// complete or ctx fires. It cancels every request's base context first, so a
+// long-lived streaming handler (Live Subscribe) observing ctx.Done() ends
+// immediately instead of holding Shutdown open until requests naturally
+// finish — which, for a live subscription, is never.
 func (t *Transport) GracefulStop(ctx context.Context) error {
 	if t.server == nil {
 		return nil
+	}
+	if t.cancelBase != nil {
+		t.cancelBase()
 	}
 	return t.server.Shutdown(ctx)
 }

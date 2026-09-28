@@ -171,7 +171,7 @@ func newConnectTransport(cfg *appconfig.Config, lc fx.Lifecycle) (*grpctransport
 		),
 	}
 
-	t, err := grpctransport.New(cfg.GRPCWebAddress, frontendFS, lgr, cfg.BindsLoopback(), connectOpts...)
+	t, err := grpctransport.New(cfg.GRPCWebAddress, frontendFS, lgr, cfg.BindsLoopback(), cfg.AllowedHostsList(), connectOpts...)
 	if err != nil {
 		return nil, errors.WrapOperation(err, "create connect transport")
 	}
@@ -214,20 +214,44 @@ func newHTTPServer(cfg *appconfig.Config, lc fx.Lifecycle) (*httpserver.Server, 
 		return nil, nil //nolint:nilnil
 	}
 
-	// Fail-closed: the internal HTTP server exposes unauthenticated health,
-	// metrics and pprof. Refuse a non-loopback bind unless explicitly accepted.
-	if !cfg.HTTPBindsLoopback() && !cfg.AllowInsecure {
-		return nil, fmt.Errorf(
-			"refusing to bind internal HTTP server to %s: it serves unauthenticated "+
-				"health/metrics/pprof. Bind a loopback address, or set allowInsecure: true "+
-				"(env ALLOW_INSECURE=true) to accept the risk explicitly",
-			cfg.Http.ListenAddress)
+	lgr := slog.Default().With(slogx.Module("transport:http"))
+	wideBind := !cfg.HTTPBindsLoopback()
+
+	// Fail-closed on the same two-flag gate as the main listener: the
+	// internal server exposes unauthenticated health, metrics and pprof, and
+	// has no basic-auth option of its own (it is a separate go-atlas
+	// listener that SetBasicAuth never reaches).
+	if wideBind {
+		if !cfg.AllowRemote {
+			return nil, fmt.Errorf(
+				"refusing to bind internal HTTP server to %s: it serves unauthenticated "+
+					"health/metrics/pprof. Set allowRemote: true (env ALLOW_REMOTE=true) to expose "+
+					"it beyond loopback",
+				cfg.Http.ListenAddress)
+		}
+		if !cfg.AllowInsecure {
+			return nil, fmt.Errorf(
+				"refusing to bind internal HTTP server to %s without authentication: it serves "+
+					"unauthenticated health/metrics/pprof and has no auth option of its own. Set "+
+					"allowInsecure: true (env ALLOW_INSECURE=true) to accept the risk explicitly",
+				cfg.Http.ListenAddress)
+		}
 	}
 
-	srv, err := httpfactory.New(cfg.Http).
-		UseLogger(slog.Default().With(slogx.Module("transport:http"))).
-		WithMiddlewares().
-		Build()
+	builder := httpfactory.New(cfg.Http).
+		UseLogger(lgr).
+		WithMiddlewares()
+	if wideBind {
+		// pprof leaks heap contents, goroutine stacks and cmdline
+		// unauthenticated; keep it loopback-only regardless of the
+		// pprof.enabled config value or allowInsecure.
+		builder = builder.WithoutPprof()
+		lgr.Warn("internal HTTP server is exposed beyond loopback WITHOUT authentication "+
+			"(allowInsecure=true); pprof has been disabled regardless of configuration",
+			slog.String("address", cfg.Http.ListenAddress))
+	}
+
+	srv, err := builder.Build()
 	if err != nil {
 		return nil, errors.WrapOperation(err, "create HTTP server")
 	}
