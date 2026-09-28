@@ -5,11 +5,18 @@ PROJECT_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 APP_NAME = natscope
 APP_PROJECT =
 APP_ENV_PREFIX ?=
-APP_VERSION ?= v$(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0")
+# The `|| echo` fallback must sit directly on git describe's own exit code —
+# piping through sed first (as this used to) makes the pipeline's exit code
+# sed's, which always succeeds, so a repo with no tags silently fell through
+# to APP_VERSION=v instead of v0.0.0. Tags are already "v"-prefixed (v1.2.3).
+APP_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
 APP_VERSION_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-GOOS ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
-GOARCH ?= $(shell uname -m)
+# `go env` reports Go's own GOOS/GOARCH names (amd64, arm64, darwin, linux);
+# `uname -m`/`uname -s` don't (e.g. "x86_64", "Darwin"), which `go build`
+# then rejects outright ("unsupported GOOS/GOARCH pair").
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 GO_RACE_DETECTOR_ENABLE ?= 0
 BUILD_TAGS ?= cse
 COMPILER_FLAGS ?=
@@ -24,6 +31,16 @@ LDFLAGS ?= -w -s
 ifeq (Darwin,$(UNAME))
 LDFLAGS := $(LDFLAGS) -extldflags=-Wl,-ld_classic
 endif
+
+# Shared appinfo -X flags: every build target must set these, or the binary
+# reports Version 0.0.0 / an empty env prefix regardless of what APP_VERSION
+# etc. were set to (this bit build-backend, and the Docker image it feeds).
+LDFLAGS_X = \
+	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Name=${APP_NAME} \
+	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Project=${APP_PROJECT} \
+	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.EnvPrefix=${APP_ENV_PREFIX} \
+	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Version=${APP_VERSION} \
+	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Commit=${APP_VERSION_COMMIT}
 
 DOCKER_IMAGE ?= "natscope"
 DOCKER_IMAGE_LATEST_TAG = "latest"
@@ -119,7 +136,7 @@ proto-breaking: ## Check for breaking changes in proto files
 ##@ Build
 
 .PHONY: build
-build: clean proto-generate tidy build-frontend ## Build project with embedded frontend
+build: clean proto-generate build-frontend ## Build project with embedded frontend
 	@echo "-------------------------------------------"
 	@echo "Build options:"
 	@echo PROJECT_ROOT="${PROJECT_ROOT}"
@@ -135,12 +152,7 @@ build: clean proto-generate tidy build-frontend ## Build project with embedded f
 	CGO_ENABLED=${CGO_ENABLE} GOOS=${GOOS} GOARCH=${GOARCH} go build -trimpath \
 		-tags "${BUILD_TAGS}" \
 		${COMPILER_FLAGS} \
-		-ldflags "${LDFLAGS} \
-			-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Name=${APP_NAME} \
-			-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Project=${APP_PROJECT} \
-			-X github.com/altessa-s/go-atlas/core/runtime/appinfo.EnvPrefix=${APP_ENV_PREFIX} \
-			-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Version=${APP_VERSION} \
-			-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Commit=${APP_VERSION_COMMIT}" \
+		-ldflags "${LDFLAGS} ${LDFLAGS_X}" \
 		-o ${BIN_OUTPUT_DIR}/${APP_NAME} ${PROJECT_ROOT}/cmd/${APP_NAME}
 
 	@echo "Binary created at: ${BIN_OUTPUT_DIR}/${APP_NAME}"
@@ -148,7 +160,7 @@ build: clean proto-generate tidy build-frontend ## Build project with embedded f
 CROSS_PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 
 .PHONY: build-all
-build-all: clean proto-generate tidy build-frontend ## Build for all platforms (linux, darwin, windows)
+build-all: clean proto-generate build-frontend ## Build for all platforms (linux, darwin, windows)
 	@for platform in $(CROSS_PLATFORMS); do \
 		os=$${platform%%/*}; \
 		arch=$${platform##*/}; \
@@ -158,12 +170,7 @@ build-all: clean proto-generate tidy build-frontend ## Build for all platforms (
 		echo "Building $${os}/$${arch}..."; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath \
 			-tags "${BUILD_TAGS}" \
-			-ldflags "-w -s \
-				-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Name=${APP_NAME} \
-				-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Project=${APP_PROJECT} \
-				-X github.com/altessa-s/go-atlas/core/runtime/appinfo.EnvPrefix=${APP_ENV_PREFIX} \
-				-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Version=${APP_VERSION} \
-				-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Commit=${APP_VERSION_COMMIT}" \
+			-ldflags "-w -s ${LDFLAGS_X}" \
 			-o "$${outdir}/${APP_NAME}$${ext}" ${PROJECT_ROOT}/cmd/${APP_NAME} || exit 1; \
 	done
 	@echo "-------------------------------------------"
@@ -171,10 +178,10 @@ build-all: clean proto-generate tidy build-frontend ## Build for all platforms (
 	@ls -la ${PROJECT_ROOT}/build/bin/${APP_VERSION}/*/
 
 .PHONY: build-backend
-build-backend: proto-generate stub-dist tidy ## Build backend only (without frontend)
+build-backend: proto-generate stub-dist ## Build backend only (without frontend)
 	CGO_ENABLED=${CGO_ENABLE} go build -trimpath \
 		-tags "${BUILD_TAGS}" \
-		-ldflags "${LDFLAGS}" \
+		-ldflags "${LDFLAGS} ${LDFLAGS_X}" \
 		-o ${BIN_OUTPUT_DIR}/${APP_NAME} ${PROJECT_ROOT}/cmd/${APP_NAME}
 
 .PHONY: build-frontend
@@ -231,7 +238,7 @@ dev-frontend: ## Run frontend in development mode
 test: test-backend test-frontend ## Run all tests
 
 .PHONY: test-backend
-test-backend: ## Run backend tests
+test-backend: stub-dist ## Run backend tests
 	@go test -v ./...
 
 .PHONY: test-frontend
@@ -239,7 +246,7 @@ test-frontend: ## Run frontend tests
 	@cd ${PROJECT_ROOT}/web && npm test
 
 .PHONY: test-coverage
-test-coverage: ## Run backend tests with coverage
+test-coverage: stub-dist ## Run backend tests with coverage
 	@go test -cover ./...
 	@go test -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
