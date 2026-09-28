@@ -1,5 +1,18 @@
+import {
+  SubjectPattern,
+  type PatternValidationError,
+} from '@/contexts/mappings/domain/value-objects/SubjectPattern'
 import { SourcePicker } from '../proto/SourcePicker'
 import { ProtoTypePicker } from '../proto/ProtoTypePicker'
+
+const PATTERN_ERROR_MESSAGE: Record<PatternValidationError, string> = {
+  EMPTY_PATTERN: 'Subject pattern is required.',
+  INVALID_CHARACTERS: 'Only letters, numbers, ".", "_", "-", "*", ">" are allowed.',
+  CONSECUTIVE_DOTS: 'Consecutive dots are not allowed.',
+  TRAILING_DOT: 'A trailing dot is not allowed.',
+  GREATER_NOT_LAST: '">" must be the last token.',
+  PARTIAL_WILDCARD_TOKEN: '"*" and ">" must occupy a whole token, not share one with other text.',
+}
 
 interface Props {
   pattern: string
@@ -34,7 +47,9 @@ export function MappingAddForm({
   mode = 'create',
   isSubmitting = false,
 }: Props) {
-  const canSubmit = !!pattern && !!protoType && !!sourceId && !isSubmitting
+  const patternResult = pattern ? SubjectPattern.create(pattern) : null
+  const patternError = patternResult?.isErr() ? PATTERN_ERROR_MESSAGE[patternResult.error] : undefined
+  const canSubmit = !!pattern && !patternError && !!protoType && !!sourceId && !isSubmitting
 
   return (
     <div className="mt-4 p-4 bg-surface-primary rounded-lg border border-border space-y-4">
@@ -69,7 +84,10 @@ export function MappingAddForm({
           value={pattern}
           onChange={(e) => onPatternChange(e.target.value)}
           placeholder="e.g., events.user.*"
-          className="w-full px-3 py-2 text-sm font-mono border border-border-strong rounded-md focus:ring-border-focus focus:border-border-focus"
+          aria-invalid={!!patternError}
+          className={`w-full px-3 py-2 text-sm font-mono border rounded-md focus:ring-border-focus focus:border-border-focus ${
+            patternError ? 'border-status-error-border' : 'border-border-strong'
+          }`}
           list="available-patterns"
         />
         {unmappedPatterns.length > 0 && (
@@ -79,6 +97,7 @@ export function MappingAddForm({
             ))}
           </datalist>
         )}
+        {patternError && <p className="text-xs text-status-error-text mt-1">{patternError}</p>}
       </div>
 
       <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">

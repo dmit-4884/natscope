@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useCallback } from 'react'
 import { listMappings } from '@/api/mappings'
+import { resolveMapping } from '@/shared/domain/resolveMapping'
 import { Mapping } from '../../domain/entities/Mapping'
 import { mappingKeys } from './mappingKeys'
 
@@ -126,23 +127,15 @@ export function useSubjectMappingEntity(subject: string | null, sourceFilter?: s
 
     const candidates = sourceFilter ? mappings.filter((m) => m.sourceId === sourceFilter) : mappings
 
-    // Direct match wins.
-    const direct = candidates.find((m) => m.pattern.value === subject)
-    if (direct) return direct
-
-    // Otherwise best wildcard match by specificity.
-    let bestMatch: Mapping | null = null
-    let bestSpecificity = -1
-    for (const m of candidates) {
-      if (m.matches(subject)) {
-        const s = m.pattern.specificity()
-        if (s > bestSpecificity) {
-          bestMatch = m
-          bestSpecificity = s
-        }
-      }
-    }
-    return bestMatch
+    // Shared with the message viewer (UnifiedMessageViewer) so Publish
+    // encodes with the same mapping the viewer decodes with — see
+    // resolveMapping's doc comment (QA-102).
+    return resolveMapping(
+      subject,
+      candidates,
+      (m) => m.pattern.value,
+      (m) => m.createdAt.getTime(),
+    )
   }, [subject, mappings, sourceFilter])
 
   return {

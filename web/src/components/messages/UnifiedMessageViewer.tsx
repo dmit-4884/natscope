@@ -13,6 +13,7 @@ import { decodeMessage } from '@/api/decode'
 import { getMessage } from '@/api/messages'
 import { deleteMessage } from '@/api/management'
 import { getSubjectPattern as getPatternFromSubject, matchesPattern as subjectMatchesPattern } from '@/contexts/messages'
+import { resolveMapping } from '@/shared/domain/resolveMapping'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
 import { getErrorMessage } from '@/api/errors'
 import { useDisplayPreferences, useConfirmation, useBehaviorPolicy } from '@/contexts/settings'
@@ -50,34 +51,16 @@ const parseJsonData = (base64Data: string): unknown | null => {
   }
 }
 
-// Pattern specificity (higher = more specific).
-const patternSpecificity = (pattern: string): number => {
-  const parts = pattern.split('.')
-  let specificity = parts.length * 10
-  for (const p of parts) {
-    if (p === '>') specificity -= 5
-    if (p === '*') specificity -= 2
-  }
-  return specificity
-}
-
-const findMappingMatch = (subject: string, mappings: MappingItem[]): MappingItem | null => {
-  const exact = mappings.find((m) => m.pattern === subject)
-  if (exact) return exact
-
-  let bestMatch: MappingItem | null = null
-  let bestSpecificity = -Infinity
-  for (const m of mappings) {
-    if (subjectMatchesPattern(subject, m.pattern)) {
-      const specificity = patternSpecificity(m.pattern)
-      if (!bestMatch || specificity > bestSpecificity) {
-        bestMatch = m
-        bestSpecificity = specificity
-      }
-    }
-  }
-  return bestMatch
-}
+// Shared with Publish's mapping resolution (useSubjectMappingEntity) so the
+// viewer decodes with the same mapping Publish encoded with — see
+// resolveMapping's doc comment (QA-102).
+const findMappingMatch = (subject: string, mappings: MappingItem[]): MappingItem | null =>
+  resolveMapping(
+    subject,
+    mappings,
+    (m) => m.pattern,
+    (m) => m.createdAt,
+  )
 
 export default function UnifiedMessageViewer({
   streamName,

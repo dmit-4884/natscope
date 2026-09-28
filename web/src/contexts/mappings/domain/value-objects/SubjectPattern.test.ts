@@ -50,6 +50,32 @@ describe('SubjectPattern', () => {
       expect(result.isErr()).toBe(true)
       expect(result.error).toBe('TRAILING_DOT')
     })
+
+    // QA-101: "a.>.b" passes the character/dot checks above but is still an
+    // invalid NATS pattern — ">" only matches when it is the last token.
+    it('rejects ">" that is not the last token', () => {
+      const result = SubjectPattern.create('a.>.b')
+      expect(result.isErr()).toBe(true)
+      expect(result.error).toBe('GREATER_NOT_LAST')
+    })
+
+    it('rejects a bare ">" not at the end of a longer pattern', () => {
+      const result = SubjectPattern.create('>.a')
+      expect(result.isErr()).toBe(true)
+      expect(result.error).toBe('GREATER_NOT_LAST')
+    })
+
+    it('rejects a wildcard sharing a token with a literal', () => {
+      expect(SubjectPattern.create('orders.b*').isErr()).toBe(true)
+      expect(SubjectPattern.create('orders.b*').error).toBe('PARTIAL_WILDCARD_TOKEN')
+      expect(SubjectPattern.create('orders.*b').error).toBe('PARTIAL_WILDCARD_TOKEN')
+      expect(SubjectPattern.create('orders.a>').error).toBe('PARTIAL_WILDCARD_TOKEN')
+    })
+
+    it('accepts ">" as the last token of a longer pattern', () => {
+      const result = SubjectPattern.create('orders.eu.>')
+      expect(result.isOk()).toBe(true)
+    })
   })
 
   describe('fromTrusted', () => {
