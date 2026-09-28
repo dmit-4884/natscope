@@ -33,6 +33,7 @@ type mockConnService struct {
 	deleteErr    error
 	dupResult    *entities.SavedConnection
 	dupErr       error
+	testResult   *entities.TestConnectionResult
 }
 
 func (m *mockConnService) Create(_ context.Context, in *entities.SavedConnectionCreate) (*entities.SavedConnection, error) {
@@ -73,6 +74,9 @@ func (m *mockConnService) Duplicate(_ context.Context, _ string, _ string) (*ent
 }
 
 func (m *mockConnService) TestConnection(_ context.Context, _ *entities.TestConnectionRequest) (*entities.TestConnectionResult, error) {
+	if m.testResult != nil {
+		return m.testResult, nil
+	}
 	return &entities.TestConnectionResult{}, nil
 }
 
@@ -216,5 +220,31 @@ func TestHandler_Delete(t *testing.T) {
 
 		_, err := handler.DeleteConnection(t.Context(), connect.NewRequest(&connectionspb.DeleteConnectionRequest{Id: "conn-1"}))
 		assert.Error(t, err)
+	})
+}
+
+func TestHandler_TestConnection_OptionalFields(t *testing.T) {
+	t.Parallel()
+
+	t.Run("failure reports only the error", func(t *testing.T) {
+		t.Parallel()
+		h := New(&mockConnService{testResult: &entities.TestConnectionResult{Error: "no servers available"}})
+		resp, err := h.TestConnection(t.Context(), connect.NewRequest(&connectionspb.TestConnectionRequest{}))
+		require.NoError(t, err)
+		assert.False(t, resp.Msg.GetSuccess())
+		assert.Equal(t, "no servers available", resp.Msg.GetError())
+		assert.Nil(t, resp.Msg.RttMs)
+		assert.Nil(t, resp.Msg.ServerVersion)
+	})
+
+	t.Run("success omits the error", func(t *testing.T) {
+		t.Parallel()
+		h := New(&mockConnService{testResult: &entities.TestConnectionResult{Success: true, RTTMs: 0, ServerVersion: "2.14.2"}})
+		resp, err := h.TestConnection(t.Context(), connect.NewRequest(&connectionspb.TestConnectionRequest{}))
+		require.NoError(t, err)
+		assert.True(t, resp.Msg.GetSuccess())
+		assert.Nil(t, resp.Msg.Error)
+		require.NotNil(t, resp.Msg.RttMs)
+		assert.Equal(t, "2.14.2", resp.Msg.GetServerVersion())
 	})
 }

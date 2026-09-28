@@ -35,7 +35,8 @@ message CreateConnectionRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).required = true,
-    (buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]+$"}
+    (buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]+$"},
+    (buf.validate.field).cel = {id: "natscope.connections.name_not_blank", message: "name must not be blank", expression: "this.matches('\\\\S')"}
   ];
 
   // Optional. User description or notes about this connection.
@@ -96,8 +97,10 @@ message UpdateConnectionRequest {
   string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Optional. Updated display name for the connection.
-  optional string name = 2
-      [(buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]+$"}];
+  optional string name = 2 [
+    (buf.validate.field).string = {max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]*$"},
+    (buf.validate.field).cel = {id: "natscope.connections.name_not_blank", message: "name must not be blank", expression: "this.matches('\\\\S')"}
+  ];
 
   // Optional. Updated description.
   optional string description = 3 [(buf.validate.field).string.max_len = 4096];
@@ -229,7 +232,8 @@ message DuplicateConnectionRequest {
   string name = 2 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).required = true,
-    (buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]+$"}
+    (buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]+$"},
+    (buf.validate.field).cel = {id: "natscope.connections.name_not_blank", message: "name must not be blank", expression: "this.matches('\\\\S')"}
   ];
 }
 

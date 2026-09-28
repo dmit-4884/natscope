@@ -119,7 +119,12 @@ func (h *Handler) TestConnection(
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(converter.Convert(result, &connectionspb.TestConnectionResponse{})), nil
+	if !result.Success {
+		return connect.NewResponse(&connectionspb.TestConnectionResponse{Error: &result.Error}), nil
+	}
+	resp := converter.Convert(result, &connectionspb.TestConnectionResponse{})
+	resp.Error = nil
+	return connect.NewResponse(resp), nil
 }
 
 // DuplicateConnection duplicates a saved connection.

@@ -16,6 +16,7 @@ import (
 	badrequestv1 "github.com/altessa-s/proto-gen-go/badrequest/v1"
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
 	messagespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/messages"
+	publishpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/publish"
 )
 
 // TestValidationReasonCodes proves the reasoncodes resolver is wired end-to-end:
@@ -39,6 +40,36 @@ func TestValidationReasonCodes(t *testing.T) {
 				return err
 			},
 			"NAME_REQUIRED",
+		},
+		{
+			"blank name → same code as a missing name",
+			func() error {
+				_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
+					Name: "   ", Urls: []string{"nats://127.0.0.1:1"},
+				}))
+				return err
+			},
+			"NAME_REQUIRED",
+		},
+		{
+			"empty name on update → same code as a missing name",
+			func() error {
+				_, err := env.connections.UpdateConnection(ctx, connect.NewRequest(&connectionspb.UpdateConnectionRequest{
+					Id: unknownUUID, Name: new(""),
+				}))
+				return err
+			},
+			"NAME_REQUIRED",
+		},
+		{
+			"message_type without source_id → catalog code",
+			func() error {
+				_, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
+					ConnectionId: "x", Subject: "a", Data: "{}", MessageType: new("pkg.T"),
+				}))
+				return err
+			},
+			"SOURCE_ID_REQUIRED",
 		},
 		{
 			"domain CEL rule → catalog code",

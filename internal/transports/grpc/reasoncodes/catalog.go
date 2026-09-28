@@ -23,4 +23,5 @@ var Catalog = map[string]string{
 	"natscope.nats.messages.start_seq_xor_start_time":   "MUTUALLY_EXCLUSIVE_FIELDS",
 	"natscope.nats.kv.mirror_sources_exclusive":         "MUTUALLY_EXCLUSIVE_FIELDS",
 	"natscope.nats.publish.source_id_with_message_type": "SOURCE_ID_REQUIRED",
+	"natscope.connections.name_not_blank":               "NAME_REQUIRED",
 }
