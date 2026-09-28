@@ -159,10 +159,7 @@ func (srv *App) ensureServiceDirs() error {
 }
 
 func envVarName(key string) string {
-	if appinfo.EnvPrefix != "" {
-		key = strings.TrimRight(appinfo.EnvPrefix, "_") + "_" + key
-	}
-	return strings.ToUpper(key)
+	return strings.ToUpper(appconfig.EnvPrefix() + key)
 }
 
 // run performs the actual server startup.

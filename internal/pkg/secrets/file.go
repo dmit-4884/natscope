@@ -213,7 +213,7 @@ func syncDir(dir string) {
 func loadOrCreateKey(path string) ([]byte, error) {
 	// Honor the derived env prefix (as the config loader does) so
 	// <PREFIX>SECRETS__FILE_KEY works; fall back to the bare name.
-	if env := strings.TrimSpace(cmp.Or(os.Getenv(appinfo.EnvPrefix+fileKeyEnv), os.Getenv(fileKeyEnv))); env != "" {
+	if env := strings.TrimSpace(cmp.Or(os.Getenv(envPrefix()+fileKeyEnv), os.Getenv(fileKeyEnv))); env != "" {
 		key, decErr := hex.DecodeString(env)
 		if decErr != nil || len(key) != keyLen {
 			return nil, fmt.Errorf("%s must be %d hex-encoded bytes: %w", fileKeyEnv, keyLen, ErrVaultKeyInvalid)
@@ -246,3 +246,11 @@ func loadOrCreateKey(path string) ([]byte, error) {
 }
 
 var _ Vault = (*File)(nil)
+
+// envPrefix mirrors appconfig.EnvPrefix: the build prefix joined with "_".
+func envPrefix() string {
+	if appinfo.EnvPrefix == "" {
+		return ""
+	}
+	return strings.TrimRight(appinfo.EnvPrefix, "_") + "_"
+}

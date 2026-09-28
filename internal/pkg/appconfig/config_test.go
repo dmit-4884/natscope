@@ -191,3 +191,38 @@ func TestResolveDataDir_ExpandsTilde(t *testing.T) {
 		t.Errorf("ResolveDataDir() = %q, want %q", got, want)
 	}
 }
+
+// Boolean env vars accept the same words the config file does.
+func TestLoad_BoolEnvMatchesYAMLWords(t *testing.T) {
+	t.Setenv("ALLOW_INSECURE", "yes")
+
+	cfg, err := appconfig.Load("", appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.AllowInsecure {
+		t.Error("ALLOW_INSECURE=yes must enable allowInsecure")
+	}
+}
+
+// The internal HTTP server accepts an IPv6 loopback address, and a bare
+// ":port" reaches the bind gate as a non-loopback bind.
+func TestLoad_HTTPListenAddressForms(t *testing.T) {
+	t.Setenv("HTTP__LISTEN_ADDRESS", "[::1]:9080")
+	cfg, err := appconfig.Load("", appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load [::1]:9080: %v", err)
+	}
+	if !cfg.HTTPBindsLoopback() {
+		t.Error("[::1]:9080 must count as a loopback bind")
+	}
+
+	t.Setenv("HTTP__LISTEN_ADDRESS", ":9080")
+	cfg, err = appconfig.Load("", appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load :9080: %v", err)
+	}
+	if cfg.HTTPBindsLoopback() {
+		t.Error(":9080 binds every interface")
+	}
+}

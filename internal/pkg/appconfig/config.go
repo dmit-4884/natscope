@@ -16,7 +16,6 @@ import (
 	"github.com/altessa-s/go-atlas/config"
 	"github.com/altessa-s/go-atlas/config/loader"
 	"github.com/altessa-s/go-atlas/config/loader/backend/yaml3"
-	"github.com/altessa-s/go-atlas/core/runtime/appinfo"
 
 	"github.com/dmit-4884/natscope/internal/pkg/logconsole"
 )
@@ -101,9 +100,10 @@ func Load(filePath string, logger *config.Logger) (*Config, error) {
 	// templates that interpolate an unset variable) must not silently
 	// override a configured value with the field's zero default.
 	clearEmptyEnvOverrides()
+	normalizeBoolEnv()
 
 	opts := []loader.Option{
-		loader.WithEnvPrefix(appinfo.EnvPrefix),
+		loader.WithEnvPrefix(EnvPrefix()),
 		// Strict mode turns a "$VAR" reference to an undefined environment
 		// variable into a load error instead of silently truncating the
 		// value at the "$" — the substitution has no escape/opt-out and
@@ -139,12 +139,30 @@ func (c *Config) Validate() error {
 	return validation.ValidateStruct(c,
 		validation.Field(&c.Logger, validation.NilOrNotEmpty, validation.By(validateLoggerOutputFormat)),
 		validation.Field(&c.Node, validation.NilOrNotEmpty),
-		validation.Field(&c.Http, validation.NilOrNotEmpty),
+		validation.Field(&c.Http, validation.NilOrNotEmpty, validation.By(validateHTTP), validation.Skip),
 		validation.Field(&c.Metrics, validation.NilOrNotEmpty),
 		validation.Field(&c.Storage, validation.NilOrNotEmpty),
 		validation.Field(&c.WebAuth, validation.NilOrNotEmpty),
 		validation.Field(&c.Secrets, validation.NilOrNotEmpty),
 	)
+}
+
+// validateHTTP validates the internal HTTP section with go-atlas's rules,
+// except that the listen address only needs to parse as host:port: go-atlas
+// rejects "[::1]:9080" and ":9080", leaving the loopback decision to the
+// fail-closed bind gate.
+func validateHTTP(value any) error {
+	h, ok := value.(*config.Http)
+	if !ok || h == nil {
+		return nil
+	}
+	_, port, err := net.SplitHostPort(h.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("listenAddress: %w", err)
+	}
+	probe := *h
+	probe.ListenAddress = net.JoinHostPort("127.0.0.1", port)
+	return probe.Validate()
 }
 
 // knownLogOutputFormats lists the output formats natscope actually supports:

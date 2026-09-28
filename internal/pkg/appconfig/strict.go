@@ -108,13 +108,44 @@ var emptyOverridableEnvKeys = []string{
 }
 
 // clearEmptyEnvOverrides unsets any of emptyOverridableEnvKeys (with the
-// build's env prefix applied, matching go-atlas's own — unprefixed for
-// config keys — naming) that are present but set to the empty string.
+// build's env prefix applied) that are present but set to the empty string.
 func clearEmptyEnvOverrides() {
 	for _, key := range emptyOverridableEnvKeys {
-		name := appinfo.EnvPrefix + key
+		name := EnvPrefix() + key
 		if v, ok := os.LookupEnv(name); ok && v == "" {
 			_ = os.Unsetenv(name)
 		}
 	}
+}
+
+// boolEnvKeys are the boolean config keys settable through the environment.
+var boolEnvKeys = []string{"ALLOW_REMOTE", "ALLOW_INSECURE", "LOGGER__COLORIZED"}
+
+// normalizeBoolEnv rewrites the YAML 1.1 boolean words the config file accepts
+// (yes/no, on/off, y/n) to true/false in boolean env vars, so both sources
+// follow the same rules.
+func normalizeBoolEnv() {
+	for _, key := range boolEnvKeys {
+		name := EnvPrefix() + key
+		v, ok := os.LookupEnv(name)
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "yes", "y", "on":
+			_ = os.Setenv(name, "true")
+		case "no", "n", "off":
+			_ = os.Setenv(name, "false")
+		}
+	}
+}
+
+// EnvPrefix returns the build's env var prefix joined with "_" (or "" for an
+// unprefixed build), so config keys use the same PREFIX_KEY form as LIB_DIR,
+// VAR_DIR and CONFIG_FILE.
+func EnvPrefix() string {
+	if appinfo.EnvPrefix == "" {
+		return ""
+	}
+	return strings.TrimRight(appinfo.EnvPrefix, "_") + "_"
 }
