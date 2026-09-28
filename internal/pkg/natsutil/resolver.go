@@ -7,17 +7,38 @@ import (
 	"cmp"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
 	atlasslices "github.com/altessa-s/go-atlas/core/collections/slices"
 )
 
+// maxResolverCacheEntries bounds the per-subject wildcard-resolution cache so
+// a stream of high-cardinality subjects (e.g. per-tenant subjects) cannot
+// grow it without limit; entries beyond the cap fall back to the linear scan.
+const maxResolverCacheEntries = 10000
+
 // MappingResolver resolves NATS subjects to SubjectMapping entries deterministically.
 // Exact match wins; wildcard ties break by specificity, then pattern, then CreatedAt.
+// A new resolver is built (via NewMappingResolver) on every mapping mutation,
+// so its wildcard-lookup cache never needs explicit invalidation.
 type MappingResolver struct {
 	exact map[string]*entities.SubjectMapping
 	wild  []*entities.SubjectMapping
+
+	// cache memoizes wildcard Resolve results per subject (nil results
+	// included) so repeated lookups for the same subject skip the linear
+	// scan; bounded by maxResolverCacheEntries.
+	cache     sync.Map
+	cacheSize atomic.Int64
+}
+
+// resolverCacheEntry holds a (possibly nil) resolved mapping so sync.Map can
+// distinguish "no match cached" from "not cached yet".
+type resolverCacheEntry struct {
+	mapping *entities.SubjectMapping
 }
 
 // NewMappingResolver builds a resolver from the given mappings.
@@ -52,6 +73,9 @@ func NewMappingResolver(ms entities.SubjectMappings) *MappingResolver {
 }
 
 // Resolve returns the best-matching mapping for a subject, or nil if no mapping matches.
+// Wildcard lookups are memoized per subject (see MappingResolver.cache) so a
+// high-throughput live session pays the linear scan once per distinct subject,
+// not once per message.
 func (r *MappingResolver) Resolve(subject string) *entities.SubjectMapping {
 	if r == nil {
 		return nil
@@ -59,12 +83,31 @@ func (r *MappingResolver) Resolve(subject string) *entities.SubjectMapping {
 	if m, ok := r.exact[subject]; ok {
 		return m
 	}
-	for _, m := range r.wild {
-		if MatchSubject(m.Pattern, subject) {
-			return m
+	if len(r.wild) == 0 {
+		return nil
+	}
+
+	if v, ok := r.cache.Load(subject); ok {
+		if entry, ok := v.(resolverCacheEntry); ok {
+			return entry.mapping
 		}
 	}
-	return nil
+
+	subjectTokens := strings.Split(subject, ".")
+	var found *entities.SubjectMapping
+	for _, m := range r.wild {
+		if matchSubjectTokens(m.Pattern, subjectTokens) {
+			found = m
+			break
+		}
+	}
+
+	if r.cacheSize.Load() < maxResolverCacheEntries {
+		if _, loaded := r.cache.LoadOrStore(subject, resolverCacheEntry{mapping: found}); !loaded {
+			r.cacheSize.Add(1)
+		}
+	}
+	return found
 }
 
 // Mappings returns all mappings the resolver was built from (exact + wildcard).

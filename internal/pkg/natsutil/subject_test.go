@@ -45,6 +45,69 @@ func TestIsInternalSubject(t *testing.T) {
 	}
 }
 
+func TestValidateSubjectPattern(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		subject string
+		wantErr bool
+	}{
+		{name: "Literal", subject: "orders.created", wantErr: false},
+		{name: "StarToken", subject: "orders.*", wantErr: false},
+		{name: "GreaterLast", subject: "orders.>", wantErr: false},
+		{name: "GreaterAlone", subject: ">", wantErr: false},
+		{name: "Empty", subject: "", wantErr: true},
+		{name: "ConsecutiveDots", subject: "a..b", wantErr: true},
+		{name: "LeadingDot", subject: ".a", wantErr: true},
+		{name: "TrailingDot", subject: "a.", wantErr: true},
+		{name: "GreaterNotLast", subject: "a.>.b", wantErr: true},
+		{name: "GreaterNotLastShort", subject: ">.a", wantErr: true},
+		{name: "PartialStarToken", subject: "a.b*", wantErr: true},
+		{name: "PartialGreaterToken", subject: "a.>x", wantErr: true},
+		{name: "Space", subject: "qa ui space", wantErr: true},
+		{name: "ControlChar", subject: "orders.ctl\u0001", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := ValidateSubjectPattern(tt.subject)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateSubjectPattern(%q) error = %v, wantErr %v", tt.subject, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateLiteralSubject(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		subject string
+		wantErr bool
+	}{
+		{name: "Literal", subject: "orders.created", wantErr: false},
+		{name: "Star", subject: "orders.*", wantErr: true},
+		{name: "Greater", subject: "orders.>", wantErr: true},
+		{name: "Empty", subject: "", wantErr: true},
+		{name: "WhitespaceOnly", subject: "   ", wantErr: true},
+		{name: "ConsecutiveDots", subject: "orders..created", wantErr: true},
+		{name: "ControlChar", subject: "orders.ctl\u0001", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := ValidateLiteralSubject(tt.subject)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateLiteralSubject(%q) error = %v, wantErr %v", tt.subject, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestMatchSubject(t *testing.T) {
 	t.Parallel()
 

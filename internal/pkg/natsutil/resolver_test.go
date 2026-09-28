@@ -4,6 +4,8 @@
 package natsutil
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -101,6 +103,68 @@ func TestResolver_NilSafe(t *testing.T) {
 	var r *MappingResolver
 	if got := r.Resolve("anything"); got != nil {
 		t.Fatalf("expected nil result on nil resolver")
+	}
+}
+
+// TestResolver_CacheConsistentWithLinearScan (QA-084 regression) rebuilds the
+// same answer whether or not the per-subject cache was already warm, and
+// tolerates concurrent Resolve calls (the cache is shared across live
+// sessions via the atomic resolver pointer in the mappings service).
+func TestResolver_CacheConsistentWithLinearScan(t *testing.T) {
+	ms := entities.SubjectMappings{
+		mapping("specific", "orders.eu.*", "T1", "src", 100),
+		mapping("broad", "orders.>", "T2", "src", 50),
+	}
+	r := NewMappingResolver(ms)
+
+	const subject = "orders.eu.created"
+	first := r.Resolve(subject)
+	if first == nil || first.Id != "specific" {
+		t.Fatalf("expected specific mapping on cold lookup, got %#v", first)
+	}
+
+	var wg sync.WaitGroup
+	for range 50 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if got := r.Resolve(subject); got == nil || got.Id != "specific" {
+				t.Errorf("expected specific mapping on warm concurrent lookup, got %#v", got)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := r.Resolve("users.created"); got != nil {
+		t.Fatalf("expected no match for an unrelated subject, got %#v", got)
+	}
+}
+
+// TestResolver_CacheBoundedSize (QA-084) verifies the wildcard-lookup cache
+// does not grow past maxResolverCacheEntries under high subject cardinality.
+func TestResolver_CacheBoundedSize(t *testing.T) {
+	r := NewMappingResolver(entities.SubjectMappings{
+		mapping("w", "wild.>", "T1", "src", 100),
+	})
+
+	for i := range maxResolverCacheEntries + 500 {
+		r.Resolve(fmt.Sprintf("wild.%d", i))
+	}
+
+	if got := r.cacheSize.Load(); got > maxResolverCacheEntries {
+		t.Fatalf("cache grew past the cap: %d > %d", got, maxResolverCacheEntries)
+	}
+}
+
+func BenchmarkResolve10kWildcards(b *testing.B) {
+	ms := make(entities.SubjectMappings, 0, 10000)
+	for i := range 10000 {
+		ms = append(ms, mapping(fmt.Sprintf("m%d", i), fmt.Sprintf("wild.%05d.*", i), "T", "src", int64(i)))
+	}
+	r := NewMappingResolver(ms)
+
+	for b.Loop() {
+		r.Resolve("wild.09999.created")
 	}
 }
 
