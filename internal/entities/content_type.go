@@ -3,7 +3,12 @@
 
 package entities
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io"
+)
 
 // ContentType is the encoding classification of a message payload.
 type ContentType string
@@ -36,8 +41,9 @@ func DetectContentType(data []byte) ContentType {
 		return ContentTypeBinary
 	}
 
+	truncated := len(data) > detectScanLimit
 	scan := data
-	if len(scan) > detectScanLimit {
+	if truncated {
 		scan = scan[:detectScanLimit]
 	}
 
@@ -47,7 +53,20 @@ func DetectContentType(data []byte) ContentType {
 		if b == ' ' || b == '\t' || b == '\n' || b == '\r' {
 			continue
 		}
-		if (b == '{' || b == '[') && json.Valid(scan) {
+		if b != '{' && b != '[' {
+			break
+		}
+		// A complete scan can be validated outright. A truncated scan can
+		// never be valid on its own — json.Valid always reports it as
+		// invalid — so check instead whether it is a well-formed JSON
+		// *prefix*: token-by-token parsing ran out of (truncated) bytes
+		// mid-structure rather than hitting a real syntax error. Bounded to
+		// detectScanLimit, so still cheap on multi-MB payloads (QA-082).
+		if !truncated {
+			if json.Valid(scan) {
+				return ContentTypeJSON
+			}
+		} else if looksLikeJSONPrefix(scan) {
 			return ContentTypeJSON
 		}
 		break
@@ -64,4 +83,19 @@ func DetectContentType(data []byte) ContentType {
 		}
 	}
 	return ContentTypeText
+}
+
+// looksLikeJSONPrefix reports whether scan is the start of a well-formed JSON
+// document that simply ran out of (truncated) bytes, as opposed to bytes that
+// happen to start with '{'/'[' but are not JSON. It tokenizes scan and
+// accepts running out of input mid-token/mid-structure (io.EOF /
+// io.ErrUnexpectedEOF) as "still plausibly JSON"; any other error means the
+// prefix is genuinely malformed.
+func looksLikeJSONPrefix(scan []byte) bool {
+	dec := json.NewDecoder(bytes.NewReader(scan))
+	for {
+		if _, err := dec.Token(); err != nil {
+			return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+		}
+	}
 }

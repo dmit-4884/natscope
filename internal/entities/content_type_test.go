@@ -4,6 +4,8 @@
 package entities
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,4 +73,45 @@ func TestDetectContentType(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestDetectContentType_LargeJSON (QA-082) is the exact repro: a valid JSON
+// document longer than detectScanLimit must still classify as JSON, not text
+// — json.Valid on a truncated prefix is always false.
+func TestDetectContentType_LargeJSON(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`{"k":"` + strings.Repeat("v", 5000) + `"}`)
+	assert.Greater(t, len(data), detectScanLimit)
+
+	got := DetectContentType(data)
+	assert.Equal(t, ContentTypeJSON, got)
+}
+
+// TestDetectContentType_LargeJSONArray covers the "[" branch and a value
+// (not just a string) straddling the scan boundary.
+func TestDetectContentType_LargeJSONArray(t *testing.T) {
+	t.Parallel()
+
+	items := make([]int, 2000)
+	for i := range items {
+		items[i] = i
+	}
+	data, err := json.Marshal(items)
+	assert.NoError(t, err)
+	assert.Greater(t, len(data), detectScanLimit)
+
+	assert.Equal(t, ContentTypeJSON, DetectContentType(data))
+}
+
+// TestDetectContentType_LargeGarbageNotMisclassifiedAsJSON ensures the
+// truncated-prefix heuristic doesn't turn into "anything starting with { is
+// JSON": a real syntax error inside the scanned prefix must still fail.
+func TestDetectContentType_LargeGarbageNotMisclassifiedAsJSON(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`{"k": not-a-valid-token-at-all, ` + strings.Repeat("x", 5000))
+	assert.Greater(t, len(data), detectScanLimit)
+
+	assert.Equal(t, ContentTypeText, DetectContentType(data))
 }
