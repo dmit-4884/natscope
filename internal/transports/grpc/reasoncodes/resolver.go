@@ -19,6 +19,7 @@ const (
 	InvalidFormatRegex      = "INVALID_FORMAT_REGEX"
 	InvalidFormatURL        = "INVALID_FORMAT_URL"
 	InvalidEnumValue        = "INVALID_ENUM_VALUE"
+	InvalidRange            = "INVALID_RANGE"
 )
 
 const (
@@ -47,8 +48,9 @@ var standardFullID = map[string]string{
 }
 
 // standardSuffix maps numeric/size families by the rule ID's last segment.
-// Combined range rules (gte_lte, ...) are omitted: the seam has no field value
-// to tell min from max, so a field needing both bounds must split them in proto.
+// Combined range rules (gte_lte, ...) all resolve to InvalidRange: unlike a
+// single bound, they don't need the field value to disambiguate min from
+// max — the violated field is out of the [min, max] window either way.
 var standardSuffix = map[string]string{
 	"gte":       InvalidMinLengthOrValue,
 	"gt":        InvalidMinLengthOrValue,
@@ -64,6 +66,15 @@ var standardSuffix = map[string]string{
 	"max_bytes": InvalidMaxLengthOrValue,
 	"len":       InvalidMaxLengthOrValue,
 	"len_bytes": InvalidMaxLengthOrValue,
+
+	"gt_lt":             InvalidRange,
+	"gt_lt_exclusive":   InvalidRange,
+	"gt_lte":            InvalidRange,
+	"gt_lte_exclusive":  InvalidRange,
+	"gte_lt":            InvalidRange,
+	"gte_lt_exclusive":  InvalidRange,
+	"gte_lte":           InvalidRange,
+	"gte_lte_exclusive": InvalidRange,
 }
 
 // Resolver maps a protovalidate rule ID to a canonical reason code, checking the

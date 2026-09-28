@@ -6,6 +6,7 @@ package history
 import (
 	"context"
 	"log/slog"
+	"unicode/utf8"
 
 	"github.com/altessa-s/go-atlas/domain/converter"
 	"github.com/altessa-s/go-atlas/domain/normalizer"
@@ -46,7 +47,7 @@ func (s *Service) Record(
 		entry.PayloadSize = len(in.PayloadJSON)
 	}
 	if len(entry.PayloadJSON) > entities.HistoryPayloadPreviewBytes {
-		entry.PayloadJSON = entry.PayloadJSON[:entities.HistoryPayloadPreviewBytes]
+		entry.PayloadJSON = truncateAtRuneBoundary(entry.PayloadJSON, entities.HistoryPayloadPreviewBytes)
 		entry.PayloadTruncated = true
 	}
 
@@ -70,6 +71,20 @@ func (s *Service) List(
 	in *entities.PublishHistoryList,
 ) (*entities.List[entities.PublishHistories], error) {
 	return s.storage.List(ctx, in)
+}
+
+// truncateAtRuneBoundary caps s to at most maxBytes, backing off to the start
+// of the last rune that would otherwise be split (a byte slice can land
+// mid-UTF-8-sequence, corrupting the final character into U+FFFD).
+func truncateAtRuneBoundary(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+	cut := maxBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
 }
 
 // Compile-time interface check.

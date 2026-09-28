@@ -73,6 +73,49 @@ func TestHistory_SaveAndListFilter(t *testing.T) {
 	}
 }
 
+// TestHistory_ListFilterByConnectionID is the QA-045 regression: filtering by
+// connection_id must find the entry regardless of how many URLs the saved
+// connection has, and must not conflate entries from a different connection
+// that happens to share a URL.
+func TestHistory_ListFilterByConnectionID(t *testing.T) {
+	s := newHistStore(t)
+	ctx := t.Context()
+
+	multi := entry("nats://a:4222,nats://b:4222", "MULTI", "multi.1")
+	multi.ConnectionID = ptr.Wrap("conn-multi")
+	_ = s.Save(ctx, multi)
+
+	shared1 := entry("nats://shared:4222", "SHARED", "shared.1")
+	shared1.ConnectionID = ptr.Wrap("conn-shared-1")
+	_ = s.Save(ctx, shared1)
+
+	shared2 := entry("nats://shared:4222", "SHARED", "shared.2")
+	shared2.ConnectionID = ptr.Wrap("conn-shared-2")
+	_ = s.Save(ctx, shared2)
+
+	byID, err := s.List(ctx, &entities.PublishHistoryList{
+		ConnectionID: ptr.Wrap("conn-multi"),
+		ListBase:     entities.ListBase{Limit: ptr.Wrap(int64(10))},
+	})
+	if err != nil {
+		t.Fatalf("list by connection_id: %v", err)
+	}
+	if len(byID.Items) != 1 || byID.Items[0].Subject != "multi.1" {
+		t.Fatalf("by connection_id = %+v, want [multi.1]", byID.Items)
+	}
+
+	sharedFiltered, err := s.List(ctx, &entities.PublishHistoryList{
+		ConnectionID: ptr.Wrap("conn-shared-1"),
+		ListBase:     entities.ListBase{Limit: ptr.Wrap(int64(10))},
+	})
+	if err != nil {
+		t.Fatalf("list by connection_id (shared url): %v", err)
+	}
+	if len(sharedFiltered.Items) != 1 || sharedFiltered.Items[0].Subject != "shared.1" {
+		t.Fatalf("by connection_id (shared url) = %+v, want [shared.1]", sharedFiltered.Items)
+	}
+}
+
 func TestHistory_PaginationNewestFirst(t *testing.T) {
 	s := newHistStore(t)
 	ctx := t.Context()

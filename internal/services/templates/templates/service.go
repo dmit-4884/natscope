@@ -5,6 +5,7 @@ package templates
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -101,6 +102,13 @@ func (s *Service) List(
 // Delete removes a template.
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if err := s.storage.Delete(ctx, id); err != nil {
+		// A missing template is a routine client error, not an operational
+		// failure; ERROR-level logs on it drown out real storage problems
+		// (QA-109).
+		if errors.Is(err, errs.ErrMessageTemplateNotFound) {
+			s.logger.DebugContext(ctx, "delete template: not found", slog.String("id", id))
+			return err
+		}
 		s.logger.ErrorContext(ctx, "failed to delete template",
 			slog.String("id", id),
 			slogx.Error(err))

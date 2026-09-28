@@ -2,6 +2,7 @@ syntax = "proto3";
 package natscope.types.nats;
 option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
 
+import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
@@ -27,7 +28,7 @@ enum AuthMethod {
 // Authentication configuration for a NATS connection.
 message AuthConfig {
   // Required. Authentication method.
-  AuthMethod method = 1 [(google.api.field_behavior) = REQUIRED];
+  AuthMethod method = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).enum.defined_only = true];
 
   // Optional. Username for USER_PASSWORD auth.
   optional string username = 2;

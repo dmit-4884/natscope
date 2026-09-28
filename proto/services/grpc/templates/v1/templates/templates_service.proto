@@ -41,13 +41,17 @@ message CreateTemplateRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).required = true,
-    (buf.validate.field).string.min_len = 1
+    (buf.validate.field).string = {min_len: 1, max_len: 256}
   ];
-  string subject = 2;
-  string message_type = 3;
-  string data = 4;
-  map<string, string> headers = 5;
-  repeated string wildcards = 6;
+  string subject = 2 [(buf.validate.field).string.max_len = 1024];
+  string message_type = 3 [(buf.validate.field).string.max_len = 512];
+  string data = 4 [(buf.validate.field).string.max_len = 1048576];
+  map<string, string> headers = 5 [(buf.validate.field).map = {
+    max_pairs: 100,
+    keys: {string: {min_len: 1, max_len: 256, pattern: "^[^ \t\r\n:]+$"}},
+    values: {string: {max_len: 4096, pattern: "^[^\r\n]*$"}}
+  }];
+  repeated string wildcards = 6 [(buf.validate.field).repeated.max_items = 256];
 }
 message CreateTemplateResponse {
   .natscope.types.templates.MessageTemplate template = 1;
@@ -60,10 +64,10 @@ message UpdateTemplateRequest {
     (buf.validate.field).required = true,
     (buf.validate.field).string.uuid = true
   ];
-  optional string name = 2;
-  optional string subject = 3;
-  optional string message_type = 4;
-  optional string data = 5;
+  optional string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+  optional string subject = 3 [(buf.validate.field).string.max_len = 1024];
+  optional string message_type = 4 [(buf.validate.field).string.max_len = 512];
+  optional string data = 5 [(buf.validate.field).string.max_len = 1048576];
   // Headers are replaced wholesale when provided. Use an empty map to clear,
   // omit the field to leave existing headers untouched.
   optional HeadersPatch headers = 6;
@@ -72,10 +76,14 @@ message UpdateTemplateRequest {
   optional WildcardsPatch wildcards = 7;
 }
 message HeadersPatch {
-  map<string, string> values = 1;
+  map<string, string> values = 1 [(buf.validate.field).map = {
+    max_pairs: 100,
+    keys: {string: {min_len: 1, max_len: 256, pattern: "^[^ \t\r\n:]+$"}},
+    values: {string: {max_len: 4096, pattern: "^[^\r\n]*$"}}
+  }];
 }
 message WildcardsPatch {
-  repeated string values = 1;
+  repeated string values = 1 [(buf.validate.field).repeated.max_items = 256];
 }
 message UpdateTemplateResponse {
   .natscope.types.templates.MessageTemplate template = 1;
@@ -126,16 +134,20 @@ message TemplateBulkCreateItem {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).required = true,
-    (buf.validate.field).string.min_len = 1
+    (buf.validate.field).string = {min_len: 1, max_len: 256}
   ];
-  string subject = 2;
-  string message_type = 3;
-  string data = 4;
-  map<string, string> headers = 5;
-  repeated string wildcards = 6;
+  string subject = 2 [(buf.validate.field).string.max_len = 1024];
+  string message_type = 3 [(buf.validate.field).string.max_len = 512];
+  string data = 4 [(buf.validate.field).string.max_len = 1048576];
+  map<string, string> headers = 5 [(buf.validate.field).map = {
+    max_pairs: 100,
+    keys: {string: {min_len: 1, max_len: 256, pattern: "^[^ \t\r\n:]+$"}},
+    values: {string: {max_len: 4096, pattern: "^[^\r\n]*$"}}
+  }];
+  repeated string wildcards = 6 [(buf.validate.field).repeated.max_items = 256];
 }
 message BatchCreateTemplatesRequest {
-  repeated TemplateBulkCreateItem templates = 1 [(buf.validate.field).repeated.min_items = 1];
+  repeated TemplateBulkCreateItem templates = 1 [(buf.validate.field).repeated = {min_items: 1, max_items: 1000}];
 }
 message BatchCreateTemplatesResponse {
   int32 created = 1;

@@ -84,8 +84,8 @@ func (s *Storage) Update(
 		if err != nil {
 			return err
 		}
-		if err := s.store.Update(ctx, doc); err != nil {
-			return mapUnique(err)
+		if updateErr := s.store.Update(ctx, doc); updateErr != nil {
+			return mapUnique(updateErr)
 		}
 		// Secrets omitted from the request are preserved: the API never returns
 		// stored secret values, so an edit that leaves a secret field blank means

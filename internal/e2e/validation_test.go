@@ -30,6 +30,7 @@ import (
 	settingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/settings/v1/settings"
 	templatespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/templates/v1/templates"
 	workspacepb "github.com/dmit-4884/natscope/proto/gen/services/grpc/workspace/v1/workspace"
+	natstypes "github.com/dmit-4884/natscope/proto/gen/types/nats"
 	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
 	settingstypes "github.com/dmit-4884/natscope/proto/gen/types/settings"
 )
@@ -412,6 +413,94 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
+		// QA-037: URLs must have a recognized scheme and no control characters.
+		{
+			"connections.Create javascript: url scheme rejected",
+			func() error {
+				_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
+					Name: "qa-037-scheme", Urls: []string{"javascript:alert(1)"},
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		{
+			"connections.Create embedded newline in url rejected",
+			func() error {
+				_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
+					Name: "qa-037-newline", Urls: []string{"nats://127.0.0.1:4222\n"},
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		{
+			"connections.Update empty-string url rejected",
+			func() error {
+				_, err := env.connections.UpdateConnection(ctx, connect.NewRequest(&connectionspb.UpdateConnectionRequest{
+					Id: "00000000-0000-0000-0000-000000000000", Urls: []string{""},
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		// QA-107: connection name rejects control/bidi/zero-width characters.
+		{
+			"connections.Create control char in name rejected",
+			func() error {
+				_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
+					Name: "qa-107-\x00-nul", Urls: []string{"nats://127.0.0.1:4222"},
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		// QA-040: name/description size caps.
+		{
+			"connections.Create oversized name rejected",
+			func() error {
+				_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
+					Name: strings.Repeat("x", 10000), Urls: []string{"nats://127.0.0.1:4222"},
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		// QA-038: unrecognized AuthMethod enum value rejected.
+		{
+			"connections.Create unknown auth method rejected",
+			func() error {
+				_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
+					Name: "qa-038-enum", Urls: []string{"nats://127.0.0.1:4222"},
+					Auth: &natstypes.AuthConfig{Method: 99, Token: strPtr("x")},
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		// QA-042: settings string "enums" reject out-of-set values.
+		{
+			"settings.Update unknown fetch_method rejected",
+			func() error {
+				_, err := env.settings.UpdateSettings(ctx, connect.NewRequest(&settingspb.UpdateSettingsRequest{
+					Messages: &settingstypes.MessageSettings{FetchMethod: strPtr("bogus")},
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
+		// QA-112: template header keys/values reject CR/LF (header injection).
+		{
+			"templates.Create header value with CRLF rejected",
+			func() error {
+				_, err := env.templates.CreateTemplate(ctx, connect.NewRequest(&templatespb.CreateTemplateRequest{
+					Name:    "qa-112-hdr",
+					Headers: map[string]string{"X-Test": "v\r\nInjected: 1"},
+				}))
+				return err
+			},
+			connect.CodeInvalidArgument,
+		},
 	}
 
 	for _, tc := range cases {
@@ -424,3 +513,5 @@ func TestValidation(t *testing.T) {
 }
 
 func uint64Ptr(v uint64) *uint64 { return &v }
+
+func strPtr(v string) *string { return &v }

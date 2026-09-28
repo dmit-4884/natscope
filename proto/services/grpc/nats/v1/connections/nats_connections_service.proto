@@ -32,13 +32,24 @@ service ConnectionsService {
 // Defines the request message for creating a new saved connection.
 message CreateConnectionRequest {
   // Required. Human-readable display name for the connection.
-  string name = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true,
+    (buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]+$"}
+  ];
 
   // Optional. User description or notes about this connection.
-  optional string description = 2;
+  optional string description = 2 [(buf.validate.field).string.max_len = 4096];
 
   // Required. NATS server URLs. Supports nats://, tls://, ws://, wss:// schemes.
-  repeated string urls = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).repeated.min_items = 1];
+  repeated string urls = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated = {
+      min_items: 1,
+      max_items: 32,
+      items: {string: {min_len: 1, max_len: 2048, pattern: "^(nats|tls|ws|wss)://[^ \t\n\r<>]+$"}}
+    }
+  ];
 
   // Optional. Authentication configuration.
   optional .natscope.types.nats.AuthConfig auth = 10;
@@ -85,13 +96,17 @@ message UpdateConnectionRequest {
   string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Optional. Updated display name for the connection.
-  optional string name = 2;
+  optional string name = 2
+      [(buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]+$"}];
 
   // Optional. Updated description.
-  optional string description = 3;
+  optional string description = 3 [(buf.validate.field).string.max_len = 4096];
 
   // Optional. Updated NATS server URLs. Replaces all existing URLs.
-  repeated string urls = 4;
+  repeated string urls = 4 [(buf.validate.field).repeated = {
+    max_items: 32,
+    items: {string: {min_len: 1, max_len: 2048, pattern: "^(nats|tls|ws|wss)://[^ \t\n\r<>]+$"}}
+  }];
 
   // Optional. Updated authentication configuration. Replaces the entire auth config.
   optional .natscope.types.nats.AuthConfig auth = 10;
@@ -143,7 +158,14 @@ message DeleteConnectionResponse {}
 // Defines the request message for testing a NATS connection without saving.
 message TestConnectionRequest {
   // Required. NATS server URLs to test.
-  repeated string urls = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).repeated.min_items = 1];
+  repeated string urls = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated = {
+      min_items: 1,
+      max_items: 32,
+      items: {string: {min_len: 1, max_len: 2048, pattern: "^(nats|tls|ws|wss)://[^ \t\n\r<>]+$"}}
+    }
+  ];
 
   // Optional. Authentication configuration.
   optional .natscope.types.nats.AuthConfig auth = 10;
@@ -151,8 +173,10 @@ message TestConnectionRequest {
   // Optional. TLS configuration.
   optional .natscope.types.nats.TlsConfig tls = 11;
 
-  // Optional. Connection timeout in milliseconds. Default: 10000 (10s).
-  google.protobuf.Duration connect_timeout = 12;
+  // Optional. Connection timeout. Default: 10s. Capped at 60s regardless of
+  // caller-requested value; the whole TestConnection call is additionally
+  // bounded independent of this field (see ConnectionsService.TestConnection).
+  google.protobuf.Duration connect_timeout = 12 [(buf.validate.field).duration.lte = {seconds: 60}];
 
   // Optional. ID of an existing saved connection. When set, the probe result
   // (version / RTT / JetStream / error) is persisted to that connection's
@@ -202,7 +226,11 @@ message DuplicateConnectionRequest {
   string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. Name for the duplicated connection.
-  string name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  string name = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true,
+    (buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^\\p{Cc}\\p{Cf}]+$"}
+  ];
 }
 
 // Defines the response message for duplicating a saved connection.

@@ -6,6 +6,7 @@ package history
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore/bbstoretest"
@@ -44,6 +45,42 @@ func TestRecord_PayloadTruncated(t *testing.T) {
 	}
 	if len(got.PayloadJSON) != entities.HistoryPayloadPreviewBytes {
 		t.Fatalf("PayloadJSON len=%d want %d (preview cap)", len(got.PayloadJSON), entities.HistoryPayloadPreviewBytes)
+	}
+}
+
+// TestRecord_PayloadTruncatedAtRuneBoundary is the QA-113 regression: a
+// truncation cut mid-UTF-8-sequence turns the final character into U+FFFD;
+// the stored preview must always be valid UTF-8, cut at the last full rune.
+func TestRecord_PayloadTruncatedAtRuneBoundary(t *testing.T) {
+	t.Parallel()
+
+	storage, err := historyBbolt.New(t.Context(), bbstoretest.NewMemoryDB(t))
+	if err != nil {
+		t.Fatalf("new history storage: %v", err)
+	}
+	svc := New(storage)
+
+	// "é" is two bytes; placed to straddle the exact cap boundary.
+	payload := strings.Repeat("a", entities.HistoryPayloadPreviewBytes-1) + "é" + strings.Repeat("b", 10)
+	got, err := svc.Record(t.Context(), &entities.PublishHistoryCreate{
+		ConnectionURL: "nats://localhost:4222",
+		Stream:        "BENCH",
+		Subject:       "bench.utf8",
+		EncodingType:  entities.EncodingTypeJSON,
+		PayloadJSON:   payload,
+		Success:       true,
+	})
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	if !got.PayloadTruncated {
+		t.Fatal("expected PayloadTruncated=true")
+	}
+	if !utf8.ValidString(got.PayloadJSON) {
+		t.Fatalf("truncated payload is not valid UTF-8: %q", got.PayloadJSON)
+	}
+	if strings.ContainsRune(got.PayloadJSON, utf8.RuneError) {
+		t.Fatalf("truncated payload contains U+FFFD: %q", got.PayloadJSON)
 	}
 }
 

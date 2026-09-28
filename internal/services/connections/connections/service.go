@@ -5,6 +5,7 @@ package connections
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -132,6 +133,14 @@ func (s *Service) Update(
 // Delete permanently removes a connection.
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if err := s.storage.Delete(ctx, id); err != nil {
+		// A missing connection is a routine client error (e.g. a stale UI
+		// tab, a double-click), not an operational failure; ERROR-level logs
+		// on it drown out real storage problems (QA-109).
+		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
+			s.logger.DebugContext(ctx, "delete connection: not found",
+				slog.String("id", id))
+			return err
+		}
 		s.logger.ErrorContext(ctx, "failed to delete connection",
 			slog.String("id", id),
 			slogx.Error(err))

@@ -28,6 +28,7 @@ func New(ctx context.Context, db *bbstore.DB) (*Storage, error) {
 	store, err := bbstore.Open[historyDoc, *historyDoc](ctx, db, bbstore.Spec{
 		Bucket: "publish_history",
 		Indexes: []bbstore.Index{
+			{Path: "connectionId"},
 			{Path: "connectionUrl"},
 			{Path: "stream"},
 		},
@@ -47,6 +48,9 @@ func (s *Storage) List(
 	in *entities.PublishHistoryList,
 ) (*entities.List[entities.PublishHistories], error) {
 	var filters []bbstore.Filter
+	if in.ConnectionID != nil {
+		filters = append(filters, bbstore.Filter{Path: "$.connectionId", Val: *in.ConnectionID})
+	}
 	if in.ConnectionURL != nil {
 		filters = append(filters, bbstore.Filter{Path: "$.connectionUrl", Val: *in.ConnectionURL})
 	}

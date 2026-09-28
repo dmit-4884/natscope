@@ -22,11 +22,18 @@ message ListPublishHistoryRequest {
   // Empty string requests the first page.
   string page_token = 2;
 
-  // Optional. Filter results by NATS connection URL.
+  // Optional. Filter results by NATS connection URL. Ambiguous for a
+  // multi-URL (cluster) connection or when two saved connections share a
+  // URL; prefer connection_id when available.
   optional string connection_url = 3;
 
   // Optional. Filter results by JetStream stream name.
   optional string stream = 4;
+
+  // Optional. Filter results by saved connection id. Preferred over
+  // connection_url: stable regardless of URL count/order and unambiguous
+  // across connections that happen to share a URL.
+  optional string connection_id = 5 [(buf.validate.field).string.uuid = true];
 }
 
 // Defines the response message for listing publish history entries.

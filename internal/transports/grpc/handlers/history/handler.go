@@ -49,6 +49,7 @@ func (h *Handler) ListPublishHistory(
 ) (*connect.Response[historypb.ListPublishHistoryResponse], error) {
 	in := req.Msg
 	listReq := &entities.PublishHistoryList{
+		ConnectionID:  in.ConnectionId,
 		ConnectionURL: in.ConnectionUrl,
 		Stream:        in.Stream,
 	}

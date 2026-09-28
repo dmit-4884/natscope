@@ -37,13 +37,13 @@ message MessageSettings {
   // Fetch method: "direct" (GetMsg API) or "consumer" (ordered consumer).
   // Stays user-tunable: in installations where the user lacks
   // create_consumer permission, "direct" is the only viable mode.
-  optional string fetch_method = 1;
+  optional string fetch_method = 1 [(buf.validate.field).string = {in: ["direct", "consumer"]}];
 
   // Default number of messages per page.
   optional int32 default_page_size = 2 [(buf.validate.field).int32 = {gte: 1, lte: 10000}];
 
   // Default fetch direction: "backward" or "forward".
-  optional string default_direction = 3;
+  optional string default_direction = 3 [(buf.validate.field).string = {in: ["backward", "forward"]}];
 
   // Maximum payload size (bytes) per message returned in list & live views.
   // 0 = unlimited (full payload). When the cap is hit, NatsMessage.truncated
@@ -72,7 +72,7 @@ message LiveSettings {
   // Stays user-tunable: same auth-perm reason as fetch_method —
   // in installations where the user lacks create_consumer permission,
   // "core_nats" is the only viable mode.
-  optional string subscription_mode = 1;
+  optional string subscription_mode = 1 [(buf.validate.field).string = {in: ["core_nats", "jetstream_ordered"]}];
 
   // Max messages per second sent to browser. 0 = unlimited. Range: 0–10000.
   optional int32 max_display_rate = 2 [(buf.validate.field).int32 = {gte: 0, lte: 10000}];
@@ -81,16 +81,16 @@ message LiveSettings {
 // DisplaySettings configures UI display preferences.
 message DisplaySettings {
   // UI density: "comfortable" or "compact".
-  optional string density = 1;
+  optional string density = 1 [(buf.validate.field).string = {in: ["comfortable", "compact"]}];
 
   // Default view mode: "history" or "realtime".
-  optional string default_view_mode = 2;
+  optional string default_view_mode = 2 [(buf.validate.field).string = {in: ["history", "realtime"]}];
 
   // Payload preview truncation length in characters.
   optional int32 payload_preview_len = 3 [(buf.validate.field).int32 = {gte: 0}];
 
   // Timestamp format: "relative", "absolute", or "iso".
-  optional string timestamp_format = 4;
+  optional string timestamp_format = 4 [(buf.validate.field).string = {in: ["relative", "absolute", "iso"]}];
 
   // JSON indent size: 2 or 4.
   optional int32 json_indent_size = 5 [(buf.validate.field).int32 = {gte: 0, lte: 8}];
