@@ -20,6 +20,10 @@ func (s *Service) GetConnectionURL(ctx context.Context, connectionID string) (st
 
 // GetConnectionHealth returns health status for a specific connection.
 func (s *Service) GetConnectionHealth(ctx context.Context, connectionID string) (*entities.ConnectionHealth, error) {
+	if c, ok := s.pool.Pooled(connectionID); ok && c.IsReconnecting() {
+		return c.Health(ctx)
+	}
+
 	c, err := s.client(ctx, connectionID)
 	if err != nil {
 		return nil, err

@@ -58,12 +58,30 @@ func TestStatusErrorConvert(t *testing.T) {
 		{name: "ErrUnauthorized", err: errs.ErrUnauthorized, wantCode: codes.Unauthenticated, wantReason: "UNAUTHORIZED"},
 		{name: "ErrPermissionDenied", err: errs.ErrPermissionDenied, wantCode: codes.PermissionDenied, wantReason: "PERMISSION_DENIED"},
 		{name: "WrappedCommonError", err: fmt.Errorf("wrap: %w", errs.ErrNotFound), wantCode: codes.NotFound, wantReason: "NOT_FOUND"},
+		{
+			name:       "WrappedSavedConnectionNotFound",
+			err:        fmt.Errorf("load connection config: %w", errs.ErrSavedConnectionNotFound),
+			wantCode:   codes.NotFound,
+			wantReason: "CONNECTION_NOT_FOUND",
+		},
 
 		// NATS connection domain (service-layer wraps SDK errs into these)
 		{name: "ErrNATSConnectionClosed", err: errs.ErrNATSConnectionClosed, wantCode: codes.Unavailable, wantReason: "NATS_CONNECTION_CLOSED"},
 		{name: "ErrNATSConnectionFailed", err: errs.ErrNATSConnectionFailed, wantCode: codes.Unavailable, wantReason: "NATS_CONNECTION_FAILED"},
 		{name: "ErrNATSTimeout", err: errs.ErrNATSTimeout, wantCode: codes.DeadlineExceeded, wantReason: "NATS_TIMEOUT"},
 		{name: "ErrNATSPermissionViolation", err: errs.ErrNATSPermissionViolation, wantCode: codes.PermissionDenied, wantReason: "NATS_PERMISSION_VIOLATION"},
+		{
+			name:       "ErrNATSAuthorizationViolation",
+			err:        errs.ErrNATSAuthorizationViolation,
+			wantCode:   codes.Unauthenticated,
+			wantReason: "NATS_AUTHORIZATION_VIOLATION",
+		},
+		{
+			name:       "DialFailedOnAuthorization",
+			err:        errors.Join(errs.ErrNATSAuthorizationViolation, fmt.Errorf("%w: %w", errs.ErrNATSConnectionFailed, errors.New("authorization violation"))),
+			wantCode:   codes.Unauthenticated,
+			wantReason: "NATS_AUTHORIZATION_VIOLATION",
+		},
 
 		// JetStream entities (service-layer wraps SDK errs into these)
 		{name: "ErrStreamNotFound", err: errs.ErrStreamNotFound, wantCode: codes.NotFound, wantReason: "NATS_STREAM_NOT_FOUND"},
@@ -113,6 +131,30 @@ func TestStatusErrorConvert(t *testing.T) {
 		// Structured JetStream API error (domain type, not SDK)
 		{name: "NATSAPIError_Conflict", err: &errs.NATSAPIError{Code: 409, ErrorCode: 10074, Description: "stream replication factor invalid"}, wantCode: codes.AlreadyExists, wantReason: "NATS_API_ERROR"},
 		{name: "NATSAPIError_BadRequest", err: &errs.NATSAPIError{Code: 400, ErrorCode: 10052, Description: "config validation failed"}, wantCode: codes.InvalidArgument, wantReason: "NATS_API_ERROR"},
+		{
+			name:       "NATSAPIError_InvalidConfigAs500",
+			err:        &errs.NATSAPIError{Code: 500, ErrorCode: 10052, Description: "roll-ups require the purge permission"},
+			wantCode:   codes.InvalidArgument,
+			wantReason: "NATS_API_ERROR",
+		},
+		{
+			name:       "NATSAPIError_ReplicasAs500",
+			err:        &errs.NATSAPIError{Code: 500, ErrorCode: 10074, Description: "replicas > 1 not supported in non-clustered mode"},
+			wantCode:   codes.FailedPrecondition,
+			wantReason: "NATS_API_ERROR",
+		},
+		{
+			name:       "NATSAPIError_MaxBytesAs503",
+			err:        &errs.NATSAPIError{Code: 503, ErrorCode: 10077, Description: "maximum bytes exceeded"},
+			wantCode:   codes.ResourceExhausted,
+			wantReason: "NATS_API_ERROR",
+		},
+		{
+			name:       "NATSAPIError_UnclassifiedServerError",
+			err:        &errs.NATSAPIError{Code: 500, ErrorCode: 10041, Description: "raft failure"},
+			wantCode:   codes.Internal,
+			wantReason: "NATS_API_ERROR",
+		},
 
 		// Context
 		{name: "ContextDeadlineExceeded", err: context.DeadlineExceeded, wantCode: codes.DeadlineExceeded, wantReason: "DEADLINE_EXCEEDED"},

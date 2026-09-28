@@ -114,6 +114,16 @@ func (p *Pool) Client(ctx context.Context, connectionID string) (Client, error) 
 	}
 }
 
+// Pooled returns the client already registered for the ID, whatever its
+// connection state, without dialing.
+func (p *Pool) Pooled(connectionID string) (Client, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	c, ok := p.clients[connectionID]
+	return c, ok
+}
+
 // Disconnect closes and removes a live client from the pool.
 func (p *Pool) Disconnect(connectionID string) {
 	p.mu.Lock()

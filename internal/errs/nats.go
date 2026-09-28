@@ -21,8 +21,12 @@ var (
 	ErrNATSTimeout = errors.New("nats: operation timed out")
 
 	// ErrNATSPermissionViolation server rejected op
-	// (nats.ErrAuthorization/ErrPermissionViolation or async violation message).
+	// (nats.ErrPermissionViolation or async violation message).
 	ErrNATSPermissionViolation = errors.New("nats: permissions violation")
+
+	// ErrNATSAuthorizationViolation server rejected the connection credentials
+	// (nats.ErrAuthorization, expired or revoked auth).
+	ErrNATSAuthorizationViolation = errors.New("nats: authorization violation")
 )
 
 // JetStream domain errors wrapping jetstream.Err* at the [services/nats]

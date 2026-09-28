@@ -44,9 +44,11 @@ var commonDomainErrors = []struct {
 	{bbstore.ErrInvalidCursor, errorMapping{codes.InvalidArgument, "invalid list cursor", "INVALID_LIST_CURSOR"}},
 	{errs.ErrUnauthorized, errorMapping{codes.Unauthenticated, "unauthorized", "UNAUTHORIZED"}},
 	{errs.ErrPermissionDenied, errorMapping{codes.PermissionDenied, "permission denied", "PERMISSION_DENIED"}},
+	{errs.ErrSavedConnectionNotFound, errorMapping{codes.NotFound, "connection not found", "CONNECTION_NOT_FOUND"}},
 
 	// NATS — common (not copied into 8+ converters); SDK sentinels translated to
 	// these in services/nats so the transport stays SDK-agnostic.
+	{errs.ErrNATSAuthorizationViolation, errorMapping{codes.Unauthenticated, "nats authorization violation", "NATS_AUTHORIZATION_VIOLATION"}},
 	{errs.ErrNATSConnectionClosed, errorMapping{codes.Unavailable, "nats connection closed", "NATS_CONNECTION_CLOSED"}},
 	{errs.ErrNATSConnectionFailed, errorMapping{codes.Unavailable, "nats server unavailable", "NATS_CONNECTION_FAILED"}},
 	{errs.ErrNATSTimeout, errorMapping{codes.DeadlineExceeded, "nats operation timed out", "NATS_TIMEOUT"}},
@@ -130,7 +132,7 @@ func statusFromAPIError(api *errs.NATSAPIError) error {
 		msg = "nats jetstream api error"
 	}
 
-	st := status.New(httpToGRPCCode(api.Code), msg)
+	st := status.New(apiErrorGRPCCode(api), msg)
 	info := &errdetails.ErrorInfo{
 		Reason: "NATS_API_ERROR",
 		Domain: "nats.jetstream",
@@ -157,6 +159,55 @@ const (
 	httpStatusInternalServerError = 500
 	httpStatusServiceUnavailable  = 503
 )
+
+// JetStream API err_code values the server reports with a 5xx HTTP code
+// although they describe invalid input, an unsupported topology, or exhausted
+// capacity.
+const (
+	jsErrClusterNotActive           = 10006
+	jsErrClusterRequired            = 10010
+	jsErrConsumerCreate             = 10012
+	jsErrInsufficientResources      = 10023
+	jsErrMemoryResourcesExceeded    = 10028
+	jsErrClusterUnsupportedFeature  = 10036
+	jsErrStorageResourcesExceeded   = 10047
+	jsErrStreamCreate               = 10049
+	jsErrStreamInvalidConfig        = 10052
+	jsErrStreamLimits               = 10053
+	jsErrStreamUpdate               = 10069
+	jsErrStreamReplicasNotSupported = 10074
+	jsErrStreamStoreFailed          = 10077
+	jsErrStreamInvalid              = 10096
+)
+
+// jsErrCodeClasses reclassifies 5xx JetStream API errors by err_code.
+var jsErrCodeClasses = map[uint16]codes.Code{
+	jsErrConsumerCreate:             codes.InvalidArgument,
+	jsErrStreamCreate:               codes.InvalidArgument,
+	jsErrStreamInvalidConfig:        codes.InvalidArgument,
+	jsErrStreamLimits:               codes.InvalidArgument,
+	jsErrStreamUpdate:               codes.InvalidArgument,
+	jsErrStreamInvalid:              codes.InvalidArgument,
+	jsErrClusterNotActive:           codes.FailedPrecondition,
+	jsErrClusterRequired:            codes.FailedPrecondition,
+	jsErrClusterUnsupportedFeature:  codes.FailedPrecondition,
+	jsErrStreamReplicasNotSupported: codes.FailedPrecondition,
+	jsErrInsufficientResources:      codes.ResourceExhausted,
+	jsErrMemoryResourcesExceeded:    codes.ResourceExhausted,
+	jsErrStorageResourcesExceeded:   codes.ResourceExhausted,
+	jsErrStreamStoreFailed:          codes.ResourceExhausted,
+}
+
+// apiErrorGRPCCode maps a JetStream API error to a gRPC code, preferring the
+// err_code class over a 5xx HTTP code.
+func apiErrorGRPCCode(api *errs.NATSAPIError) codes.Code {
+	if api.Code >= httpStatusInternalServerError {
+		if c, ok := jsErrCodeClasses[api.ErrorCode]; ok {
+			return c
+		}
+	}
+	return httpToGRPCCode(api.Code)
+}
 
 // httpToGRPCCode maps NATS-server "HTTP-like" status codes (APIError.Code) to
 // gRPC codes.

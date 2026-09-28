@@ -32,7 +32,10 @@ func TestWrapErr_SentinelMapping(t *testing.T) {
 		{"ConnectionDraining", nats.ErrConnectionDraining, errs.ErrNATSConnectionClosed},
 		{"Disconnected", nats.ErrDisconnected, errs.ErrNATSConnectionClosed},
 		{"Timeout", nats.ErrTimeout, errs.ErrNATSTimeout},
-		{"Authorization", nats.ErrAuthorization, errs.ErrNATSPermissionViolation},
+		{"Authorization", nats.ErrAuthorization, errs.ErrNATSAuthorizationViolation},
+		{"AuthExpired", nats.ErrAuthExpired, errs.ErrNATSAuthorizationViolation},
+		{"AuthRevoked", nats.ErrAuthRevoked, errs.ErrNATSAuthorizationViolation},
+		{"AccountAuthExpired", nats.ErrAccountAuthExpired, errs.ErrNATSAuthorizationViolation},
 		{"PermissionViolation", nats.ErrPermissionViolation, errs.ErrNATSPermissionViolation},
 
 		// JetStream
@@ -41,6 +44,7 @@ func TestWrapErr_SentinelMapping(t *testing.T) {
 		{"ConsumerNotFound", jetstream.ErrConsumerNotFound, errs.ErrConsumerNotFound},
 		{"JetStreamNotEnabled", jetstream.ErrJetStreamNotEnabled, errs.ErrJetStreamNotEnabled},
 		{"JetStreamNotEnabledForAccount", jetstream.ErrJetStreamNotEnabledForAccount, errs.ErrJetStreamNotEnabled},
+		{"NoResponders", nats.ErrNoResponders, errs.ErrJetStreamNotEnabled},
 		{"BucketNotFound", jetstream.ErrBucketNotFound, errs.ErrBucketNotFound},
 		{"BucketExists", jetstream.ErrBucketExists, errs.ErrBucketExists},
 		{"KeyNotFound", jetstream.ErrKeyNotFound, errs.ErrKeyNotFound},
@@ -82,6 +86,9 @@ func TestWrapErr_ClientValidationMapping(t *testing.T) {
 		{"BucketRequired", jetstream.ErrBucketRequired},
 		{"KeyValueConfigRequired", jetstream.ErrKeyValueConfigRequired},
 		{"ObjectConfigRequired", jetstream.ErrObjectConfigRequired},
+		{"HistoryTooLarge", jetstream.ErrHistoryTooLarge},
+		{"BadSubject", nats.ErrBadSubject},
+		{"MaxPayload", nats.ErrMaxPayload},
 	}
 
 	for _, tt := range tests {

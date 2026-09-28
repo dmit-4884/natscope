@@ -28,7 +28,10 @@ var natsSentinelMap = []struct {
 	{nats.ErrConnectionDraining, errs.ErrNATSConnectionClosed},
 	{nats.ErrDisconnected, errs.ErrNATSConnectionClosed},
 	{nats.ErrTimeout, errs.ErrNATSTimeout},
-	{nats.ErrAuthorization, errs.ErrNATSPermissionViolation},
+	{nats.ErrAuthorization, errs.ErrNATSAuthorizationViolation},
+	{nats.ErrAuthExpired, errs.ErrNATSAuthorizationViolation},
+	{nats.ErrAuthRevoked, errs.ErrNATSAuthorizationViolation},
+	{nats.ErrAccountAuthExpired, errs.ErrNATSAuthorizationViolation},
 	{nats.ErrPermissionViolation, errs.ErrNATSPermissionViolation},
 
 	// JetStream entities
@@ -37,6 +40,7 @@ var natsSentinelMap = []struct {
 	{jetstream.ErrConsumerNotFound, errs.ErrConsumerNotFound},
 	{jetstream.ErrJetStreamNotEnabled, errs.ErrJetStreamNotEnabled},
 	{jetstream.ErrJetStreamNotEnabledForAccount, errs.ErrJetStreamNotEnabled},
+	{nats.ErrNoResponders, errs.ErrJetStreamNotEnabled},
 	{jetstream.ErrBucketNotFound, errs.ErrBucketNotFound},
 	{jetstream.ErrBucketExists, errs.ErrBucketExists},
 	{jetstream.ErrKeyNotFound, errs.ErrKeyNotFound},
@@ -60,6 +64,9 @@ var natsValidationSentinels = []error{
 	jetstream.ErrBucketRequired,
 	jetstream.ErrKeyValueConfigRequired,
 	jetstream.ErrObjectConfigRequired,
+	jetstream.ErrHistoryTooLarge,
+	nats.ErrBadSubject,
+	nats.ErrMaxPayload,
 }
 
 // wrapErr is the single place translating NATS/JetStream SDK errors into

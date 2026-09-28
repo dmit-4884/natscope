@@ -36,6 +36,7 @@ export interface ValidationViolation {
 const DOMAIN_REASON_LABELS: Record<string, string> = {
   // NATS
   NATS_PERMISSION_VIOLATION: 'Permission denied',
+  NATS_AUTHORIZATION_VIOLATION: 'NATS rejected the connection credentials',
   NATS_TIMEOUT: 'Connection timed out',
   NATS_CONNECTION_FAILED: 'NATS server unavailable',
   NATS_CONNECTION_CLOSED: 'Connection closed',
