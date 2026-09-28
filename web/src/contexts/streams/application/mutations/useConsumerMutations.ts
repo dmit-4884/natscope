@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/utils/toast'
 import * as api from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
+import { formatDateTime } from '@/utils/formatters'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import type { ConsumerCreateRequest, ConsumerUpdateRequest } from '@/types/management'
 import type { ConsumerInfo } from '@/types/nats'
@@ -89,8 +90,13 @@ export function usePauseConsumer(
       if (!connectionId || !streamName) throw new Error('No connection or stream')
       return api.pauseConsumer(connectionId, streamName, name, pauseUntil)
     },
-    onSuccess: (_result, { name }) => {
-      toast.success(`Consumer "${name}" paused`)
+    onSuccess: (result, { name }) => {
+      if (result.paused) {
+        const until = result.pause_until ? ` until ${formatDateTime(result.pause_until)}` : ''
+        toast.success(`Consumer "${name}" paused${until}`)
+      } else {
+        toast.warning(`Consumer "${name}" was not paused — the pause time must be in the future`)
+      }
       queryClient.invalidateQueries({ queryKey: streamDetailKey(connectionId, streamName) })
       queryClient.invalidateQueries({ queryKey: consumersListKey(connectionId, streamName) })
     },

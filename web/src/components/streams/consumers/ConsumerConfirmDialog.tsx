@@ -3,6 +3,9 @@ import { parseIntOr } from '@/utils/numbers'
 import { DontAskAgainCheckbox } from '@/components/common/DontAskAgainCheckbox'
 import type { ConsumerInfo } from '@/types/nats'
 
+const MIN_PAUSE_MINUTES = 1
+const MAX_PAUSE_MINUTES = 525_600 // 1 year
+
 type ConsumerConfirmType = 'delete' | 'pause'
 
 export interface ConsumerConfirmAction {
@@ -38,6 +41,10 @@ export function ConsumerConfirmDialog({ action, onChange, onCancel, onConfirm }:
     </span>
   )
 
+  const pauseMinutes = action.pauseMinutes ?? 5
+  const pauseMinutesInvalid =
+    !isDelete && (!Number.isFinite(pauseMinutes) || pauseMinutes < MIN_PAUSE_MINUTES || pauseMinutes > MAX_PAUSE_MINUTES)
+
   const extra = isDelete ? (
     <DontAskAgainCheckbox
       checked={action.dontAskAgain ?? false}
@@ -51,9 +58,12 @@ export function ConsumerConfirmDialog({ action, onChange, onCancel, onConfirm }:
       <Input
         id="consumer-pause-minutes"
         type="number"
-        min={1}
-        value={action.pauseMinutes || 5}
-        onChange={(e) => onChange({ ...action, pauseMinutes: parseIntOr(e.target.value, 5) })}
+        min={MIN_PAUSE_MINUTES}
+        max={MAX_PAUSE_MINUTES}
+        error={pauseMinutesInvalid}
+        errorMessage={pauseMinutesInvalid ? `Enter ${MIN_PAUSE_MINUTES}–${MAX_PAUSE_MINUTES} minutes` : undefined}
+        value={pauseMinutes}
+        onChange={(e) => onChange({ ...action, pauseMinutes: parseIntOr(e.target.value, 0) })}
       />
     </div>
   )
@@ -66,6 +76,7 @@ export function ConsumerConfirmDialog({ action, onChange, onCancel, onConfirm }:
       confirmLabel={verb}
       tone={isDelete ? 'danger' : 'warning'}
       extra={extra}
+      confirmDisabled={pauseMinutesInvalid}
       onCancel={onCancel}
       onConfirm={onConfirm}
     />
