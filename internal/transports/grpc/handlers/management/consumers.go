@@ -60,6 +60,12 @@ func (h *Handler) UpdateConsumer(
 ) (*connect.Response[managementpb.UpdateConsumerResponse], error) {
 	in := req.Msg
 	ur := converter.Convert(in, &entities.ConsumerUpdateRequest{}, protoCodecs)
+	// An absent back_off repeated field converts to a non-nil empty slice, not
+	// nil, so downstream WithIgnoreNilValues doesn't skip it and wipes the
+	// consumer's existing backoff on any unrelated update (QA-015).
+	if len(in.GetBackOff()) == 0 {
+		ur.BackOff = nil
+	}
 	consumer, err := h.natsService.UpdateConsumer(ctx, in.GetConnectionId(), in.GetStreamName(), in.GetConsumerName(), *ur)
 	if err != nil {
 		return nil, err

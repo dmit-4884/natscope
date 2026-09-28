@@ -100,6 +100,17 @@ func (c *Client) CreateConsumer(
 ) (*entities.ConsumerInfo, error) {
 	_ = normalizer.Normalize(&config) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
+	if err := validateConsumerRequestLengths(streamName, config.Name, config.FilterSubject, config.FilterSubjects); err != nil {
+		return nil, wrapErr(err)
+	}
+	// A whitespace-only name passes proto's min_len:1 but normalizes (trim) to
+	// "", which toJetStreamConsumerConfig then treats as "ephemeral" even
+	// though the caller asked for a durable consumer — check the trimmed name,
+	// not the raw one (QA-055).
+	if !config.Ephemeral && config.Name == "" {
+		return nil, wrapErr(&errs.NATSValidationError{Description: "consumer name is required"})
+	}
+
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
 		return nil, wrapErr(err)
@@ -129,6 +140,30 @@ func (c *Client) UpdateConsumer(
 	if config.FilterSubject != nil && len(config.FilterSubjects) > 0 {
 		return nil, wrapErr(&errs.NATSValidationError{Description: "filter_subject and filter_subjects are mutually exclusive"})
 	}
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return nil, wrapErr(err)
+	}
+	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
+		return nil, wrapErr(err)
+	}
+	// The stream name is validated by Stream() below, but the consumer name
+	// below goes straight into a hand-built subject: a name containing "."
+	// (or another JetStream API subject-separator/wildcard character) makes
+	// that subject match no responder, hanging until the request timeout
+	// instead of failing fast (QA-050).
+	if err := validateConsumerNameChars(consumerName); err != nil {
+		return nil, wrapErr(err)
+	}
+	if config.FilterSubject != nil {
+		if err := validateNATSNameLength("filter subject", *config.FilterSubject); err != nil {
+			return nil, wrapErr(err)
+		}
+	}
+	for _, s := range config.FilterSubjects {
+		if err := validateNATSNameLength("filter subject", s); err != nil {
+			return nil, wrapErr(err)
+		}
+	}
 
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
@@ -143,17 +178,21 @@ func (c *Client) UpdateConsumer(
 
 	var infoResp struct {
 		Config *jetstream.ConsumerConfig `json:"config"`
-		Error  *struct {
-			Code        int    `json:"code"`
-			Description string `json:"description"`
-		} `json:"error,omitempty"`
+		Error  *jetstream.APIError       `json:"error,omitempty"`
 	}
 	if err = json.Unmarshal(msg.Data, &infoResp); err != nil {
 		return nil, wrapErr(errors.WrapOperation(err, "unmarshal consumer info"))
 	}
 	if infoResp.Error != nil {
+		// The hand-built subject bypasses the SDK's own not-found translation,
+		// so a missing consumer surfaced as a generic NATS_API_ERROR instead of
+		// the NATS_CONSUMER_NOT_FOUND every other consumer RPC uses (QA-115).
+		if infoResp.Error.ErrorCode == jetstream.JSErrCodeConsumerNotFound {
+			return nil, wrapErr(jetstream.ErrConsumerNotFound)
+		}
 		return nil, wrapErr(&errs.NATSAPIError{
 			Code:        infoResp.Error.Code,
+			ErrorCode:   uint16(infoResp.Error.ErrorCode),
 			Description: infoResp.Error.Description,
 		})
 	}
@@ -185,6 +224,13 @@ func (c *Client) UpdateConsumer(
 
 // DeleteConsumer deletes a consumer from a stream.
 func (c *Client) DeleteConsumer(ctx context.Context, streamName string, consumerName string) error {
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return wrapErr(err)
+	}
+	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
+		return wrapErr(err)
+	}
+
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
 		return wrapErr(err)
@@ -203,74 +249,62 @@ func (c *Client) PauseConsumer(
 	streamName, consumerName string,
 	pauseUntil string,
 ) (*entities.ConsumerPauseResponse, error) {
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return nil, wrapErr(err)
+	}
+	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
+		return nil, wrapErr(err)
+	}
+
 	pauseUntilTime, err := time.Parse(time.RFC3339, pauseUntil)
 	if err != nil {
 		return nil, wrapErr(fmt.Errorf("%w: invalid pause_until (must be RFC3339): %v", errs.ErrInvalidRequest, err))
 	}
 
-	pauseReq := struct {
-		PauseUntil time.Time `json:"pause_until"`
-	}{PauseUntil: pauseUntilTime}
-
-	reqData, err := json.Marshal(pauseReq)
+	// stream.PauseConsumer validates the consumer name client-side (rejecting
+	// "." and other JetStream separators before ever building a subject —
+	// unlike the previous hand-built "$JS.API.CONSUMER.PAUSE.<stream>.<name>",
+	// which matched no responder for such a name and hung for the full
+	// request timeout, QA-050) and translates a missing consumer to the same
+	// jetstream.ErrConsumerNotFound every other consumer RPC uses instead of a
+	// generic NATS_API_ERROR (QA-115).
+	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
-		return nil, wrapErr(errors.WrapOperation(err, "marshal pause request"))
+		return nil, wrapErr(err)
 	}
 
-	subject := fmt.Sprintf("$JS.API.CONSUMER.PAUSE.%s.%s", streamName, consumerName)
-	msg, err := c.request(ctx, subject, reqData)
+	resp, err := stream.PauseConsumer(ctx, consumerName, pauseUntilTime)
 	if err != nil {
-		return nil, wrapErr(errors.WrapOperation(err, "pause consumer"))
-	}
-
-	var resp struct {
-		Paused         bool      `json:"paused"`
-		PauseUntil     time.Time `json:"pause_until"`
-		PauseRemaining int64     `json:"pause_remaining"`
-		Error          *struct {
-			Code        int    `json:"code"`
-			Description string `json:"description"`
-		} `json:"error,omitempty"`
-	}
-	if err := json.Unmarshal(msg.Data, &resp); err != nil {
-		return nil, wrapErr(errors.WrapOperation(err, "unmarshal pause response"))
-	}
-	if resp.Error != nil {
-		return nil, wrapErr(&errs.NATSAPIError{
-			Code:        resp.Error.Code,
-			Description: resp.Error.Description,
-		})
+		return nil, wrapErr(err)
 	}
 
 	return &entities.ConsumerPauseResponse{
 		Paused:         resp.Paused,
 		PauseUntil:     &resp.PauseUntil,
-		PauseRemaining: time.Duration(resp.PauseRemaining),
+		PauseRemaining: resp.PauseRemaining,
 	}, nil
 }
 
 // ResumeConsumer resumes a paused consumer immediately.
 func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumerName string) error {
-	subject := fmt.Sprintf("$JS.API.CONSUMER.PAUSE.%s.%s", streamName, consumerName)
-	msg, err := c.request(ctx, subject, []byte("{}"))
-	if err != nil {
-		return wrapErr(errors.WrapOperation(err, "resume consumer"))
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return wrapErr(err)
+	}
+	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
+		return wrapErr(err)
 	}
 
-	var resp struct {
-		Error *struct {
-			Code        int    `json:"code"`
-			Description string `json:"description"`
-		} `json:"error,omitempty"`
+	// See PauseConsumer: the SDK method validates the consumer name and maps
+	// not-found consistently (QA-050, QA-115), which the previous hand-built
+	// "$JS.API.CONSUMER.PAUSE.<stream>.<name>" request (pauseUntil omitted)
+	// did not.
+	stream, err := c.jetStream.Stream(ctx, streamName)
+	if err != nil {
+		return wrapErr(err)
 	}
-	if err := json.Unmarshal(msg.Data, &resp); err != nil {
-		return wrapErr(errors.WrapOperation(err, "unmarshal resume response"))
-	}
-	if resp.Error != nil {
-		return wrapErr(&errs.NATSAPIError{
-			Code:        resp.Error.Code,
-			Description: resp.Error.Description,
-		})
+
+	if _, err := stream.ResumeConsumer(ctx, consumerName); err != nil {
+		return wrapErr(err)
 	}
 
 	return nil
