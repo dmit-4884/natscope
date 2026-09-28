@@ -51,7 +51,12 @@ export function ConfigRow({
         {label}
         {hint && <HelpIcon hint={hint} />}
       </span>
-      <span className={`text-sm text-content-primary font-medium ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
+      <span
+        className={`text-sm text-content-primary font-medium min-w-0 break-all ${mono ? 'font-mono text-xs' : ''}`}
+        title={value}
+      >
+        {value}
+      </span>
     </div>
   )
 }

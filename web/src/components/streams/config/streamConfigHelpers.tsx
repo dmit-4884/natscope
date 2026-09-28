@@ -23,7 +23,9 @@ export function ConfigRow({ label, value, hint }: { label: string; value: string
         {label}
         {hint && <HelpIcon hint={hint} />}
       </span>
-      <span className="text-sm text-content-primary font-medium">{value}</span>
+      <span className="text-sm text-content-primary font-medium min-w-0 break-all" title={value}>
+        {value}
+      </span>
     </div>
   )
 }

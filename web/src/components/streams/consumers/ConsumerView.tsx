@@ -47,10 +47,10 @@ export function ConsumerView({
 
   return (
     <>
-      <div className="flex items-center px-4 py-3 border-b bg-surface-secondary shrink-0">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-content-primary">{consumer.name}</h3>
+      <div className="flex items-center px-4 py-3 border-b bg-surface-secondary shrink-0 min-w-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="font-semibold text-content-primary truncate" title={consumer.name}>{consumer.name}</h3>
             {!consumer.config?.durable_name && (
               <Tooltip content="No durable name — the server removes this consumer after the inactivity threshold">
                 <Badge variant="default" size="sm">

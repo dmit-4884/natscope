@@ -269,7 +269,7 @@ export default function StreamView() {
         {/* Header with Tabs */}
         <div className="border-b bg-surface-secondary">
           <div className="px-4 py-3">
-            <h2 className="text-sm font-semibold text-content-primary mb-3">
+            <h2 className="text-sm font-semibold text-content-primary mb-3 truncate" title={decodeURIComponent(streamName)}>
               Stream: {decodeURIComponent(streamName)}
             </h2>
             <div className="flex gap-1">
