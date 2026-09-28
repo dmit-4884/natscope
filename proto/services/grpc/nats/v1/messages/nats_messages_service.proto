@@ -98,7 +98,7 @@ message GetMessageRequest {
   string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
   // Required. Sequence number of the message to retrieve.
-  uint64 sequence = 3 [(google.api.field_behavior) = REQUIRED];
+  uint64 sequence = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).uint64.gt = 0];
 }
 
 // Defines the response message for getting a single JetStream message.

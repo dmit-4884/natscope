@@ -137,15 +137,15 @@ message CreateStreamRequest {
 
   // Optional. Retention policy for the stream.
   // Values: 0 = LimitsPolicy, 1 = InterestPolicy, 2 = WorkQueuePolicy.
-  int32 retention = 5;
+  int32 retention = 5 [(buf.validate.field).int32 = {in: [0, 1, 2]}];
 
   // Optional. Storage backend type for the stream.
   // Values: 0 = FileStorage, 1 = MemoryStorage.
-  int32 storage = 6;
+  int32 storage = 6 [(buf.validate.field).int32 = {in: [0, 1]}];
 
   // Optional. Discard policy when stream limits are reached.
   // Values: 0 = DiscardOld, 1 = DiscardNew.
-  int32 discard = 7;
+  int32 discard = 7 [(buf.validate.field).int32 = {in: [0, 1]}];
 
   // Optional. Maximum number of messages allowed in the stream. -1 for unlimited.
   int64 max_msgs = 8;
@@ -191,7 +191,7 @@ message CreateStreamRequest {
 
   // Optional. Compression algorithm for stream data.
   // Values: 0 = None, 1 = S2.
-  int32 compression = 22;
+  int32 compression = 22 [(buf.validate.field).int32 = {in: [0, 1]}];
 
   // Optional. Initial sequence number for the stream. Defaults to 1.
   uint64 first_seq = 23;
@@ -276,7 +276,7 @@ message UpdateStreamRequest {
 
   // Optional. Updated discard policy when stream limits are reached.
   // Values: 0 = DiscardOld, 1 = DiscardNew.
-  optional int32 discard = 14;
+  optional int32 discard = 14 [(buf.validate.field).int32 = {in: [0, 1]}];
 
   // Optional. Updated setting to apply discard new policy on a per-subject basis.
   optional bool discard_new_per_subject = 15;
@@ -289,7 +289,7 @@ message UpdateStreamRequest {
 
   // Optional. Updated compression algorithm (mutable since NATS 2.10).
   // Values: 0 = None, 1 = S2.
-  optional int32 compression = 18;
+  optional int32 compression = 18 [(buf.validate.field).int32 = {in: [0, 1]}];
 
   // Optional. Updated republish configuration. Send empty message to clear.
   optional .natscope.types.nats.RePublish republish = 19;
@@ -468,7 +468,7 @@ message CreateConsumerRequest {
   // Optional. Message delivery start policy.
   // Values: 0 = DeliverAll, 1 = DeliverLast, 2 = DeliverNew, 3 = DeliverByStartSequence,
   // 4 = DeliverByStartTime, 5 = DeliverLastPerSubject.
-  int32 deliver_policy = 5;
+  int32 deliver_policy = 5 [(buf.validate.field).int32 = {in: [0, 1, 2, 3, 4, 5]}];
 
   // Optional. Starting sequence number when deliverPolicy is DeliverByStartSequence.
   uint64 opt_start_seq = 6;
@@ -479,7 +479,7 @@ message CreateConsumerRequest {
 
   // Optional. Acknowledgement policy.
   // Values: 0 = AckExplicit, 1 = AckNone, 2 = AckAll.
-  int32 ack_policy = 8;
+  int32 ack_policy = 8 [(buf.validate.field).int32 = {in: [0, 1, 2]}];
 
   // Optional. Duration to wait for message acknowledgement before redelivery.
   google.protobuf.Duration ack_wait = 9;
@@ -498,7 +498,7 @@ message CreateConsumerRequest {
 
   // Optional. Replay policy for historical messages.
   // Values: 0 = ReplayInstant, 1 = ReplayOriginal.
-  int32 replay_policy = 14;
+  int32 replay_policy = 14 [(buf.validate.field).int32 = {in: [0, 1]}];
 
   // Optional. Maximum message delivery rate in bits per second. 0 for unlimited.
   uint64 rate_limit = 15;

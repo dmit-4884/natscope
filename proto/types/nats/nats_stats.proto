@@ -84,7 +84,7 @@ message ConsumerStats {
   int32 max_waiting = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
   int32 max_request_batch = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
   google.protobuf.Duration max_request_expires = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 max_request_max_bytes = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_request_max_bytes = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   string durable = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
   string description = 29 [(google.api.field_behavior) = OUTPUT_ONLY];

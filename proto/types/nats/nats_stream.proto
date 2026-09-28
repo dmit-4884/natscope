@@ -372,7 +372,7 @@ message ConsumerConfig {
   bool memory_storage = 25;
 
   // Required. Maximum total bytes for a single pull request.
-  int32 max_request_max_bytes = 26;
+  int64 max_request_max_bytes = 26;
 
   // Optional. User-defined metadata as key-value pairs.
   map<string, string> metadata = 27;
