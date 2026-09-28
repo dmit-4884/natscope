@@ -156,7 +156,7 @@ message MappingHealthItem {
   string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Required. Health state value. One of:
   //   "ok", "source_missing", "source_disabled", "selection_missing",
-  //   "descriptor_missing", "type_missing".
+  //   "descriptor_missing", "type_missing", "mapping_missing".
   string health = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Optional. Human-readable detail (e.g. which source is missing).
   string detail = 3 [(google.api.field_behavior) = OUTPUT_ONLY];

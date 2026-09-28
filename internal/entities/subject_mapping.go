@@ -26,8 +26,11 @@ const (
 	// MappingHealthDescriptorMissing no compiled descriptor for (source, tag).
 	MappingHealthDescriptorMissing MappingHealth = "descriptor_missing"
 
-	// MappingHealthTypeMissing message type not present in the active snapshot.
+	// MappingHealthTypeMissing message type not present in the resolved snapshot.
 	MappingHealthTypeMissing MappingHealth = "type_missing"
+
+	// MappingHealthMappingMissing the mapping id itself does not exist.
+	MappingHealthMappingMissing MappingHealth = "mapping_missing"
 )
 
 // SubjectMapping maps a NATS subject pattern to a proto message type, scoped to

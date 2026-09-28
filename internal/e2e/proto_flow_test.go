@@ -122,10 +122,30 @@ func TestProtoFlow(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	_, err = env.mappings.CreateMapping(ctx, connect.NewRequest(&mappingspb.CreateMappingRequest{
+	mappingResp, err := env.mappings.CreateMapping(ctx, connect.NewRequest(&mappingspb.CreateMappingRequest{
 		Pattern: subject, MessageType: fullName, SourceId: sourceID,
 	}))
 	require.NoError(t, err)
+
+	t.Run("mapping health follows the pinned version", func(t *testing.T) {
+		pinnedResp, err := env.mappings.CreateMapping(ctx, connect.NewRequest(&mappingspb.CreateMappingRequest{
+			Pattern: "flow.pinned", MessageType: fullName, SourceId: sourceID, PinnedTag: new("no-such-tag"),
+		}))
+		require.NoError(t, err)
+
+		healthResp, err := env.mappings.BatchCheckMappingHealth(ctx, connect.NewRequest(&mappingspb.BatchCheckMappingHealthRequest{
+			Ids: []string{mappingResp.Msg.GetMapping().GetId(), pinnedResp.Msg.GetMapping().GetId(), unknownUUID},
+		}))
+		require.NoError(t, err)
+		items := healthResp.Msg.GetItems()
+		require.Len(t, items, 3)
+		assert.Equal(t, "ok", items[0].GetHealth())
+		assert.Equal(t, "descriptor_missing", items[1].GetHealth())
+		assert.Equal(t, "mapping_missing", items[2].GetHealth())
+
+		_, err = env.mappings.DeleteMapping(ctx, connect.NewRequest(&mappingspb.DeleteMappingRequest{Id: pinnedResp.Msg.GetMapping().GetId()}))
+		require.NoError(t, err)
+	})
 
 	t.Run("publish + server-side proto decode", func(t *testing.T) {
 		msgType := fullName

@@ -9,6 +9,7 @@ export type MappingHealth =
   | 'selection_missing'
   | 'descriptor_missing'
   | 'type_missing'
+  | 'mapping_missing'
 
 export interface MappingHealthInfo {
   id: string

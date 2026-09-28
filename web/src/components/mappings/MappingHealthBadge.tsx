@@ -17,6 +17,7 @@ const COLOR_BY_HEALTH: Record<MappingHealth, string> = {
   selection_missing: 'bg-status-warning-bg text-amber-700 border-amber-200',
   descriptor_missing: 'bg-status-error-bg text-red-700 border-red-200',
   type_missing: 'bg-status-error-bg text-red-700 border-red-200',
+  mapping_missing: 'bg-status-error-bg text-red-700 border-red-200',
 }
 
 const SHORT_LABEL: Record<MappingHealth, string> = {
@@ -26,6 +27,7 @@ const SHORT_LABEL: Record<MappingHealth, string> = {
   selection_missing: 'No version',
   descriptor_missing: 'Not compiled',
   type_missing: 'Type missing',
+  mapping_missing: 'Deleted',
 }
 
 const DEFAULT_TOOLTIP: Record<MappingHealth, string> = {
@@ -33,8 +35,9 @@ const DEFAULT_TOOLTIP: Record<MappingHealth, string> = {
   source_missing: 'The proto source this mapping points at no longer exists.',
   source_disabled: 'The source is disabled. Toggle it on in Proto Files.',
   selection_missing: 'Git source has no selected version. Pick a tag in Proto Files.',
-  descriptor_missing: 'No compiled descriptor for the active version. Run Compile in Proto Files.',
+  descriptor_missing: 'No compiled descriptor for the version this mapping uses. Run Compile in Proto Files or fix its pin.',
   type_missing: 'The message type is not present in the compiled descriptor.',
+  mapping_missing: 'This mapping no longer exists.',
 }
 
 const ICON_BY_HEALTH: Record<MappingHealth, ReactNode> = {
@@ -44,6 +47,7 @@ const ICON_BY_HEALTH: Record<MappingHealth, ReactNode> = {
   selection_missing: <WarningIcon className="w-3 h-3" />,
   descriptor_missing: <CloseIcon className="w-3 h-3" />,
   type_missing: <CloseIcon className="w-3 h-3" />,
+  mapping_missing: <CloseIcon className="w-3 h-3" />,
 }
 
 /**
