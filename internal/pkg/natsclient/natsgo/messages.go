@@ -85,7 +85,12 @@ func (c *Client) GetMessage(ctx context.Context, streamName string, sequence uin
 	return toMessageWithHex(msg), nil
 }
 
-// PublishToStream publishes a message to a JetStream stream.
+// PublishToStream publishes a message to a JetStream stream. It first checks
+// that a stream actually captures subject: JetStream publish is a
+// request/reply on the subject itself, so without this check a core (non-JetStream)
+// subscriber on the same subject looks exactly like a JetStream responder —
+// either the request hangs for the full publish timeout with no subscriber,
+// or a core subscriber's unrelated reply gets misread as a PubAck (QA-077).
 func (c *Client) PublishToStream(
 	ctx context.Context,
 	subject string,
@@ -94,6 +99,9 @@ func (c *Client) PublishToStream(
 ) (*entities.PubAck, error) {
 	if err := validateNATSSubjectLength("subject", subject); err != nil {
 		return nil, wrapErr(err)
+	}
+	if _, err := c.jetStream.StreamNameBySubject(ctx, subject); err != nil {
+		return nil, wrapErr(errors.WrapOperation(err, "resolve stream for subject"))
 	}
 
 	msg := &nats.Msg{

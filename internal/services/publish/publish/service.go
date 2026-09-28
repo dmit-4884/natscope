@@ -5,12 +5,15 @@ package publish
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/altessa-s/go-atlas/domain/normalizer"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	corecontext "github.com/altessa-s/go-atlas/core/context"
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
@@ -60,12 +63,24 @@ func New(
 }
 
 // Publish runs the full pipeline; every user-actionable failure becomes a
-// PublishResult.Error (see package doc).
+// PublishResult.Error (see package doc). Malformed-request checks (subject
+// syntax, header names) run before any NATS work and return a transport
+// error, consistent with protovalidate's role at the boundary.
 func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*entities.PublishResult, error) {
 	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
+	if err := natsutil.ValidateLiteralSubject(in.Subject); err != nil {
+		return nil, err
+	}
+	if err := natsutil.ValidateHeaderNames(in.Headers); err != nil {
+		return nil, err
+	}
+
 	data, encErr := s.resolvePayload(ctx, in)
 	if encErr != nil {
+		// Encode failures are as real an attempt as a publish failure — history
+		// must record both the same way, or it under-reports failures (QA-131).
+		s.recordHistory(ctx, in, "", 0, len(data), false, encErr)
 		return softFailure(*encErr), nil
 	}
 
@@ -143,7 +158,13 @@ func (s *Service) recordHistory(
 		encoding = entities.EncodingTypeProtobuf
 	}
 
-	connURL, _ := s.natsService.GetConnectionURL(ctx, in.ConnectionID) //nolint:errcheck // history-only enrichment
+	connURL, urlErr := s.natsService.GetConnectionURL(ctx, in.ConnectionID)
+	if urlErr != nil && errors.Is(urlErr, errs.ErrSavedConnectionNotFound) {
+		// A history row for a connection id that doesn't exist can never be
+		// followed up on (no connection to link back to, no URL to show) and
+		// only pollutes the audit trail — skip it (QA-131).
+		return
+	}
 
 	create := &entities.PublishHistoryCreate{
 		ConnectionID:   &in.ConnectionID,

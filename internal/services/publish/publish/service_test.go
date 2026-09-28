@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 
 	historysvc "github.com/dmit-4884/natscope/internal/services/history"
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
@@ -186,7 +187,14 @@ func TestPublish_EncodeError(t *testing.T) {
 	require.NoError(t, err) // soft failure — Error in body, not transport error
 	require.NotNil(t, resp.Error)
 	assert.Contains(t, *resp.Error, "bad json")
-	assert.Equal(t, 0, hist.called, "encode failures are not recorded to history")
+
+	hist.mu.Lock()
+	defer hist.mu.Unlock()
+	require.Equal(t, 1, hist.called, "encode failures must be recorded to history, same as publish failures")
+	require.NotNil(t, hist.last)
+	assert.False(t, hist.last.Success)
+	require.NotNil(t, hist.last.Error)
+	assert.Contains(t, *hist.last.Error, "bad json")
 }
 
 func TestPublish_PublishError_RecordedAsFailure(t *testing.T) {
@@ -281,5 +289,73 @@ func TestPublish_MissingSourceIDForMessageType(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp.Error)
 	assert.Contains(t, *resp.Error, "source_id is required")
-	assert.Equal(t, 0, hist.called)
+
+	hist.mu.Lock()
+	defer hist.mu.Unlock()
+	assert.Equal(t, 1, hist.called, "a rejected publish attempt must still be recorded to history")
+}
+
+// TestPublish_RejectsWildcardSubject (QA-078) verifies a wildcard-looking
+// subject is rejected up front as a transport error, instead of being
+// published to JetStream as a literal, unmatchable subject.
+func TestPublish_RejectsWildcardSubject(t *testing.T) {
+	t.Parallel()
+
+	natsm := &mockNATSService{
+		publishFn: func(_ context.Context, _, _ string, _ []byte, _ map[string]string) (*entities.PubAck, error) {
+			t.Fatal("nats.PublishToStream should not be called for an invalid subject")
+			return nil, nil
+		},
+	}
+	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{})
+
+	_, err := s.Publish(t.Context(), &entities.PublishRequest{
+		ConnectionID: "c1", Subject: "orders.*", Data: "{}",
+	})
+	require.Error(t, err, "a wildcard subject must be a transport error, not a soft failure")
+}
+
+// TestPublish_RejectsInvalidHeaderName (QA-079) verifies an invalid header
+// name is rejected up front instead of silently dropped on the wire.
+func TestPublish_RejectsInvalidHeaderName(t *testing.T) {
+	t.Parallel()
+
+	natsm := &mockNATSService{
+		publishFn: func(_ context.Context, _, _ string, _ []byte, _ map[string]string) (*entities.PubAck, error) {
+			t.Fatal("nats.PublishToStream should not be called for an invalid header name")
+			return nil, nil
+		},
+	}
+	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{})
+
+	_, err := s.Publish(t.Context(), &entities.PublishRequest{
+		ConnectionID: "c1", Subject: "orders.created", Data: "{}",
+		Headers: map[string]string{"Bad Key": "v"},
+	})
+	require.Error(t, err, "an invalid header name must be a transport error, not a silently incomplete publish")
+}
+
+// TestPublish_SkipsHistoryForUnknownConnection (QA-131) verifies a publish
+// attempt against a connection id that doesn't resolve isn't recorded — it
+// can never be followed up on and only pollutes the audit trail.
+func TestPublish_SkipsHistoryForUnknownConnection(t *testing.T) {
+	t.Parallel()
+
+	hist := &recordedHistory{}
+	natsm := &mockNATSService{
+		publishFn: func(_ context.Context, _, _ string, _ []byte, _ map[string]string) (*entities.PubAck, error) {
+			return &entities.PubAck{Stream: "S", Sequence: 1}, nil
+		},
+		urlFn: func(string) (string, error) { return "", errs.ErrSavedConnectionNotFound },
+	}
+	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+
+	_, err := s.Publish(t.Context(), &entities.PublishRequest{
+		ConnectionID: "not-a-connection", Subject: "orders.created", Data: "{}",
+	})
+	require.NoError(t, err)
+
+	hist.mu.Lock()
+	defer hist.mu.Unlock()
+	assert.Equal(t, 0, hist.called, "no history row should be written for an unknown connection id")
 }
