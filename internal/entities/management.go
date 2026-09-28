@@ -572,6 +572,20 @@ type ObjectInfo struct {
 
 	// Metadata is custom key-value metadata.
 	Metadata map[string]string
+
+	// Link, when non-nil, means this entry is a link to another object or
+	// bucket rather than a stored object itself.
+	Link *ObjectLink
+}
+
+// ObjectLink is a reference from one object to another object or bucket.
+type ObjectLink struct {
+	// Bucket is the name of the Object Store bucket the link points to.
+	Bucket string
+
+	// Name is the linked object's name; empty means the link points at the
+	// whole bucket.
+	Name string
 }
 
 // ObjectMeta is the client-supplied metadata for an object upload.

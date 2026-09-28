@@ -7,6 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"sync"
+	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
 
@@ -15,10 +18,48 @@ import (
 	"github.com/altessa-s/go-atlas/domain/normalizer"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
+
+	corecontext "github.com/altessa-s/go-atlas/core/context"
 )
+
+const (
+	// objectOperationTimeout bounds Object Store operations against an
+	// unresponsive server. Unlike kv.go, none of these methods used to set a
+	// deadline at all: ListObjectBuckets could hang forever (QA-025), and
+	// GetObject fell back to nats.go's undocumented hard 5s default, which
+	// cascades into Slow-Consumer disconnects under concurrent load
+	// (QA-024). Kept longer than kvOperationTimeout to leave room for larger
+	// payload transfers.
+	objectOperationTimeout = 30 * time.Second
+
+	// maxGetObjectBytes caps GetObject's in-memory buffer. natscope reads the
+	// whole object into memory before responding (no server-streaming RPC
+	// yet), so an object created by another client with no size limit would
+	// otherwise be buffered in full regardless of size (see QA-071). Matches
+	// maxRequestBytes, the request-side cap the transport enforces.
+	maxGetObjectBytes = 32 << 20 // 32 MiB
+
+	// objChunksSubjectSuffix/objMetaSubjectSuffix mirror nats.go's Object
+	// Store subject layout (jetstream/object.go: "$O.<bucket>.C.>" and
+	// "$O.<bucket>.M.>", always set together by CreateObjectStore).
+	objChunksSubjectSuffix = ".C.>"
+	objMetaSubjectSuffix   = ".M.>"
+)
+
+// streamInfoProvider exposes the jetstream.StreamInfo backing an
+// ObjectStoreStatus. The interface itself has no Config()/State() accessor,
+// but nats.go's only implementation (*jetstream.ObjectBucketStatus) exposes
+// it via this method, so it's asserted rather than reached into directly.
+type streamInfoProvider interface {
+	StreamInfo() *jetstream.StreamInfo
+}
 
 // ListObjectBuckets returns all Object Store buckets in the connection.
 func (c *Client) ListObjectBuckets(ctx context.Context) ([]entities.ObjectBucketInfo, error) {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
 	var buckets []entities.ObjectBucketInfo //nolint:prealloc
 	lister := c.jetStream.ObjectStores(ctx)
 	for status := range lister.Status() {
@@ -55,6 +96,9 @@ func countObjects(ctx context.Context, js jetstream.JetStream, bucket string) (u
 
 // CreateObjectBucket creates a new Object Store bucket.
 func (c *Client) CreateObjectBucket(ctx context.Context, config entities.ObjectBucketConfig) (*entities.ObjectBucketInfo, error) {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
 	_ = normalizer.Normalize(&config) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
 	objConfig := converter.Convert(config, &jetstream.ObjectStoreConfig{},
@@ -63,12 +107,12 @@ func (c *Client) CreateObjectBucket(ctx context.Context, config entities.ObjectB
 	objConfig.TTL = config.TTL
 	obj, err := c.jetStream.CreateObjectStore(ctx, *objConfig)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, wrapBucketErr(err)
 	}
 
 	status, err := obj.Status(ctx)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, wrapBucketErr(err)
 	}
 
 	// A freshly created bucket has no objects yet.
@@ -77,9 +121,24 @@ func (c *Client) CreateObjectBucket(ctx context.Context, config entities.ObjectB
 }
 
 // DeleteObjectBucket deletes an Object Store bucket and all its objects.
+// ObjectStore(), unlike KeyValue(), does no sanity check that the stream is
+// actually shaped like an object store, so a plain stream merely named
+// OBJ_<bucket> would otherwise be deleted outright; verifyObjectBucket closes
+// that gap (see QA-066).
 func (c *Client) DeleteObjectBucket(ctx context.Context, bucket string) error {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
+	obj, err := c.jetStream.ObjectStore(ctx, bucket)
+	if err != nil {
+		return wrapBucketErr(err)
+	}
+	if err := verifyObjectBucket(ctx, obj, bucket); err != nil {
+		return err
+	}
+
 	if err := c.jetStream.DeleteObjectStore(ctx, bucket); err != nil {
-		return wrapErr(err)
+		return wrapBucketErr(err)
 	}
 
 	return nil
@@ -87,14 +146,17 @@ func (c *Client) DeleteObjectBucket(ctx context.Context, bucket string) error {
 
 // GetObjectBucket returns information about a specific Object Store bucket.
 func (c *Client) GetObjectBucket(ctx context.Context, bucket string) (*entities.ObjectBucketInfo, error) {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
 	obj, err := c.jetStream.ObjectStore(ctx, bucket)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, wrapBucketErr(err)
 	}
 
 	status, err := obj.Status(ctx)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, wrapBucketErr(err)
 	}
 
 	count, err := countObjects(ctx, c.jetStream, bucket)
@@ -106,53 +168,129 @@ func (c *Client) GetObjectBucket(ctx context.Context, bucket string) (*entities.
 	return &result, nil
 }
 
-// ListObjects returns all objects in an Object Store bucket.
+// ListObjects returns all objects in an Object Store bucket. An empty bucket
+// returns an empty slice rather than jetstream.ErrNoObjectsFound (see
+// QA-065), matching every other empty-collection response in this API.
 func (c *Client) ListObjects(ctx context.Context, bucket string) ([]*entities.ObjectInfo, error) {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
 	obj, err := c.jetStream.ObjectStore(ctx, bucket)
 	if err != nil {
 		return nil, wrapErr(err)
 	}
 
 	list, err := obj.List(ctx)
+	if errors.Is(err, jetstream.ErrNoObjectsFound) {
+		return []*entities.ObjectInfo{}, nil
+	}
 	if err != nil {
 		return nil, wrapErr(err)
 	}
 
-	return slices.To(list, func(info *jetstream.ObjectInfo) *entities.ObjectInfo {
-		return converter.Convert(info, &entities.ObjectInfo{})
-	}), nil
+	return slices.To(list, toObjectInfo), nil
 }
 
-// GetObject returns the content and metadata of an object.
+// GetObject returns the content and metadata of an object. Uses a single
+// Get() rather than separate GetBytes+GetInfo calls, so the returned info
+// always describes the data actually returned: a second, independent GetInfo
+// lookup can race a concurrent Put and report a newer version's digest/size
+// for the data read moments before (see QA-069). GetObject on a link follows
+// it and returns the target's own info/data, which is also what makes those
+// consistent for links (see QA-072); a link to an entire bucket has no
+// single object to read and is rejected instead.
 func (c *Client) GetObject(ctx context.Context, bucket string, name string) ([]byte, *entities.ObjectInfo, error) {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
 	obj, err := c.jetStream.ObjectStore(ctx, bucket)
 	if err != nil {
 		return nil, nil, wrapErr(err)
 	}
 
-	data, err := obj.GetBytes(ctx, name)
+	result, err := obj.Get(ctx, name)
+	if err != nil {
+		if errors.Is(err, jetstream.ErrCantGetBucket) {
+			return nil, nil, errs.ErrObjectLinkToBucket
+		}
+		return nil, nil, wrapErr(err)
+	}
+	defer result.Close() //nolint:errcheck // best-effort; the read error below is authoritative
+
+	info, err := result.Info()
+	if err != nil {
+		return nil, nil, wrapErr(err)
+	}
+	if info.Size > maxGetObjectBytes {
+		return nil, nil, errs.ErrObjectTooLargeToRetrieve
+	}
+
+	data, err := io.ReadAll(result)
 	if err != nil {
 		return nil, nil, wrapErr(err)
 	}
 
-	info, err := obj.GetInfo(ctx, name)
-	if err != nil {
-		return nil, nil, wrapErr(err)
-	}
-
-	return data, converter.Convert(info, &entities.ObjectInfo{}), nil
+	return data, toObjectInfo(info), nil
 }
 
-// PutObject stores an object in an Object Store bucket.
+// checkObjectCapacity is a best-effort guard against nats.go's async Put
+// (jetstream/object.go obs.Put publishes chunks and the rollup meta message
+// independently via PublishMsgAsync, checking for errors only at the end): a
+// Put that would clearly exceed the bucket's max_bytes is refused before
+// nats.go replaces the current meta with a rollup that then points at chunks
+// which fail to write, destroying the previous object with no way to recover
+// it (see QA-002). It never blocks a Put outright — a status/info read that
+// fails or can't be inspected is "can't tell, let Put decide for itself".
+func checkObjectCapacity(ctx context.Context, obj jetstream.ObjectStore, name string, newSize int64) error {
+	status, err := obj.Status(ctx)
+	if err != nil {
+		return nil //nolint:nilerr // best-effort guard; Put will surface the real error
+	}
+	provider, ok := status.(streamInfoProvider)
+	if !ok {
+		return nil
+	}
+	info := provider.StreamInfo()
+	if info == nil || info.Config.MaxBytes <= 0 {
+		return nil
+	}
+
+	var oldSize int64
+	if existing, getErr := obj.GetInfo(ctx, name); getErr == nil && existing != nil {
+		oldSize = int64(existing.Size) //nolint:gosec // object sizes stay far below int64 range
+	}
+
+	if int64(info.State.Bytes)-oldSize+newSize <= info.Config.MaxBytes { //nolint:gosec // same
+		return nil
+	}
+	return errs.ErrObjectBucketCapacityExceeded
+}
+
+// PutObject stores an object in an Object Store bucket. Writes to the same
+// (bucket, name) are serialized: nats.go's Put races when the same object is
+// written concurrently and can leave orphaned chunks behind after every
+// writer but the last "wins" (see QA-070). A capacity precheck additionally
+// refuses Puts that would clearly overflow the bucket (see QA-002 and
+// checkObjectCapacity).
 func (c *Client) PutObject(
 	ctx context.Context,
 	bucket string,
 	meta entities.ObjectMeta,
 	data []byte,
 ) (*entities.ObjectInfo, error) {
+	unlock := c.lockObjectPut(bucket, meta.Name)
+	defer unlock()
+
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
 	obj, err := c.jetStream.ObjectStore(ctx, bucket)
 	if err != nil {
 		return nil, wrapErr(err)
+	}
+
+	if capErr := checkObjectCapacity(ctx, obj, meta.Name, int64(len(data))); capErr != nil { //nolint:gosec // data is bounded by maxRequestBytes
+		return nil, capErr
 	}
 
 	objMeta := converter.Convert(meta, &jetstream.ObjectMeta{})
@@ -162,11 +300,26 @@ func (c *Client) PutObject(
 		return nil, wrapErr(err)
 	}
 
-	return converter.Convert(info, &entities.ObjectInfo{}), nil
+	return toObjectInfo(info), nil
+}
+
+// lockObjectPut serializes PutObject calls for the same (bucket, name); see
+// PutObject. The lock table is never trimmed — bounded in practice by the
+// number of distinct object names a connection's lifetime touches, which is
+// negligible next to the memory an in-flight Put itself already holds.
+func (c *Client) lockObjectPut(bucket, name string) (unlock func()) {
+	key := bucket + "\x00" + name
+	value, _ := c.putObjectLocks.LoadOrStore(key, &sync.Mutex{})
+	mu := value.(*sync.Mutex) //nolint:errcheck // always stored as *sync.Mutex by this same LoadOrStore call
+	mu.Lock()
+	return mu.Unlock
 }
 
 // DeleteObject deletes an object from an Object Store bucket.
 func (c *Client) DeleteObject(ctx context.Context, bucket string, name string) error {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
 	obj, err := c.jetStream.ObjectStore(ctx, bucket)
 	if err != nil {
 		return wrapErr(err)
@@ -180,17 +333,69 @@ func (c *Client) DeleteObject(ctx context.Context, bucket string, name string) e
 }
 
 // SealObjectBucket seals an Object Store bucket, making it read-only.
+// ObjectStore() does no sanity check that the stream is actually shaped like
+// an object store, so a plain stream merely named OBJ_<bucket> would
+// otherwise be sealed — irreversibly — outright; verifyObjectBucket closes
+// that gap (see QA-066).
 func (c *Client) SealObjectBucket(ctx context.Context, bucket string) error {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+
 	obj, err := c.jetStream.ObjectStore(ctx, bucket)
 	if err != nil {
-		return wrapErr(err)
+		return wrapBucketErr(err)
+	}
+	if err := verifyObjectBucket(ctx, obj, bucket); err != nil {
+		return err
 	}
 
 	if err := obj.Seal(ctx); err != nil {
-		return wrapErr(err)
+		return wrapBucketErr(err)
 	}
 
 	return nil
+}
+
+// verifyObjectBucket confirms bucket is backed by a stream shaped like an
+// Object Store (subjects "$O.<bucket>.C.>" and "$O.<bucket>.M.>", exactly
+// what CreateObjectStore always sets). Best-effort: if status can't be read
+// or asserted, the caller proceeds and lets the real operation report its
+// own error (see QA-066).
+func verifyObjectBucket(ctx context.Context, obj jetstream.ObjectStore, bucket string) error {
+	status, err := obj.Status(ctx)
+	if err != nil {
+		return wrapBucketErr(err)
+	}
+	provider, ok := status.(streamInfoProvider)
+	if !ok {
+		return nil
+	}
+	info := provider.StreamInfo()
+	if info == nil {
+		return nil
+	}
+	if objectStreamSubjectsValid(bucket, info.Config.Subjects) {
+		return nil
+	}
+	return errors.Join(errs.ErrNotAKVOrObjectBucket, jetstream.ErrBadBucket)
+}
+
+func objectStreamSubjectsValid(bucket string, subjects []string) bool {
+	if len(subjects) != 2 { //nolint:mnd // exactly the chunk+meta subjects CreateObjectStore always sets
+		return false
+	}
+	wantChunks := "$O." + bucket + objChunksSubjectSuffix
+	wantMeta := "$O." + bucket + objMetaSubjectSuffix
+	seenChunks, seenMeta := false, false
+	for _, s := range subjects {
+		switch s {
+		case wantChunks:
+			seenChunks = true
+		case wantMeta:
+			seenMeta = true
+		}
+	}
+	return seenChunks && seenMeta
 }
 
 func toObjectBucketInfo(status jetstream.ObjectStoreStatus, objectCount uint64) entities.ObjectBucketInfo {
@@ -205,4 +410,18 @@ func toObjectBucketInfo(status jetstream.ObjectStoreStatus, objectCount uint64) 
 		IsCompressed: status.IsCompressed(),
 		Metadata:     status.Metadata(),
 	}
+}
+
+// toObjectInfo maps a jetstream object entry, including link metadata
+// (jetstream.ObjectInfo.Opts.Link) that a plain field-name converter can't
+// reach since it's nested under Opts (see QA-072).
+func toObjectInfo(info *jetstream.ObjectInfo) *entities.ObjectInfo {
+	out := converter.Convert(info, &entities.ObjectInfo{})
+	if info.Opts != nil && info.Opts.Link != nil {
+		out.Link = &entities.ObjectLink{
+			Bucket: info.Opts.Link.Bucket,
+			Name:   info.Opts.Link.Name,
+		}
+	}
+	return out
 }

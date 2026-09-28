@@ -17,6 +17,19 @@ import (
 	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
+// objectInfoToProto converts an object entry to its proto form. Link is
+// converted by hand: like Placement/Mirror/Republish elsewhere in this
+// handler, converter.Convert doesn't auto-convert a nested pointer-to-struct
+// field between two different named types, so it's excluded and mapped
+// explicitly (see QA-072).
+func objectInfoToProto(info *entities.ObjectInfo) *natspb.ObjectInfo {
+	out := converter.Convert(info, &natspb.ObjectInfo{}, protoCodecs, converter.WithIgnoreFields("Link"))
+	if info.Link != nil {
+		out.Link = converter.Convert(info.Link, &natspb.ObjectLink{})
+	}
+	return out
+}
+
 // ListObjectBuckets lists all Object Store buckets.
 func (h *Handler) ListObjectBuckets(
 	ctx context.Context,
@@ -110,9 +123,7 @@ func (h *Handler) ListObjects(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.ListObjectsResponse{
-		Objects: slices.To(objects, func(o *entities.ObjectInfo) *natspb.ObjectInfo {
-			return converter.Convert(o, &natspb.ObjectInfo{}, protoCodecs)
-		}),
+		Objects: slices.To(objects, objectInfoToProto),
 	}), nil
 }
 
@@ -127,7 +138,7 @@ func (h *Handler) GetObject(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.GetObjectResponse{
-		Info: converter.Convert(info, &natspb.ObjectInfo{}, protoCodecs),
+		Info: objectInfoToProto(info),
 		Data: data,
 	}), nil
 }
@@ -144,7 +155,7 @@ func (h *Handler) PutObject(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.PutObjectResponse{
-		Info: converter.Convert(info, &natspb.ObjectInfo{}, protoCodecs),
+		Info: objectInfoToProto(info),
 	}), nil
 }
 
