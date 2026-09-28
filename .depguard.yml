@@ -28,7 +28,8 @@
       "google.golang.org/genproto",
       "google.golang.org/protobuf",
       "golang.org/x/sync",
-      "golang.org/x/net"
+      "golang.org/x/net",
+      "gopkg.in/yaml.v3"
     ]
   }
 }

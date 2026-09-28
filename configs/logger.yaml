@@ -19,7 +19,8 @@
 #
 #  # <string> Specifies the output format for log messages.
 #  # Controls the structure and formatting of log entries.
-#  # Supported values: console, text, json
+#  # Supported values: console, text, json — any other value is rejected at
+#  # startup rather than silently falling back to text.
 #  # console: compact terminal lines (HH:MM:SS, subsystem prefix, no app metadata).
 #  # Default value: console when stderr is a terminal, text otherwise.
 #  # The --log-format flag overrides both this file and LOGGER__OUTPUT_FORMAT.

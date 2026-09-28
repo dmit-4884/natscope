@@ -4,6 +4,8 @@
 package appconfig_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
@@ -52,5 +54,140 @@ func TestWebAuthEnabled(t *testing.T) {
 		if got := tc.cfg.Enabled(); got != tc.want {
 			t.Errorf("%s: Enabled() = %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+// A whitespace-only credential must fail Validate (fail-closed) instead of
+// silently starting without auth (Enabled() would return false for it).
+func TestWebAuthValidate_RejectsBlank(t *testing.T) {
+	cases := []struct {
+		name    string
+		cfg     *appconfig.WebAuthConfig
+		wantErr bool
+	}{
+		{"both set", &appconfig.WebAuthConfig{Username: "u", Password: "p"}, false},
+		{"whitespace password", &appconfig.WebAuthConfig{Username: "u", Password: "   "}, true},
+		{"whitespace username", &appconfig.WebAuthConfig{Username: "\t", Password: "p"}, true},
+	}
+	for _, tc := range cases {
+		err := tc.cfg.Validate()
+		if (err != nil) != tc.wantErr {
+			t.Errorf("%s: Validate() error = %v, wantErr %v", tc.name, err, tc.wantErr)
+		}
+	}
+}
+
+func TestAllowedHostsList(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"", nil},
+		{"example.com", []string{"example.com"}},
+		{"example.com:4280, other.example:4280 ,,", []string{"example.com:4280", "other.example:4280"}},
+	}
+	for _, tc := range cases {
+		c := &appconfig.Config{AllowedHosts: tc.in}
+		got := c.AllowedHostsList()
+		if len(got) != len(tc.want) {
+			t.Fatalf("AllowedHostsList(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("AllowedHostsList(%q)[%d] = %q, want %q", tc.in, i, got[i], tc.want[i])
+			}
+		}
+	}
+}
+
+// An unsupported outputFormat must be rejected at load time instead of
+// silently falling back to text — go-atlas's own Logger.Validate does not
+// check this field at all.
+func TestLoad_RejectsUnknownOutputFormat(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("logger:\n  outputFormat: xml\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if _, err := appconfig.Load(path, appconfig.LoggerDefaults(false)); err == nil {
+		t.Fatal("Load() with outputFormat: xml, want an error")
+	}
+}
+
+// A file whose extension isn't .yaml/.yml must fail loudly instead of the
+// loader silently skipping it and starting on an all-default configuration.
+func TestLoad_RejectsUnsupportedExtension(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.conf")
+	if err := os.WriteFile(path, []byte("grpcWebAddress: \"127.0.0.1:1\"\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if _, err := appconfig.Load(path, appconfig.LoggerDefaults(false)); err == nil {
+		t.Fatal("Load() with a .conf file, want an error")
+	}
+}
+
+// A typo'd key must fail loudly instead of silently keeping the default
+// (e.g. "datadir" instead of "dataDir" leaves the data directory unchanged).
+func TestLoad_RejectsUnknownKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	yaml := "storage:\n  local:\n    datadir: " + dir + "\n"
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if _, err := appconfig.Load(path, appconfig.LoggerDefaults(false)); err == nil {
+		t.Fatal("Load() with an unknown key, want an error")
+	}
+}
+
+// A "$" that doesn't reference a defined environment variable must fail the
+// load instead of silently truncating the value (a real secret's password
+// generator commonly produces "$" characters).
+func TestLoad_RejectsUndefinedEnvSubstitution(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	yaml := "webAuth:\n  username: qa-user\n  password: \"qa-secret-pa$word-7f3a\"\n"
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if _, err := appconfig.Load(path, appconfig.LoggerDefaults(false)); err == nil {
+		t.Fatal("Load() with an undefined $word reference, want an error")
+	}
+}
+
+// An env var explicitly set to the empty string must be treated as unset,
+// not as an override to the field's zero value.
+func TestLoad_EmptyEnvOverrideIgnored(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	yaml := "storage:\n  local:\n    dataDir: " + dir + "\n"
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	t.Setenv("STORAGE__LOCAL__DATA_DIR", "")
+
+	cfg, err := appconfig.Load(path, appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.GetLocalDataDir() != dir {
+		t.Errorf("GetLocalDataDir() = %q, want %q (empty env override must be ignored)", cfg.GetLocalDataDir(), dir)
+	}
+}
+
+// "~" in dataDir must expand to the home directory, matching the documented
+// default (~/.natscope/data) instead of creating a literal "~" directory
+// under the current working directory.
+func TestResolveDataDir_ExpandsTilde(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfg := &appconfig.Config{Storage: &appconfig.StorageConfig{
+		Local: &appconfig.LocalStorageConfig{DataDir: "~/.natscope/data-tilde"},
+	}}
+	want := filepath.Join(home, ".natscope", "data-tilde")
+	if got := cfg.ResolveDataDir(); got != want {
+		t.Errorf("ResolveDataDir() = %q, want %q", got, want)
 	}
 }
