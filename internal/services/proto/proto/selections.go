@@ -64,15 +64,18 @@ func (s *Service) Select(ctx context.Context, in *entities.ProtoSelectionCreate)
 	return selection, nil
 }
 
-// ListSelections returns all selections.
-func (s *Service) ListSelections(ctx context.Context) (entities.ProtoSelections, error) {
-	return s.selectionsStorage.GetAll(ctx)
+// ListSelections returns selections with pagination, mirroring ListSources.
+func (s *Service) ListSelections(
+	ctx context.Context,
+	in *entities.ProtoSelectionsList,
+) (*entities.List[entities.ProtoSelections], error) {
+	return s.selectionsStorage.List(ctx, in)
 }
 
 // LoadAllSelections runs FetchAndCompile on every stored selection; per-
 // selection failures are logged and counted, never abort (partial load is OK).
 func (s *Service) LoadAllSelections(ctx context.Context) (*entities.ProtoLoadResult, error) {
-	selections, err := s.ListSelections(ctx)
+	selections, err := s.selectionsStorage.GetAll(ctx)
 	if err != nil {
 		return nil, err
 	}

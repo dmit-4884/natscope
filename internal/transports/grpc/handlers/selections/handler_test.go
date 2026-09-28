@@ -28,6 +28,7 @@ type mockProtoService struct {
 	protosvc.Registry
 	listResult   entities.ProtoSelections
 	listErr      error
+	listReceived *entities.ProtoSelectionsList
 	selectResult *entities.ProtoSelection
 	selectErr    error
 	deleteErr    error
@@ -36,8 +37,27 @@ type mockProtoService struct {
 	stats        *entities.ProtoStats
 }
 
-func (m *mockProtoService) ListSelections(_ context.Context) (entities.ProtoSelections, error) {
-	return m.listResult, m.listErr
+// ListSelections mimics the storage-layer SourceID filter so handler tests can
+// exercise the request-to-filter translation without a real store.
+func (m *mockProtoService) ListSelections(
+	_ context.Context,
+	in *entities.ProtoSelectionsList,
+) (*entities.List[entities.ProtoSelections], error) {
+	m.listReceived = in
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	items := m.listResult
+	if in != nil && in.SourceID != nil {
+		var filtered entities.ProtoSelections
+		for _, s := range items {
+			if s.SourceID == *in.SourceID {
+				filtered = append(filtered, s)
+			}
+		}
+		items = filtered
+	}
+	return &entities.List[entities.ProtoSelections]{Items: items}, nil
 }
 
 func (m *mockProtoService) Select(_ context.Context, _ *entities.ProtoSelectionCreate) (*entities.ProtoSelection, error) {
@@ -95,6 +115,23 @@ func TestHandler_ListSelections(t *testing.T) {
 
 		_, err := handler.ListSelections(t.Context(), connect.NewRequest(&selectionspb.ListSelectionsRequest{}))
 		assert.Error(t, err)
+	})
+
+	// QA-127: page_size/page_token must reach the service, not be discarded.
+	t.Run("ForwardsPagination", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockProtoService{}
+		handler := New(svc, svc)
+
+		_, err := handler.ListSelections(t.Context(), connect.NewRequest(&selectionspb.ListSelectionsRequest{
+			PageSize:  1,
+			PageToken: "cursor-abc",
+		}))
+		require.NoError(t, err)
+		require.NotNil(t, svc.listReceived)
+		require.NotNil(t, svc.listReceived.Limit)
+		assert.Equal(t, int64(1), *svc.listReceived.Limit)
+		assert.Equal(t, "cursor-abc", svc.listReceived.Cursor)
 	})
 }
 

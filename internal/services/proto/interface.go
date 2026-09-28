@@ -163,8 +163,8 @@ type SelectionManager interface {
 	// Select selects a proto version for a user (creates or updates).
 	Select(ctx context.Context, in *entities.ProtoSelectionCreate) (*entities.ProtoSelection, error)
 
-	// ListSelections returns all selections.
-	ListSelections(ctx context.Context) (entities.ProtoSelections, error)
+	// ListSelections returns selections with pagination.
+	ListSelections(ctx context.Context, in *entities.ProtoSelectionsList) (*entities.List[entities.ProtoSelections], error)
 
 	// LoadAllSelections fetch+compiles every stored selection; per-selection
 	// failures are logged, never abort.

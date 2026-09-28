@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/altessa-s/go-atlas/core/collections/slices"
+	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -52,24 +53,28 @@ func (h *Handler) HTTPHandler(opts ...connect.HandlerOption) (string, http.Handl
 	return selectionsconnect.NewSelectionsServiceHandler(h, opts...)
 }
 
-// ListSelections returns all proto selections, optionally filtered by source.
+// ListSelections returns a paginated page of proto selections, optionally
+// filtered by source.
 func (h *Handler) ListSelections(
 	ctx context.Context,
 	req *connect.Request[selectionspb.ListSelectionsRequest],
 ) (*connect.Response[selectionspb.ListSelectionsResponse], error) {
-	selections, err := h.protoService.ListSelections(ctx)
+	in := req.Msg
+	listReq := &entities.ProtoSelectionsList{}
+	if ps := in.GetPageSize(); ps > 0 {
+		listReq.Limit = ptr.Wrap(int64(ps))
+	}
+	listReq.Cursor = in.GetPageToken()
+	if sourceID := in.GetSourceId(); sourceID != "" {
+		listReq.SourceID = ptr.Wrap(sourceID)
+	}
+
+	list, err := h.protoService.ListSelections(ctx, listReq)
 	if err != nil {
 		return nil, err
 	}
-	if sourceID := req.Msg.GetSourceId(); sourceID != "" {
-		selections = slices.ToWithFilter(
-			selections,
-			func(s *entities.ProtoSelection) bool { return s.SourceID == sourceID },
-			func(s *entities.ProtoSelection) *entities.ProtoSelection { return s },
-		)
-	}
 	return connect.NewResponse(&selectionspb.ListSelectionsResponse{
-		Selections: slices.To(selections, func(s *entities.ProtoSelection) *protopb.ProtoSelection {
+		Selections: slices.To(list.Items, func(s *entities.ProtoSelection) *protopb.ProtoSelection {
 			return converter.Convert(
 				s,
 				&protopb.ProtoSelection{},
@@ -77,6 +82,7 @@ func (h *Handler) ListSelections(
 				grpchelpers.ProtoCodecs,
 			)
 		}),
+		NextPageToken: list.NextCursor,
 	}), nil
 }
 
