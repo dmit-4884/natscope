@@ -16,8 +16,37 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
+
+// unmarshalOpts decodes JSON into a dynamic message. DiscardUnknown is left
+// at its zero value (false) deliberately: it controls both unrecognized JSON
+// field names and unrecognized enum name values, and silently dropping either
+// produces a message that does not match what the caller sent (a typo'd field
+// or enum name should fail the same way a wrong type or an out-of-range
+// integer already does, not vanish without an error).
+var unmarshalOpts = protojson.UnmarshalOptions{}
+
+// marshalOpts marshals deterministically. proto.Marshal's default field order
+// for a dynamicpb message is unspecified across calls, so the same JSON input
+// can produce different bytes on every encode — breaking byte-for-byte
+// comparisons (dedup, CAS, tests, diffing against a producer).
+var marshalOpts = proto.MarshalOptions{Deterministic: true}
+
+// decodeDynamic parses JSON into a fresh dynamic message for md.
+func decodeDynamic(md protoreflect.MessageDescriptor, data []byte) (*dynamicpb.Message, error) {
+	msg := dynamicpb.NewMessage(md)
+	if err := unmarshalOpts.Unmarshal(data, msg); err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+
+// encodeDynamic marshals msg to deterministic protobuf bytes.
+func encodeDynamic(msg *dynamicpb.Message) ([]byte, error) {
+	return marshalOpts.Marshal(msg)
+}
 
 // Encode converts JSON data to protobuf binary format using the resolved
 // snapshot.
@@ -38,17 +67,15 @@ func (s *Service) Encode(ctx context.Context, req entities.CodecRequest) (*entit
 		}, nil
 	}
 
-	msg := dynamicpb.NewMessage(md)
-	if unmarshalErr := (protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}).Unmarshal(req.JSON, msg); unmarshalErr != nil {
+	msg, unmarshalErr := decodeDynamic(md, req.JSON)
+	if unmarshalErr != nil {
 		return &entities.EncodeResult{
 			Success: false,
 			Error:   fmt.Sprintf("Cannot convert JSON to '%s': %v", req.MessageType, unmarshalErr),
 		}, nil
 	}
 
-	data, err := proto.Marshal(msg)
+	data, err := encodeDynamic(msg)
 	if err != nil {
 		return &entities.EncodeResult{
 			Success: false,
@@ -75,11 +102,11 @@ func (s *Service) EncodeRaw(ctx context.Context, req entities.CodecRequest) ([]b
 		return nil, errs.ErrProtoMessageNotFound
 	}
 
-	msg := dynamicpb.NewMessage(md)
-	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(req.JSON, msg); err != nil {
+	msg, err := decodeDynamic(md, req.JSON)
+	if err != nil {
 		return nil, errors.Wrapf(err, "cannot convert JSON to '%s'", req.MessageType)
 	}
-	return proto.Marshal(msg)
+	return encodeDynamic(msg)
 }
 
 // Validate validates protobuf data against buf.validate rules within the
