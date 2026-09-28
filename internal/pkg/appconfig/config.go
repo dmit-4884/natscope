@@ -36,11 +36,8 @@ type Config struct {
 	// otherwise). Off by default. Env ALLOW_INSECURE.
 	AllowInsecure bool `yaml:"allowInsecure"`
 
-	// AllowedHosts is a comma-separated allowlist of extra Host header values
-	// accepted on a non-loopback bind, on top of GRPCWebAddress itself (DNS
-	// rebinding protection). Ignored on a loopback bind, where only
-	// 127.0.0.1/[::1]/localhost at the bound port are ever accepted. Env
-	// ALLOWED_HOSTS.
+	// AllowedHosts is a comma-separated list of Host names accepted besides
+	// localhost and IP literals (DNS rebinding protection). Env ALLOWED_HOSTS.
 	AllowedHosts string `yaml:"allowedHosts"`
 
 	// WebAuth protects the whole listener (UI + API) with HTTP basic auth.

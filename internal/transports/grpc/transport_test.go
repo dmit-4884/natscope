@@ -5,53 +5,38 @@ package grpc
 
 import "testing"
 
-func TestBuildAllowedHosts(t *testing.T) {
+func TestHostAllowed(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
-		name       string
-		address    string
-		loopback   bool
-		extraHosts []string
-		wantHosts  []string
+		name         string
+		loopback     bool
+		authUser     string
+		allowedHosts []string
+		host         string
+		want         bool
 	}{
-		{
-			name:      "loopback ignores extra hosts",
-			address:   "127.0.0.1:4280",
-			loopback:  true,
-			wantHosts: []string{"127.0.0.1:4280", "[::1]:4280", "localhost:4280"},
-		},
-		{
-			name:      "wide bind accepts the bound address itself",
-			address:   "0.0.0.0:4280",
-			loopback:  false,
-			wantHosts: []string{"0.0.0.0:4280"},
-		},
-		{
-			name:       "wide bind adds configured extra hosts with the bound port",
-			address:    "0.0.0.0:4280",
-			loopback:   false,
-			extraHosts: []string{"example.com", "other.example:9999"},
-			wantHosts:  []string{"0.0.0.0:4280", "example.com:4280", "other.example:9999"},
-		},
+		{name: "localhost on bound port", loopback: true, host: "localhost:4280", want: true},
+		{name: "localhost via tunnel port", loopback: true, host: "localhost:9000", want: true},
+		{name: "ipv4 literal", loopback: true, host: "127.0.0.1:4280", want: true},
+		{name: "ipv6 literal", loopback: true, host: "[::1]:4280", want: true},
+		{name: "rebinding name on loopback", loopback: true, host: "evil.example:4280", want: false},
+		{name: "unlisted name on loopback", loopback: true, allowedHosts: []string{"other.example"}, host: "evil.example:4280", want: false},
+		{name: "configured name on loopback", loopback: true, allowedHosts: []string{"natscope.local"}, host: "natscope.local:4280", want: true},
+		{name: "wide insecure bind rejects names", host: "evil.example:4280", want: false},
+		{name: "wide insecure bind accepts published localhost", host: "localhost:8080", want: true},
+		{name: "wide bind accepts configured name", allowedHosts: []string{"Natscope.Example.com:443"}, host: "natscope.example.com", want: true},
+		{name: "wide auth bind accepts any name", authUser: "admin", host: "natscope.example.com", want: true},
+		{name: "wide auth bind honors explicit allowlist", authUser: "admin", allowedHosts: []string{"natscope.example.com"}, host: "evil.example", want: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := buildAllowedHosts(tc.address, tc.loopback, tc.extraHosts)
-			if len(got) != len(tc.wantHosts) {
-				t.Fatalf("buildAllowedHosts() = %v, want %v", got, tc.wantHosts)
-			}
-			for _, want := range tc.wantHosts {
-				if _, ok := got[want]; !ok {
-					t.Errorf("buildAllowedHosts() missing %q; got %v", want, got)
-				}
+			t.Parallel()
+
+			tr := &Transport{loopback: tc.loopback, authUser: tc.authUser, allowedHosts: hostNameSet(tc.allowedHosts)}
+			if got := tr.hostAllowed(tc.host); got != tc.want {
+				t.Errorf("hostAllowed(%q) = %v, want %v", tc.host, got, tc.want)
 			}
 		})
-	}
-}
-
-func TestBuildAllowedHosts_LoopbackWithoutPortRejectsEverything(t *testing.T) {
-	// No port to pin the allowlist to; fail closed rather than accept any Host.
-	got := buildAllowedHosts("127.0.0.1", true, nil)
-	if len(got) != 0 {
-		t.Errorf("buildAllowedHosts() = %v, want empty", got)
 	}
 }

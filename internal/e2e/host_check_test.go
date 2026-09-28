@@ -11,13 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestHostHeaderAllowlist covers QA-003: the transport used to accept any
-// Host header on a loopback bind, so a page whose hostname resolves to
-// 127.0.0.1 via DNS rebinding could send same-origin requests (matching
-// Sec-Fetch-Site/Origin, so http.CrossOriginProtection alone lets them
-// through) that the real client would never send. A request whose Host
-// doesn't match 127.0.0.1/[::1]/localhost at the bound port must be rejected
-// before it reaches any handler.
+// TestHostHeaderAllowlist sends a DNS-rebinding style request: a foreign
+// Host name with a same-origin fetch context must be rejected before any
+// handler runs.
 func TestHostHeaderAllowlist(t *testing.T) {
 	env := setupE2E(t)
 
@@ -38,8 +34,8 @@ func TestHostHeaderAllowlist(t *testing.T) {
 		"a request with an untrusted Host header must be rejected before reaching any handler")
 }
 
-// TestHostHeaderAllowlist_AcceptsRealHost is the control: a request whose
-// Host matches the bound address must still work normally.
+// TestHostHeaderAllowlist_AcceptsRealHost is the control: the bound IP
+// address as Host still works.
 func TestHostHeaderAllowlist_AcceptsRealHost(t *testing.T) {
 	env := setupE2E(t)
 

@@ -222,9 +222,9 @@ WEB_AUTH__USERNAME=admin WEB_AUTH__PASSWORD=change-me natscope
 loopback. Without it Natscope refuses to start on a non-loopback bind; `ALLOW_INSECURE=true` overrides
 that and accepts the risk (with a prominent warning in the log).
 
-Every request's `Host` header is also checked against an allowlist (defense against DNS rebinding): on
-loopback, only `127.0.0.1`/`[::1]`/`localhost` at the bound port; on a wide bind, `grpcWebAddress` itself
-plus anything listed in `allowedHosts` (env `ALLOWED_HOSTS`, comma-separated).
+Every request's `Host` header is checked as a defense against DNS rebinding: `localhost` and IP literals are
+always accepted; any other name (e.g. a reverse proxy's public host) must be listed in `allowedHosts` (env
+`ALLOWED_HOSTS`, comma-separated) — unless `webAuth` is set on a wide bind and the list is empty.
 
 The listener itself has **no TLS** — it speaks cleartext h2c, so credentials and API responses travel
 unencrypted. Any remote exposure must sit behind a TLS-terminating reverse proxy (nginx, caddy, traefik).

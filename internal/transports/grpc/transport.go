@@ -43,6 +43,7 @@ type Transport struct {
 	connectOpt   []connect.HandlerOption
 	authUser     string
 	authPass     string
+	loopback     bool
 	allowedHosts map[string]struct{}
 	baseCtx      context.Context //nolint:containedctx // canceled from GracefulStop to unblock in-flight streaming handlers; see Listen.
 	cancelBase   context.CancelFunc
@@ -65,16 +66,15 @@ var devTrustedOrigins = []string{
 }
 
 // New creates a Connect transport; frontendFS may be nil when built without an
-// embedded UI. loopback selects the Host-header allowlist: on a loopback bind
-// only 127.0.0.1/[::1]/localhost at the bound port are accepted, regardless
-// of extraHosts; on a non-loopback bind, address itself plus extraHosts are
-// accepted.
+// embedded UI. Requests are accepted only for Host names that are localhost,
+// an IP literal, or listed in allowedHosts; with basic auth on a non-loopback
+// bind and no allowedHosts, any Host is accepted.
 func New(
 	address string,
 	frontendFS fs.FS,
 	logger *slog.Logger,
 	loopback bool,
-	extraHosts []string,
+	allowedHosts []string,
 	connectOpts ...connect.HandlerOption,
 ) (*Transport, error) {
 	csrf := http.NewCrossOriginProtection()
@@ -96,54 +96,49 @@ func New(
 		frontendFS:   frontendFS,
 		csrf:         csrf,
 		connectOpt:   connectOpts,
-		allowedHosts: buildAllowedHosts(address, loopback, extraHosts),
+		loopback:     loopback,
+		allowedHosts: hostNameSet(allowedHosts),
 	}
 	return t, nil
 }
 
-// loopbackHostNames are the Host header names accepted on a loopback bind,
-// in addition to the bound port.
-var loopbackHostNames = []string{"127.0.0.1", "[::1]", "localhost"}
-
-// buildAllowedHosts computes the Host header allowlist for a bind. This is
-// the DNS-rebinding defense: without it, a page whose hostname resolves to
-// 127.0.0.1 can send same-origin requests (same Sec-Fetch-Site, matching
-// Origin/Host) that http.CrossOriginProtection alone does not reject.
-func buildAllowedHosts(address string, loopback bool, extraHosts []string) map[string]struct{} {
-	allowed := make(map[string]struct{})
-	_, port, err := net.SplitHostPort(address)
-
-	if loopback {
-		if err != nil {
-			return allowed // no port to pin the allowlist to; reject everything (fail-closed).
+// hostNameSet normalizes configured hosts to lowercase names without ports.
+func hostNameSet(hosts []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(hosts))
+	for _, h := range hosts {
+		if name := hostName(h); name != "" {
+			set[name] = struct{}{}
 		}
-		for _, host := range loopbackHostNames {
-			allowed[strings.ToLower(host+":"+port)] = struct{}{}
-		}
-		return allowed
 	}
-
-	allowed[strings.ToLower(address)] = struct{}{}
-	for _, host := range extraHosts {
-		host = strings.ToLower(strings.TrimSpace(host))
-		if host == "" {
-			continue
-		}
-		if !strings.Contains(host, ":") && err == nil {
-			host += ":" + port
-		}
-		allowed[host] = struct{}{}
-	}
-	return allowed
+	return set
 }
 
-// checkHost rejects a request whose Host header is not in the allowlist,
-// before it reaches CSRF protection or basic auth — a same-origin request
-// crafted via DNS rebinding presents a Host/Origin that CSRF checks alone
-// accept.
+// hostName strips the port and IPv6 brackets from a Host value and lowercases it.
+func hostName(host string) string {
+	host = strings.TrimSpace(host)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return strings.ToLower(strings.TrimSuffix(strings.TrimPrefix(host, "["), "]"))
+}
+
+// hostAllowed guards against DNS rebinding, which always arrives with an
+// attacker-controlled DNS name in Host.
+func (t *Transport) hostAllowed(host string) bool {
+	name := hostName(host)
+	if name == "localhost" || net.ParseIP(name) != nil {
+		return true
+	}
+	if _, ok := t.allowedHosts[name]; ok {
+		return true
+	}
+	return !t.loopback && t.authUser != "" && len(t.allowedHosts) == 0
+}
+
+// checkHost rejects requests whose Host fails hostAllowed before CSRF or auth run.
 func (t *Transport) checkHost(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := t.allowedHosts[strings.ToLower(r.Host)]; !ok {
+		if !t.hostAllowed(r.Host) {
 			t.logger.Warn("rejected request with untrusted Host header",
 				slog.String("host", r.Host),
 				slog.String("remote", r.RemoteAddr),
