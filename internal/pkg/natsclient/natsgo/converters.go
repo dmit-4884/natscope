@@ -31,9 +31,15 @@ var srcDestToJetStream = converter.WithFieldMappings(map[string]string{
 })
 
 // streamConvertOpts maps jetstream.StreamInfo → entities.StreamInfo. TimeStamp set
-// explicitly by toStreamInfo.
+// explicitly by toStreamInfo. The srcDestToEntity Source/Destination→Src/Dest
+// mapping is intentionally NOT included here: it only applies to RePublish
+// (whose entity has Src/Dest), and the converter applies field mappings
+// globally across the whole nested conversion — including
+// SubjectTransformConfig, whose entity already uses Source/Destination
+// directly. Applying the mapping there redirects those fields to a
+// nonexistent "Src"/"Dest" pair and silently drops them (QA-012). RePublish is
+// converted separately below, with the mapping scoped to just that call.
 var streamConvertOpts = []converter.Option{
-	srcDestToEntity,
 	converter.WithIgnoreFields("TimeStamp"),
 }
 
@@ -43,9 +49,13 @@ var consumerConvertOpts = []converter.Option{
 	converter.WithIgnoreFields("OptStartTime", "Created", "TimeStamp"),
 }
 
-// toStreamInfo also sets Raw (JSON) and TimeStamp (fetch time).
+// toStreamInfo also sets Raw (JSON), TimeStamp (fetch time), and Republish
+// (converted separately from the rest of the config — see streamConvertOpts).
 func toStreamInfo(info *jetstream.StreamInfo) *entities.StreamInfo {
 	result := converter.Convert(info, &entities.StreamInfo{}, streamConvertOpts...)
+	if info.Config.RePublish != nil {
+		result.Config.Republish = converter.Convert(info.Config.RePublish, &entities.StreamRePublish{}, srcDestToEntity)
+	}
 	rawJSON, _ := json.Marshal(info) //nolint:errcheck // jetstream.StreamInfo marshals deterministically
 	result.Raw = string(rawJSON)
 	result.TimeStamp = new(time.Now().UTC())
@@ -83,15 +93,20 @@ func toConsumerInfo(info *jetstream.ConsumerInfo, streamName string) *entities.C
 	result.Stream = streamName
 	result.Created = new(info.Created)
 	result.TimeStamp = new(info.TimeStamp)
+	if info.Config.OptStartTime != nil && result.Config != nil {
+		result.Config.OptStartTime = info.Config.OptStartTime.Format(time.RFC3339)
+	}
 	return result
 }
 
 // rawMessageOpts maps jetstream.RawStreamMsg → entities.Message. IgnoreZeroValues
 // preserves nil-header→nil-map; DataSize/ContentType/DataRawHex set explicitly.
+// StringSliceJoin (not StringSliceFirst) keeps every value of a repeated
+// header instead of silently dropping all but the first (QA-057).
 var rawMessageOpts = []converter.Option{
 	converter.WithCodecs(
 		convcodecs.BytesBase64,
-		convcodecs.StringSliceFirst,
+		convcodecs.StringSliceJoin,
 	),
 	converter.WithFieldMappings(map[string]string{
 		"Time":   "Timestamp",

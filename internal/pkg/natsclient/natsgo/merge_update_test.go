@@ -10,6 +10,7 @@ import (
 
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
@@ -455,17 +456,19 @@ func TestApplyStreamUpdate(t *testing.T) {
 		})
 	})
 
-	t.Run("sources append", func(t *testing.T) {
-		t.Run("add sources", func(t *testing.T) {
+	t.Run("sources replace", func(t *testing.T) {
+		t.Run("sent sources replace the current list", func(t *testing.T) {
+			// QA-013: re-sending the current sources used to append them again
+			// ("duplicate source configuration detected"), making it impossible
+			// to ever change a stream's sources through Update.
 			current := jetstream.StreamConfig{
 				Sources: []*jetstream.StreamSource{{Name: "src1"}},
 			}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
 				Sources: []*entities.StreamSource{{Name: "src2"}},
 			})
-			assert.Len(t, result.Sources, 2)
-			assert.Equal(t, "src1", result.Sources[0].Name)
-			assert.Equal(t, "src2", result.Sources[1].Name)
+			assert.Len(t, result.Sources, 1)
+			assert.Equal(t, "src2", result.Sources[0].Name)
 		})
 
 		t.Run("empty sources preserved", func(t *testing.T) {
@@ -774,33 +777,30 @@ func TestApplyStreamUpdate(t *testing.T) {
 		assertStreamUnchangedExcept(t, base, r2, map[string]bool{"Description": true})
 	})
 
-	// Sources append-only semantics
+	// Sources replace semantics (QA-013)
 
-	t.Run("sources append-only semantics", func(t *testing.T) {
-		t.Run("appends to existing sources", func(t *testing.T) {
+	t.Run("sources replace semantics", func(t *testing.T) {
+		t.Run("sent sources replace the existing list, not append", func(t *testing.T) {
 			current := jetstream.StreamConfig{
 				Sources: []*jetstream.StreamSource{{Name: "existing1"}, {Name: "existing2"}},
 			}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
 				Sources: []*entities.StreamSource{{Name: "new1"}, {Name: "new2"}},
 			})
-			assert.Len(t, result.Sources, 4)
-			assert.Equal(t, "existing1", result.Sources[0].Name)
-			assert.Equal(t, "existing2", result.Sources[1].Name)
-			assert.Equal(t, "new1", result.Sources[2].Name)
-			assert.Equal(t, "new2", result.Sources[3].Name)
+			assert.Len(t, result.Sources, 2)
+			assert.Equal(t, "new1", result.Sources[0].Name)
+			assert.Equal(t, "new2", result.Sources[1].Name)
 		})
 
-		t.Run("duplicate source name still appends", func(t *testing.T) {
+		t.Run("re-sending the current sources is a no-op, not a duplicate", func(t *testing.T) {
 			current := jetstream.StreamConfig{
 				Sources: []*jetstream.StreamSource{{Name: "src1"}},
 			}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
 				Sources: []*entities.StreamSource{{Name: "src1"}},
 			})
-			assert.Len(t, result.Sources, 2)
+			assert.Len(t, result.Sources, 1)
 			assert.Equal(t, "src1", result.Sources[0].Name)
-			assert.Equal(t, "src1", result.Sources[1].Name)
 		})
 
 		t.Run("sources with FilterSubject and SubjectTransforms preserved", func(t *testing.T) {
@@ -818,12 +818,51 @@ func TestApplyStreamUpdate(t *testing.T) {
 					},
 				},
 			})
-			assert.Len(t, result.Sources, 2)
-			assert.Equal(t, "src2", result.Sources[1].Name)
-			assert.Equal(t, "orders.>", result.Sources[1].FilterSubject)
-			assert.Len(t, result.Sources[1].SubjectTransforms, 1)
-			assert.Equal(t, "orders.>", result.Sources[1].SubjectTransforms[0].Source)
-			assert.Equal(t, "archive.orders.>", result.Sources[1].SubjectTransforms[0].Destination)
+			assert.Len(t, result.Sources, 1)
+			assert.Equal(t, "src2", result.Sources[0].Name)
+			assert.Equal(t, "orders.>", result.Sources[0].FilterSubject)
+			assert.Len(t, result.Sources[0].SubjectTransforms, 1)
+			assert.Equal(t, "orders.>", result.Sources[0].SubjectTransforms[0].Source)
+			assert.Equal(t, "archive.orders.>", result.Sources[0].SubjectTransforms[0].Destination)
+		})
+	})
+
+	// Republish clear semantics (QA-001)
+
+	t.Run("republish clear semantics", func(t *testing.T) {
+		t.Run("empty republish clears it instead of routing >-to->", func(t *testing.T) {
+			// The proto doc says "send an empty message to clear"; naively
+			// converting an empty entity produces &RePublish{Source: "",
+			// Destination: ""}, which NATS normalizes into a passthrough route
+			// that republishes every message to its own subject — filling the
+			// stream with copies of itself.
+			current := jetstream.StreamConfig{
+				RePublish: &jetstream.RePublish{Source: ">", Destination: "mirror.>"},
+			}
+			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
+				Republish: &entities.StreamRePublish{},
+			})
+			assert.Nil(t, result.RePublish)
+		})
+
+		t.Run("non-empty republish still applies", func(t *testing.T) {
+			current := jetstream.StreamConfig{}
+			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
+				Republish: &entities.StreamRePublish{Src: "orders.>", Dest: "audit.orders.>", HeadersOnly: true},
+			})
+			require.NotNil(t, result.RePublish)
+			assert.Equal(t, "orders.>", result.RePublish.Source)
+			assert.Equal(t, "audit.orders.>", result.RePublish.Destination)
+			assert.True(t, result.RePublish.HeadersOnly)
+		})
+
+		t.Run("omitted republish (nil) leaves the current value untouched", func(t *testing.T) {
+			current := jetstream.StreamConfig{
+				RePublish: &jetstream.RePublish{Source: "a.>", Destination: "b.>"},
+			}
+			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{})
+			require.NotNil(t, result.RePublish)
+			assert.Equal(t, "a.>", result.RePublish.Source)
 		})
 	})
 

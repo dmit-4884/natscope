@@ -4,11 +4,13 @@
 package management
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 
 	grpchelpers "github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
 	grpc_nats_management "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
@@ -29,9 +31,12 @@ var replicasMappingToEntity = converter.WithFieldMappings(map[string]string{"Num
 
 // protoStreamSourceToEntity converts proto StreamSourceConfig;
 // OptStartTime/SubjectTransforms/External handled manually (converter gaps).
-func protoStreamSourceToEntity(src *grpc_nats_management.StreamSourceConfig) *entities.StreamSource {
+// A malformed OptStartTime returns an error instead of being silently dropped
+// — the source would otherwise replicate its entire history instead of the
+// requested cutoff (QA-049).
+func protoStreamSourceToEntity(src *grpc_nats_management.StreamSourceConfig) (*entities.StreamSource, error) {
 	if src == nil {
-		return nil
+		return nil, nil //nolint:nilnil // nil input means "not configured", not an error
 	}
 
 	result := converter.Convert(src, &entities.StreamSource{},
@@ -39,9 +44,14 @@ func protoStreamSourceToEntity(src *grpc_nats_management.StreamSourceConfig) *en
 	)
 
 	if src.OptStartTime != nil {
-		if t, err := time.Parse(time.RFC3339, src.GetOptStartTime()); err == nil {
-			result.OptStartTime = &t
+		t, err := time.Parse(time.RFC3339, src.GetOptStartTime())
+		if err != nil {
+			return nil, &errs.NATSValidationError{
+				Description: fmt.Sprintf("invalid opt_start_time %q: must be RFC3339", src.GetOptStartTime()),
+				Cause:       err,
+			}
 		}
+		result.OptStartTime = &t
 	}
 
 	for _, st := range src.GetSubjectTransforms() {
@@ -52,7 +62,25 @@ func protoStreamSourceToEntity(src *grpc_nats_management.StreamSourceConfig) *en
 		result.External = converter.Convert(src.GetExternal(), &entities.ExternalStream{})
 	}
 
-	return result
+	return result, nil
+}
+
+// protoStreamSourcesToEntity converts a repeated StreamSourceConfig, stopping
+// at the first conversion error (see protoStreamSourceToEntity).
+func protoStreamSourcesToEntity(sources []*grpc_nats_management.StreamSourceConfig) ([]*entities.StreamSource, error) {
+	if len(sources) == 0 {
+		return nil, nil
+	}
+
+	result := make([]*entities.StreamSource, 0, len(sources))
+	for _, src := range sources {
+		converted, err := protoStreamSourceToEntity(src)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, converted)
+	}
+	return result, nil
 }
 
 // streamSourceRefToEntity converts proto StreamSourceRef (KV mirror/sources);

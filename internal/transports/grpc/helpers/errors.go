@@ -67,6 +67,7 @@ var commonDomainErrors = []struct {
 	{errs.ErrObjectAlreadyExists, errorMapping{codes.AlreadyExists, "object already exists", "NATS_OBJECT_EXISTS"}},
 	{errs.ErrMsgNotFound, errorMapping{codes.NotFound, "message not found", "NATS_MSG_NOT_FOUND"}},
 	{errs.ErrMsgDeleteDenied, errorMapping{codes.FailedPrecondition, "message deletion disabled on stream", "NATS_MSG_DELETE_DENIED"}},
+	{errs.ErrStreamPurgeDenied, errorMapping{codes.FailedPrecondition, "stream purge disabled on stream", "NATS_STREAM_PURGE_DENIED"}},
 	{errs.ErrWorkQueueConsumerNotAllowed, errorMapping{
 		codes.FailedPrecondition,
 		"cannot create read consumer on WorkQueue stream",

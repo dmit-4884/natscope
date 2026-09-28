@@ -47,6 +47,9 @@ var (
 	// ErrMsgDeleteDenied single-message delete on a deny_delete stream; never
 	// succeeds, maps to FailedPrecondition.
 	ErrMsgDeleteDenied = errors.New("nats: message deletion is disabled on this stream (deny_delete)")
+	// ErrStreamPurgeDenied a stream purge on a deny_purge/sealed stream; never
+	// succeeds, maps to FailedPrecondition.
+	ErrStreamPurgeDenied = errors.New("nats: stream purge is disabled on this stream (deny_purge)")
 )
 
 // ErrWorkQueueConsumerNotAllowed ephemeral AckNone consumers auto-ack on

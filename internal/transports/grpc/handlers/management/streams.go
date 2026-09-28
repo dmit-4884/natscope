@@ -8,7 +8,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/altessa-s/go-atlas/core/collections/slices"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -32,9 +31,17 @@ func (h *Handler) CreateStream(
 		cr.Placement = converter.Convert(in.GetPlacement(), &entities.Placement{})
 	}
 	if in.GetMirror() != nil {
-		cr.Mirror = protoStreamSourceToEntity(in.GetMirror())
+		mirror, err := protoStreamSourceToEntity(in.GetMirror())
+		if err != nil {
+			return nil, err
+		}
+		cr.Mirror = mirror
 	}
-	cr.Sources = slices.To(in.GetSources(), protoStreamSourceToEntity)
+	sources, err := protoStreamSourcesToEntity(in.GetSources())
+	if err != nil {
+		return nil, err
+	}
+	cr.Sources = sources
 	if in.GetSubjectTransform() != nil {
 		cr.SubjectTransform = converter.Convert(in.GetSubjectTransform(), &entities.SubjectTransformConfig{})
 	}
@@ -42,7 +49,10 @@ func (h *Handler) CreateStream(
 		cr.Republish = converter.Convert(in.GetRepublish(), &entities.StreamRePublish{})
 	}
 	if in.GetConsumerLimits() != nil {
-		cr.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{})
+		// protoCodecs is required here: ConsumerLimits.InactiveThreshold is a
+		// Duration, and without it the converter silently drops the field
+		// instead of converting it (QA-011).
+		cr.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{}, protoCodecs)
 	}
 
 	stream, err := h.natsService.CreateStream(ctx, in.GetConnectionId(), *cr)
@@ -74,9 +84,15 @@ func (h *Handler) UpdateStream(
 		ur.SubjectTransform = converter.Convert(in.GetSubjectTransform(), &entities.SubjectTransformConfig{})
 	}
 	if in.GetConsumerLimits() != nil {
-		ur.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{})
+		// See CreateStream: protoCodecs is required for the Duration field
+		// (QA-011).
+		ur.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{}, protoCodecs)
 	}
-	ur.Sources = slices.To(in.GetSources(), protoStreamSourceToEntity)
+	sources, err := protoStreamSourcesToEntity(in.GetSources())
+	if err != nil {
+		return nil, err
+	}
+	ur.Sources = sources
 
 	stream, err := h.natsService.UpdateStream(ctx, in.GetConnectionId(), in.GetStreamName(), *ur)
 	if err != nil {
