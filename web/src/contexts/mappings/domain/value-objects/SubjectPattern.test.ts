@@ -51,7 +51,7 @@ describe('SubjectPattern', () => {
       expect(result.error).toBe('TRAILING_DOT')
     })
 
-    // QA-101: "a.>.b" passes the character/dot checks above but is still an
+    // "a.>.b" passes the character/dot checks above but is still an
     // invalid NATS pattern — ">" only matches when it is the last token.
     it('rejects ">" that is not the last token', () => {
       const result = SubjectPattern.create('a.>.b')

@@ -21,7 +21,7 @@ function renderPage() {
   )
 }
 
-// QA-165: the form must validate the path/URL before saving instead of
+// the form must validate the path/URL before saving instead of
 // persisting a source that can never compile.
 describe('ProtoSourceEditPage — validate before save', () => {
   beforeEach(() => {

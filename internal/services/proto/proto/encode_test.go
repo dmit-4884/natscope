@@ -48,7 +48,7 @@ message Order {
 	return md
 }
 
-// TestDecodeDynamic_UnknownEnumName_Errors is the QA-074 regression: an
+// TestDecodeDynamic_UnknownEnumName_Errors is a regression test: an
 // unrecognized enum name string must not be silently discarded.
 func TestDecodeDynamic_UnknownEnumName_Errors(t *testing.T) {
 	t.Parallel()
@@ -59,7 +59,7 @@ func TestDecodeDynamic_UnknownEnumName_Errors(t *testing.T) {
 }
 
 // TestDecodeDynamic_UnknownField_Errors covers the PUB-4 part merged into
-// QA-074: a typo'd JSON field name must not be silently discarded either.
+// a typo'd JSON field name must not be silently discarded either.
 func TestDecodeDynamic_UnknownField_Errors(t *testing.T) {
 	t.Parallel()
 	md := compileOrderDescriptor(t)
@@ -95,7 +95,7 @@ func TestDecodeDynamic_KnownFieldsAndEnum_StillEncodes(t *testing.T) {
 	assert.NotEmpty(t, data)
 }
 
-// TestEncodeDynamic_Deterministic is the QA-129 regression: encoding the same
+// TestEncodeDynamic_Deterministic is a regression test: encoding the same
 // JSON repeatedly must always produce identical bytes.
 func TestEncodeDynamic_Deterministic(t *testing.T) {
 	t.Parallel()

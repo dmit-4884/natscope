@@ -16,7 +16,7 @@ import (
 	livepb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/live"
 )
 
-// TestGracefulShutdown_ClosesOpenLiveStream covers QA-032: GracefulStop used
+// TestGracefulShutdown_ClosesOpenLiveStream covers the fix: GracefulStop used
 // to only call http.Server.Shutdown, which waits for in-flight requests to
 // finish on their own — a Live Subscribe stream never finishes on its own,
 // so shutdown hung until the fx stop timeout and the process exited non-zero.

@@ -27,7 +27,7 @@ func isHeaderNameByte(b byte) bool {
 
 // ValidateHeaderName reports whether name is a valid RFC 7230 token. NATS
 // serializes headers as HTTP-style headers; a name outside this set is
-// silently dropped on encode (QA-079/QA-162) instead of reaching the peer.
+// silently dropped on encode instead of reaching the peer.
 func ValidateHeaderName(name string) bool {
 	if name == "" {
 		return false

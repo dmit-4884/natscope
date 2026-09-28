@@ -225,7 +225,7 @@ func TestConnections_UpdatePreservesOmittedSecret(t *testing.T) {
 	}
 }
 
-// TestConnections_UpdateAuthReplacePrunesStaleSecret is the QA-006 regression:
+// TestConnections_UpdateAuthReplacePrunesStaleSecret is a regression test:
 // switching auth method (authReplaced=true) must purge the previous method's
 // vault secret, not merge it forward under the new method.
 func TestConnections_UpdateAuthReplacePrunesStaleSecret(t *testing.T) {
@@ -268,7 +268,7 @@ func TestConnections_UpdateAuthReplacePrunesStaleSecret(t *testing.T) {
 	}
 }
 
-// TestConnections_UpdateAuthReplaceToNoneClearsVault is the QA-006 repro for
+// TestConnections_UpdateAuthReplaceToNoneClearsVault reproduces the bug for
 // clearing auth entirely: switching to AUTH_METHOD_UNSPECIFIED (which
 // ApplyUpdate collapses to a nil Auth) must remove every auth.* vault key.
 func TestConnections_UpdateAuthReplaceToNoneClearsVault(t *testing.T) {
@@ -296,7 +296,7 @@ func TestConnections_UpdateAuthReplaceToNoneClearsVault(t *testing.T) {
 }
 
 // TestConnections_UpdateTLSReplacePrunesStaleClientKey is the TLS half of
-// QA-006: replacing tls (even with an empty block) must purge the previous
+// replacing tls (even with an empty block) must purge the previous
 // client key rather than leaving it behind in the vault.
 func TestConnections_UpdateTLSReplacePrunesStaleClientKey(t *testing.T) {
 	s, vault, _ := newStorage(t)
@@ -349,8 +349,8 @@ func TestConnections_SoftDelete(t *testing.T) {
 	}
 }
 
-// TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites is the QA-008
-// regression: three goroutines each update one field of the same connection,
+// TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites is a
+// regression test: three goroutines each update one field of the same connection,
 // round after round. Since Update now does its read-modify-write inside one
 // bbolt transaction, every round must leave all three fields at that round's
 // value — none may be clobbered by a stale concurrent read.

@@ -19,7 +19,7 @@ import (
 
 // TestDurationSaturating_Overflow verifies that a Duration far outside
 // time.Duration's representable range saturates instead of silently wrapping
-// modulo 2^64 (QA-010): "18446744074s" (~584 years) used to convert to
+// modulo 2^64: "18446744074s" (~584 years) used to convert to
 // 0.29s with go-atlas's plain durpb codec, instantly expiring anything using
 // it as a retention/ack-wait/etc. window.
 func TestDurationSaturating_Overflow(t *testing.T) {
@@ -42,7 +42,7 @@ func TestDurationSaturating_Overflow(t *testing.T) {
 // TestDurationSaturating_PointerPreservesExplicitZero verifies that a present
 // (but zero) Duration converts to a non-nil zero *time.Duration instead of
 // being treated the same as an absent field, so an Update* request field can
-// actually reset a value to zero (QA-053, a side effect of the same fix).
+// actually reset a value to zero.
 func TestDurationSaturating_PointerPreservesExplicitZero(t *testing.T) {
 	type dst struct {
 		MaxAge *time.Duration

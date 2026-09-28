@@ -75,7 +75,7 @@ func TestDetectContentType(t *testing.T) {
 	}
 }
 
-// TestDetectContentType_LargeJSON (QA-082) is the exact repro: a valid JSON
+// TestDetectContentType_LargeJSON is the exact repro: a valid JSON
 // document longer than detectScanLimit must still classify as JSON, not text
 // — json.Valid on a truncated prefix is always false.
 func TestDetectContentType_LargeJSON(t *testing.T) {

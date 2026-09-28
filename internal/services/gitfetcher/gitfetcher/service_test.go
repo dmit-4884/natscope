@@ -240,7 +240,7 @@ func TestValidateRepository_NonExistent(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestValidateRepository_DoesNotLeakResponseBody is the QA-027 regression: a
+// TestValidateRepository_DoesNotLeakResponseBody is a regression test: a
 // non-git HTTP server's response body (e.g. an internal service's banner)
 // must never appear in the error returned to the (unauthenticated) caller.
 func TestValidateRepository_DoesNotLeakResponseBody(t *testing.T) {
@@ -296,7 +296,7 @@ func TestFetchVersion_UnknownTag(t *testing.T) {
 
 	_, err := svc.FetchVersion(t.Context(), repoURL, "v2.0.0")
 	require.Error(t, err)
-	// QA-075: an unknown tag must classify as not-found, not internal.
+	// an unknown tag must classify as not-found, not internal.
 	assert.ErrorIs(t, err, errs.ErrProtoVersionNotFound)
 }
 

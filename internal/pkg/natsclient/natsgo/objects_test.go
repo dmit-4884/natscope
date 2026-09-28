@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestObjectStreamSubjectsValid covers QA-066: ObjectStore(), unlike
+// TestObjectStreamSubjectsValid covers the fix: ObjectStore(), unlike
 // KeyValue(), does no sanity check that a stream is actually shaped like an
 // Object Store, so DeleteObjectBucket/SealObjectBucket relies on this check
 // instead of trusting the stream name alone.
@@ -70,7 +70,7 @@ func TestObjectStreamSubjectsValid(t *testing.T) {
 	}
 }
 
-// TestToObjectInfo_MapsLink covers QA-072: link metadata
+// TestToObjectInfo_MapsLink covers the fix: link metadata
 // (jetstream.ObjectInfo.Opts.Link) sits under a nested Opts pointer the
 // generic converter can't reach by field name, so it needs its own mapping.
 func TestToObjectInfo_MapsLink(t *testing.T) {

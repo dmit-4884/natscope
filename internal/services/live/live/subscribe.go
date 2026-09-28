@@ -33,7 +33,7 @@ func (s *Service) Subscribe(
 	mode, maxDisplayRate, payloadCap := s.resolveSettings(ctx)
 	// Request-level override has highest precedence over the user setting, but
 	// only when it actually requests a cap: 0 means "omitted" per the proto
-	// doc, not "unlimited" (QA-132). protovalidate already rejects negative.
+	// doc, not "unlimited". protovalidate already rejects negative.
 	if in.MaxPayloadBytes != nil && *in.MaxPayloadBytes > 0 {
 		payloadCap = *in.MaxPayloadBytes
 	}
@@ -67,7 +67,7 @@ func (s *Service) Subscribe(
 
 // validateSubscriptionTargets rejects a malformed subject pattern before any
 // NATS work happens: an invalid pattern (e.g. "a.>.b") reaches the server as
-// a raw SUB and gets the whole shared pool connection closed (QA-028/QA-030).
+// a raw SUB and gets the whole shared pool connection closed.
 func validateSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) error {
 	for _, target := range targets {
 		if target == nil {
@@ -81,10 +81,8 @@ func validateSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) err
 }
 
 // dedupeSubscriptionTargets removes exact (subject, streamName) duplicates
-// and, within the same stream grouping, drops a literal subject already
-// covered by another target's wildcard pattern — otherwise a message on that
-// subject is delivered to the session once per matching subscription
-// (QA-085).
+// and literal subjects already covered by another target's wildcard in the
+// same stream grouping, so each message is delivered once.
 func dedupeSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) []*entities.LiveSubscriptionTarget {
 	type targetKey struct {
 		subject    string
@@ -172,7 +170,7 @@ func (s *Service) resolveSettings(ctx context.Context) (mode string, maxDisplayR
 // startSubscriptions resolves every target into concrete NATS subscriptions;
 // per-target failures are tolerated as long as at least one target succeeds,
 // and are returned alongside so the caller can surface them as LiveError
-// events instead of dropping them (QA-080).
+// events instead of dropping them.
 func (s *Service) startSubscriptions(
 	ctx context.Context,
 	connectionID string,
@@ -206,7 +204,7 @@ func (s *Service) startSubscriptions(
 // is derived from the user's own subject pattern (not the delivered
 // message): a subscription explicitly targeting "$KV.>" or "_myapp.>" must
 // receive matching messages, while a broad ">" subscription keeps filtering
-// internal namespaces out to avoid an accidental firehose (QA-083).
+// internal namespaces out to avoid an accidental firehose.
 func (s *Service) buildMessageHandler(
 	targetSubject string,
 	msgChan chan<- *entities.NatsMessage,
@@ -219,7 +217,7 @@ func (s *Service) buildMessageHandler(
 		}
 		// Counted at arrival so LiveStats.TotalMessages means the same thing
 		// regardless of which stage later drops the message (buffer-full here,
-		// or rate-limited in runLoop) — QA-133.
+		// or rate-limited in runLoop).
 		sess.totalMessages.Add(1)
 		size := int64(len(msg.Data))
 		if sess.bufferedBytes.Add(size) > maxBufferedBytes {

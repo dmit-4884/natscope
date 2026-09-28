@@ -458,7 +458,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 
 	t.Run("sources replace", func(t *testing.T) {
 		t.Run("sent sources replace the current list", func(t *testing.T) {
-			// QA-013: re-sending the current sources used to append them again
+			// re-sending the current sources used to append them again
 			// ("duplicate source configuration detected"), making it impossible
 			// to ever change a stream's sources through Update.
 			current := jetstream.StreamConfig{
@@ -777,7 +777,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		assertStreamUnchangedExcept(t, base, r2, map[string]bool{"Description": true})
 	})
 
-	// Sources replace semantics (QA-013)
+	// Sources replace semantics
 
 	t.Run("sources replace semantics", func(t *testing.T) {
 		t.Run("sent sources replace the existing list, not append", func(t *testing.T) {
@@ -827,7 +827,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		})
 	})
 
-	// Republish clear semantics (QA-001)
+	// Republish clear semantics
 
 	t.Run("republish clear semantics", func(t *testing.T) {
 		t.Run("empty republish clears it instead of routing >-to->", func(t *testing.T) {

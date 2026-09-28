@@ -259,7 +259,7 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			// QA-128: NUL/BEL control characters in the name must be rejected,
+			// NUL/BEL control characters in the name must be rejected,
 			// not written verbatim to logs.
 			"sources.CreateSource name with control characters",
 			func() error {
@@ -272,7 +272,7 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			// QA-128: no upper bound on name length previously.
+			// no upper bound on name length previously.
 			"sources.CreateSource name too long",
 			func() error {
 				_, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
@@ -292,7 +292,7 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			// QA-128: an unrecognized source_type number must not silently
+			// an unrecognized source_type number must not silently
 			// become git.
 			"sources.CreateSource unknown source_type",
 			func() error {
@@ -405,7 +405,7 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// QA-037: URLs must have a recognized scheme and no control characters.
+		// URLs must have a recognized scheme and no control characters.
 		{
 			"connections.Create javascript: url scheme rejected",
 			func() error {
@@ -436,7 +436,7 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// QA-107: connection name rejects control/bidi/zero-width characters.
+		// connection name rejects control/bidi/zero-width characters.
 		{
 			"connections.Create control char in name rejected",
 			func() error {
@@ -447,7 +447,7 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// QA-040: name/description size caps.
+		// name/description size caps.
 		{
 			"connections.Create oversized name rejected",
 			func() error {
@@ -458,7 +458,7 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// QA-038: unrecognized AuthMethod enum value rejected.
+		// unrecognized AuthMethod enum value rejected.
 		{
 			"connections.Create unknown auth method rejected",
 			func() error {
@@ -470,7 +470,7 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// QA-042: settings string "enums" reject out-of-set values.
+		// settings string "enums" reject out-of-set values.
 		{
 			"settings.Update unknown fetch_method rejected",
 			func() error {
@@ -481,7 +481,7 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// QA-112: template header keys/values reject CR/LF (header injection).
+		// template header keys/values reject CR/LF (header injection).
 		{
 			"templates.Create header value with CRLF rejected",
 			func() error {

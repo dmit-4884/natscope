@@ -42,7 +42,7 @@ func (s *Storage) Save(ctx context.Context, in *entities.MessageTemplate) error 
 
 // Update atomically loads the template by id, lets mutate apply the caller's
 // change to it, and persists the result within a single storage transaction —
-// so concurrent partial updates on different fields cannot race (QA-044).
+// so concurrent partial updates on different fields cannot race.
 func (s *Storage) Update(
 	ctx context.Context,
 	id string,

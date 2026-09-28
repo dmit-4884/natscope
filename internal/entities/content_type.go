@@ -61,7 +61,7 @@ func DetectContentType(data []byte) ContentType {
 		// invalid — so check instead whether it is a well-formed JSON
 		// *prefix*: token-by-token parsing ran out of (truncated) bytes
 		// mid-structure rather than hitting a real syntax error. Bounded to
-		// detectScanLimit, so still cheap on multi-MB payloads (QA-082).
+		// detectScanLimit, so still cheap on multi-MB payloads.
 		if !truncated {
 			if json.Valid(scan) {
 				return ContentTypeJSON

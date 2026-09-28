@@ -39,7 +39,7 @@ func (d *fakeDialer) TestConnection(
 	return nil, nil //nolint:nilnil // unused by this test
 }
 
-// TestPool_OnDisconnect_NotifiesOnExplicitDisconnect (QA-028) verifies a
+// TestPool_OnDisconnect_NotifiesOnExplicitDisconnect verifies a
 // registered listener fires when a connection is explicitly dropped from the
 // pool — the hook a live session uses to end itself instead of silently
 // going quiet once its connection is replaced.

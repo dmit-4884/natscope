@@ -90,7 +90,7 @@ func (c *Client) GetMessage(ctx context.Context, streamName string, sequence uin
 // request/reply on the subject itself, so without this check a core (non-JetStream)
 // subscriber on the same subject looks exactly like a JetStream responder —
 // either the request hangs for the full publish timeout with no subscriber,
-// or a core subscriber's unrelated reply gets misread as a PubAck (QA-077).
+// or a core subscriber's unrelated reply gets misread as a PubAck.
 func (c *Client) PublishToStream(
 	ctx context.Context,
 	subject string,

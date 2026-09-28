@@ -34,8 +34,8 @@ func acceptAndHold(ln net.Listener) {
 	}
 }
 
-// TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied is the QA-004
-// regression: ConnectTimeout is already a time.Duration; it must not be
+// TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied is a
+// regression test: ConnectTimeout is already a time.Duration; it must not be
 // re-multiplied by time.Millisecond. A "quiet" TCP listener that accepts and
 // never speaks is used so the probe only returns once its timeout elapses.
 func TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied(t *testing.T) {
@@ -59,7 +59,7 @@ func TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied(t *testing.T) {
 	require.Less(t, elapsed, 5*time.Second, "connect timeout must be ~300ms, not ~3.5 days")
 }
 
-// TestConnection_CtxCancelCutsProbeShort is the QA-005 regression: the
+// TestConnection_CtxCancelCutsProbeShort is a regression test: the
 // caller's context bounds the whole call, even when ConnectTimeout itself is
 // large (today: TestConnection ignores ctx entirely and blocks for the full
 // per-URL timeout, holding the socket open the whole time — a client that
@@ -89,7 +89,7 @@ func TestConnection_CtxCancelCutsProbeShort(t *testing.T) {
 	require.Less(t, elapsed, 5*time.Second, "ctx cancellation must cut the probe short, not wait out ConnectTimeout")
 }
 
-// TestConnection_NkeySeedErrorSurfacesAsFailure is the QA-038 regression: an
+// TestConnection_NkeySeedErrorSurfacesAsFailure is a regression test: an
 // unparseable NKey seed must not be silently dropped (falling back to
 // anonymous auth while reporting success); it must fail with an error naming
 // the seed.
@@ -109,7 +109,7 @@ func TestConnection_NkeySeedErrorSurfacesAsFailure(t *testing.T) {
 	require.Contains(t, strings.ToLower(result.Error), "seed")
 }
 
-// TestConnection_MalformedHTTPResponseIsSanitized is the QA-036 regression: a
+// TestConnection_MalformedHTTPResponseIsSanitized is a regression test: a
 // non-NATS/non-WebSocket listener's raw banner must not be echoed back to the
 // caller (TestConnection was a banner-grab primitive against ws:// targets).
 func TestConnection_MalformedHTTPResponseIsSanitized(t *testing.T) {

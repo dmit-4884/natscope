@@ -243,7 +243,7 @@ func (s *Service) rebuildResolver(ctx context.Context) {
 
 // validatePatternAndType rejects a pattern/messageType that is empty (or
 // whitespace-only, since callers trim first) and a pattern that isn't a
-// syntactically valid NATS subject pattern (QA-086/QA-101): min_len:1 alone
+// syntactically valid NATS subject pattern: min_len:1 alone
 // lets "   " through, and it trims to a mapping that can never match.
 func validatePatternAndType(pattern, messageType string) error {
 	if pattern == "" {

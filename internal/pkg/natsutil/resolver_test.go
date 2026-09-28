@@ -106,7 +106,7 @@ func TestResolver_NilSafe(t *testing.T) {
 	}
 }
 
-// TestResolver_CacheConsistentWithLinearScan (QA-084 regression) rebuilds the
+// TestResolver_CacheConsistentWithLinearScan rebuilds the
 // same answer whether or not the per-subject cache was already warm, and
 // tolerates concurrent Resolve calls (the cache is shared across live
 // sessions via the atomic resolver pointer in the mappings service).
@@ -140,7 +140,7 @@ func TestResolver_CacheConsistentWithLinearScan(t *testing.T) {
 	}
 }
 
-// TestResolver_CacheBoundedSize (QA-084) verifies the wildcard-lookup cache
+// TestResolver_CacheBoundedSize verifies the wildcard-lookup cache
 // does not grow past maxResolverCacheEntries under high subject cardinality.
 func TestResolver_CacheBoundedSize(t *testing.T) {
 	r := NewMappingResolver(entities.SubjectMappings{

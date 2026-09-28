@@ -48,7 +48,7 @@ func TestRecord_PayloadTruncated(t *testing.T) {
 	}
 }
 
-// TestRecord_PayloadTruncatedAtRuneBoundary is the QA-113 regression: a
+// TestRecord_PayloadTruncatedAtRuneBoundary is a regression test: a
 // truncation cut mid-UTF-8-sequence turns the final character into U+FFFD;
 // the stored preview must always be valid UTF-8, cut at the last full rune.
 func TestRecord_PayloadTruncatedAtRuneBoundary(t *testing.T) {

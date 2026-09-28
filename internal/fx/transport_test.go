@@ -11,7 +11,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 )
 
-// TestNewHTTPServer_WideBindRequiresAllowRemote covers QA-089: the internal
+// TestNewHTTPServer_WideBindRequiresAllowRemote covers the fix: the internal
 // HTTP server (health/metrics/pprof) used to gate a non-loopback bind on
 // AllowInsecure alone, unlike the main listener's two-flag AllowRemote +
 // AllowInsecure gate — so ALLOW_INSECURE=true by itself exposed pprof

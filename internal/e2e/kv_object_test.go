@@ -32,10 +32,10 @@ func kvObjTestConn(t *testing.T, env *e2eEnv, name string) string {
 	return resp.Msg.GetConnection().GetId()
 }
 
-// TestQAKVBucketHistoryRejectsOutOfRange covers QA-023: history above 64 used
+// TestKVBucketHistoryRejectsOutOfRange covers the fix: history above 64 used
 // to be silently truncated (uint32 -> uint8) instead of rejected, producing a
 // bucket with a different history depth than requested.
-func TestQAKVBucketHistoryRejectsOutOfRange(t *testing.T) {
+func TestKVBucketHistoryRejectsOutOfRange(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-kv-history")
@@ -59,9 +59,9 @@ func TestQAKVBucketHistoryRejectsOutOfRange(t *testing.T) {
 	assert.EqualValues(t, 64, created.Msg.GetBucket().GetHistory())
 }
 
-// TestQAKVBucketDescriptionRoundTrips covers QA-060: description was saved
+// TestKVBucketDescriptionRoundTrips covers the fix: description was saved
 // correctly on the server but Create/Get/List never returned it.
-func TestQAKVBucketDescriptionRoundTrips(t *testing.T) {
+func TestKVBucketDescriptionRoundTrips(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-kv-desc")
@@ -80,11 +80,11 @@ func TestQAKVBucketDescriptionRoundTrips(t *testing.T) {
 	assert.Equal(t, "qa desc kv1", got.Msg.GetBucket().GetDescription())
 }
 
-// TestQAKVKeyValidation covers QA-062 (a key with an empty path segment such
+// TestKVKeyValidation covers the fix (a key with an empty path segment such
 // as "a..b" passes nats.go's own validation but is invalid as a subject,
-// previously surfacing as Internal on all five key RPCs) and QA-064
+// previously surfacing as Internal on all five key RPCs)
 // (GetKVKeyHistory's Watch-based validator uniquely let wildcards through).
-func TestQAKVKeyValidation(t *testing.T) {
+func TestKVKeyValidation(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-kv-keys")
@@ -148,10 +148,10 @@ func TestQAKVKeyValidation(t *testing.T) {
 	})
 }
 
-// TestQAEmptyBucketsReturnEmptyList covers QA-065: an empty bucket used to
+// TestEmptyBucketsReturnEmptyList covers the fix: an empty bucket used to
 // surface as not_found instead of an empty list, unlike every other
 // empty-collection response in this API (including List*Buckets itself).
-func TestQAEmptyBucketsReturnEmptyList(t *testing.T) {
+func TestEmptyBucketsReturnEmptyList(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-empty")
@@ -177,11 +177,11 @@ func TestQAEmptyBucketsReturnEmptyList(t *testing.T) {
 	assert.Empty(t, objs.Msg.GetObjects())
 }
 
-// TestQABucketDeleteSealRefusesPlainStream covers QA-066: Delete/Seal never
+// TestBucketDeleteSealRefusesPlainStream covers the fix: Delete/Seal never
 // checked that the stream behind a KV_/OBJ_-named bucket is actually shaped
 // like one, so a plain stream that merely shared the name was deleted or
 // sealed outright.
-func TestQABucketDeleteSealRefusesPlainStream(t *testing.T) {
+func TestBucketDeleteSealRefusesPlainStream(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-badbucket")
@@ -226,12 +226,12 @@ func TestQABucketDeleteSealRefusesPlainStream(t *testing.T) {
 	})
 }
 
-// TestQAPutObjectCapacityGuardPreservesOriginal covers QA-002: an overwrite
+// TestPutObjectCapacityGuardPreservesOriginal covers the fix: an overwrite
 // that fails because it would exceed the bucket's max_bytes used to destroy
 // the original object — nats.go's Put publishes the rollup meta and the data
 // chunks independently, so a failed write left the previous version
 // unreachable. The capacity precheck now refuses the write up front instead.
-func TestQAPutObjectCapacityGuardPreservesOriginal(t *testing.T) {
+func TestPutObjectCapacityGuardPreservesOriginal(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-obj-capacity")
@@ -266,11 +266,11 @@ func TestQAPutObjectCapacityGuardPreservesOriginal(t *testing.T) {
 	assert.Equal(t, originalDigest, getResp.Msg.GetInfo().GetDigest())
 }
 
-// TestQAConcurrentPutObjectSameName covers QA-069 (GetObject must never
-// return data from one Put paired with metadata from another) and QA-070
+// TestConcurrentPutObjectSameName covers the fix (GetObject must never
+// return data from one Put paired with metadata from another)
 // (concurrent writers of the same name must not leave the stream full of
 // orphaned chunks from writers that "lost" the race).
-func TestQAConcurrentPutObjectSameName(t *testing.T) {
+func TestConcurrentPutObjectSameName(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-obj-concurrent")
@@ -325,10 +325,10 @@ func TestQAConcurrentPutObjectSameName(t *testing.T) {
 		"serialized PutObject must not leave the stream full of orphaned chunks from losing writers")
 }
 
-// TestQAObjectLinkReflectedInAPI covers QA-072: an object link
+// TestObjectLinkReflectedInAPI covers the fix: an object link
 // (jetstream AddLink) was invisible in ObjectInfo, and GetObject on a link
 // returned the target's data paired with the link's own (empty) info.
-func TestQAObjectLinkReflectedInAPI(t *testing.T) {
+func TestObjectLinkReflectedInAPI(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-obj-link")
@@ -375,10 +375,10 @@ func TestQAObjectLinkReflectedInAPI(t *testing.T) {
 		"info must describe the data actually returned, not the link's own (empty) meta")
 }
 
-// TestQAKVBucketMirrorSourcesMutuallyExclusive covers QA-126: mirror and
+// TestKVBucketMirrorSourcesMutuallyExclusive covers the fix: mirror and
 // sources set together used to be accepted with sources silently dropped
 // (nats.go's CreateKeyValue ignores Sources when Mirror is set).
-func TestQAKVBucketMirrorSourcesMutuallyExclusive(t *testing.T) {
+func TestKVBucketMirrorSourcesMutuallyExclusive(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 	connID := kvObjTestConn(t, env, "qa-kv-mirror-sources")

@@ -88,8 +88,8 @@ func TestTemplates_Update(t *testing.T) {
 	}
 }
 
-// TestTemplates_UpdateConcurrentPartialUpdatesDoNotLoseWrites is the QA-044
-// regression: three goroutines each update a different field of the same
+// TestTemplates_UpdateConcurrentPartialUpdatesDoNotLoseWrites is a
+// regression test: three goroutines each update a different field of the same
 // template, round after round. Since Update now does its read-modify-write
 // inside one bbolt transaction, every round must leave all three fields at
 // that round's value.

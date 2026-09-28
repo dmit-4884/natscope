@@ -74,7 +74,7 @@ func TestHistory_SaveAndListFilter(t *testing.T) {
 	}
 }
 
-// TestHistory_ListFilterByConnectionID is the QA-045 regression: filtering by
+// TestHistory_ListFilterByConnectionID is a regression test: filtering by
 // connection_id must find the entry regardless of how many URLs the saved
 // connection has, and must not conflate entries from a different connection
 // that happens to share a URL.

@@ -159,7 +159,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     }
   }
 
-  // QA-165: block Save on an unvalidated path/URL so a source can never be
+  // block Save on an unvalidated path/URL so a source can never be
   // created (or repointed) in a state that will never compile. Only checked
   // when the path/URL is new or changed — editing unrelated fields on an
   // already-valid source doesn't re-pay the round trip.

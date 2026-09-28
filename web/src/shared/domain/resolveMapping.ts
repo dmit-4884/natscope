@@ -24,7 +24,7 @@ function patternSpecificity(pattern: string): number {
  * This is the single mapping-resolution algorithm for the frontend: Publish
  * (schema used to encode) and the message viewer (schema used to decode)
  * must agree, or a message can be encoded with one schema and rendered with
- * another (QA-102).
+ * another.
  */
 export function resolveMapping<T>(
   subject: string,

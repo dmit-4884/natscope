@@ -450,7 +450,7 @@ func TestE2E(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, getResp.Msg.GetEntry())
 		// KV entry values are base64 on the wire both ways: Put decodes it,
-		// Get encodes it back, so the round trip is symmetric (see QA-022).
+		// Get encodes it back, so the round trip is symmetric.
 		decoded, err := base64.StdEncoding.DecodeString(getResp.Msg.GetEntry().GetValue())
 		require.NoError(t, err)
 		assert.Equal(t, "hello-kv", string(decoded))

@@ -144,7 +144,7 @@ func TestHandler_CreateSource(t *testing.T) {
 		assert.ErrorIs(t, err, errs.ErrProtoSourceNameAlreadyInUse)
 	})
 
-	// QA-128: an unspecified/unrecognized source_type must be rejected, not
+	// an unspecified/unrecognized source_type must be rejected, not
 	// silently treated as git.
 	t.Run("UnknownSourceType", func(t *testing.T) {
 		t.Parallel()

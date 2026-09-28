@@ -33,7 +33,7 @@ var replicasMappingToEntity = converter.WithFieldMappings(map[string]string{"Num
 // OptStartTime/SubjectTransforms/External handled manually (converter gaps).
 // A malformed OptStartTime returns an error instead of being silently dropped
 // — the source would otherwise replicate its entire history instead of the
-// requested cutoff (QA-049).
+// requested cutoff.
 func protoStreamSourceToEntity(src *grpc_nats_management.StreamSourceConfig) (*entities.StreamSource, error) {
 	if src == nil {
 		return nil, nil //nolint:nilnil // nil input means "not configured", not an error

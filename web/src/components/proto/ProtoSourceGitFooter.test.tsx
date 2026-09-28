@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@/test/utils'
 import { ProtoSourceGitFooter } from './ProtoSourceGitFooter'
 
-// QA-100: SourcesService/ListTags errors must surface to the user instead of
+// SourcesService/ListTags errors must surface to the user instead of
 // rendering an empty "No versions found" dropdown.
 describe('ProtoSourceGitFooter — tagsError', () => {
   it('shows the error and a Retry action instead of the dropdown', () => {

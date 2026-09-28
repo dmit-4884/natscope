@@ -117,7 +117,7 @@ func TestHandler_ListSelections(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// QA-127: page_size/page_token must reach the service, not be discarded.
+	// page_size/page_token must reach the service, not be discarded.
 	t.Run("ForwardsPagination", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockProtoService{}

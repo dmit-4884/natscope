@@ -76,21 +76,19 @@ var ErrNATSInvalidArgument = errors.New("nats: invalid argument")
 // isn't actually a KV/Object store (wrong subject shape, or missing the
 // per-subject history nats.go's own KV sanity check requires); produced by
 // [natsgo] before a bucket-shaped RPC would otherwise delete or seal a plain
-// stream that merely shares its name (see QA-066).
+// stream that merely shares its name.
 var ErrNotAKVOrObjectBucket = errors.New("nats: stream is not a valid KV/Object bucket")
 
 // ErrObjectBucketCapacityExceeded a PutObject would exceed the bucket's
-// max_bytes; refused by [natsgo] before nats.go's async chunk+meta publish
-// (see QA-002: a failed Put there can strand the previous object's meta on
-// an unrecoverable rollup).
+// max_bytes and is refused before any chunk is written.
 var ErrObjectBucketCapacityExceeded = errors.New("nats: object write would exceed the bucket's max_bytes")
 
-// ErrObjectTooLargeToRetrieve GetObject refuses to buffer an object whose
-// size exceeds natscope's read cap; see QA-071 (unbounded server memory use).
+// ErrObjectTooLargeToRetrieve GetObject refuses to buffer an object larger
+// than natscope's read cap.
 var ErrObjectTooLargeToRetrieve = errors.New("nats: object exceeds the maximum size retrievable via GetObject")
 
 // ErrObjectLinkToBucket GetObject was called on an entry that links to an
-// entire bucket rather than a single object; see QA-072.
+// entire bucket rather than a single object.
 var ErrObjectLinkToBucket = errors.New("nats: object is a link to a bucket, not a single object")
 
 // NATSValidationError is the domain form of a client-side NATS validation failure.

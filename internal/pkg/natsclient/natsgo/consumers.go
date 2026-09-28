@@ -106,7 +106,7 @@ func (c *Client) CreateConsumer(
 	// A whitespace-only name passes proto's min_len:1 but normalizes (trim) to
 	// "", which toJetStreamConsumerConfig then treats as "ephemeral" even
 	// though the caller asked for a durable consumer — check the trimmed name,
-	// not the raw one (QA-055).
+	// not the raw one.
 	if !config.Ephemeral && config.Name == "" {
 		return nil, wrapErr(&errs.NATSValidationError{Description: "consumer name is required"})
 	}
@@ -150,7 +150,7 @@ func (c *Client) UpdateConsumer(
 	// below goes straight into a hand-built subject: a name containing "."
 	// (or another JetStream API subject-separator/wildcard character) makes
 	// that subject match no responder, hanging until the request timeout
-	// instead of failing fast (QA-050).
+	// instead of failing fast.
 	if err := validateConsumerNameChars(consumerName); err != nil {
 		return nil, wrapErr(err)
 	}
@@ -186,7 +186,7 @@ func (c *Client) UpdateConsumer(
 	if infoResp.Error != nil {
 		// The hand-built subject bypasses the SDK's own not-found translation,
 		// so a missing consumer surfaced as a generic NATS_API_ERROR instead of
-		// the NATS_CONSUMER_NOT_FOUND every other consumer RPC uses (QA-115).
+		// the NATS_CONSUMER_NOT_FOUND every other consumer RPC uses.
 		if infoResp.Error.ErrorCode == jetstream.JSErrCodeConsumerNotFound {
 			return nil, wrapErr(jetstream.ErrConsumerNotFound)
 		}
@@ -261,7 +261,7 @@ func (c *Client) PauseConsumer(
 		// NATSValidationError (not the generic errs.ErrInvalidRequest) so the
 		// field-specific "must be RFC3339" message reaches the caller instead
 		// of being overwritten by ErrInvalidRequest's static "invalid request"
-		// mapping (QA-119).
+		// mapping.
 		return nil, wrapErr(&errs.NATSValidationError{
 			Description: fmt.Sprintf("invalid pause_until %q: must be RFC3339", pauseUntil),
 			Cause:       err,
@@ -272,9 +272,9 @@ func (c *Client) PauseConsumer(
 	// "." and other JetStream separators before ever building a subject —
 	// unlike the previous hand-built "$JS.API.CONSUMER.PAUSE.<stream>.<name>",
 	// which matched no responder for such a name and hung for the full
-	// request timeout, QA-050) and translates a missing consumer to the same
+	// request timeout) and translates a missing consumer to the same
 	// jetstream.ErrConsumerNotFound every other consumer RPC uses instead of a
-	// generic NATS_API_ERROR (QA-115).
+	// generic NATS_API_ERROR.
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
 		return nil, wrapErr(err)
@@ -292,9 +292,8 @@ func (c *Client) PauseConsumer(
 	}, nil
 }
 
-// ResumeConsumer resumes a paused consumer immediately, returning the
-// server's actual post-resume state (Paused is reported by NATS, not assumed
-// — see QA-119).
+// ResumeConsumer resumes a paused consumer immediately and returns the
+// server's post-resume state.
 func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumerName string) (*entities.ConsumerPauseResponse, error) {
 	if err := validateNATSNameLength("stream name", streamName); err != nil {
 		return nil, wrapErr(err)
@@ -304,7 +303,7 @@ func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumer
 	}
 
 	// See PauseConsumer: the SDK method validates the consumer name and maps
-	// not-found consistently (QA-050, QA-115), which the previous hand-built
+	// not-found consistently, which the previous hand-built
 	// "$JS.API.CONSUMER.PAUSE.<stream>.<name>" request (pauseUntil omitted)
 	// did not.
 	stream, err := c.jetStream.Stream(ctx, streamName)

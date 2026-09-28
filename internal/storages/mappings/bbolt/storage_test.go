@@ -247,7 +247,7 @@ func TestMappings_BulkSaveDeletesAbsent(t *testing.T) {
 	}
 }
 
-// TestMappings_BulkSavePreservesPinsWhenUnset is the QA-031 regression: a
+// TestMappings_BulkSavePreservesPinsWhenUnset is a regression test: a
 // BatchSaveMappings item that omits pinned_tag/pinned_fingerprint for an
 // existing (pattern, sourceId) must not silently clear the pin.
 func TestMappings_BulkSavePreservesPinsWhenUnset(t *testing.T) {
@@ -324,7 +324,7 @@ func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
 	}
 }
 
-// TestMappings_BulkSaveRejectsDuplicateKeyInBatch is the QA-134 regression: a
+// TestMappings_BulkSaveRejectsDuplicateKeyInBatch is a regression test: a
 // batch with two items sharing the same (pattern, sourceId) must be rejected,
 // instead of one silently overwriting the other with a misleading count.
 func TestMappings_BulkSaveRejectsDuplicateKeyInBatch(t *testing.T) {
@@ -359,7 +359,7 @@ func TestMappings_BulkSaveRejectsDuplicateKeyInBatch(t *testing.T) {
 	}
 }
 
-// TestMappings_BulkSaveEmptyListDeletesAll is the QA-134 regression for the
+// TestMappings_BulkSaveEmptyListDeletesAll is a regression test for the
 // other direction: BatchSaveMappings with zero items is a deliberate "replace
 // all with nothing", not a request that should be rejected.
 func TestMappings_BulkSaveEmptyListDeletesAll(t *testing.T) {

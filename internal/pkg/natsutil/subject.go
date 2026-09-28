@@ -71,7 +71,7 @@ func validateSubjectTokens(subject string, allowWildcards bool) error {
 
 // checkSubjectCharacters rejects whitespace and control characters, which
 // nats.go accepts client-side but the server either rejects (closing the
-// shared pool connection, QA-030) or silently stores as literal bytes.
+// shared pool connection) or silently stores as literal bytes.
 func checkSubjectCharacters(subject string) error {
 	for _, r := range subject {
 		if r < 0x21 || r == 0x7f {

@@ -12,7 +12,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 )
 
-// TestNewSecretsVault_KeyringUnavailableFailsClosed covers QA-090: an
+// TestNewSecretsVault_KeyringUnavailableFailsClosed covers the fix: an
 // explicit SECRETS__BACKEND=keyring used to skip the availability probe that
 // "auto" already had, so the server started "healthy" and the first
 // secret-reading RPC failed as an unmapped internal error instead of a clear

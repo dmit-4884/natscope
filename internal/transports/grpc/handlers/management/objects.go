@@ -21,7 +21,7 @@ import (
 // converted by hand: like Placement/Mirror/Republish elsewhere in this
 // handler, converter.Convert doesn't auto-convert a nested pointer-to-struct
 // field between two different named types, so it's excluded and mapped
-// explicitly (see QA-072).
+// explicitly.
 func objectInfoToProto(info *entities.ObjectInfo) *natspb.ObjectInfo {
 	out := converter.Convert(info, &natspb.ObjectInfo{}, protoCodecs, converter.WithIgnoreFields("Link"))
 	if info.Link != nil {

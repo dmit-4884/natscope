@@ -24,7 +24,7 @@ import (
 
 // ListStreams returns all JetStream streams via a single paged STREAM.LIST
 // call (O(1) JetStream API requests), matching GetAllStreamsStats instead of
-// the previous STREAM.NAMES + one STREAM.INFO per stream (QA-116).
+// the previous STREAM.NAMES + one STREAM.INFO per stream.
 func (c *Client) ListStreams(ctx context.Context) ([]entities.StreamInfo, error) {
 	streams := []entities.StreamInfo{}
 	streamLister := c.jetStream.ListStreams(ctx)
@@ -129,7 +129,7 @@ func (c *Client) GetStreamStats(ctx context.Context, streamName string) (*entiti
 	}
 
 	// WithSubjectFilter populates State.Subjects (per-subject message counts);
-	// without it the field is always empty (QA-122).
+	// without it the field is always empty.
 	info, err := stream.Info(ctx, jetstream.WithSubjectFilter(">"))
 	if err != nil {
 		return nil, wrapErr(coreerrs.WrapOperation(err, "get stream info"))
@@ -170,15 +170,13 @@ func (c *Client) CreateStream(ctx context.Context, config entities.StreamCreateR
 	}
 	// GetStream/DeleteStream/UpdateStream don't trim, so a padded name here
 	// created a stream the caller could never look up again with the exact
-	// string they sent — reject instead of silently trimming (QA-117).
+	// string they sent — reject instead of silently trimming.
 	if rawName != config.Name {
 		return nil, wrapErr(&errs.NATSValidationError{
 			Description: fmt.Sprintf("stream name %q must not have leading/trailing whitespace", rawName),
 		})
 	}
-	// ListStreams/GetAllStreamsStats hide "$"-prefixed names (reserved for
-	// system streams); creating one there would make it invisible in the UI
-	// (QA-052).
+	// "$"-prefixed names are reserved for system streams and hidden from lists.
 	if strings.HasPrefix(config.Name, "$") {
 		return nil, wrapErr(&errs.NATSValidationError{
 			Description: fmt.Sprintf("stream name %q must not start with '$' (reserved for system streams)", config.Name),
@@ -245,10 +243,10 @@ func (c *Client) PurgeStream(ctx context.Context, name string, req entities.Stre
 
 	// Resolve+validate the stream via the SDK first, instead of building the
 	// purge subject by hand against an unchecked name: it rejects a
-	// dotted/space-containing name instantly (QA-050 — the hand-built subject
+	// dotted/space-containing name instantly (the hand-built subject
 	// otherwise matches no JetStream API responder and hangs for the full
 	// request timeout) and gives the usual NATS_STREAM_NOT_FOUND reason for a
-	// missing stream instead of a generic NATS_API_ERROR (QA-115).
+	// missing stream instead of a generic NATS_API_ERROR.
 	stream, err := c.jetStream.Stream(ctx, name)
 	if err != nil {
 		return 0, wrapErr(coreerrs.WrapOperation(err, "get stream"))
@@ -375,7 +373,7 @@ func (c *Client) mergeStreamUpdate(
 	// Replace, not append: the UI round-trips the current sources back on
 	// every save (passthrough), and re-sending the existing list used to fail
 	// with "duplicate source configuration detected" — the only way to ever
-	// change a stream's sources was to hit that error (QA-013). A caller that
+	// change a stream's sources was to hit that error. A caller that
 	// wants sources left untouched simply omits the field (nil slice); an
 	// empty (non-nil) list would need proto presence tracking to distinguish
 	// "clear all" from "not sent", which is out of scope here.
@@ -391,7 +389,7 @@ func (c *Client) mergeStreamUpdate(
 		// Destination:""}, which NATS normalizes to a ">"→">" passthrough
 		// route instead of clearing it — every incoming message gets
 		// republished to its own subject, filling the stream with copies of
-		// itself (QA-001). Treat "no src/dest" as the documented clear.
+		// itself. Treat "no src/dest" as the documented clear.
 		if update.Republish.Src == "" && update.Republish.Dest == "" {
 			current.RePublish = nil
 		} else {

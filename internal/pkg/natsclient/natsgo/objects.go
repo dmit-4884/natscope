@@ -25,18 +25,13 @@ import (
 
 const (
 	// objectOperationTimeout bounds Object Store operations against an
-	// unresponsive server. Unlike kv.go, none of these methods used to set a
-	// deadline at all: ListObjectBuckets could hang forever (QA-025), and
-	// GetObject fell back to nats.go's undocumented hard 5s default, which
-	// cascades into Slow-Consumer disconnects under concurrent load
-	// (QA-024). Kept longer than kvOperationTimeout to leave room for larger
-	// payload transfers.
+	// unresponsive server; longer than kvOperationTimeout for larger payloads.
 	objectOperationTimeout = 30 * time.Second
 
 	// maxGetObjectBytes caps GetObject's in-memory buffer. natscope reads the
 	// whole object into memory before responding (no server-streaming RPC
 	// yet), so an object created by another client with no size limit would
-	// otherwise be buffered in full regardless of size (see QA-071). Matches
+	// otherwise be buffered in full regardless of size. Matches
 	// maxRequestBytes, the request-side cap the transport enforces.
 	maxGetObjectBytes = 32 << 20 // 32 MiB
 
@@ -124,7 +119,7 @@ func (c *Client) CreateObjectBucket(ctx context.Context, config entities.ObjectB
 // ObjectStore(), unlike KeyValue(), does no sanity check that the stream is
 // actually shaped like an object store, so a plain stream merely named
 // OBJ_<bucket> would otherwise be deleted outright; verifyObjectBucket closes
-// that gap (see QA-066).
+// that gap.
 func (c *Client) DeleteObjectBucket(ctx context.Context, bucket string) error {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
 	defer cancel()
@@ -168,9 +163,8 @@ func (c *Client) GetObjectBucket(ctx context.Context, bucket string) (*entities.
 	return &result, nil
 }
 
-// ListObjects returns all objects in an Object Store bucket. An empty bucket
-// returns an empty slice rather than jetstream.ErrNoObjectsFound (see
-// QA-065), matching every other empty-collection response in this API.
+// ListObjects returns all objects in an Object Store bucket; an empty bucket
+// returns an empty slice.
 func (c *Client) ListObjects(ctx context.Context, bucket string) ([]*entities.ObjectInfo, error) {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
 	defer cancel()
@@ -195,9 +189,9 @@ func (c *Client) ListObjects(ctx context.Context, bucket string) ([]*entities.Ob
 // Get() rather than separate GetBytes+GetInfo calls, so the returned info
 // always describes the data actually returned: a second, independent GetInfo
 // lookup can race a concurrent Put and report a newer version's digest/size
-// for the data read moments before (see QA-069). GetObject on a link follows
+// for the data read moments before. GetObject on a link follows
 // it and returns the target's own info/data, which is also what makes those
-// consistent for links (see QA-072); a link to an entire bucket has no
+// consistent for links; a link to an entire bucket has no
 // single object to read and is rejected instead.
 func (c *Client) GetObject(ctx context.Context, bucket string, name string) ([]byte, *entities.ObjectInfo, error) {
 	if err := validateNATSSubjectLength("object name", name); err != nil {
@@ -243,7 +237,7 @@ func (c *Client) GetObject(ctx context.Context, bucket string, name string) ([]b
 // Put that would clearly exceed the bucket's max_bytes is refused before
 // nats.go replaces the current meta with a rollup that then points at chunks
 // which fail to write, destroying the previous object with no way to recover
-// it (see QA-002). It never blocks a Put outright — a status/info read that
+// it. It never blocks a Put outright — a status/info read that
 // fails or can't be inspected is "can't tell, let Put decide for itself".
 func checkObjectCapacity(ctx context.Context, obj jetstream.ObjectStore, name string, newSize int64) error {
 	status, err := obj.Status(ctx)
@@ -271,11 +265,8 @@ func checkObjectCapacity(ctx context.Context, obj jetstream.ObjectStore, name st
 }
 
 // PutObject stores an object in an Object Store bucket. Writes to the same
-// (bucket, name) are serialized: nats.go's Put races when the same object is
-// written concurrently and can leave orphaned chunks behind after every
-// writer but the last "wins" (see QA-070). A capacity precheck additionally
-// refuses Puts that would clearly overflow the bucket (see QA-002 and
-// checkObjectCapacity).
+// (bucket, name) are serialized, and a Put that would overflow the bucket is
+// refused up front (see checkObjectCapacity).
 func (c *Client) PutObject(
 	ctx context.Context,
 	bucket string,
@@ -348,7 +339,7 @@ func (c *Client) DeleteObject(ctx context.Context, bucket string, name string) e
 // ObjectStore() does no sanity check that the stream is actually shaped like
 // an object store, so a plain stream merely named OBJ_<bucket> would
 // otherwise be sealed — irreversibly — outright; verifyObjectBucket closes
-// that gap (see QA-066).
+// that gap.
 func (c *Client) SealObjectBucket(ctx context.Context, bucket string) error {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
 	defer cancel()
@@ -372,7 +363,7 @@ func (c *Client) SealObjectBucket(ctx context.Context, bucket string) error {
 // Object Store (subjects "$O.<bucket>.C.>" and "$O.<bucket>.M.>", exactly
 // what CreateObjectStore always sets). Best-effort: if status can't be read
 // or asserted, the caller proceeds and lets the real operation report its
-// own error (see QA-066).
+// own error.
 func verifyObjectBucket(ctx context.Context, obj jetstream.ObjectStore, bucket string) error {
 	status, err := obj.Status(ctx)
 	if err != nil {
@@ -426,7 +417,7 @@ func toObjectBucketInfo(status jetstream.ObjectStoreStatus, objectCount uint64) 
 
 // toObjectInfo maps a jetstream object entry, including link metadata
 // (jetstream.ObjectInfo.Opts.Link) that a plain field-name converter can't
-// reach since it's nested under Opts (see QA-072).
+// reach since it's nested under Opts.
 func toObjectInfo(info *jetstream.ObjectInfo) *entities.ObjectInfo {
 	out := converter.Convert(info, &entities.ObjectInfo{})
 	if info.Opts != nil && info.Opts.Link != nil {

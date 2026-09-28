@@ -62,7 +62,7 @@ func (h *Handler) UpdateConsumer(
 	ur := converter.Convert(in, &entities.ConsumerUpdateRequest{}, protoCodecs)
 	// An absent back_off repeated field converts to a non-nil empty slice, not
 	// nil, so downstream WithIgnoreNilValues doesn't skip it and wipes the
-	// consumer's existing backoff on any unrelated update (QA-015).
+	// consumer's existing backoff on any unrelated update.
 	if len(in.GetBackOff()) == 0 {
 		ur.BackOff = nil
 	}
@@ -116,7 +116,7 @@ func (h *Handler) PauseConsumer(
 	if resp.PauseUntil != nil {
 		// RFC3339Nano (not RFC3339): the plain form truncates fractional
 		// seconds, silently rounding down a pauseUntil like "...:00.5Z" to
-		// "...:00Z" in the response (QA-119).
+		// "...:00Z" in the response.
 		s := resp.PauseUntil.Format(time.RFC3339Nano)
 		pbResp.PauseUntil = &s
 	}
@@ -140,6 +140,6 @@ func (h *Handler) ResumeConsumer(
 	}
 	// Report the server's actual post-resume state instead of a hardcoded
 	// false, which used to claim "not paused" even when the resume itself
-	// failed to take effect (QA-119).
+	// failed to take effect.
 	return connect.NewResponse(&managementpb.ResumeConsumerResponse{Paused: resp.Paused}), nil
 }

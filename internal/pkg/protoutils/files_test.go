@@ -51,7 +51,7 @@ func TestReadFilesFromPaths_RejectsMissing(t *testing.T) {
 	assert.Contains(t, diags[0].Message, "not accessible")
 }
 
-// TestReadFilesFromPaths_RejectsSymlink is the QA-076 regression: a
+// TestReadFilesFromPaths_RejectsSymlink is a regression test: a
 // *.proto-named symlink must not be followed, matching WalkProtoTree's
 // no-follow-symlink policy — otherwise the target's content (e.g. /etc/passwd)
 // is read and can leak through compile diagnostics.

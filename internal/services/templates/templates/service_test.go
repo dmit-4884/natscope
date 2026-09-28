@@ -65,7 +65,7 @@ func TestCreate_NormalizesTrim(t *testing.T) {
 	assert.Equal(t, "s.x", created.Subject)
 }
 
-// TestCreate_WhitespaceOnlyNameRejected is the QA-043 regression: buf.validate
+// TestCreate_WhitespaceOnlyNameRejected is a regression test: buf.validate
 // only checks min_len on the raw request, so a whitespace-only name passes it
 // and must be rejected again after the trim normalizer collapses it to empty.
 func TestCreate_WhitespaceOnlyNameRejected(t *testing.T) {
@@ -141,7 +141,7 @@ func TestUpdate_NotFound(t *testing.T) {
 	assert.ErrorIs(t, err, errs.ErrMessageTemplateNotFound)
 }
 
-// TestUpdate_WhitespaceOnlyNameRejected is the QA-043 regression for
+// TestUpdate_WhitespaceOnlyNameRejected is a regression test for
 // UpdateTemplate: no buf.validate min_len applies to the optional name field,
 // so this is the only guard against blanking a template's name.
 func TestUpdate_WhitespaceOnlyNameRejected(t *testing.T) {
@@ -218,7 +218,7 @@ func TestBulkCreate(t *testing.T) {
 	assert.Len(t, out.Items, 2)
 }
 
-// TestBulkCreate_WhitespaceOnlyNameRejected is the QA-043 regression for
+// TestBulkCreate_WhitespaceOnlyNameRejected is a regression test for
 // BatchCreateTemplates.
 func TestBulkCreate_WhitespaceOnlyNameRejected(t *testing.T) {
 	t.Parallel()

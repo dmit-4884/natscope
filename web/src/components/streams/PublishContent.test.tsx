@@ -193,7 +193,7 @@ describe('PublishContent template loading', () => {
   })
 })
 
-// QA-162: a header key outside the RFC 7230 token grammar is silently
+// a header key outside the RFC 7230 token grammar is silently
 // dropped on encode, so Publish must block on it with a visible reason
 // instead of reporting a false "success".
 describe('PublishContent header name validation', () => {

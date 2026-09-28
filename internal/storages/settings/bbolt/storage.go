@@ -59,7 +59,7 @@ func (s *Storage) Get(ctx context.Context) (*entities.UserSettings, error) {
 // Update atomically loads settings (or a fresh default if none saved yet),
 // lets mutate apply the caller's change, and persists the result within a
 // single storage transaction, so concurrent partial updates to different
-// setting groups cannot race (QA-041).
+// setting groups cannot race.
 func (s *Storage) Update(
 	ctx context.Context,
 	mutate func(existing *entities.UserSettings),

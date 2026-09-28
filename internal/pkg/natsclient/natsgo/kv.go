@@ -26,13 +26,8 @@ import (
 // so validateKVKey rejects nothing a successful nats.go call would accept.
 var kvKeyPattern = regexp.MustCompile(`^[-/_=.a-zA-Z0-9]+$`)
 
-// validateKVKey rejects key shapes nats.go's own validation lets through
-// inconsistently: empty path segments such as "a..b" pass nats.go's keyValid
-// (only leading/trailing dots are checked), and wildcards pass History's
-// Watch-based validator even though every other key RPC rejects them (see
-// QA-062, QA-064). A rejected key never reaches the wire, so the error
-// carries the same "nats: invalid key" text nats.go uses for the cases it
-// does catch.
+// validateKVKey rejects empty path segments ("a..b") and wildcards for every
+// key RPC with the same "nats: invalid key" error nats.go uses.
 func validateKVKey(key string) error {
 	if key != "" && key[0] != '.' && key[len(key)-1] != '.' && !strings.Contains(key, "..") &&
 		kvKeyPattern.MatchString(key) {
@@ -47,12 +42,8 @@ func validateKVKey(key string) error {
 // wrapBucketErr wraps errors from KV/Object bucket-level operations
 // (Create/Get/Delete/Seal). nats.go's own error chains for a missing bucket
 // join both jetstream.ErrBucketNotFound and jetstream.ErrStreamNotFound, and
-// natsSentinelMap (natsgo/errors.go) lists the stream sentinel first, so
-// plain wrapErr reports the stream-level reason instead of the bucket-level
-// one a caller actually asked about (see QA-124). It also translates
-// jetstream.ErrBadBucket, which wrapErr never maps, so a stream that merely
-// shares a KV_/OBJ_ name refuses instead of silently being deleted or sealed
-// (see QA-066).
+// wrapErr would report the stream-level sentinel first. It also maps
+// jetstream.ErrBadBucket to errs.ErrNotAKVOrObjectBucket.
 func wrapBucketErr(err error) error {
 	if err == nil {
 		return nil
@@ -123,7 +114,7 @@ func (c *Client) CreateKVBucket(ctx context.Context, config entities.KVBucketCon
 // DeleteKVBucket deletes a KeyValue bucket and all its data. nats.go's
 // DeleteKeyValue skips the sanity check KeyValue() itself does (history depth
 // > 0), so a stream merely named KV_<bucket> would otherwise be deleted
-// outright; KeyValue() first confirms it's really a KV bucket (see QA-066).
+// outright; KeyValue() first confirms it's really a KV bucket.
 func (c *Client) DeleteKVBucket(ctx context.Context, bucket string) error {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)
 	defer cancel()
@@ -160,8 +151,7 @@ func (c *Client) GetKVBucket(ctx context.Context, bucket string) (*entities.KVBu
 
 // ListKVKeys returns all keys in a bucket. Keys() creates an ephemeral
 // consumer, so a missing CONSUMER.CREATE perm surfaces only as a timeout. An
-// empty bucket returns an empty slice rather than jetstream.ErrNoKeysFound
-// (see QA-065), matching every other empty-collection response in this API.
+// empty bucket returns an empty slice.
 func (c *Client) ListKVKeys(ctx context.Context, bucket string) ([]string, error) {
 	kvCtx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)
 	defer cancel()

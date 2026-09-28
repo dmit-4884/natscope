@@ -50,24 +50,16 @@ func (c *Client) getMessagesParallel(
 		}, nil
 	}
 
-	if startSeq == 0 {
-		if direction == DefaultDirection {
-			startSeq = info.State.LastSeq
-		} else {
-			startSeq = info.State.FirstSeq
-		}
-	} else if direction == DefaultDirection {
-		// Backward: clamp a huge/overflowed startSeq down to LastSeq instead of
-		// walking entirely above it and returning an empty page instead of the
-		// newest messages (QA-120).
+	backward := direction == DefaultDirection
+	switch {
+	case startSeq == 0 && backward:
+		startSeq = info.State.LastSeq
+	case startSeq == 0:
+		startSeq = info.State.FirstSeq
+	case backward:
 		startSeq = min(startSeq, info.State.LastSeq)
-	} else {
-		// Forward: clamp a startSeq below FirstSeq (e.g. after a purge) up to
-		// FirstSeq instead of walking entirely below it and reporting
-		// hasMore=true with nextSeq=1, looping forever (QA-019). A startSeq
-		// above LastSeq is left alone: buildSequenceList already turns that into
-		// a correctly empty page (e.g. a jump-to-time resolved past the last
-		// message must return nothing, not the last message again).
+	default:
+		// A forward start past LastSeq stays put so the page comes back empty.
 		startSeq = max(startSeq, info.State.FirstSeq)
 	}
 
@@ -124,7 +116,7 @@ func (c *Client) getMessagesParallel(
 	// hasMore reflects whether the +1 probe message was actually collected —
 	// deriving it only from the early-break flag above missed the case where
 	// the probe was the very last entry in seqsToFetch (a stream of exactly
-	// limit+1 messages), silently losing that last message (QA-018).
+	// limit+1 messages), silently losing that last message.
 	hasMore := len(messages) > limit
 
 	// Trim the extra +1 message used for hasMore detection.
@@ -135,7 +127,7 @@ func (c *Client) getMessagesParallel(
 	// Cursor from the last kept message; if the window came back empty (an
 	// interior gap wider than the fetch window, or nothing but holes to the
 	// stream boundary), resume from the end of the queried window instead of
-	// falling back to 0 — which wraps nextSeq to 1 and loops forever (QA-019).
+	// falling back to 0 — which wraps nextSeq to 1 and loops forever.
 	cursorSeq := lastProcessedSeq
 	switch {
 	case len(messages) > 0:

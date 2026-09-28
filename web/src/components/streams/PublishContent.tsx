@@ -281,7 +281,7 @@ export default function PublishContent({
     if (jsonError) return 'Fix the JSON syntax error below'
     // A header name outside RFC 7230's token grammar is silently dropped on
     // encode — publishing anyway would look like success while losing data
-    // the user believes they sent (QA-162).
+    // the user believes they sent.
     if (hasInvalidHeaderName) return 'Fix the invalid header name below'
     return null
   }, [subjectPattern, unfilledWildcards, messageJson, jsonError, hasInvalidHeaderName])

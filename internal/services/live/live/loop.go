@@ -40,7 +40,7 @@ const (
 
 	// emitStallTimeout bounds a single emit (stream.Send) call. A client that
 	// stopped reading TCP would otherwise block the loop indefinitely, letting
-	// msgChan back up with full-size, undecoded payloads (QA-029). The
+	// msgChan back up with full-size, undecoded payloads. The
 	// underlying send typically unblocks shortly after via request-context
 	// cancellation once this ends the session.
 	emitStallTimeout = 10 * time.Second
@@ -146,7 +146,7 @@ func (s *Service) runLoop(
 	}
 
 	// resetDecoderIfDirty re-initializes the decoder after a proto reload and
-	// tells the client so (QA-080/QA-081); checked both on a timer and per
+	// tells the client so; checked both on a timer and per
 	// message so a quiet session still finds out within one stats tick.
 	resetDecoderIfDirty := func() error {
 		if !sess.decoderDirty.CompareAndSwap(1, 0) {

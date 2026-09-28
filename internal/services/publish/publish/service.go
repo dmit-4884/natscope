@@ -165,7 +165,7 @@ func (s *Service) recordHistory(
 	if urlErr != nil && errors.Is(urlErr, errs.ErrSavedConnectionNotFound) {
 		// A history row for a connection id that doesn't exist can never be
 		// followed up on (no connection to link back to, no URL to show) and
-		// only pollutes the audit trail — skip it (QA-131).
+		// only pollutes the audit trail — skip it.
 		return
 	}
 

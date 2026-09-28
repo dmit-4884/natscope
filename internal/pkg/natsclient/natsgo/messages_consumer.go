@@ -59,7 +59,7 @@ func (c *Client) getMessagesViaConsumer(
 	}
 	// A never-written stream has no valid start sequence for
 	// DeliverByStartSequencePolicy; the server rejects that with a confusing
-	// "optional start sequence is not set" instead of an empty page (QA-059).
+	// "optional start sequence is not set" instead of an empty page.
 	if info != nil && info.State.Msgs == 0 {
 		return &entities.MessagesResponse{Messages: []*entities.Message{}, HasMore: false}, nil
 	}
@@ -101,7 +101,7 @@ func (c *Client) getMessagesViaConsumer(
 
 		// Enough live/matching messages, or the window already reaches the
 		// true start of the stream — widening further can't surface more
-		// (QA-016, QA-017: a deletion gap or sparse subject filter previously
+		// (a deletion gap or sparse subject filter previously
 		// left the browse window undersized, and "found fewer than the window
 		// implies" was wrongly read as "reached the start of the stream").
 		if len(resp.Messages) > limit || fetchStart <= info.State.FirstSeq {
@@ -188,7 +188,7 @@ func (c *Client) consumeBrowseBatch(
 		headers := make(map[string]string)
 		hdrs := msg.Headers()
 		for k, v := range hdrs {
-			// Join every value instead of keeping only the first (QA-057).
+			// Join every value instead of keeping only the first.
 			headers[k] = strings.Join(v, ", ")
 		}
 

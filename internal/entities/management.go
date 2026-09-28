@@ -116,7 +116,7 @@ type StreamUpdateRequest struct {
 	// Description is the stream description (mutable). nil_on_empty is
 	// deliberately not applied here: a present-but-empty pointer is how the
 	// caller clears the description; collapsing it to nil (same as "not sent")
-	// made that impossible (QA-053).
+	// made that impossible.
 	Description *string `normalize:"trim"`
 
 	// MaxMsgs is the maximum number of messages (mutable).
@@ -333,9 +333,7 @@ type ConsumerCreateRequest struct {
 // ConsumerUpdateRequest holds mutable consumer fields; pointers distinguish
 // "not sent" (nil) from "set to zero value".
 type ConsumerUpdateRequest struct {
-	// Description is the consumer description (mutable). nil_on_empty is
-	// deliberately not applied here — see StreamUpdateRequest.Description
-	// (QA-053).
+	// Description is the consumer description (mutable); "" clears it.
 	Description *string `normalize:"trim"`
 
 	// AckWait is the acknowledgment wait time (mutable).

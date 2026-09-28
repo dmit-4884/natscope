@@ -44,7 +44,7 @@ func (c *Client) Subscribe(
 		// Set at delivery, not later when the live loop converts the message
 		// to proto: that conversion can trail receipt by up to one batch
 		// interval, and every message in a batch would otherwise share the
-		// batch's conversion time instead of its own (QA-133).
+		// batch's conversion time instead of its own.
 		handler(&entities.NatsMessage{
 			Subject:   msg.Subject,
 			Data:      msg.Data,

@@ -21,7 +21,7 @@ type Storage interface {
 	// Update atomically loads the template by id, lets mutate apply the
 	// caller's change to it, and persists the result within a single storage
 	// transaction — so concurrent partial updates on different fields cannot
-	// race (QA-044). Returns errs.ErrMessageTemplateNotFound if id is not
+	// race. Returns errs.ErrMessageTemplateNotFound if id is not
 	// present.
 	Update(ctx context.Context, id string, mutate func(existing *entities.MessageTemplate)) (*entities.MessageTemplate, error)
 

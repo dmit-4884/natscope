@@ -108,8 +108,8 @@ func TestSettings_EmptyGroupsStayNil(t *testing.T) {
 	}
 }
 
-// TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites is the QA-041
-// regression: three goroutines each update a different setting group, round
+// TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites is a
+// regression test: three goroutines each update a different setting group, round
 // after round. Since Update now does its read-modify-write inside one bbolt
 // transaction, every round must leave all three groups at that round's value.
 func TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {

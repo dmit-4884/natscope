@@ -23,12 +23,12 @@ type Storage interface {
 
 	// Update atomically loads the connection by id, lets mutate apply the
 	// caller's change to it, and persists the result within a single storage
-	// transaction — so concurrent partial updates cannot race (QA-008).
+	// transaction — so concurrent partial updates cannot race.
 	// errs.ErrSavedConnectionNotFound if missing. mutate returns
 	// authReplaced/tlsReplaced: whether it explicitly replaced (rather than
 	// left untouched) the Auth/TLS subtree, so vault secrets belonging to the
 	// previous config that are not part of the new one are purged instead of
-	// merged forward (QA-006).
+	// merged forward.
 	Update(
 		ctx context.Context,
 		id string,

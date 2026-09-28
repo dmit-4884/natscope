@@ -63,9 +63,9 @@ func (s *Storage) Save(ctx context.Context, in *entities.SavedConnection) error 
 // change to it, and persists the result — all inside one bbolt transaction, so
 // concurrent partial updates on different fields (two browser tabs, "Ping
 // all" racing an edit) serialize on bbolt's writer lock instead of one
-// clobbering the other via a stale read-modify-write (QA-008). mutate reports
+// clobbering the other via a stale read-modify-write. mutate reports
 // whether it explicitly replaced the Auth/TLS subtree, so stale vault secrets
-// from the previous config are pruned rather than merged forward (QA-006).
+// from the previous config are pruned rather than merged forward.
 func (s *Storage) Update(
 	ctx context.Context,
 	id string,

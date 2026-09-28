@@ -51,7 +51,7 @@ func (h *Handler) CreateStream(
 	if in.GetConsumerLimits() != nil {
 		// protoCodecs is required here: ConsumerLimits.InactiveThreshold is a
 		// Duration, and without it the converter silently drops the field
-		// instead of converting it (QA-011).
+		// instead of converting it.
 		cr.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{}, protoCodecs)
 	}
 
@@ -84,8 +84,6 @@ func (h *Handler) UpdateStream(
 		ur.SubjectTransform = converter.Convert(in.GetSubjectTransform(), &entities.SubjectTransformConfig{})
 	}
 	if in.GetConsumerLimits() != nil {
-		// See CreateStream: protoCodecs is required for the Duration field
-		// (QA-011).
 		ur.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{}, protoCodecs)
 	}
 	sources, err := protoStreamSourcesToEntity(in.GetSources())

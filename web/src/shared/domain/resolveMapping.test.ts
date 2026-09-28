@@ -33,7 +33,7 @@ describe('resolveMapping', () => {
     expect(resolve('orders.created', [greater, star])).toBe(star)
   })
 
-  // QA-102: the exact repro — the same wildcard pattern bound to two
+  // the exact repro — the same wildcard pattern bound to two
   // different sources must resolve identically for Publish and the message
   // viewer, and must agree with the server's resolver (natsutil), which
   // breaks identical-pattern wildcard ties by the oldest createdAt.

@@ -164,7 +164,7 @@ func (c *Client) resolveSeqByTimeConsumer(
 	// nats-server computing the consumer's start time from that overflowed
 	// value can wrap to a time before every message in the stream — the
 	// consumer then delivers from the very beginning instead of finding
-	// nothing (QA-058). Any target after the last known message trivially has
+	// nothing. Any target after the last known message trivially has
 	// no match.
 	if !info.State.LastTime.IsZero() && target.After(info.State.LastTime) {
 		return info.State.LastSeq + 1, nil

@@ -70,7 +70,7 @@ const invalidConsumerNameChars = ">*. /\\\t\r\n"
 
 // validateConsumerNameChars rejects a consumer name containing a character
 // JetStream itself disallows there, before it is embedded by hand in a
-// "$JS.API.CONSUMER...<name>" subject (QA-050). The error wraps
+// "$JS.API.CONSUMER...<name>" subject. The error wraps
 // jetstream.ErrInvalidConsumerName so wrapErr classifies it exactly like the
 // SDK's own client-side rejection.
 func validateConsumerNameChars(name string) error {

@@ -129,7 +129,7 @@ export function useSubjectMappingEntity(subject: string | null, sourceFilter?: s
 
     // Shared with the message viewer (UnifiedMessageViewer) so Publish
     // encodes with the same mapping the viewer decodes with — see
-    // resolveMapping's doc comment (QA-102).
+    // resolveMapping's doc comment.
     return resolveMapping(
       subject,
       candidates,

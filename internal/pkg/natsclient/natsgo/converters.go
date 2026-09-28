@@ -37,7 +37,7 @@ var srcDestToJetStream = converter.WithFieldMappings(map[string]string{
 // globally across the whole nested conversion — including
 // SubjectTransformConfig, whose entity already uses Source/Destination
 // directly. Applying the mapping there redirects those fields to a
-// nonexistent "Src"/"Dest" pair and silently drops them (QA-012). RePublish is
+// nonexistent "Src"/"Dest" pair and silently drops them. RePublish is
 // converted separately below, with the mapping scoped to just that call.
 var streamConvertOpts = []converter.Option{
 	converter.WithIgnoreFields("TimeStamp"),

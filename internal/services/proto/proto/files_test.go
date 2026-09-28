@@ -157,8 +157,8 @@ message Common { string s = 1; }
 	assert.NotEmpty(t, fds, "should compile with include dirs satisfying the import")
 }
 
-// TestCompileFiles_IncludeDirs_RejectsArbitraryFileRead is the QA-026
-// regression: an import naming a non-".proto" file under an Include
+// TestCompileFiles_IncludeDirs_RejectsArbitraryFileRead is a
+// regression test: an import naming a non-".proto" file under an Include
 // Directory (e.g. "passwd" with includeDirs=["/etc"]) must not be read, and
 // its content must never appear in the returned diagnostics.
 func TestCompileFiles_IncludeDirs_RejectsArbitraryFileRead(t *testing.T) {
@@ -184,7 +184,7 @@ message M {}
 	}
 }
 
-// TestCompileFiles_IncludeDirs_RejectsAbsoluteImport covers the second QA-026
+// TestCompileFiles_IncludeDirs_RejectsAbsoluteImport covers the second
 // repro: an absolute import path must not be resolved directly off the
 // filesystem, even with no Include Directories configured.
 func TestCompileFiles_IncludeDirs_RejectsAbsoluteImport(t *testing.T) {
@@ -211,7 +211,7 @@ message M {}
 	}
 }
 
-// TestCompileFiles_IncludeDirs_RejectsSymlink is the QA-076 regression on the
+// TestCompileFiles_IncludeDirs_RejectsSymlink is a regression test on the
 // compile path: a symlink under an Include Directory must not be followed.
 func TestCompileFiles_IncludeDirs_RejectsSymlink(t *testing.T) {
 	dir := t.TempDir()
