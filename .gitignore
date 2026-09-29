@@ -121,3 +121,6 @@ nats-docs/
 web/test-results/
 web/playwright-report/
 web/blob-report/
+
+# IDE settings stay local
+.idea/
