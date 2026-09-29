@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -277,6 +279,58 @@ func TestMessagesPaginationSubjectFilterFindsOldMatches(t *testing.T) {
 			seqs := walkMessages(t, env, connID, stream, messagespb.Direction_DIRECTION_BACKWARD, "sparse.rare", 5)
 			assert.ElementsMatch(t, []uint64{rare1, rare2, rare3}, seqs,
 				"a subject filter must find matches beyond the first browse window, not just the newest one")
+		})
+	}
+}
+
+// TestMessagesPaginationLargeStream checks the first page of a stream larger than the search range, and a filter older than it.
+func TestMessagesPaginationLargeStream(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := createTestConnection(t, env, "pagination-large", env.natsURL, nil)
+
+	nc, err := nats.Connect(env.natsURL)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+
+	const stream = "LARGE"
+	_, err = js.CreateStream(ctx, jetstream.StreamConfig{Name: stream, Subjects: []string{"large.>"}, Storage: jetstream.MemoryStorage})
+	require.NoError(t, err)
+
+	ack, err := js.Publish(ctx, "large.rare", []byte("{}"))
+	require.NoError(t, err)
+	const total = 12000
+	for range total - 1 {
+		_, err := js.PublishAsync("large.a", []byte("{}"))
+		require.NoError(t, err)
+	}
+	select {
+	case <-js.PublishAsyncComplete():
+	case <-time.After(30 * time.Second):
+		t.Fatal("async publish did not complete")
+	}
+
+	for _, method := range []string{"consumer", "direct"} {
+		t.Run(method, func(t *testing.T) {
+			setMessagesFetchMethod(t, env, method)
+
+			limit := int64(50)
+			resp, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
+				ConnectionId: connID, StreamName: stream, Limit: &limit,
+			}))
+			require.NoError(t, err)
+			msgs := resp.Msg.GetMessages()
+			require.Len(t, msgs, int(limit))
+			for i, m := range msgs {
+				assert.Equal(t, uint64(total-i), m.GetSequence(), "the default page must start at the newest message")
+			}
+			assert.True(t, resp.Msg.GetHasMore())
+			assert.Equal(t, uint64(total)-uint64(limit), resp.Msg.GetNextSeq())
+
+			seqs := walkMessages(t, env, connID, stream, messagespb.Direction_DIRECTION_BACKWARD, "large.rare", 5)
+			assert.Equal(t, []uint64{ack.Sequence}, seqs, "a filter match older than the widest window must still be reached")
 		})
 	}
 }

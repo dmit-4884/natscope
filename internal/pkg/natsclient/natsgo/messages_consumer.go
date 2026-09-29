@@ -75,16 +75,15 @@ func (c *Client) getMessagesViaConsumer(
 		endSeq = info.State.LastSeq
 	}
 
-	window := uint64(limit+1) * backwardFetchMultiplier
+	maxWindow := uint64(DefaultSearchRange - 1)
+	window := min(uint64(limit+1)*backwardFetchMultiplier, maxWindow)
 
 	var resp *entities.MessagesResponse
-	for attempt := 0; attempt < backwardWidenAttempts; attempt++ {
-		fetchStart := uint64(1)
-		if endSeq > window {
+	var fetchStart uint64
+	for attempt := 0; ; attempt++ {
+		fetchStart = max(info.State.FirstSeq, 1)
+		if endSeq > window && endSeq-window > fetchStart {
 			fetchStart = endSeq - window
-		}
-		if fetchStart < info.State.FirstSeq {
-			fetchStart = info.State.FirstSeq
 		}
 
 		resp, err = c.consumeBrowseBatch(ctx, stream, info, fetchStart, startSeq, filterSubjects, limit, direction)
@@ -92,13 +91,17 @@ func (c *Client) getMessagesViaConsumer(
 			return nil, err
 		}
 
-		// Stop once there are enough messages or the window reaches FirstSeq.
-		if len(resp.Messages) > limit || fetchStart <= info.State.FirstSeq {
+		if resp.HasMore || fetchStart <= info.State.FirstSeq {
+			return resp, nil
+		}
+		if attempt+1 >= backwardWidenAttempts || window >= maxWindow {
 			break
 		}
-		window *= backwardWidenFactor
+		window = min(window*backwardWidenFactor, maxWindow)
 	}
 
+	resp.HasMore = true
+	resp.NextSeq = fetchStart - 1
 	return resp, nil
 }
 
