@@ -9,6 +9,7 @@ package convcodecs
 import (
 	"encoding/base64"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +71,33 @@ var DurationSaturating convcodec.Codec = func(fieldName string, src, dst reflect
 		dst = dst.Elem()
 	}
 	dst.SetInt(int64(goDur))
+}
+
+// DurationString renders a time.Duration as its String form, leaving zero as "".
+var DurationString convcodec.Codec = func(fieldName string, src, dst reflect.Value, next convcodec.CodecHandler) {
+	if src.Type() != goDurationType || dst.Kind() != reflect.String {
+		next(fieldName, src, dst)
+		return
+	}
+	if d := time.Duration(src.Int()); d != 0 {
+		dst.SetString(d.String())
+	}
+}
+
+// EnumNames renders integer enums listed in names as the name at their value's index; unknown values render as the number.
+func EnumNames(names map[reflect.Type][]string) convcodec.Codec {
+	return func(fieldName string, src, dst reflect.Value, next convcodec.CodecHandler) {
+		list, ok := names[src.Type()]
+		if !ok || dst.Kind() != reflect.String {
+			next(fieldName, src, dst)
+			return
+		}
+		if i := src.Int(); i >= 0 && i < int64(len(list)) {
+			dst.SetString(list[i])
+			return
+		}
+		dst.SetString(strconv.FormatInt(src.Int(), 10))
+	}
 }
 
 func indirectType(t reflect.Type) reflect.Type {

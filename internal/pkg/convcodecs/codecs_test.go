@@ -5,6 +5,7 @@ package convcodecs
 
 import (
 	"math"
+	"reflect"
 	"testing"
 	"time"
 
@@ -65,4 +66,41 @@ func TestDurationSaturating_NormalValuePassesThrough(t *testing.T) {
 	)
 
 	assert.Equal(t, 30*time.Second, result.AckWait)
+}
+
+func TestDurationString(t *testing.T) {
+	type src struct {
+		MaxAge  time.Duration
+		AckWait time.Duration
+	}
+	type dst struct {
+		MaxAge  string
+		AckWait string
+	}
+
+	result := converter.Convert(&src{MaxAge: 90 * time.Minute}, &dst{}, converter.WithCodecs(DurationString))
+
+	assert.Equal(t, "1h30m0s", result.MaxAge)
+	assert.Empty(t, result.AckWait)
+}
+
+func TestEnumNames(t *testing.T) {
+	type level int
+	type src struct {
+		Level   level
+		Unknown level
+		Count   int
+	}
+	type dst struct {
+		Level   string
+		Unknown string
+		Count   int
+	}
+
+	codec := EnumNames(map[reflect.Type][]string{reflect.TypeFor[level](): {"low", "high"}})
+	result := converter.Convert(&src{Level: 1, Unknown: 7, Count: 3}, &dst{}, converter.WithCodecs(codec))
+
+	assert.Equal(t, "high", result.Level)
+	assert.Equal(t, "7", result.Unknown)
+	assert.Equal(t, 3, result.Count)
 }

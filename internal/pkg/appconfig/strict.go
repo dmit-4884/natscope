@@ -89,6 +89,8 @@ var emptyOverridableEnvKeys = []string{
 	"WEB_AUTH__PASSWORD",
 	"SECRETS__BACKEND",
 	"SECRETS__FILE_KEY",
+	"MCP__ENABLED",
+	"MCP__ALLOW_WRITES",
 }
 
 // clearEmptyEnvOverrides unsets every prefixed emptyOverridableEnvKeys entry set to "".
@@ -102,7 +104,7 @@ func clearEmptyEnvOverrides() {
 }
 
 // boolEnvKeys are the boolean config keys settable through the environment.
-var boolEnvKeys = []string{"ALLOW_REMOTE", "ALLOW_INSECURE", "LOGGER__COLORIZED"}
+var boolEnvKeys = []string{"ALLOW_REMOTE", "ALLOW_INSECURE", "LOGGER__COLORIZED", "MCP__ENABLED", "MCP__ALLOW_WRITES"}
 
 // normalizeBoolEnv rewrites yes/no, on/off and y/n in boolEnvKeys to true/false, as the config file accepts them.
 func normalizeBoolEnv() {

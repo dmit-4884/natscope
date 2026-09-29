@@ -13,6 +13,7 @@ import (
 
 	"github.com/altessa-s/go-atlas/core/runtime/appinfo"
 
+	"github.com/dmit-4884/natscope/cmd/natscope/commands/mcp"
 	"github.com/dmit-4884/natscope/cmd/natscope/commands/server"
 	"github.com/dmit-4884/natscope/cmd/natscope/commands/server/run"
 	"github.com/dmit-4884/natscope/cmd/natscope/commands/version"
@@ -47,6 +48,9 @@ func New() *cobra.Command {
 
 				# Show version information
 				natscope version
+
+				# Serve the MCP tools over stdio (natscope must be running)
+				natscope mcp
 
 				# Show detailed help for server commands
 				natscope server --help
@@ -83,6 +87,7 @@ func (c *Command) configure() {
 
 	c.AddCommand(version.New())
 	c.AddCommand(server.New())
+	c.AddCommand(mcpcmd.New())
 }
 
 // run starts the server, making a bare "natscope" equivalent to "natscope server run".

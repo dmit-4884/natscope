@@ -158,6 +158,11 @@ func (t *Transport) RegisterHandlers(handlers []Handler) {
 	t.mux.HandleFunc("/", t.serveSPA)
 }
 
+// Mount serves h at pattern behind the same Host check, auth and CSRF guards. Must be called before Start.
+func (t *Transport) Mount(pattern string, h http.Handler) {
+	t.mux.Handle(pattern, h)
+}
+
 // assetsPrefix holds Vite's hashed build output; a miss under it is a 404, not index.html.
 const assetsPrefix = "/assets/"
 

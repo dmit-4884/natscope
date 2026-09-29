@@ -1,0 +1,140 @@
+// Copyright 2026 The Natscope Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package streams
+
+import (
+	"time"
+
+	mcptransport "github.com/dmit-4884/natscope/internal/transports/mcp"
+)
+
+type streamSummary struct {
+	Config  streamSummaryConfig `json:"config"`
+	State   *streamStateView    `json:"state,omitempty"`
+	Created time.Time           `json:"created"`
+}
+
+type streamSummaryConfig struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Subjects    []string `json:"subjects"`
+	Retention   string   `json:"retention"`
+	Storage     string   `json:"storage"`
+	Replicas    int      `json:"replicas"`
+	Sealed      bool     `json:"sealed,omitempty"`
+}
+
+type streamStateView struct {
+	Msgs        uint64    `json:"messages"`
+	Bytes       uint64    `json:"bytes"`
+	FirstSeq    uint64    `json:"firstSeq"`
+	LastSeq     uint64    `json:"lastSeq"`
+	FirstTime   time.Time `json:"firstTime"`
+	LastTime    time.Time `json:"lastTime"`
+	Consumers   int       `json:"consumers"`
+	NumDeleted  int       `json:"deleted,omitempty"`
+	NumSubjects uint64    `json:"subjects"`
+}
+
+type listStreamsOutput struct {
+	Streams []streamSummary `json:"streams"`
+}
+
+type streamInput struct {
+	mcptransport.ConnectionArg
+	Stream string `json:"stream" jsonschema:"stream name"`
+}
+
+type streamView struct {
+	Config  streamConfigView `json:"config"`
+	State   *streamStateView `json:"state,omitempty"`
+	Created time.Time        `json:"created"`
+	Cluster *clusterView     `json:"cluster,omitempty"`
+}
+
+type streamConfigView struct {
+	Name              string            `json:"name"`
+	Description       string            `json:"description,omitempty"`
+	Subjects          []string          `json:"subjects"`
+	Retention         string            `json:"retention"`
+	Storage           string            `json:"storage"`
+	Replicas          int               `json:"replicas"`
+	Discard           string            `json:"discard"`
+	MaxMsgs           int64             `json:"maxMsgs" jsonschema:"-1 means unlimited"`
+	MaxBytes          int64             `json:"maxBytes" jsonschema:"-1 means unlimited"`
+	MaxAge            string            `json:"maxAge,omitempty"`
+	MaxMsgSize        int32             `json:"maxMsgSize" jsonschema:"-1 means unlimited"`
+	MaxMsgsPerSubject int64             `json:"maxMsgsPerSubject" jsonschema:"-1 means unlimited"`
+	MaxConsumers      int               `json:"maxConsumers" jsonschema:"-1 means unlimited"`
+	Duplicates        string            `json:"duplicateWindow,omitempty"`
+	Compression       string            `json:"compression"`
+	Sealed            bool              `json:"sealed"`
+	DenyDelete        bool              `json:"denyDelete"`
+	DenyPurge         bool              `json:"denyPurge"`
+	AllowRollup       bool              `json:"allowRollup"`
+	AllowDirect       bool              `json:"allowDirect"`
+	AllowMsgTTL       bool              `json:"allowMsgTtl"`
+	Mirror            *sourceView       `json:"mirror,omitempty"`
+	Sources           []*sourceView     `json:"sources,omitempty"`
+	Metadata          map[string]string `json:"metadata,omitempty"`
+}
+
+type sourceView struct {
+	Name          string `json:"name"`
+	FilterSubject string `json:"filterSubject,omitempty"`
+	OptStartSeq   uint64 `json:"startSeq,omitempty"`
+}
+
+type clusterView struct {
+	Name     string      `json:"name,omitempty"`
+	Leader   string      `json:"leader,omitempty"`
+	Replicas []*peerView `json:"replicas,omitempty"`
+}
+
+type peerView struct {
+	Name    string `json:"name"`
+	Current bool   `json:"current"`
+	Offline bool   `json:"offline,omitempty"`
+	Active  string `json:"lastActive,omitempty"`
+	Lag     uint64 `json:"lag,omitempty"`
+}
+
+type listConsumersInput struct {
+	mcptransport.ConnectionArg
+	Stream string `json:"stream,omitempty" jsonschema:"stream name; omit to list the consumers of every stream"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"maximum consumers to return, most pending first, 1-1000 (default 200)"`
+}
+
+type consumerView struct {
+	Stream         string            `json:"stream"`
+	Name           string            `json:"name"`
+	Description    string            `json:"description,omitempty"`
+	Durable        string            `json:"durable,omitempty"`
+	FilterSubject  string            `json:"filterSubject,omitempty"`
+	FilterSubjects []string          `json:"filterSubjects,omitempty"`
+	DeliverPolicy  string            `json:"deliverPolicy"`
+	AckPolicy      string            `json:"ackPolicy"`
+	AckWait        string            `json:"ackWait,omitempty"`
+	MaxDeliver     int               `json:"maxDeliver"`
+	MaxAckPending  int               `json:"maxAckPending"`
+	PushBound      bool              `json:"pushBound,omitempty"`
+	NumPending     uint64            `json:"numPending"`
+	NumAckPending  int               `json:"numAckPending"`
+	NumRedelivered int               `json:"numRedelivered"`
+	NumWaiting     int               `json:"numWaiting"`
+	Delivered      sequenceView      `json:"delivered"`
+	AckFloor       sequenceView      `json:"ackFloor"`
+	Created        *time.Time        `json:"created,omitempty"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+}
+
+type sequenceView struct {
+	Consumer uint64 `json:"consumerSeq"`
+	Stream   uint64 `json:"streamSeq"`
+}
+
+type listConsumersOutput struct {
+	Consumers []consumerView `json:"consumers"`
+	Total     int            `json:"total" jsonschema:"consumers found before the limit"`
+}

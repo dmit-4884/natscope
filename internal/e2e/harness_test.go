@@ -79,6 +79,11 @@ type e2eEnv struct {
 // the real natscope app on a free localhost port, returning the wired Connect clients.
 func setupE2E(t *testing.T) *e2eEnv {
 	t.Helper()
+	return setupE2EWith(t, nil)
+}
+
+func setupE2EWith(t *testing.T, configure func(*appconfig.Config)) *e2eEnv {
+	t.Helper()
 
 	// 1. In-memory keychain so cryptobox never prompts / touches the real OS keychain.
 	keyring.MockInit()
@@ -103,6 +108,9 @@ func setupE2E(t *testing.T) *e2eEnv {
 			Storage: &appconfig.StorageConfig{
 				Local: &appconfig.LocalStorageConfig{DataDir: t.TempDir()},
 			},
+		}
+		if configure != nil {
+			configure(cfg)
 		}
 
 		candidate := fx.New(

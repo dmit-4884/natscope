@@ -207,3 +207,63 @@ func TestLoad_HTTPListenAddressForms(t *testing.T) {
 		t.Error(":9080 binds every interface")
 	}
 }
+
+func TestMCPDefaults(t *testing.T) {
+	if cfg := (&appconfig.Config{}); !cfg.MCPEnabled() || cfg.MCPAllowWrites() {
+		t.Error("an unset mcp section must mean enabled, read-only")
+	}
+
+	cfg, err := appconfig.Load("", appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.MCPEnabled() {
+		t.Error("mcp must be enabled by default")
+	}
+	if cfg.MCPAllowWrites() {
+		t.Error("mcp writes must be off by default")
+	}
+}
+
+func TestLoad_MCPPartialSectionKeepsDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("mcp:\n  allowWrites: true\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := appconfig.Load(path, appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.MCPEnabled() {
+		t.Error("enabled must keep its default when the section sets only allowWrites")
+	}
+	if !cfg.MCPAllowWrites() {
+		t.Error("allowWrites: true must be honored")
+	}
+
+	t.Setenv("MCP__ENABLED", "off")
+	cfg, err = appconfig.Load(path, appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.MCPEnabled() {
+		t.Error("MCP__ENABLED=off must disable the endpoint")
+	}
+}
+
+func TestLoad_MCPDisabledInYAML(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("mcp:\n  enabled: false\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := appconfig.Load(path, appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.MCPEnabled() {
+		t.Error("enabled: false must disable the endpoint")
+	}
+}

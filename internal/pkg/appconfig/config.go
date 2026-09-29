@@ -55,6 +55,9 @@ type Config struct {
 	// Secrets selects the vault backend; allocated like Storage so nested
 	// defaults apply when the YAML omits the section.
 	Secrets *SecretsConfig `yaml:"secrets"`
+
+	// MCP configures the /mcp endpoint; allocated like Storage so nested defaults apply.
+	MCP *MCPConfig `yaml:"mcp"`
 }
 
 // Secret vault backends: auto probes the OS keychain and falls back to the

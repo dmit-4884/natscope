@@ -10,6 +10,8 @@
       "github.com/spf13/cobra",
       "github.com/altessa-s/go-atlas",
       "github.com/google/uuid",
+      "github.com/google/jsonschema-go",
+      "github.com/modelcontextprotocol/go-sdk",
       "github.com/go-ozzo/ozzo-validation/v4",
       "github.com/dmit-4884/natscope",
       "github.com/nats-io/nats.go",

@@ -41,6 +41,13 @@ import (
 	grpctransport "github.com/dmit-4884/natscope/internal/transports/grpc"
 	workspaceHandler "github.com/dmit-4884/natscope/internal/transports/grpc/handlers/workspace"
 	grpchelpers "github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
+	mcptransport "github.com/dmit-4884/natscope/internal/transports/mcp"
+	connectionsTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/connections"
+	kvTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/kv"
+	messagesTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/messages"
+	publishTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/publish"
+	schemaTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/schema"
+	streamsTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/streams"
 )
 
 // maxRequestBytes caps a single decoded request message to protect the process
@@ -83,6 +90,21 @@ func TransportsModule() fx.Option {
 			}
 		}, fx.ParamTags(`group:"connect-handlers"`))),
 
+		// MCP endpoint at /mcp — toolsets collected via the mcp-toolsets group.
+		fx.Provide(mcptransport.NewConnections),
+		fx.Provide(AsMCPToolset(connectionsTools.New)),
+		fx.Provide(AsMCPToolset(streamsTools.New)),
+		fx.Provide(AsMCPToolset(messagesTools.New)),
+		fx.Provide(AsMCPToolset(schemaTools.New)),
+		fx.Provide(AsMCPToolset(kvTools.New)),
+		fx.Provide(AsMCPToolset(publishTools.New)),
+		fx.Provide(fx.Annotate(mcptransport.New, fx.ParamTags(``, `group:"mcp-toolsets"`))),
+		fx.Invoke(func(t *grpctransport.Transport, e *mcptransport.Endpoint) {
+			if t != nil && e != nil {
+				t.Mount(mcptransport.Path, e)
+			}
+		}),
+
 		// Proto reload flips each live session's dirty bit so it re-initializes
 		// its decoder before the next message; also restores local-source watchers.
 		fx.Invoke(func(lc fx.Lifecycle, protoSvc protosvc.Codec, liveSvc livesvc.Service) error {
@@ -108,6 +130,12 @@ func TransportsModule() fx.Option {
 // connect-handlers group consumed by the transport.
 func AsConnectHandler(f any) any {
 	return fx.Annotate(f, fx.As(new(grpctransport.Handler)), fx.ResultTags(`group:"connect-handlers"`))
+}
+
+// AsMCPToolset annotates a toolset constructor so its result lands in the
+// mcp-toolsets group consumed by the MCP endpoint.
+func AsMCPToolset(f any) any {
+	return fx.Annotate(f, fx.As(new(mcptransport.Toolset)), fx.ResultTags(`group:"mcp-toolsets"`))
 }
 
 // newConnectTransport builds the unified Connect transport and wires

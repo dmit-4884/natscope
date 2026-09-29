@@ -1,0 +1,16 @@
+# Model Context Protocol endpoint for AI agents (Claude Code, Cursor, …).
+# Served at /mcp on the grpcWebAddress listener, behind the same Host check
+# and webAuth as the UI and API.
+# All parameters are commented out by default (template mode): the values shown
+# are the built-in defaults.
+
+#mcp:
+#  # <bool> Serve the MCP endpoint.
+#  # Env: MCP__ENABLED
+#  # Default value: true
+#  enabled: true
+#
+#  # <bool> Register publish_message, the only tool that writes to NATS.
+#  # Env: MCP__ALLOW_WRITES
+#  # Default value: false
+#  allowWrites: false
