@@ -7,11 +7,11 @@ import { clearActiveConnection, useActiveConnection } from '@/contexts/connectio
 import { kvKeys, type KVBucketInfo } from '@/contexts/kv'
 import { objectKeys, type ObjectBucketInfo } from '@/contexts/objects'
 import { useDisplayPreferences, useUpdateSettings } from '@/contexts/settings'
+import { isRegularStreamName, streamKeys } from '@/contexts/streams'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { useDialogA11y } from '@/hooks/useDialogA11y'
 import { resetAllStores } from '@/stores/resetAllStores'
 import { usePreferencesStore } from '@/stores/preferencesStore'
-import type { StreamInfo } from '@/types/nats'
 
 interface CommandItem {
   id: string
@@ -51,24 +51,19 @@ export default function CommandPalette() {
   const resourceCommands = useMemo<CommandItem[]>(() => {
     if (!open || !connectionId) return []
     const out: CommandItem[] = []
-    const streamsData = queryClient.getQueryData<{ streams: StreamInfo[] }>([
-      CONNECTION_QUERY_PREFIX,
-      connectionId,
-      'streams',
-    ])
-    for (const s of streamsData?.streams ?? []) {
-      if (s.name.startsWith('KV_') || s.name.startsWith('OBJ_')) continue
+    const streamNames = queryClient.getQueryData<string[]>(streamKeys.names(connectionId)) ?? []
+    for (const name of streamNames.filter(isRegularStreamName)) {
       out.push({
-        id: `stream-${s.name}`,
-        label: `Stream: ${s.name}`,
+        id: `stream-${name}`,
+        label: `Stream: ${name}`,
         group: 'Resources',
-        action: () => navigate(`/streams/${encodeURIComponent(s.name)}`),
+        action: () => navigate(`/streams/${encodeURIComponent(name)}`),
       })
     }
     const kvBuckets = queryClient.getQueryData<KVBucketInfo[]>(kvKeys.buckets(connectionId))
     const kvBucketNames = new Set<string>((kvBuckets ?? []).map((b) => b.bucket))
-    for (const s of streamsData?.streams ?? []) {
-      if (s.name.startsWith('KV_')) kvBucketNames.add(s.name.slice('KV_'.length))
+    for (const name of streamNames) {
+      if (name.startsWith('KV_')) kvBucketNames.add(name.slice('KV_'.length))
     }
     for (const name of kvBucketNames) {
       out.push({
@@ -80,8 +75,8 @@ export default function CommandPalette() {
     }
     const objBuckets = queryClient.getQueryData<ObjectBucketInfo[]>(objectKeys.buckets(connectionId))
     const objBucketNames = new Set<string>((objBuckets ?? []).map((b) => b.bucket))
-    for (const s of streamsData?.streams ?? []) {
-      if (s.name.startsWith('OBJ_')) objBucketNames.add(s.name.slice('OBJ_'.length))
+    for (const name of streamNames) {
+      if (name.startsWith('OBJ_')) objBucketNames.add(name.slice('OBJ_'.length))
     }
     for (const name of objBucketNames) {
       out.push({
@@ -112,6 +107,12 @@ export default function CommandPalette() {
       label: 'Go to Object Stores',
       group: 'Navigation',
       action: () => navigate('/objects'),
+    },
+    {
+      id: 'go-request',
+      label: 'Go to Request / Reply',
+      group: 'Navigation',
+      action: () => navigate('/request'),
     },
     {
       id: 'toggle-density',

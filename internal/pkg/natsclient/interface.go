@@ -62,6 +62,9 @@ type StreamReader interface {
 	// ListStreams returns all JetStream streams (parallel fetch).
 	ListStreams(ctx context.Context) ([]entities.StreamInfo, error)
 
+	// ListStreamNames returns the names of all JetStream streams, sorted.
+	ListStreamNames(ctx context.Context) ([]string, error)
+
 	// GetStreamInfo returns detail for one stream.
 	GetStreamInfo(ctx context.Context, streamName string) (*entities.StreamInfo, error)
 

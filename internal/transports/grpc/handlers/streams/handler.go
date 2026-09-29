@@ -56,6 +56,18 @@ func (h *Handler) ListStreams(
 	}), nil
 }
 
+// ListStreamNames returns the sorted stream names for a connection.
+func (h *Handler) ListStreamNames(
+	ctx context.Context,
+	req *connect.Request[streamspb.ListStreamNamesRequest],
+) (*connect.Response[streamspb.ListStreamNamesResponse], error) {
+	names, err := h.natsService.ListStreamNames(ctx, req.Msg.ConnectionId)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&streamspb.ListStreamNamesResponse{Names: names}), nil
+}
+
 // GetStream returns detailed information for a specific stream.
 func (h *Handler) GetStream(
 	ctx context.Context,

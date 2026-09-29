@@ -40,6 +40,7 @@ type mockStorage struct {
 	updateTLSReplaced  bool
 	deleteCalled       bool
 	deleteID           string
+	exists             bool
 }
 
 func (m *mockStorage) Save(_ context.Context, in *entities.SavedConnection) error {
@@ -84,7 +85,43 @@ func (m *mockStorage) Delete(_ context.Context, id string) error {
 	return m.deleteErr
 }
 func (m *mockStorage) Exists(_ context.Context, _ string, _ ...bool) (bool, error) {
-	return false, nil
+	return m.exists, nil
+}
+
+// mockLayouts is an in-memory sidebar layout store.
+type mockLayouts struct {
+	layouts   map[string]*entities.SidebarLayout
+	deleteErr error
+	deleted   []string
+}
+
+func (m *mockLayouts) Get(_ context.Context, connectionID string) (*entities.SidebarLayout, error) {
+	if l, ok := m.layouts[connectionID]; ok {
+		return l, nil
+	}
+	return nil, errs.ErrSidebarLayoutNotFound
+}
+
+func (m *mockLayouts) Update(
+	ctx context.Context,
+	connectionID string,
+	mutate func(*entities.SidebarLayout),
+) (*entities.SidebarLayout, error) {
+	existing, err := m.Get(ctx, connectionID)
+	if err != nil {
+		existing = &entities.SidebarLayout{ConnectionID: connectionID}
+	}
+	mutate(existing)
+	if m.layouts == nil {
+		m.layouts = map[string]*entities.SidebarLayout{}
+	}
+	m.layouts[connectionID] = existing
+	return existing, nil
+}
+
+func (m *mockLayouts) Delete(_ context.Context, connectionID string) error {
+	m.deleted = append(m.deleted, connectionID)
+	return m.deleteErr
 }
 func (m *mockStorage) WithTransaction(ctx context.Context, handler func(context.Context, storage.Storage) error) error {
 	return handler(ctx, m)
@@ -170,7 +207,7 @@ func TestService_Create(t *testing.T) {
 			t.Parallel()
 
 			store := &mockStorage{saveErr: tt.saveErr}
-			svc := New(store, nil)
+			svc := New(store, &mockLayouts{}, nil)
 
 			result, err := svc.Create(t.Context(), tt.input)
 
@@ -203,7 +240,7 @@ func TestService_Get(t *testing.T) {
 			c.Name = "found"
 		})
 		store := &mockStorage{getResult: conn}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		result, err := svc.Get(t.Context(), conn.Id)
 		require.NoError(t, err)
@@ -213,7 +250,7 @@ func TestService_Get(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{getErr: errs.ErrSavedConnectionNotFound}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		result, err := svc.Get(t.Context(), "nonexistent")
 		assert.ErrorIs(t, err, errs.ErrSavedConnectionNotFound)
@@ -231,7 +268,7 @@ func TestService_List(t *testing.T) {
 			NextCursor: ptr.Wrap("next"),
 		}
 		store := &mockStorage{listResult: expected}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		result, err := svc.List(t.Context(), &entities.SavedConnectionsList{})
 		require.NoError(t, err)
@@ -243,7 +280,7 @@ func TestService_List(t *testing.T) {
 	t.Run("StorageError", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{listErr: errors.New("db error")}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		_, err := svc.List(t.Context(), &entities.SavedConnectionsList{})
 		assert.Error(t, err)
@@ -261,7 +298,7 @@ func TestService_Update(t *testing.T) {
 		})
 		store := &mockStorage{getResult: existing}
 		natsSvc := &mockNATSService{}
-		svc := New(store, natsSvc)
+		svc := New(store, &mockLayouts{}, natsSvc)
 
 		result, err := svc.Update(t.Context(), &entities.SavedConnectionUpdate{
 			Id:   existing.Id,
@@ -279,7 +316,7 @@ func TestService_Update(t *testing.T) {
 	t.Run("GetFails_NotFound", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{getErr: errs.ErrSavedConnectionNotFound}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		_, err := svc.Update(t.Context(), &entities.SavedConnectionUpdate{Id: "x"})
 		assert.ErrorIs(t, err, errs.ErrSavedConnectionNotFound)
@@ -292,7 +329,7 @@ func TestService_Update(t *testing.T) {
 			getResult: existing,
 			updateErr: errs.ErrSavedConnectionNotFound,
 		}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		_, err := svc.Update(t.Context(), &entities.SavedConnectionUpdate{Id: existing.Id})
 		assert.ErrorIs(t, err, errs.ErrSavedConnectionNotFound)
@@ -307,7 +344,7 @@ func TestService_Delete(t *testing.T) {
 		existing := entities.SavedConnectionNew()
 		store := &mockStorage{getResult: existing}
 		natsSvc := &mockNATSService{}
-		svc := New(store, natsSvc)
+		svc := New(store, &mockLayouts{}, natsSvc)
 
 		err := svc.Delete(t.Context(), existing.Id)
 		require.NoError(t, err)
@@ -320,7 +357,7 @@ func TestService_Delete(t *testing.T) {
 	t.Run("StorageError", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{deleteErr: errors.New("db error")}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		err := svc.Delete(t.Context(), "conn-1")
 		assert.Error(t, err)
@@ -342,7 +379,7 @@ func TestService_Duplicate(t *testing.T) {
 			}
 		})
 		store := &mockStorage{getResult: existing}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		result, err := svc.Duplicate(t.Context(), existing.Id, "copy")
 		require.NoError(t, err)
@@ -357,7 +394,7 @@ func TestService_Duplicate(t *testing.T) {
 	t.Run("SourceNotFound", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{getErr: errs.ErrSavedConnectionNotFound}
-		svc := New(store, nil)
+		svc := New(store, &mockLayouts{}, nil)
 
 		_, err := svc.Duplicate(t.Context(), "nonexistent", "copy")
 		assert.ErrorIs(t, err, errs.ErrSavedConnectionNotFound)
@@ -381,7 +418,7 @@ func TestService_TestConnection(t *testing.T) {
 		natsSvc := &mockNATSService{
 			testResult: &entities.TestConnectionResult{Success: true, ServerVersion: "2.10.0"},
 		}
-		svc := New(store, natsSvc)
+		svc := New(store, &mockLayouts{}, natsSvc)
 
 		result, err := svc.TestConnection(t.Context(), &entities.TestConnectionRequest{
 			ConnectionID: saved.Id,
@@ -413,7 +450,7 @@ func TestService_TestConnection(t *testing.T) {
 		natsSvc := &mockNATSService{
 			testResult: &entities.TestConnectionResult{Success: true},
 		}
-		svc := New(store, natsSvc)
+		svc := New(store, &mockLayouts{}, natsSvc)
 
 		_, err := svc.TestConnection(t.Context(), &entities.TestConnectionRequest{
 			URLs: []string{"nats://ad-hoc:4222"},
@@ -438,7 +475,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 	t.Run("Create_UserPassword", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}
-		svc := New(store, &mockNATSService{})
+		svc := New(store, &mockLayouts{}, &mockNATSService{})
 
 		conn, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{
 			Name: "c",
@@ -460,7 +497,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 	t.Run("Create_BareTokenBecomesTokenAuth", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}
-		svc := New(store, &mockNATSService{})
+		svc := New(store, &mockLayouts{}, &mockNATSService{})
 
 		conn, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{
 			Name: "c",
@@ -477,7 +514,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 	t.Run("Create_CleanURLLeavesAuthUntouched", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}
-		svc := New(store, &mockNATSService{})
+		svc := New(store, &mockLayouts{}, &mockNATSService{})
 
 		conn, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{
 			Name: "c",
@@ -494,7 +531,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 	t.Run("Create_ConflictWithExplicitAuth", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}
-		svc := New(store, &mockNATSService{})
+		svc := New(store, &mockLayouts{}, &mockNATSService{})
 
 		_, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{
 			Name: "c",
@@ -509,7 +546,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 	t.Run("Create_MixedCredentialsAcrossURLs", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}
-		svc := New(store, &mockNATSService{})
+		svc := New(store, &mockLayouts{}, &mockNATSService{})
 
 		_, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{
 			Name: "c",
@@ -528,7 +565,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 				c.URLs = []string{"nats://old:4222"}
 			}),
 		}
-		svc := New(store, &mockNATSService{})
+		svc := New(store, &mockLayouts{}, &mockNATSService{})
 
 		conn, err := svc.Update(t.Context(), &entities.SavedConnectionUpdate{
 			Id:   "id",
@@ -552,7 +589,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 				c.URLs = []string{"nats://kept:4222"}
 			}),
 		}
-		svc := New(store, &mockNATSService{})
+		svc := New(store, &mockLayouts{}, &mockNATSService{})
 
 		conn, err := svc.Update(t.Context(), &entities.SavedConnectionUpdate{Id: "id"})
 
@@ -564,7 +601,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}
 		natsSvc := &mockNATSService{testResult: &entities.TestConnectionResult{Success: true}}
-		svc := New(store, natsSvc)
+		svc := New(store, &mockLayouts{}, natsSvc)
 
 		_, err := svc.TestConnection(t.Context(), &entities.TestConnectionRequest{
 			URLs: []string{"nats://bob:s3cr3t@h1:4222"},

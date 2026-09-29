@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -37,6 +38,25 @@ func (c *Client) ListStreams(ctx context.Context) ([]entities.StreamInfo, error)
 	}
 
 	return streams, nil
+}
+
+// ListStreamNames returns the names of all streams, sorted; like ListStreams it
+// skips internal "$"-prefixed streams.
+func (c *Client) ListStreamNames(ctx context.Context) ([]string, error) {
+	names := []string{}
+	nameLister := c.jetStream.StreamNames(ctx)
+	for name := range nameLister.Name() {
+		if strings.HasPrefix(name, "$") {
+			continue
+		}
+		names = append(names, name)
+	}
+	if err := nameLister.Err(); err != nil {
+		return nil, wrapErr(coreerrs.WrapOperation(err, "list stream names"))
+	}
+
+	sort.Strings(names)
+	return names, nil
 }
 
 // GetStreamInfo returns detailed information about a specific stream.

@@ -18,6 +18,10 @@ type Storage interface {
 	// Get returns a connection by Id; errs.ErrConnectionNotFound if missing.
 	Get(ctx context.Context, id string, includeDeleted ...bool) (*entities.SavedConnection, error)
 
+	// Exists reports whether a connection with id is saved, without reading its
+	// secrets from the vault.
+	Exists(ctx context.Context, id string, includeDeleted ...bool) (bool, error)
+
 	// List returns connections with pagination.
 	List(ctx context.Context, in *entities.SavedConnectionsList) (*entities.List[entities.SavedConnections], error)
 

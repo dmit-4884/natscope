@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Code } from '@connectrpc/connect'
-import { useStreamEntities, filterRegularStreams, type Stream } from '@/contexts/streams'
+import { isRegularStreamName, useStreamNames } from '@/contexts/streams'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { EmptyState, PlusIcon, RefreshIcon, SkeletonRows } from '@/components/ui'
-import Tooltip from '@/components/common/Tooltip'
+import { SidebarResourceList } from '@/components/common/sidebar/SidebarResourceList'
 import { getErrorMessage, isErrorCode } from '@/api/errors'
 
 const STREAMS_ICON = (
@@ -17,43 +17,14 @@ interface StreamListProps {
   connectionId: string
 }
 
-function StreamItem({
-  stream,
-  isSelected,
-}: {
-  stream: Stream
-  isSelected: boolean
-}) {
-  const streamName = stream.name.value
-
-  return (
-    <Link
-      to={`/streams/${encodeURIComponent(streamName)}`}
-      className={`group block px-3 py-2 transition-all ${
-        isSelected
-          ? 'bg-accent-light border-l-2 border-l-blue-500'
-          : 'hover:bg-surface-secondary border-l-2 border-l-transparent'
-      }`}
-      title={streamName}
-    >
-      <span className={`text-sm truncate block ${
-        isSelected ? 'font-medium text-content-primary' : 'text-gray-700'
-      }`}>
-        {streamName}
-      </span>
-    </Link>
-  )
-}
+const streamHref = (name: string) => `/streams/${encodeURIComponent(name)}`
 
 export default function StreamList({ connectionId }: StreamListProps) {
   const { streamName: selectedStream } = useParams()
-  const { streams: allStreams, isLoading, error, refetch, isFetching } = useStreamEntities(connectionId)
+  const { data: allNames, isLoading, error, refetch, isFetching } = useStreamNames(connectionId)
 
   // Filter to only show regular streams (KV and Object stores are in separate sections)
-  const streams = useMemo(
-    () => filterRegularStreams(allStreams),
-    [allStreams]
-  )
+  const streams = useMemo(() => (allNames ?? []).filter(isRegularStreamName), [allNames])
 
   if (isLoading) {
     return <SkeletonRows count={6} rowClassName="h-9" className="p-2" />
@@ -99,28 +70,15 @@ export default function StreamList({ connectionId }: StreamListProps) {
   }
 
   return (
-    <div>
-      <div className="flex justify-end border-b border-border bg-surface-secondary">
-        <Tooltip content="Refresh streams">
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="px-2.5 py-1.5 text-content-muted hover:text-content-secondary hover:bg-surface-tertiary transition-colors disabled:opacity-50"
-            aria-label="Refresh streams"
-          >
-            <RefreshIcon className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-          </button>
-        </Tooltip>
-      </div>
-
-      {/* Stream list */}
-      {streams.map((stream) => (
-        <StreamItem
-          key={stream.name.value}
-          stream={stream}
-          isSelected={stream.name.value === selectedStream}
-        />
-      ))}
-    </div>
+    <SidebarResourceList
+      connectionId={connectionId}
+      section="streams"
+      names={streams}
+      selectedName={selectedStream}
+      hrefFor={streamHref}
+      noun="stream"
+      isRefreshing={isFetching}
+      onRefresh={() => refetch()}
+    />
   )
 }

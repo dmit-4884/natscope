@@ -70,5 +70,8 @@ export {
   EyeIcon,
   EyeOffIcon,
   SwitchHorizontalIcon,
+  StarIcon,
+  StarSolidIcon,
+  DragHandleIcon,
   DotsHorizontalIcon,
 } from './icons'

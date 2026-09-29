@@ -13,6 +13,20 @@ You can create a stream, edit its config, purge it, seal it and delete it withou
 
 <Video src="/media/streams.mp4" poster="/media/streams.jpg" caption="Creating a stream and reviewing its config." />
 
+## Find and arrange streams
+
+The sidebar loads only stream names, so it stays quick with thousands of streams. It shows the first 12;
+**Show more** reveals 50 more at a time. The same tools work in the **KV Stores** and **Object Store**
+sections.
+
+- **Filter** narrows the list to names that contain the text you type.
+- The **star** next to a name pins it to the top of the section.
+- **Drag** a name to reorder it, or focus it and press `Alt+↑` / `Alt+↓`. Reordering is off while a
+  filter is active. **Reset to A–Z order** in the list menu drops the manual order and keeps your pins.
+
+Pins and order are saved per connection in Natscope's own database, so they survive reloads and restarts.
+Deleting the connection removes them.
+
 ## Create a stream
 
 Click the **+** next to **Streams** in the sidebar, or open `/streams/new`. The **Create New Stream**

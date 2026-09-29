@@ -5,3 +5,4 @@ export {
   useTestConnection,
   useDuplicateConnection,
 } from './useConnectionMutations'
+export { useUpdateSidebarLayout } from './useUpdateSidebarLayout'

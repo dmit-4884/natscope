@@ -144,6 +144,10 @@ func (s *Storage) Get(ctx context.Context, id string, includeDeleted ...bool) (*
 	return s.hydrate(ctx, doc)
 }
 
+func (s *Storage) Exists(ctx context.Context, id string, includeDeleted ...bool) (bool, error) {
+	return s.store.Exists(ctx, id, includeDeleted...)
+}
+
 func (s *Storage) List(
 	ctx context.Context,
 	in *entities.SavedConnectionsList,

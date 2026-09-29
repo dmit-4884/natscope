@@ -34,6 +34,18 @@ type mockConnService struct {
 	dupResult    *entities.SavedConnection
 	dupErr       error
 	testResult   *entities.TestConnectionResult
+	layout       *entities.SidebarLayout
+	layoutErr    error
+	layoutUpdate *entities.SidebarLayoutUpdate
+}
+
+func (m *mockConnService) GetSidebarLayout(_ context.Context, _ string) (*entities.SidebarLayout, error) {
+	return m.layout, m.layoutErr
+}
+
+func (m *mockConnService) UpdateSidebarLayout(_ context.Context, in *entities.SidebarLayoutUpdate) (*entities.SidebarLayout, error) {
+	m.layoutUpdate = in
+	return m.layout, m.layoutErr
 }
 
 func (m *mockConnService) Create(_ context.Context, in *entities.SavedConnectionCreate) (*entities.SavedConnection, error) {
@@ -246,5 +258,56 @@ func TestHandler_TestConnection_OptionalFields(t *testing.T) {
 		assert.Nil(t, resp.Msg.Error)
 		require.NotNil(t, resp.Msg.RttMs)
 		assert.Equal(t, "2.14.2", resp.Msg.GetServerVersion())
+	})
+}
+
+func TestHandler_SidebarLayout(t *testing.T) {
+	t.Parallel()
+
+	layout := &entities.SidebarLayout{
+		ConnectionID: "conn-1",
+		Streams:      entities.SectionLayout{Pinned: []string{"ORDERS"}, Order: []string{"EVENTS"}},
+		KV:           entities.SectionLayout{Pinned: []string{"config"}},
+	}
+
+	t.Run("get", func(t *testing.T) {
+		t.Parallel()
+		h := New(&mockConnService{layout: layout})
+
+		resp, err := h.GetSidebarLayout(t.Context(), connect.NewRequest(&connectionspb.GetSidebarLayoutRequest{ConnectionId: "conn-1"}))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"ORDERS"}, resp.Msg.GetLayout().GetStreams().GetPinned())
+		assert.Equal(t, []string{"EVENTS"}, resp.Msg.GetLayout().GetStreams().GetOrder())
+		assert.Equal(t, []string{"config"}, resp.Msg.GetLayout().GetKv().GetPinned())
+		assert.NotNil(t, resp.Msg.GetLayout().GetObjects(), "an empty section still reaches the wire")
+	})
+
+	t.Run("update converts only the sections that are set", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockConnService{layout: layout}
+		h := New(svc)
+
+		_, err := h.UpdateSidebarLayout(t.Context(), connect.NewRequest(&connectionspb.UpdateSidebarLayoutRequest{
+			ConnectionId: "conn-1",
+			Kv:           &connectionspb.SectionLayout{Pinned: []string{"config"}, Order: []string{"flags"}},
+		}))
+		require.NoError(t, err)
+
+		got := svc.layoutUpdate
+		require.NotNil(t, got)
+		assert.Equal(t, "conn-1", got.ConnectionID)
+		assert.Nil(t, got.Streams)
+		assert.Nil(t, got.Objects)
+		require.NotNil(t, got.KV)
+		assert.Equal(t, []string{"config"}, got.KV.Pinned)
+		assert.Equal(t, []string{"flags"}, got.KV.Order)
+	})
+
+	t.Run("unknown connection", func(t *testing.T) {
+		t.Parallel()
+		h := New(&mockConnService{layoutErr: errs.ErrSavedConnectionNotFound})
+
+		_, err := h.GetSidebarLayout(t.Context(), connect.NewRequest(&connectionspb.GetSidebarLayoutRequest{ConnectionId: "conn-1"}))
+		assert.ErrorIs(t, err, errs.ErrSavedConnectionNotFound)
 	})
 }

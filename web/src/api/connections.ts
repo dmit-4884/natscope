@@ -258,3 +258,39 @@ export async function duplicateConnection(id: string, name: string): Promise<Sav
   const response = await connectionsClient.duplicateConnection({ id, name })
   return toSavedConnection(response.connection!)
 }
+
+export type SidebarSection = 'streams' | 'kv' | 'objects'
+
+export interface SectionLayout {
+  pinned: string[]
+  order: string[]
+}
+
+export type SidebarLayout = Record<SidebarSection, SectionLayout>
+
+function toSectionLayout(section: { pinned: string[]; order: string[] } | undefined): SectionLayout {
+  return { pinned: section?.pinned ?? [], order: section?.order ?? [] }
+}
+
+function toSidebarLayout(
+  layout: { streams?: SectionLayout; kv?: SectionLayout; objects?: SectionLayout } | undefined,
+): SidebarLayout {
+  return {
+    streams: toSectionLayout(layout?.streams),
+    kv: toSectionLayout(layout?.kv),
+    objects: toSectionLayout(layout?.objects),
+  }
+}
+
+export async function getSidebarLayout(connectionId: string, signal?: AbortSignal): Promise<SidebarLayout> {
+  const response = await connectionsClient.getSidebarLayout({ connectionId }, { signal })
+  return toSidebarLayout(response.layout)
+}
+
+export async function updateSidebarLayout(
+  connectionId: string,
+  patch: Partial<SidebarLayout>,
+): Promise<SidebarLayout> {
+  const response = await connectionsClient.updateSidebarLayout({ connectionId, ...patch })
+  return toSidebarLayout(response.layout)
+}

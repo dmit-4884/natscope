@@ -27,6 +27,12 @@ service ConnectionsService {
 
   // Duplicates an existing saved connection with a new name.
   rpc DuplicateConnection(DuplicateConnectionRequest) returns (DuplicateConnectionResponse) {}
+
+  // Returns how the sidebar arranges the streams, KV buckets and object buckets of a saved connection.
+  rpc GetSidebarLayout(GetSidebarLayoutRequest) returns (GetSidebarLayoutResponse) {}
+
+  // Replaces the arrangement of the sidebar sections that are set; the others are kept.
+  rpc UpdateSidebarLayout(UpdateSidebarLayoutRequest) returns (UpdateSidebarLayoutResponse) {}
 }
 
 // Defines the request message for creating a new saved connection.
@@ -239,4 +245,58 @@ message DuplicateConnectionRequest {
 message DuplicateConnectionResponse {
   // Required. The newly created duplicate connection.
   .natscope.types.nats.SavedConnection connection = 1;
+}
+
+// Arranges one sidebar list: pinned names first, then the manual order; names in neither follow by name.
+message SectionLayout {
+  // Optional. Pinned names, in display order.
+  repeated string pinned = 1 [(buf.validate.field).repeated = {max_items: 10000, items: {string: {min_len: 1, max_len: 256}}}];
+
+  // Optional. Manually ordered names that are not pinned, in display order.
+  repeated string order = 2 [(buf.validate.field).repeated = {max_items: 10000, items: {string: {min_len: 1, max_len: 256}}}];
+}
+
+// The sidebar arrangement saved for a connection.
+message SidebarLayout {
+  // Required. Arrangement of the Streams section.
+  SectionLayout streams = 1;
+
+  // Required. Arrangement of the KV Stores section.
+  SectionLayout kv = 2;
+
+  // Required. Arrangement of the Object Store section.
+  SectionLayout objects = 3;
+}
+
+// Defines the request message for reading a connection's sidebar layout.
+message GetSidebarLayoutRequest {
+  // Required. Identifier of the saved connection.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+}
+
+// Defines the response message for reading a connection's sidebar layout.
+message GetSidebarLayoutResponse {
+  // Required. The saved layout; empty sections when nothing was arranged yet.
+  SidebarLayout layout = 1;
+}
+
+// Defines the request message for updating a connection's sidebar layout (partial update, unset sections are kept).
+message UpdateSidebarLayoutRequest {
+  // Required. Identifier of the saved connection.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Optional. Replaces the Streams section when set.
+  optional SectionLayout streams = 2;
+
+  // Optional. Replaces the KV Stores section when set.
+  optional SectionLayout kv = 3;
+
+  // Optional. Replaces the Object Store section when set.
+  optional SectionLayout objects = 4;
+}
+
+// Defines the response message for updating a connection's sidebar layout.
+message UpdateSidebarLayoutResponse {
+  // Required. The layout after the update.
+  SidebarLayout layout = 1;
 }

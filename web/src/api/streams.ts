@@ -240,6 +240,11 @@ export async function getStreams(
   return { streams: response.streams.map(toStreamInfo) }
 }
 
+export async function getStreamNames(connectionId: string, signal?: AbortSignal): Promise<string[]> {
+  const response = await streamsClient.listStreamNames({ connectionId }, { signal })
+  return response.names
+}
+
 export async function getStreamDetail(
   streamName: string,
   connectionId: string,

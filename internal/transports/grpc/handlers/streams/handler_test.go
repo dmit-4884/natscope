@@ -20,18 +20,23 @@ import (
 
 // --- Mocks ---
 
-// mockNATSSvc embeds nats.StreamReader and overrides only the two methods the
+// mockNATSSvc embeds nats.StreamReader and overrides only the methods the
 // streams handler calls.
 type mockNATSSvc struct {
 	natssvc.StreamReader
-	listResult []entities.StreamInfo
-	listErr    error
-	getResult  *entities.StreamInfo
-	getErr     error
+	listResult  []entities.StreamInfo
+	listErr     error
+	namesResult []string
+	getResult   *entities.StreamInfo
+	getErr      error
 }
 
 func (m *mockNATSSvc) ListStreams(_ context.Context, _ string) ([]entities.StreamInfo, error) {
 	return m.listResult, m.listErr
+}
+
+func (m *mockNATSSvc) ListStreamNames(_ context.Context, _ string) ([]string, error) {
+	return m.namesResult, m.listErr
 }
 
 func (m *mockNATSSvc) GetStreamInfo(_ context.Context, _ string, _ string) (*entities.StreamInfo, error) {
@@ -64,6 +69,31 @@ func TestHandler_ListStreams(t *testing.T) {
 		h := New(&mockNATSSvc{listErr: errs.ErrNATSConnectionFailed})
 
 		_, err := h.ListStreams(t.Context(), connect.NewRequest(&streamspb.ListStreamsRequest{
+			ConnectionId: "conn1",
+		}))
+		assert.ErrorIs(t, err, errs.ErrNATSConnectionFailed)
+	})
+}
+
+func TestHandler_ListStreamNames(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
+		h := New(&mockNATSSvc{namesResult: []string{"EVENTS", "ORDERS"}})
+
+		resp, err := h.ListStreamNames(t.Context(), connect.NewRequest(&streamspb.ListStreamNamesRequest{
+			ConnectionId: "conn1",
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"EVENTS", "ORDERS"}, resp.Msg.GetNames())
+	})
+
+	t.Run("ServiceError", func(t *testing.T) {
+		t.Parallel()
+		h := New(&mockNATSSvc{listErr: errs.ErrNATSConnectionFailed})
+
+		_, err := h.ListStreamNames(t.Context(), connect.NewRequest(&streamspb.ListStreamNamesRequest{
 			ConnectionId: "conn1",
 		}))
 		assert.ErrorIs(t, err, errs.ErrNATSConnectionFailed)

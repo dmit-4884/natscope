@@ -18,6 +18,15 @@ func (s *Service) ListStreams(ctx context.Context, connectionID string) ([]entit
 	return c.ListStreams(ctx)
 }
 
+// ListStreamNames returns the names of all streams, sorted.
+func (s *Service) ListStreamNames(ctx context.Context, connectionID string) ([]string, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.ListStreamNames(ctx)
+}
+
 // GetStreamInfo returns detailed information about a specific stream.
 func (s *Service) GetStreamInfo(ctx context.Context, connectionID string, streamName string) (*entities.StreamInfo, error) {
 	c, err := s.client(ctx, connectionID)

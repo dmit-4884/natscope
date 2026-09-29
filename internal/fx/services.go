@@ -41,6 +41,8 @@ import (
 	connectionsStorageIface "github.com/dmit-4884/natscope/internal/storages/connections"
 	connectionsBbolt "github.com/dmit-4884/natscope/internal/storages/connections/bbolt"
 	historyBbolt "github.com/dmit-4884/natscope/internal/storages/history/bbolt"
+	layoutsStorageIface "github.com/dmit-4884/natscope/internal/storages/layouts"
+	layoutsBbolt "github.com/dmit-4884/natscope/internal/storages/layouts/bbolt"
 	mappingsBbolt "github.com/dmit-4884/natscope/internal/storages/mappings/bbolt"
 	conflictsBbolt "github.com/dmit-4884/natscope/internal/storages/proto/conflicts/bbolt"
 	descriptorsBbolt "github.com/dmit-4884/natscope/internal/storages/proto/descriptors/bbolt"
@@ -62,6 +64,7 @@ func ServicesModule() fx.Option {
 			fx.As(new(protosvc.SelectionManager)),
 		)),
 		fx.Provide(fx.Annotate(newConnectionsStorage, fx.As(new(connectionsStorageIface.Storage)))),
+		fx.Provide(newLayoutsStorage),
 		fx.Provide(fx.Annotate(connectionsService.New, fx.As(new(connectionssvc.Service)))),
 		fx.Provide(fx.Annotate(newMappingsService, fx.As(new(mappingssvc.Service)))),
 		fx.Provide(fx.Annotate(newHistoryService, fx.As(new(historysvc.Service)))),
@@ -150,6 +153,15 @@ func newConnectionsStorage(db *bbstore.DB, vault secrets.Vault) (connectionsStor
 	storage, err := connectionsBbolt.New(context.Background(), db, vault)
 	if err != nil {
 		return nil, errors.WrapOperation(err, "create connections storage")
+	}
+	return storage, nil
+}
+
+// newLayoutsStorage creates the bbolt sidebar layouts storage.
+func newLayoutsStorage(db *bbstore.DB) (layoutsStorageIface.Storage, error) {
+	storage, err := layoutsBbolt.New(context.Background(), db)
+	if err != nil {
+		return nil, errors.WrapOperation(err, "create sidebar layouts storage")
 	}
 	return storage, nil
 }

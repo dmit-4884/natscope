@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useStreams } from '@/contexts/streams'
+import { useStreamNames } from '@/contexts/streams'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { EmptyState, PlusIcon, RefreshIcon, SkeletonRows } from '@/components/ui'
-import Tooltip from '@/components/common/Tooltip'
+import { SidebarResourceList } from '@/components/common/sidebar/SidebarResourceList'
 import { getErrorMessage } from '@/api/errors'
 
 const KV_ICON = (
@@ -12,52 +12,26 @@ const KV_ICON = (
   </svg>
 )
 
+const KV_STREAM_PREFIX = 'KV_'
+
 interface KVListProps {
   connectionId: string
 }
 
-function KVItem({
-  isSelected,
-  displayName,
-}: {
-  isSelected: boolean
-  displayName: string
-}) {
-  return (
-    <Link
-      to={`/kv/${encodeURIComponent(displayName)}`}
-      className={`group block px-3 py-2 transition-all ${
-        isSelected
-          ? 'bg-accent-light border-l-2 border-l-blue-500'
-          : 'hover:bg-surface-secondary border-l-2 border-l-transparent'
-      }`}
-      title={displayName}
-    >
-      <span className={`text-sm truncate block ${
-        isSelected ? 'font-medium text-content-primary' : 'text-gray-700'
-      }`}>
-        {displayName}
-      </span>
-    </Link>
-  )
-}
+const bucketHref = (name: string) => `/kv/${encodeURIComponent(name)}`
 
 export default function KVList({ connectionId }: KVListProps) {
   const { bucketName: selectedBucket } = useParams()
-  const { data, isLoading, isFetching, error, refetch } = useStreams(connectionId)
+  const { data: streamNames, isLoading, isFetching, error, refetch } = useStreamNames(connectionId)
 
-  // Filter to only show KV streams (streams starting with KV_)
-  const kvStores = useMemo(() => {
-    if (!data?.streams) return []
-    return data.streams
-      .filter(stream => stream.name.startsWith('KV_'))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [data?.streams])
-
-  // Get display name (remove KV_ prefix)
-  const getDisplayName = (streamName: string) => {
-    return streamName.startsWith('KV_') ? streamName.slice(3) : streamName
-  }
+  // Filter to only show KV streams (streams starting with KV_), without the prefix
+  const buckets = useMemo(
+    () =>
+      (streamNames ?? [])
+        .filter((name) => name.startsWith(KV_STREAM_PREFIX))
+        .map((name) => name.slice(KV_STREAM_PREFIX.length)),
+    [streamNames],
+  )
 
   if (isLoading) {
     return <SkeletonRows count={5} rowClassName="h-9" className="p-2" />
@@ -71,7 +45,7 @@ export default function KVList({ connectionId }: KVListProps) {
     )
   }
 
-  if (kvStores.length === 0) {
+  if (buckets.length === 0) {
     return (
       <EmptyState
         size="sm"
@@ -103,42 +77,28 @@ export default function KVList({ connectionId }: KVListProps) {
 
   return (
     <div>
-      {/* Toolbar */}
-      <div className="flex items-center border-b border-border bg-surface-secondary">
-        <Link
-          to={`/kv/new`}
-          className="flex-1 px-3 py-2.5 flex items-center gap-2 hover:bg-surface-tertiary transition-colors"
-        >
-          <span className="text-content-muted">
-            <PlusIcon className="w-4 h-4" />
-          </span>
-          <span className="text-xs font-semibold uppercase tracking-wide text-content-secondary whitespace-nowrap truncate">
-            Create KV Store
-          </span>
-        </Link>
-        <Tooltip content="Refresh KV stores">
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="shrink-0 px-2.5 py-2.5 text-content-muted hover:text-content-secondary hover:bg-surface-tertiary transition-colors disabled:opacity-50"
-            aria-label="Refresh KV stores"
-          >
-            <RefreshIcon className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-          </button>
-        </Tooltip>
-      </div>
+      <Link
+        to={`/kv/new`}
+        className="px-3 py-2.5 flex items-center gap-2 border-b border-border bg-surface-secondary hover:bg-surface-tertiary transition-colors"
+      >
+        <span className="text-content-muted">
+          <PlusIcon className="w-4 h-4" />
+        </span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-content-secondary whitespace-nowrap truncate">
+          Create KV Store
+        </span>
+      </Link>
 
-      {/* KV list */}
-      {kvStores.map((stream) => {
-        const displayName = getDisplayName(stream.name)
-        return (
-          <KVItem
-            key={stream.name}
-            isSelected={displayName === selectedBucket}
-            displayName={displayName}
-          />
-        )
-      })}
+      <SidebarResourceList
+        connectionId={connectionId}
+        section="kv"
+        names={buckets}
+        selectedName={selectedBucket}
+        hrefFor={bucketHref}
+        noun="KV bucket"
+        isRefreshing={isFetching}
+        onRefresh={() => refetch()}
+      />
     </div>
   )
 }

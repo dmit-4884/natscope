@@ -11,6 +11,10 @@ service StreamsService {
   // Returns all JetStream streams available on the specified connection.
   rpc ListStreams(ListStreamsRequest) returns (ListStreamsResponse) {}
 
+  // Returns the names of all JetStream streams on the specified connection, sorted by name.
+  // Much cheaper than ListStreams: the server pages names 1024 at a time instead of full stream info.
+  rpc ListStreamNames(ListStreamNamesRequest) returns (ListStreamNamesResponse) {}
+
   // Returns detailed information about a single JetStream stream.
   rpc GetStream(GetStreamRequest) returns (GetStreamResponse) {}
 }
@@ -25,6 +29,18 @@ message ListStreamsRequest {
 message ListStreamsResponse {
   // Required. List of JetStream stream information objects.
   repeated .natscope.types.nats.StreamInfo streams = 1;
+}
+
+// Defines the request message for listing JetStream stream names.
+message ListStreamNamesRequest {
+  // Required. Identifier of the NATS connection to query stream names from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+}
+
+// Defines the response message for listing JetStream stream names.
+message ListStreamNamesResponse {
+  // Required. Stream names, sorted by name.
+  repeated string names = 1;
 }
 
 // Defines the request message for getting a single JetStream stream.

@@ -142,6 +142,36 @@ func (h *Handler) DuplicateConnection(
 	}), nil
 }
 
+// GetSidebarLayout returns how the sidebar arranges a connection's resources.
+func (h *Handler) GetSidebarLayout(
+	ctx context.Context,
+	req *connect.Request[connectionspb.GetSidebarLayoutRequest],
+) (*connect.Response[connectionspb.GetSidebarLayoutResponse], error) {
+	layout, err := h.connService.GetSidebarLayout(ctx, req.Msg.ConnectionId)
+	if err != nil {
+		return nil, err
+	}
+
+	return connect.NewResponse(&connectionspb.GetSidebarLayoutResponse{
+		Layout: converter.Convert(layout, &connectionspb.SidebarLayout{}),
+	}), nil
+}
+
+// UpdateSidebarLayout replaces the sidebar sections set in the request.
+func (h *Handler) UpdateSidebarLayout(
+	ctx context.Context,
+	req *connect.Request[connectionspb.UpdateSidebarLayoutRequest],
+) (*connect.Response[connectionspb.UpdateSidebarLayoutResponse], error) {
+	layout, err := h.connService.UpdateSidebarLayout(ctx, converter.Convert(req.Msg, &entities.SidebarLayoutUpdate{}))
+	if err != nil {
+		return nil, err
+	}
+
+	return connect.NewResponse(&connectionspb.UpdateSidebarLayoutResponse{
+		Layout: converter.Convert(layout, &connectionspb.SidebarLayout{}),
+	}), nil
+}
+
 // toProtoConnection converts a saved connection to its wire form and redacts
 // secrets: the secret values (NATS auth, TLS client key) are input-only and
 // never echoed back — only boolean has_* presence flags are exposed so the UI

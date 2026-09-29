@@ -21,19 +21,22 @@ import (
 	connectionsvc "github.com/dmit-4884/natscope/internal/services/connections"
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
 	storage "github.com/dmit-4884/natscope/internal/storages/connections"
+	layoutsstorage "github.com/dmit-4884/natscope/internal/storages/layouts"
 )
 
 // Service implements connections.Service.
 type Service struct {
 	storage    storage.Storage
+	layouts    layoutsstorage.Storage
 	natService natssvc.ConnectionManager
 	logger     *slog.Logger
 }
 
 // New creates a new connections service.
-func New(storage storage.Storage, natService natssvc.ConnectionManager) *Service {
+func New(storage storage.Storage, layouts layoutsstorage.Storage, natService natssvc.ConnectionManager) *Service {
 	return &Service{
 		storage:    storage,
+		layouts:    layouts,
 		natService: natService,
 		logger:     slog.Default().With(slogx.Module("service:connections")),
 	}
@@ -145,6 +148,12 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	}
 
 	s.natService.DisconnectFromPool(id)
+
+	if err := s.layouts.Delete(ctx, id); err != nil && !errors.Is(err, errs.ErrSidebarLayoutNotFound) {
+		s.logger.WarnContext(ctx, "failed to delete sidebar layout",
+			slog.String("id", id),
+			slogx.Error(err))
+	}
 
 	s.logger.InfoContext(ctx, "connection deleted",
 		slog.String("id", id))

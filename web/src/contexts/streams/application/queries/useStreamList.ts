@@ -1,11 +1,13 @@
-import { getStreams, getStreamDetail } from '@/api/streams'
+import { getStreams, getStreamDetail, getStreamNames } from '@/api/streams'
 import { useConnectionQuery } from '@/hooks/useConnectionQuery'
 import { Stream } from '../../domain/entities/Stream'
 
+export function isRegularStreamName(name: string): boolean {
+  return !name.startsWith('KV_') && !name.startsWith('OBJ_')
+}
+
 export function filterRegularStreams(streams: Stream[]): Stream[] {
-  return streams.filter(
-    (s) => !s.name.value.startsWith('KV_') && !s.name.value.startsWith('OBJ_')
-  )
+  return streams.filter((s) => isRegularStreamName(s.name.value))
 }
 
 export function useStreams(connectionId: string | null) {
@@ -13,6 +15,15 @@ export function useStreams(connectionId: string | null) {
     key: ['streams'],
     connectionId,
     fetcher: (signal) => getStreams({ connection_id: connectionId! }, signal),
+    refetchOnWindowFocus: true,
+  })
+}
+
+export function useStreamNames(connectionId: string | null) {
+  return useConnectionQuery({
+    key: ['streams', 'names'],
+    connectionId,
+    fetcher: (signal) => getStreamNames(connectionId!, signal),
     refetchOnWindowFocus: true,
   })
 }

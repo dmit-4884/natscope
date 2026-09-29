@@ -33,4 +33,12 @@ type Service interface {
 	// empty, it probes the request's URLs/auth/TLS ad-hoc. Meta write failures
 	// are non-fatal — the probe result is always returned.
 	TestConnection(ctx context.Context, in *entities.TestConnectionRequest) (*entities.TestConnectionResult, error)
+
+	// GetSidebarLayout returns the connection's sidebar layout, empty when none
+	// was saved; errs.ErrSavedConnectionNotFound for an unknown connection.
+	GetSidebarLayout(ctx context.Context, connectionID string) (*entities.SidebarLayout, error)
+
+	// UpdateSidebarLayout replaces the sections set in `in` and keeps the others;
+	// errs.ErrSavedConnectionNotFound for an unknown connection.
+	UpdateSidebarLayout(ctx context.Context, in *entities.SidebarLayoutUpdate) (*entities.SidebarLayout, error)
 }

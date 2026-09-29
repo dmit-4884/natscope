@@ -10,6 +10,8 @@ export interface SearchInputProps {
   onChange: (value: string) => void
   /** Placeholder text */
   placeholder?: string
+  /** Accessible name; defaults to the placeholder */
+  label?: string
   /** Debounce delay in ms (0 to disable) */
   debounce?: number
   /** Search suggestions */
@@ -53,6 +55,7 @@ export function SearchInput({
   value,
   onChange,
   placeholder = 'Search...',
+  label,
   debounce = 300,
   suggestions,
   recentSearches,
@@ -211,6 +214,7 @@ export function SearchInput({
         }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
+        aria-label={label ?? placeholder}
         autoFocus={autoFocus}
         className={cn(
           'w-full rounded-md border border-border-strong bg-surface-primary text-content-primary',
