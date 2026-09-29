@@ -71,7 +71,8 @@ export default defineConfig({
           { text: 'Templates', link: '/guide/templates' },
           { text: 'Publish history', link: '/guide/history' },
           { text: 'Workspace', link: '/guide/workspace' },
-          { text: 'Settings', link: '/guide/settings' }
+          { text: 'Settings', link: '/guide/settings' },
+          { text: 'AI agents (MCP)', link: '/guide/mcp' }
         ]
       },
       {

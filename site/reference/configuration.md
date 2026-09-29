@@ -72,6 +72,15 @@ One listener speaks Connect, gRPC-Web and gRPC, and serves the SPA. There is no 
 
 See [Secrets](/reference/secrets).
 
+### MCP
+
+| Key | Env | Default | What it does |
+|-----|-----|---------|--------------|
+| `mcp.enabled` | `MCP__ENABLED` | `true` | Serve the MCP endpoint at `/mcp` |
+| `mcp.allowWrites` | `MCP__ALLOW_WRITES` | `false` | Register `publish_message`, the only tool that writes to NATS |
+
+See [AI agents (MCP)](/guide/mcp).
+
 ### Logging
 
 | Key | Env | Default | Values |
