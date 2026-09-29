@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
-import { PlusIcon } from '@/components/ui'
+import { PlusIcon, SwitchHorizontalIcon } from '@/components/ui'
 import StreamList from '../streams/StreamList'
 import KVList from '../kv/KVList'
 import ObjectList from '../objects/ObjectList'
@@ -72,6 +72,7 @@ export default function Sidebar({ connectionId }: SidebarProps) {
   const isStreams = location.pathname.includes('/streams/') && !!streamName
   const isKV = location.pathname.includes('/kv')
   const isObjects = location.pathname.includes('/objects')
+  const isRequest = location.pathname.startsWith('/request')
 
   // Mini-rail mode: narrow strip of section icons that navigate on click.
   if (collapsed) {
@@ -123,6 +124,21 @@ export default function Sidebar({ connectionId }: SidebarProps) {
             {OBJECTS_ICON}
           </button>
         </Tooltip>
+        <Tooltip content="Request / Reply">
+          <button
+            type="button"
+            onClick={() => navigate('/request')}
+            className={`p-1.5 rounded transition-colors ${
+              isRequest
+                ? 'text-accent bg-accent-muted/70'
+                : 'text-content-tertiary hover:text-content-primary hover:bg-surface-hover/60'
+            }`}
+            aria-label="Request / Reply"
+            aria-current={isRequest ? 'page' : undefined}
+          >
+            <SwitchHorizontalIcon />
+          </button>
+        </Tooltip>
       </nav>
     )
   }
@@ -166,6 +182,17 @@ export default function Sidebar({ connectionId }: SidebarProps) {
         >
           <ObjectList connectionId={connectionId} />
         </CollapsibleSection>
+
+        <Link
+          to="/request"
+          aria-current={isRequest ? 'page' : undefined}
+          className={`flex items-center gap-2 px-3 py-2 border-b border-border transition-colors ${
+            isRequest ? 'bg-accent-light text-accent-text' : 'bg-surface-secondary text-gray-700 hover:bg-surface-tertiary'
+          }`}
+        >
+          <SwitchHorizontalIcon />
+          <span className="text-xs font-semibold uppercase tracking-wide">Request / Reply</span>
+        </Link>
       </div>
     </nav>
   )

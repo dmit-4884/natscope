@@ -7,15 +7,18 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,6 +27,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	mcpcmd "github.com/dmit-4884/natscope/cmd/natscope/commands/mcp"
+	mcptransport "github.com/dmit-4884/natscope/internal/transports/mcp"
 	mappingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/mappings/v1/mappings"
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
@@ -370,6 +374,7 @@ func TestMCPProtoPublishAndDecode(t *testing.T) {
 
 	t.Run("write tool is exposed", func(t *testing.T) {
 		assert.Contains(t, toolNames(t, cs), "publish_message")
+		assert.Contains(t, toolNames(t, cs), "request_message")
 		assert.NotContains(t, cs.InitializeResult().Instructions, "read-only")
 	})
 
@@ -464,6 +469,31 @@ func TestMCPProtoPublishAndDecode(t *testing.T) {
 
 		bad := callToolError(t, cs, "publish_message", map[string]any{"subject": "mcpflow.created", "json": map[string]any{"count": "many"}})
 		assert.NotEmpty(t, bad)
+	})
+
+	t.Run("request a service", func(t *testing.T) {
+		nc, err := nats.Connect(env.natsURL)
+		require.NoError(t, err)
+		defer nc.Close()
+		_, err = nc.Subscribe("mcpsvc.echo", func(m *nats.Msg) {
+			_ = m.Respond(fmt.Appendf(nil, `{"echo":%q}`, m.Data))
+		})
+		require.NoError(t, err)
+		require.NoError(t, nc.Flush())
+
+		out := callTool[struct {
+			Subject  string             `json:"subject"`
+			Size     int                `json:"size"`
+			Body     *mcptransport.Body `json:"body"`
+			Encoding string             `json:"encoding"`
+		}](t, cs, "request_message", map[string]any{"subject": "mcpsvc.echo", "text": "ping", "timeoutMs": 2000})
+		assert.True(t, strings.HasPrefix(out.Subject, nats.InboxPrefix), out.Subject)
+		assert.Equal(t, "raw", out.Encoding)
+		require.NotNil(t, out.Body)
+		assert.JSONEq(t, `{"echo":"ping"}`, string(out.Body.JSON))
+		assert.Equal(t, len(`{"echo":"ping"}`), out.Size)
+
+		assert.Contains(t, callToolError(t, cs, "request_message", map[string]any{"subject": "mcpsvc.nobody"}), "NATS_NO_RESPONDERS")
 	})
 
 	t.Run("decode payload by type and by subject", func(t *testing.T) {

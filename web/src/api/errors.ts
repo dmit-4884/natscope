@@ -39,6 +39,7 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   NATS_PERMISSION_VIOLATION: 'Permission denied',
   NATS_AUTHORIZATION_VIOLATION: 'NATS rejected the connection credentials',
   NATS_TIMEOUT: 'Connection timed out',
+  NATS_NO_RESPONDERS: 'No responders on this subject',
   NATS_CONNECTION_FAILED: 'NATS server unavailable',
   NATS_CONNECTION_CLOSED: 'Connection closed',
   NATS_STREAM_NOT_FOUND: 'Stream not found',

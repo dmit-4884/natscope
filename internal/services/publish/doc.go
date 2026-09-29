@@ -8,5 +8,8 @@
 // PublishResult.Error (never transport errors); history is written for both
 // success and failure.
 //
+// Request reuses the payload encoding for a core NATS request-reply exchange;
+// its failures are plain errors and it keeps no history.
+//
 // Implementations must be safe for concurrent use.
 package publish

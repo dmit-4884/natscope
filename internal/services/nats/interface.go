@@ -167,6 +167,19 @@ type Publisher interface {
 	) (*entities.PubAck, error)
 }
 
+// Requester sends core NATS requests.
+type Requester interface {
+	// Request sends a core NATS request and returns the first reply before ctx
+	// ends; errs.ErrNATSNoResponders when nothing listens on subject.
+	Request(
+		ctx context.Context,
+		connectionID string,
+		subject string,
+		data []byte,
+		headers map[string]string,
+	) (*entities.Reply, error)
+}
+
 // Subscriber creates live subscriptions over core NATS and JetStream.
 type Subscriber interface {
 	// Subscribe creates a Core NATS subscription for live streaming.

@@ -59,6 +59,7 @@ var (
 	_ natssvc.StreamManager     = (*Service)(nil)
 	_ natssvc.ConsumerManager   = (*Service)(nil)
 	_ natssvc.Publisher         = (*Service)(nil)
+	_ natssvc.Requester         = (*Service)(nil)
 	_ natssvc.Subscriber        = (*Service)(nil)
 	_ natssvc.StatsReader       = (*Service)(nil)
 	_ natssvc.KVStore           = (*Service)(nil)

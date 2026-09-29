@@ -20,6 +20,7 @@ const CreateKVPage = lazy(() => import('./components/kv/CreateKVPage'))
 const KVOverviewPage = lazy(() => import('./components/kv/KVOverviewPage'))
 const ObjectsTab = lazy(() => import('./components/management/objects/ObjectsTab'))
 const ObjectsOverviewPage = lazy(() => import('./components/objects/ObjectsOverviewPage'))
+const RequestPage = lazy(() => import('./components/request/RequestPage'))
 // Settings pages are eager-loaded: lazy-load + Suspense caused a
 // "Loading..." flash on every tab switch.
 import SettingsLayout from './components/settings/page/SettingsLayout'
@@ -99,6 +100,9 @@ export const router = createBrowserRouter([
               { path: ':bucketName', element: <LazyRoute><ObjectsTab /></LazyRoute> },
             ]
           },
+
+          // Request / Reply
+          { path: 'request', element: <LazyRoute><RequestPage /></LazyRoute> },
 
           // Settings (full-page version of the modal)
           {

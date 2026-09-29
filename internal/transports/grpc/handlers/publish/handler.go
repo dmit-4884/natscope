@@ -65,6 +65,25 @@ func (h *Handler) PublishMessage(
 	}), nil
 }
 
+// RequestMessage sends a core NATS request and returns the first reply; no
+// responders, timeouts and encode failures are transport errors.
+func (h *Handler) RequestMessage(
+	ctx context.Context,
+	req *connect.Request[publishpb.RequestMessageRequest],
+) (*connect.Response[publishpb.RequestMessageResponse], error) {
+	in := converter.Convert(
+		req.Msg,
+		&entities.RequestMessage{},
+		converter.WithHandleEmbeddedStructs(true),
+		grpchelpers.ProtoCodecs,
+	)
+	reply, err := h.publishService.Request(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(converter.Convert(reply, &publishpb.RequestMessageResponse{}, grpchelpers.ProtoCodecs)), nil
+}
+
 // EncodeMessage encodes a JSON message to protobuf (for validation/preview).
 func (h *Handler) EncodeMessage(
 	ctx context.Context,

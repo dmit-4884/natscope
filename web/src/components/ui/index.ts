@@ -69,5 +69,6 @@ export {
   UsersIcon,
   EyeIcon,
   EyeOffIcon,
+  SwitchHorizontalIcon,
   DotsHorizontalIcon,
 } from './icons'

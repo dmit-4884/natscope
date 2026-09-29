@@ -49,6 +49,7 @@ once at startup: restart the client after changing `mcp.allowWrites`.
 | `get_schema_status` | Loaded types and conflicts between proto sources |
 | `list_kv_buckets`, `list_kv_keys`, `get_kv_entry`, `get_kv_history` | Key/Value buckets, keys and revisions |
 | `publish_message` | Publish JSON (encoded to Protobuf when the subject is mapped) or text. Only with `mcp.allowWrites` |
+| `request_message` | Send a core NATS request and return the first reply. Only with `mcp.allowWrites` |
 
 Tools that talk to NATS take a `connection` argument, a saved connection's name or id. With a single saved
 connection it can be omitted. Payloads are clipped to a byte budget (a page or tail carries at most 256 KiB);
@@ -57,8 +58,9 @@ a clipped message is marked `truncated` and `get_message` fetches more of it.
 ## Writes
 
 The endpoint is read-only by default. Set `mcp.allowWrites: true` (env `MCP__ALLOW_WRITES=true`) to add
-`publish_message`. Every publish lands in the [publish history](/guide/history), so you can see what the agent
-sent. Deleting, purging and sealing are not exposed over MCP at all.
+`publish_message` and `request_message`. Every publish lands in the [publish history](/guide/history), so you can
+see what the agent sent. A request is not recorded, but the service that answers it may act on it, so it counts as
+a write. Deleting, purging and sealing are not exposed over MCP at all.
 
 Message payloads reach the agent as data. A payload that contains instructions can still influence a model,
 which is one more reason to keep writes off unless you need them.

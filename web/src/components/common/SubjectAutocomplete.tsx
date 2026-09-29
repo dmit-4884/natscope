@@ -10,6 +10,8 @@ interface Props {
   maxOptions?: number
   inputId?: string
   disabled?: boolean
+  invalid?: boolean
+  describedBy?: string
 }
 
 /**
@@ -25,6 +27,8 @@ export function SubjectAutocomplete({
   maxOptions = 8,
   inputId,
   disabled,
+  invalid,
+  describedBy,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
@@ -103,6 +107,8 @@ export function SubjectAutocomplete({
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         disabled={disabled}
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
         autoComplete="off"
         spellCheck={false}
         className={

@@ -16,3 +16,17 @@ var (
 	// (strict mode rejects compilation).
 	ErrSchemaConflict = errors.New("proto: schema conflict")
 )
+
+// ProtoEncodeError is a JSON payload that could not be encoded to its protobuf
+// message type; Description is user-facing and safe to return to the client.
+type ProtoEncodeError struct {
+	Description string
+}
+
+// Error implements the error interface.
+func (e *ProtoEncodeError) Error() string {
+	if e == nil || e.Description == "" {
+		return "proto: payload could not be encoded"
+	}
+	return e.Description
+}

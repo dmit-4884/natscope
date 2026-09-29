@@ -11,7 +11,7 @@ import { formatBytes } from '@/utils/formatters'
 import { useProtoMessageEntity } from '@/contexts/proto'
 import { useSubjectMappingEntity } from '@/contexts/mappings'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
-import { processHelpers } from '@/utils/helpers'
+import { jsonSyntaxError, processHelpers } from '@/utils/helpers'
 import { plural } from '@/utils/plural'
 import { SubjectDropdown } from './publish/SubjectDropdown'
 import { EditableSubject } from './publish/EditableSubject'
@@ -42,16 +42,6 @@ interface PublishContentProps {
 
 const AUTO_VALIDATE_DEBOUNCE_MS = 600
 const HELPER_JSON_DEBOUNCE_MS = 200
-
-function jsonSyntaxError(value: string): string | null {
-  if (!value.trim()) return null
-  try {
-    JSON.parse(value.includes('{{') ? processHelpers(value) : value)
-    return null
-  } catch (e) {
-    return e instanceof Error ? e.message : 'Invalid JSON'
-  }
-}
 
 export default function PublishContent({
   subjects,

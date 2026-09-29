@@ -203,6 +203,7 @@ func TestToolError(t *testing.T) {
 func TestInstructionsReflectWriteMode(t *testing.T) {
 	t.Parallel()
 	assert.Contains(t, instructions(true), "publish_message publishes")
+	assert.Contains(t, instructions(true), "request_message sends")
 	assert.Contains(t, instructions(false), "read-only")
 }
 

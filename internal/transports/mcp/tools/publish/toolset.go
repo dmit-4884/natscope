@@ -1,7 +1,7 @@
 // Copyright 2026 The Natscope Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package publish holds publish_message, the MCP write tool, registered only when mcp.allowWrites is on.
+// Package publish holds publish_message and request_message, the MCP write tools, registered only when mcp.allowWrites is on.
 package publish
 
 import (
@@ -20,9 +20,12 @@ import (
 const (
 	encodingProtobuf = "protobuf"
 	encodingRaw      = "raw"
+
+	maxRequestTimeoutMs = 60_000
+	replyPayloadBudget  = 64 << 10
 )
 
-// Toolset serves publish_message.
+// Toolset serves publish_message and request_message.
 type Toolset struct {
 	enabled  bool
 	conns    *mcptransport.Connections
@@ -42,7 +45,7 @@ func New(
 	return &Toolset{enabled: cfg.MCPAllowWrites(), conns: conns, publish: publish, mappings: mappings, registry: registry}
 }
 
-// Register adds publish_message to s when writes are allowed.
+// Register adds publish_message and request_message to s when writes are allowed.
 func (t *Toolset) Register(s *mcp.Server) {
 	if !t.enabled {
 		return
@@ -54,4 +57,13 @@ func (t *Toolset) Register(s *mcp.Server) {
 			"Check the payload with validate_payload first. The publish is recorded in the natscope publish history.",
 		Annotations: &mcp.ToolAnnotations{Title: "Publish message", DestructiveHint: ptr.Wrap(false)},
 	}, t.publishMessage)
+
+	mcptransport.AddTool(s, &mcp.Tool{
+		Name: "request_message",
+		Description: "Send a core NATS request to a service subject and return the first reply. The payload works like publish_message; " +
+			"omit json and text for an empty request. Fails at once with NATS_NO_RESPONDERS when nothing listens on the subject and " +
+			"with NATS_TIMEOUT when no reply arrives within timeoutMs. Decode a Protobuf reply body with decode_payload. " +
+			"Requests are not recorded in the publish history.",
+		Annotations: &mcp.ToolAnnotations{Title: "Send request", DestructiveHint: ptr.Wrap(false)},
+	}, t.requestMessage)
 }

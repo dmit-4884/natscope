@@ -25,6 +25,7 @@ message browser, in live tail, and in the publish preview.
 - **Live tail** of a stream or subject pattern with a display-rate throttle.
 - **Consumers** created, edited, paused and resumed, push and pull.
 - **Publishing** of JSON or Protobuf messages with schema validation and custom headers.
+- **Request / Reply** to call NATS services and read their replies, decoded from Protobuf.
 - **Protobuf sources** from Git repositories, local directories or uploaded files, with versioning and
   live reload.
 - **Key/Value and Object Store** buckets browsed and managed from the same UI.

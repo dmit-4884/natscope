@@ -7,8 +7,11 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
@@ -35,6 +38,49 @@ func (t *Toolset) publishMessage(ctx context.Context, _ *mcp.CallToolRequest, in
 	}
 	out.Stream, out.Sequence, out.Duplicate = res.Stream, res.Sequence, res.Duplicate
 	return nil, out, nil
+}
+
+func (t *Toolset) requestMessage(ctx context.Context, _ *mcp.CallToolRequest, in requestInput) (*mcp.CallToolResult, requestOutput, error) {
+	if in.TimeoutMs < 0 || in.TimeoutMs > maxRequestTimeoutMs {
+		return nil, requestOutput{}, mcptransport.Errorf("timeoutMs must be between 1 and %d", maxRequestTimeoutMs)
+	}
+	connID, err := t.conns.Resolve(ctx, in.Connection)
+	if err != nil {
+		return nil, requestOutput{}, err
+	}
+
+	req := &entities.PublishRequest{Subject: strings.TrimSpace(in.Subject), Headers: in.Headers}
+	enc := publishOutput{Encoding: encodingRaw}
+	if in.JSON != nil || in.Text != "" || in.Type != "" {
+		req, enc, err = t.request(ctx, publishInput{
+			Subject:  in.Subject,
+			JSON:     in.JSON,
+			Text:     in.Text,
+			Type:     in.Type,
+			SourceID: in.SourceID,
+			Raw:      in.Raw,
+			Headers:  in.Headers,
+		})
+		if err != nil {
+			return nil, requestOutput{}, err
+		}
+	}
+	req.ConnectionID = connID
+
+	reply, err := t.publish.Request(ctx, &entities.RequestMessage{
+		PublishRequest: *req,
+		Timeout:        time.Duration(in.TimeoutMs) * time.Millisecond,
+	})
+	if err != nil {
+		return nil, requestOutput{}, err
+	}
+
+	out := converter.Convert(reply, &requestOutput{})
+	out.Size = len(reply.Data)
+	out.DurationMs = float64(reply.Duration) / float64(time.Millisecond)
+	out.Body, out.Truncated = mcptransport.NewBody(reply.Data, replyPayloadBudget, false)
+	out.Encoding, out.MessageType = enc.Encoding, enc.MessageType
+	return nil, *out, nil
 }
 
 func (t *Toolset) request(ctx context.Context, in publishInput) (*entities.PublishRequest, publishOutput, error) {

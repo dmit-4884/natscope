@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { helpers, processHelpers } from './helpers'
+import { helpers, jsonSyntaxError, processHelpers } from './helpers'
 
 describe('helpers', () => {
   describe('helpers array', () => {
@@ -106,5 +106,22 @@ describe('helpers', () => {
       // In JSON context (after :), value should be quoted
       expect(result).toMatch(/"id":\s*"[^"]+"/i)
     })
+  })
+})
+
+describe('jsonSyntaxError', () => {
+  it('accepts empty input and valid JSON', () => {
+    expect(jsonSyntaxError('')).toBeNull()
+    expect(jsonSyntaxError('  ')).toBeNull()
+    expect(jsonSyntaxError('{"a":1}')).toBeNull()
+  })
+
+  it('expands helpers before parsing', () => {
+    expect(jsonSyntaxError('{"id": {{uuid}}}')).toBeNull()
+  })
+
+  it('reports the parse error for invalid JSON', () => {
+    expect(jsonSyntaxError('{"a":')).toEqual(expect.any(String))
+    expect(jsonSyntaxError('plain text')).toEqual(expect.any(String))
   })
 })

@@ -4,12 +4,16 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/
 
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
 import "types/proto/proto_codec.proto";
 
 // Provides operations for publishing messages to NATS, encoding payloads to protobuf, and validating JSON against protobuf schemas.
 service PublishService {
   // Publishes a JSON-encoded message to a NATS subject. The server encodes the payload to protobuf before publishing.
   rpc PublishMessage(PublishMessageRequest) returns (PublishMessageResponse) {}
+
+  // Sends a core NATS request and returns the first reply. The server encodes the payload to protobuf when message_type is set.
+  rpc RequestMessage(RequestMessageRequest) returns (RequestMessageResponse) {}
 
   // Encodes a JSON payload into protobuf binary format using the specified message type.
   rpc EncodeMessage(EncodeMessageRequest) returns (EncodeMessageResponse) {}
@@ -66,6 +70,55 @@ message PublishMessageResponse {
 
   // Indicates if this message was a duplicate (matched Nats-Msg-Id within the dedup window).
   bool duplicate = 4;
+}
+
+// Defines the request message for a core NATS request-reply exchange.
+message RequestMessageRequest {
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.publish.source_id_with_message_type"
+    message: "source_id is required when message_type is set"
+    expression: "!has(this.message_type) || this.message_type == '' || (has(this.source_id) && this.source_id != '')"
+  };
+
+  // Required. Identifier of the NATS connection to send the request through.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Literal NATS subject the responders listen on.
+  string subject = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Fully qualified protobuf message type name for encoding. If empty, data is sent as raw bytes.
+  optional string message_type = 3;
+
+  // Optional. Request payload: JSON when message_type is set, raw text otherwise. Empty sends a request without a body.
+  string data = 4;
+
+  // Optional. Custom NATS headers to include with the request. Key-value pairs.
+  map<string, string> headers = 5;
+
+  // Optional. Identifier of the proto source whose snapshot is used for protobuf encoding.
+  // Required if messageType is set.
+  optional string source_id = 6;
+
+  // Optional. Specific tag of the source snapshot. Empty means active selection.
+  optional string source_tag = 7;
+
+  // Optional. How long to wait for a reply. Defaults to 5 seconds.
+  google.protobuf.Duration timeout = 8 [(buf.validate.field).duration = {gt: {}, lte: {seconds: 60}}];
+}
+
+// Defines the response message for a core NATS request: the first reply received.
+message RequestMessageResponse {
+  // Required. Subject the reply was delivered on (the request's reply inbox).
+  string subject = 1;
+
+  // Required. Reply payload bytes.
+  bytes data = 2;
+
+  // Optional. Headers the responder attached to the reply.
+  map<string, string> headers = 3;
+
+  // Required. Time from sending the request to receiving the reply.
+  google.protobuf.Duration duration = 4;
 }
 
 // Defines the request message for encoding a JSON payload to protobuf binary format.

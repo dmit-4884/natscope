@@ -104,3 +104,13 @@ export function processHelpers(text: string, sharedValues?: Record<string, strin
 
   return result
 }
+
+export function jsonSyntaxError(value: string): string | null {
+  if (!value.trim()) return null
+  try {
+    JSON.parse(value.includes('{{') ? processHelpers(value) : value)
+    return null
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Invalid JSON'
+  }
+}

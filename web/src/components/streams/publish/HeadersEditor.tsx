@@ -8,18 +8,21 @@ export interface HeaderEntry {
   value: string
 }
 
+export type KnownHeaders = Record<string, { hint: string; valuePlaceholder?: string }>
+
 interface Props {
   headers: HeaderEntry[]
   onAdd: () => void
   onRemove: (index: number) => void
   onUpdate: (index: number, field: 'key' | 'value', value: string) => void
+  knownHeaders?: KnownHeaders
 }
 
 /**
  * Standard JetStream publish headers (datalist + hints) — surfaces dedup /
  * optimistic-concurrency features.
  */
-const KNOWN_HEADERS: Record<string, { hint: string; valuePlaceholder?: string }> = {
+const KNOWN_HEADERS: KnownHeaders = {
   'Nats-Msg-Id': {
     hint: 'Enables de-duplication: messages with the same id within the stream dedup window are dropped. Tip: use {{uuid}}.',
     valuePlaceholder: '{{uuid}}',
@@ -44,7 +47,7 @@ const KNOWN_HEADERS: Record<string, { hint: string; valuePlaceholder?: string }>
 
 const DATALIST_ID = 'nats-standard-headers'
 
-export function HeadersEditor({ headers, onAdd, onRemove, onUpdate }: Props) {
+export function HeadersEditor({ headers, onAdd, onRemove, onUpdate, knownHeaders = KNOWN_HEADERS }: Props) {
   const rowKeys = useRowKeys(headers.length)
   const handleAdd = () => {
     rowKeys.registerAdd()
@@ -77,7 +80,7 @@ export function HeadersEditor({ headers, onAdd, onRemove, onUpdate }: Props) {
         </Button>
       </div>
       <datalist id={DATALIST_ID}>
-        {Object.keys(KNOWN_HEADERS).map((k) => (
+        {Object.keys(knownHeaders).map((k) => (
           <option key={k} value={k} />
         ))}
       </datalist>
@@ -85,7 +88,7 @@ export function HeadersEditor({ headers, onAdd, onRemove, onUpdate }: Props) {
         <div className="space-y-2">
           {headers.map((header, index) => {
             const trimmedKey = header.key.trim()
-            const known = KNOWN_HEADERS[trimmedKey]
+            const known = knownHeaders[trimmedKey]
             const isDuplicate = duplicateKeys.has(trimmedKey.toLowerCase())
             const isInvalid = trimmedKey.length > 0 && !isValidHeaderName(trimmedKey)
             return (

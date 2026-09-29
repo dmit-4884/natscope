@@ -127,6 +127,13 @@ type Publisher interface {
 	PublishToStream(ctx context.Context, subject string, data []byte, headers map[string]string) (*entities.PubAck, error)
 }
 
+// Requester sends core NATS requests.
+type Requester interface {
+	// Request publishes to subject with a reply inbox and returns the first reply
+	// before ctx ends; errs.ErrNATSNoResponders when nothing listens on subject.
+	Request(ctx context.Context, subject string, data []byte, headers map[string]string) (*entities.Reply, error)
+}
+
 // Subscriber creates live subscriptions over core NATS and JetStream.
 type Subscriber interface {
 	// Subscribe creates a Core NATS subscription for live streaming.
@@ -233,6 +240,7 @@ type Client interface {
 	StreamManager
 	ConsumerManager
 	Publisher
+	Requester
 	Subscriber
 	StatsReader
 	KVStore

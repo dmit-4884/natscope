@@ -37,12 +37,18 @@ func (m *mockProtoService) EncodeRaw(ctx context.Context, req entities.CodecRequ
 type mockNATSService struct {
 	natssvc.ConnectionManager
 	natssvc.Publisher
+	natssvc.Requester
 	publishFn func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.PubAck, error)
+	requestFn func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.Reply, error)
 	urlFn     func(connID string) (string, error)
 }
 
 func (m *mockNATSService) PublishToStream(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.PubAck, error) {
 	return m.publishFn(ctx, connID, subject, data, headers)
+}
+
+func (m *mockNATSService) Request(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.Reply, error) {
+	return m.requestFn(ctx, connID, subject, data, headers)
 }
 
 func (m *mockNATSService) GetConnectionURL(_ context.Context, connID string) (string, error) {
@@ -97,7 +103,7 @@ func TestPublish_RawJSON(t *testing.T) {
 			return &entities.PubAck{Stream: "ORDERS", Sequence: 42}, nil
 		},
 	}
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
 
 	resp, err := s.Publish(t.Context(), &entities.PublishRequest{
 		ConnectionID: "conn-1",
@@ -140,7 +146,7 @@ func TestPublish_ProtoEncoded(t *testing.T) {
 			return &entities.PubAck{Stream: "ORDERS", Sequence: 7}, nil
 		},
 	}
-	s := New(natsm, natsm, proto, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, proto, &mockHistoryService{rec: hist}, &mockSettingsService{})
 
 	msgType := "api.v1.Order"
 	sourceID := "src-1"
@@ -176,7 +182,7 @@ func TestPublish_EncodeError(t *testing.T) {
 			return nil, nil
 		},
 	}
-	s := New(natsm, natsm, proto, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, proto, &mockHistoryService{rec: hist}, &mockSettingsService{})
 
 	msgType := "api.v1.Bad"
 	sourceID := "src-1"
@@ -206,7 +212,7 @@ func TestPublish_PublishError_RecordedAsFailure(t *testing.T) {
 			return nil, errors.New("stream not found")
 		},
 	}
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
 
 	resp, err := s.Publish(t.Context(), &entities.PublishRequest{
 		ConnectionID: "c1", Subject: "x", Data: "{}",
@@ -234,7 +240,7 @@ func TestPublish_HistoryRecordFailureDoesNotPropagate(t *testing.T) {
 			return &entities.PubAck{Stream: "S", Sequence: 1}, nil
 		},
 	}
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
 
 	resp, err := s.Publish(t.Context(), &entities.PublishRequest{
 		ConnectionID: "c1", Subject: "x", Data: "{}",
@@ -261,7 +267,7 @@ func TestPublish_RespectsCustomTimeoutFromSettings(t *testing.T) {
 	timeoutSec := int32(7)
 	settings := &entities.UserSettings{Publish: &entities.PublishSettings{PublishTimeoutSec: &timeoutSec}}
 
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{settings: settings})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{settings: settings})
 
 	_, err := s.Publish(t.Context(), &entities.PublishRequest{
 		ConnectionID: "c1", Subject: "x", Data: "{}",
@@ -280,7 +286,7 @@ func TestPublish_MissingSourceIDForMessageType(t *testing.T) {
 			return nil, nil
 		},
 	}
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
 
 	msgType := "api.v1.Order"
 	resp, err := s.Publish(t.Context(), &entities.PublishRequest{
@@ -305,7 +311,7 @@ func TestPublish_RejectsWildcardSubject(t *testing.T) {
 			return nil, nil
 		},
 	}
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{})
 
 	_, err := s.Publish(t.Context(), &entities.PublishRequest{
 		ConnectionID: "c1", Subject: "orders.*", Data: "{}",
@@ -323,7 +329,7 @@ func TestPublish_RejectsInvalidHeaderName(t *testing.T) {
 			return nil, nil
 		},
 	}
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{})
 
 	_, err := s.Publish(t.Context(), &entities.PublishRequest{
 		ConnectionID: "c1", Subject: "orders.created", Data: "{}",
@@ -343,7 +349,7 @@ func TestPublish_SkipsHistoryForUnknownConnection(t *testing.T) {
 		},
 		urlFn: func(string) (string, error) { return "", errs.ErrSavedConnectionNotFound },
 	}
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
 
 	_, err := s.Publish(t.Context(), &entities.PublishRequest{
 		ConnectionID: "not-a-connection", Subject: "orders.created", Data: "{}",
@@ -364,7 +370,7 @@ func TestPublish_HistoryKeepsTextEncodingHeadersAndDuplicate(t *testing.T) {
 			return &entities.PubAck{Stream: "ORDERS", Sequence: 7, Duplicate: true}, nil
 		},
 	}
-	s := New(natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
 
 	_, err := s.Publish(t.Context(), &entities.PublishRequest{
 		ConnectionID: "conn-1",

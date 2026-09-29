@@ -65,6 +65,7 @@ export default defineConfig({
           { text: 'Live tail', link: '/guide/live-tail' },
           { text: 'Consumers', link: '/guide/consumers' },
           { text: 'Publishing', link: '/guide/publish' },
+          { text: 'Request / Reply', link: '/guide/request-reply' },
           { text: 'Protobuf', link: '/guide/protobuf' },
           { text: 'Key/Value', link: '/guide/kv' },
           { text: 'Object Store', link: '/guide/object-store' },

@@ -15,6 +15,9 @@ interface Props {
   disabledReason?: string | null
   isPublishing: boolean
   onPublish: () => void
+  submitLabel?: string
+  pendingLabel?: string
+  shortcutVerb?: string
   children?: React.ReactNode
 }
 
@@ -69,6 +72,9 @@ export function PublishActionBar({
   disabledReason,
   isPublishing,
   onPublish,
+  submitLabel = 'Publish Message',
+  pendingLabel = 'Publishing...',
+  shortcutVerb = 'publish',
   children,
 }: Props) {
   const platformCmd = isMacPlatform() ? '⌘' : 'Ctrl'
@@ -77,7 +83,7 @@ export function PublishActionBar({
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className="text-xs text-content-muted">{platformCmd}+Enter to publish</span>
+        <span className="text-xs text-content-muted">{platformCmd}+Enter to {shortcutVerb}</span>
         {children}
       </div>
       <div className="flex items-center gap-3">
@@ -100,14 +106,14 @@ export function PublishActionBar({
           {isPublishing ? (
             <>
               <Spinner size="sm" />
-              Publishing...
+              {pendingLabel}
             </>
           ) : (
             <>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
-              Publish Message
+              {submitLabel}
             </>
           )}
         </button>

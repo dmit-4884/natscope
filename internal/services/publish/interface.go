@@ -16,4 +16,10 @@ type Service interface {
 	// return is reserved for unexpected internal failures (user-actionable ones go
 	// through PublishResult.Error).
 	Publish(ctx context.Context, in *entities.PublishRequest) (*entities.PublishResult, error)
+
+	// Request sends a core NATS request and returns the first reply. Unlike
+	// Publish, every failure is an error (errs.ErrNATSNoResponders,
+	// errs.ErrNATSTimeout, *errs.ProtoEncodeError, ...) and nothing is recorded to
+	// history.
+	Request(ctx context.Context, in *entities.RequestMessage) (*entities.Reply, error)
 }

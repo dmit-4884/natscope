@@ -30,11 +30,12 @@ import (
 const defaultPublishTimeout = 10 * time.Second
 
 // natsDeps bundles the narrow NATS roles the publish service needs: connection
-// URL lookup plus stream publishing. The roles are injected separately so fx can
-// resolve each, then embedded here for internal use.
+// URL lookup, stream publishing and core requests. The roles are injected
+// separately so fx can resolve each, then embedded here for internal use.
 type natsDeps struct {
 	natssvc.ConnectionManager
 	natssvc.Publisher
+	natssvc.Requester
 }
 
 // Service implements publishsvc.Service.
@@ -50,12 +51,13 @@ type Service struct {
 func New(
 	connManager natssvc.ConnectionManager,
 	publisher natssvc.Publisher,
+	requester natssvc.Requester,
 	protoService protosvc.Codec,
 	historyService historysvc.Service,
 	settingsService settingssvc.Service,
 ) *Service {
 	return &Service{
-		natsService:     natsDeps{connManager, publisher},
+		natsService:     natsDeps{connManager, publisher, requester},
 		protoService:    protoService,
 		historyService:  historyService,
 		settingsService: settingsService,

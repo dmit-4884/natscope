@@ -63,6 +63,10 @@ var ErrLiveConsumerStalled = errors.New("nats: live consumer stopped reading, cl
 // ErrLiveConnectionLost the NATS connection behind a live session was closed or replaced.
 var ErrLiveConnectionLost = errors.New("nats: live connection was closed or replaced")
 
+// ErrNATSNoResponders a core NATS request found no subscriber on its subject;
+// the server reports it at once instead of letting the request time out.
+var ErrNATSNoResponders = errors.New("nats: no responders available for request")
+
 // ErrNATSInvalidArgument is a client-side rejection of a NATS request.
 var ErrNATSInvalidArgument = errors.New("nats: invalid argument")
 

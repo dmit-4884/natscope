@@ -52,6 +52,7 @@ var commonDomainErrors = []struct {
 	{errs.ErrNATSConnectionClosed, errorMapping{codes.Unavailable, "nats connection closed", "NATS_CONNECTION_CLOSED"}},
 	{errs.ErrNATSConnectionFailed, errorMapping{codes.Unavailable, "nats server unavailable", "NATS_CONNECTION_FAILED"}},
 	{errs.ErrNATSTimeout, errorMapping{codes.DeadlineExceeded, "nats operation timed out", "NATS_TIMEOUT"}},
+	{errs.ErrNATSNoResponders, errorMapping{codes.Unavailable, "no responders for the request subject", "NATS_NO_RESPONDERS"}},
 	{errs.ErrNATSPermissionViolation, errorMapping{codes.PermissionDenied, "nats permissions violation", "NATS_PERMISSION_VIOLATION"}},
 	{errs.ErrNATSInvalidArgument, errorMapping{codes.InvalidArgument, "nats: invalid argument", "NATS_INVALID_ARGUMENT"}},
 	{errs.ErrStreamNotFound, errorMapping{codes.NotFound, "stream not found", "NATS_STREAM_NOT_FOUND"}},
@@ -116,6 +117,9 @@ func StatusErrorConvert(_ context.Context, err error) error {
 
 	if valErr, ok := errors.AsType[*errs.NATSValidationError](err); ok && valErr != nil {
 		return NewStatus(codes.InvalidArgument, valErr.Error(), "NATS_INVALID_ARGUMENT")
+	}
+	if encErr, ok := errors.AsType[*errs.ProtoEncodeError](err); ok && encErr != nil {
+		return NewStatus(codes.InvalidArgument, encErr.Error(), "PROTO_ENCODE_FAILED")
 	}
 
 	// Per-handler errors are matched upstream; here we handle only the common set.

@@ -52,6 +52,7 @@ func InfrastructureModule() fx.Option {
 			fx.As(new(natssvc.StreamManager)),
 			fx.As(new(natssvc.ConsumerManager)),
 			fx.As(new(natssvc.Publisher)),
+			fx.As(new(natssvc.Requester)),
 			fx.As(new(natssvc.Subscriber)),
 			fx.As(new(natssvc.StatsReader)),
 			fx.As(new(natssvc.KVStore)),

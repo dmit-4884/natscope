@@ -69,6 +69,7 @@ func TestStatusErrorConvert(t *testing.T) {
 		{name: "ErrNATSConnectionClosed", err: errs.ErrNATSConnectionClosed, wantCode: codes.Unavailable, wantReason: "NATS_CONNECTION_CLOSED"},
 		{name: "ErrNATSConnectionFailed", err: errs.ErrNATSConnectionFailed, wantCode: codes.Unavailable, wantReason: "NATS_CONNECTION_FAILED"},
 		{name: "ErrNATSTimeout", err: errs.ErrNATSTimeout, wantCode: codes.DeadlineExceeded, wantReason: "NATS_TIMEOUT"},
+		{name: "ErrNATSNoResponders", err: errs.ErrNATSNoResponders, wantCode: codes.Unavailable, wantReason: "NATS_NO_RESPONDERS"},
 		{name: "ErrNATSPermissionViolation", err: errs.ErrNATSPermissionViolation, wantCode: codes.PermissionDenied, wantReason: "NATS_PERMISSION_VIOLATION"},
 		{
 			name:       "ErrNATSAuthorizationViolation",
@@ -105,6 +106,12 @@ func TestStatusErrorConvert(t *testing.T) {
 		{name: "ErrNoProtoSources", err: errs.ErrNoProtoSources, wantCode: codes.FailedPrecondition, wantReason: "NO_PROTO_SOURCES"},
 		{name: "ErrProtoMessageNotFound", err: errs.ErrProtoMessageNotFound, wantCode: codes.NotFound, wantReason: "PROTO_MESSAGE_NOT_FOUND"},
 		{name: "ErrSchemaConflict", err: errs.ErrSchemaConflict, wantCode: codes.FailedPrecondition, wantReason: "SCHEMA_CONFLICT"},
+		{
+			name:       "WrappedProtoEncodeError",
+			err:        fmt.Errorf("encode request: %w", &errs.ProtoEncodeError{Description: "Cannot convert JSON to 'o.v1.Order'"}),
+			wantCode:   codes.InvalidArgument,
+			wantReason: "PROTO_ENCODE_FAILED",
+		},
 
 		// Workspace import/export shared
 		{name: "ErrWorkspaceInvalidFile", err: errs.ErrWorkspaceInvalidFile, wantCode: codes.InvalidArgument, wantReason: "WORKSPACE_INVALID_FILE"},
@@ -194,6 +201,16 @@ func TestNATSValidationErrorMessage(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, st.Code())
 	assert.Equal(t, `nats: invalid stream name: "bad name"`, st.Message())
+}
+
+func TestProtoEncodeErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	encErr := &errs.ProtoEncodeError{Description: `Cannot convert JSON to 'o.v1.Order': unknown field "x"`}
+	st, ok := status.FromError(StatusErrorConvert(t.Context(), encErr))
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+	assert.Equal(t, `Cannot convert JSON to 'o.v1.Order': unknown field "x"`, st.Message())
 }
 
 // TestNATSAPIErrorMetadata verifies err_code/http_code survive in the ErrorInfo metadata.

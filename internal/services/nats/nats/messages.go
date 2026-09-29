@@ -51,3 +51,18 @@ func (s *Service) PublishToStream(
 	}
 	return c.PublishToStream(ctx, subject, data, headers)
 }
+
+// Request sends a core NATS request and returns the first reply.
+func (s *Service) Request(
+	ctx context.Context,
+	connectionID string,
+	subject string,
+	data []byte,
+	headers map[string]string,
+) (*entities.Reply, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.Request(ctx, subject, data, headers)
+}

@@ -101,6 +101,16 @@ func TestRequestRejectsAmbiguousPayloads(t *testing.T) {
 	}
 }
 
+func TestRequestMessageRejectsTimeoutOutOfRange(t *testing.T) {
+	t.Parallel()
+	ts := newToolset()
+
+	for _, timeoutMs := range []int{-1, maxRequestTimeoutMs + 1} {
+		_, _, err := ts.requestMessage(t.Context(), nil, requestInput{Subject: "svc.ping", TimeoutMs: timeoutMs})
+		require.EqualError(t, err, "timeoutMs must be between 1 and 60000")
+	}
+}
+
 func TestRegisterHonorsAllowWrites(t *testing.T) {
 	t.Parallel()
 	assert.True(t, newToolset().enabled)

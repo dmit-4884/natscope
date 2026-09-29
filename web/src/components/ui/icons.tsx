@@ -223,6 +223,14 @@ export function EyeOffIcon({ className }: IconProps) {
   )
 }
 
+export function SwitchHorizontalIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+    </svg>
+  )
+}
+
 export function DotsHorizontalIcon({ className }: IconProps) {
   return (
     <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" className={className ?? 'w-4 h-4'}>
