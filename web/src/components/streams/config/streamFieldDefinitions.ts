@@ -49,7 +49,7 @@ export interface StreamFieldDef {
   defaultValue?: unknown
   /** Server capability required to use this field; resolved by the form via useServerCapabilities. */
   requiresCapability?: CapabilityKey
-  /** Number/duration field backed by a proto int32 — value is clamped to the int32 range. */
+  /** Backed by a proto int32; the value is clamped to the int32 range. */
   int32?: boolean
 }
 

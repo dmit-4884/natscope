@@ -1,8 +1,5 @@
 import { matchSubject } from './subjectMatch'
 
-/** Specificity score (higher = more specific): matches the server's
- * natsutil.specificity so client-side previews agree with what Live/Messages
- * actually decode with. */
 function patternSpecificity(pattern: string): number {
   let score = 0
   for (const token of pattern.split('.')) {
@@ -13,19 +10,6 @@ function patternSpecificity(pattern: string): number {
   return score
 }
 
-/**
- * Resolves the mapping that would win for a subject, using the same
- * tie-break the server's resolver (natsutil.MappingResolver) applies: an
- * exact (non-wildcard) pattern match wins outright — ties on an identical
- * pattern across sources go to the most recently created one; otherwise the
- * highest-specificity wildcard match wins — ties break by pattern
- * (lexicographic ascending), then by the oldest created.
- *
- * This is the single mapping-resolution algorithm for the frontend: Publish
- * (schema used to encode) and the message viewer (schema used to decode)
- * must agree, or a message can be encoded with one schema and rendered with
- * another.
- */
 export function resolveMapping<T>(
   subject: string,
   candidates: readonly T[],

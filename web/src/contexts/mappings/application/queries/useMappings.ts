@@ -127,9 +127,6 @@ export function useSubjectMappingEntity(subject: string | null, sourceFilter?: s
 
     const candidates = sourceFilter ? mappings.filter((m) => m.sourceId === sourceFilter) : mappings
 
-    // Shared with the message viewer (UnifiedMessageViewer) so Publish
-    // encodes with the same mapping the viewer decodes with — see
-    // resolveMapping's doc comment.
     return resolveMapping(
       subject,
       candidates,

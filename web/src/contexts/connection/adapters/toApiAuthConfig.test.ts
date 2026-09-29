@@ -14,7 +14,6 @@ describe('toApiAuthConfig', () => {
     expect(toApiAuthConfig(null)).toBeUndefined()
   })
 
-  // regression: an explicit "clear auth" must not be dropped.
   it('emits AUTH_METHOD_UNSPECIFIED for none when explicit, never undefined', () => {
     const result = toApiAuthConfig(AuthConfig.fromTrusted({ method: 'none' }), { explicit: true })
     expect(result).toBeDefined()

@@ -30,9 +30,6 @@ export async function getPublishHistory(
 ): Promise<PublishHistoryEntry[]> {
   const response = await historyClient.listPublishHistory(
     {
-      // connectionId is unambiguous regardless of URL count/order; connectionUrl
-      // is only sent as a fallback when no id is available. Both
-      // filters AND together server-side, so sending both would over-restrict.
       connectionId,
       connectionUrl: connectionId ? undefined : connectionUrl,
       stream,

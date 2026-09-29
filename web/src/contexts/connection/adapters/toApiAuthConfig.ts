@@ -15,16 +15,6 @@ const DOMAIN_TO_PROTO: Record<AuthMethod, ProtoAuthMethod> = {
   credentials: ProtoAuthMethod.CREDENTIALS,
 }
 
-/**
- * Domain AuthConfig → proto.
- *  - explicit: false (default) — undefined for 'none' (leave auth untouched on
- *    UpdateConnection; used by Test on unsaved).
- *  - explicit: true — always emit an object, even for 'none', so the backend
- *    treats it as a replace (AUTH_METHOD_UNSPECIFIED clears stored auth).
- *    Without this, an Edit-mode "Authentication: None" save sent no `auth`
- *    field at all, which the backend reads as "leave unchanged" — the UI
- *    reported success while the old credentials stayed in effect.
- */
 export function toApiAuthConfig(
   config: AuthConfig | undefined | null,
   opts: { explicit: boolean } = { explicit: false },

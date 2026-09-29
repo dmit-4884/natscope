@@ -108,10 +108,7 @@ export default function ConnectedLayout() {
     navigate('/', { replace: true })
   }, [dropConnectionQueries, navigate])
 
-  // Handle invalid connection (lazy connect failed on backend, or the
-  // connection stayed unreachable long enough to give up). This is a forced
-  // disconnect, not a user-initiated one — session drafts stay put, so a
-  // reconnect (to this or another connection) doesn't lose unsaved work.
+  // Handle invalid connection (lazy connect failed on backend, or it stayed unreachable).
   const handleInvalidConnection = useCallback(async (error: unknown) => {
     logger.warn('Connection is no longer valid, disconnecting...')
     const name = currentConnection?.name

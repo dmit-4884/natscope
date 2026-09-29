@@ -159,10 +159,6 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     }
   }
 
-  // block Save on an unvalidated path/URL so a source can never be
-  // created (or repointed) in a state that will never compile. Only checked
-  // when the path/URL is new or changed — editing unrelated fields on an
-  // already-valid source doesn't re-pay the round trip.
   const pathOrRepoChanged =
     !isEdit ||
     (sourceType === 'local' && localPath !== (existing?.localPath || '')) ||

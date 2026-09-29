@@ -81,7 +81,7 @@ export default function StreamConfigTab() {
       handleCancelEdit()
       refetch()
     } catch {
-      /* toasted by the mutation hook; keep the diff modal open */
+      /* toasted by the mutation hook */
     }
   }
 
@@ -99,7 +99,7 @@ export default function StreamConfigTab() {
       setConfirmAction(null)
       refetch()
     } catch {
-      /* toasted by the mutation hook; keep the confirm dialog open */
+      /* toasted by the mutation hook */
     }
   }
 

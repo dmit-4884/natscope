@@ -47,9 +47,6 @@ export class SubjectPattern extends ValueObject<SubjectPatternProps> {
 
     const parts = trimmed.split('.')
 
-    // "*"/">" only match a whole token — "a.b*" or "a.*b" are not wildcards,
-    // they're literal segments containing a wildcard character, which NATS
-    // rejects. ">" additionally only matches when it is the last token.
     for (const [i, part] of parts.entries()) {
       const hasWildcardChar = part.includes('*') || part.includes('>')
       if (hasWildcardChar && part !== '*' && part !== '>') {

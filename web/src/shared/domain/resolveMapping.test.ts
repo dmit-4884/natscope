@@ -33,10 +33,6 @@ describe('resolveMapping', () => {
     expect(resolve('orders.created', [greater, star])).toBe(star)
   })
 
-  // the exact repro — the same wildcard pattern bound to two
-  // different sources must resolve identically for Publish and the message
-  // viewer, and must agree with the server's resolver (natsutil), which
-  // breaks identical-pattern wildcard ties by the oldest createdAt.
   it('the same wildcard pattern across two sources resolves to the oldest one, independent of input order', () => {
     const older = c('qa.ui.proto.*', 'qa-ui-local', 1000)
     const newer = c('qa.ui.proto.*', 'qa-ui-files-dup', 2000)
@@ -53,8 +49,6 @@ describe('resolveMapping', () => {
   })
 
   it('equal-specificity wildcards tie-break lexicographically by pattern', () => {
-    // "*.x" (10 + 1 = 11) and "a.*" (10 + 1 = 11) both match "a.x" with the
-    // same specificity; "*.x" sorts first lexicographically ('*' < 'a').
     const starDotX = c('*.x', 'src', 1)
     const aDotStar = c('a.*', 'src', 1)
     expect(resolve('a.x', [aDotStar, starDotX])).toBe(starDotX)

@@ -9,8 +9,7 @@ const SUSTAINED_FAILURE_MS = 60_000
 
 /**
  * Validate a saved connection is reachable; calls onInvalidConnection with the
- * failing error once the connection is confirmed gone, or a transient outage
- * has not recovered within {@link SUSTAINED_FAILURE_MS}.
+ * failing error once the connection is gone or unreachable past {@link SUSTAINED_FAILURE_MS}.
  * Shares the polled ['health'] query (~100B) with the header indicator.
  */
 export function useConnectionValidation(

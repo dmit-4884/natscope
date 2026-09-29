@@ -4,7 +4,7 @@ import { DontAskAgainCheckbox } from '@/components/common/DontAskAgainCheckbox'
 import type { ConsumerInfo } from '@/types/nats'
 
 const MIN_PAUSE_MINUTES = 1
-const MAX_PAUSE_MINUTES = 525_600 // 1 year
+const MAX_PAUSE_MINUTES = 525_600
 
 type ConsumerConfirmType = 'delete' | 'pause'
 

@@ -21,8 +21,6 @@ function renderPage() {
   )
 }
 
-// the form must validate the path/URL before saving instead of
-// persisting a source that can never compile.
 describe('ProtoSourceEditPage — validate before save', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -86,7 +84,6 @@ describe('ProtoSourceEditPage — validate before save', () => {
 
     renderPage()
 
-    // Git is the default source type — no need to click a type button.
     fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'qa-165-git' } })
     fireEvent.change(screen.getByLabelText('Repository URL *'), {
       target: { value: 'file:///tmp/repo' },

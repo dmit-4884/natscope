@@ -51,9 +51,6 @@ const parseJsonData = (base64Data: string): unknown | null => {
   }
 }
 
-// Shared with Publish's mapping resolution (useSubjectMappingEntity) so the
-// viewer decodes with the same mapping Publish encoded with — see
-// resolveMapping's doc comment.
 const findMappingMatch = (subject: string, mappings: MappingItem[]): MappingItem | null =>
   resolveMapping(
     subject,
