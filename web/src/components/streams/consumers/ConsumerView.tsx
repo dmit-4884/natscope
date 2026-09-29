@@ -71,7 +71,7 @@ export function ConsumerView({
       </div>
 
       <div className="flex-1 overflow-auto p-4">
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr,550px] gap-4 items-start">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,600px),1fr))] gap-4 items-start">
           <div className="flex flex-col gap-4">
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -136,7 +136,7 @@ export function ConsumerView({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-1">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-x-6 gap-y-1">
                   <ConfigRow
                     label="Deliver Policy"
                     value={consumer.config?.deliver_policy || '-'}
