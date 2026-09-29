@@ -51,11 +51,7 @@ func New() *cobra.Command {
 func (c *Command) configure() {
 	c.AddCommand(run.New())
 
-	// "server" has no positional args of its own; an unresolved subcommand
-	// name (e.g. "server bogus") falls through here and must be rejected
-	// instead of printing help with a misleadingly successful exit code.
-	// This requires an explicit RunE — cobra only reaches Args validation
-	// for a command that is Runnable.
+	// Cobra checks Args only on a Runnable command, hence the RunE below.
 	c.Args = cobra.NoArgs
 	c.RunE = func(cmd *cobra.Command, _ []string) error {
 		return cmd.Help()

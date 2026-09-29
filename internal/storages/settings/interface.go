@@ -19,10 +19,7 @@ type Storage interface {
 	// Returns errs.ErrSettingsNotFound if no custom settings exist.
 	Get(ctx context.Context) (*entities.UserSettings, error)
 
-	// Update atomically loads settings (or a fresh default if none saved yet),
-	// lets mutate apply the caller's change, and persists the result within a
-	// single storage transaction — so concurrent partial updates to different
-	// setting groups cannot race.
+	// Update loads settings (or a fresh default), applies mutate and persists the result in one transaction.
 	Update(ctx context.Context, mutate func(existing *entities.UserSettings)) (*entities.UserSettings, error)
 
 	// Delete removes user settings.

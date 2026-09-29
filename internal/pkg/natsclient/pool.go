@@ -116,8 +116,7 @@ func (p *Pool) Client(ctx context.Context, connectionID string) (Client, error) 
 	}
 }
 
-// Pooled returns the client already registered for the ID, whatever its
-// connection state, without dialing.
+// Pooled returns the client registered for the ID, whatever its connection state, without dialing.
 func (p *Pool) Pooled(connectionID string) (Client, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -126,17 +125,14 @@ func (p *Pool) Pooled(connectionID string) (Client, bool) {
 	return c, ok
 }
 
-// OnDisconnect registers fn to run, outside the pool lock, whenever a
-// connection is dropped from the pool (explicit Disconnect or eviction of a
-// dead connection).
+// OnDisconnect registers fn to run, outside the pool lock, whenever a connection leaves the pool.
 func (p *Pool) OnDisconnect(fn func(connectionID string)) {
 	p.mu.Lock()
 	p.listeners = append(p.listeners, fn)
 	p.mu.Unlock()
 }
 
-// Disconnect closes and removes a live client from the pool, then notifies
-// any OnDisconnect listeners.
+// Disconnect closes and removes a live client, then notifies OnDisconnect listeners.
 func (p *Pool) Disconnect(connectionID string) {
 	p.mu.Lock()
 	c, ok := p.clients[connectionID]

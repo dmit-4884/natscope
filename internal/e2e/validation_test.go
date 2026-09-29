@@ -259,8 +259,6 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			// NUL/BEL control characters in the name must be rejected,
-			// not written verbatim to logs.
 			"sources.CreateSource name with control characters",
 			func() error {
 				_, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
@@ -272,7 +270,6 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			// no upper bound on name length previously.
 			"sources.CreateSource name too long",
 			func() error {
 				_, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
@@ -292,8 +289,6 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			// an unrecognized source_type number must not silently
-			// become git.
 			"sources.CreateSource unknown source_type",
 			func() error {
 				_, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
@@ -405,7 +400,6 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// URLs must have a recognized scheme and no control characters.
 		{
 			"connections.Create javascript: url scheme rejected",
 			func() error {
@@ -436,7 +430,6 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// connection name rejects control/bidi/zero-width characters.
 		{
 			"connections.Create control char in name rejected",
 			func() error {
@@ -447,7 +440,6 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// name/description size caps.
 		{
 			"connections.Create oversized name rejected",
 			func() error {
@@ -458,7 +450,6 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// unrecognized AuthMethod enum value rejected.
 		{
 			"connections.Create unknown auth method rejected",
 			func() error {
@@ -470,7 +461,6 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// settings string "enums" reject out-of-set values.
 		{
 			"settings.Update unknown fetch_method rejected",
 			func() error {
@@ -481,7 +471,6 @@ func TestValidation(t *testing.T) {
 			},
 			connect.CodeInvalidArgument,
 		},
-		// template header keys/values reject CR/LF (header injection).
 		{
 			"templates.Create header value with CRLF rejected",
 			func() error {

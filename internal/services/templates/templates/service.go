@@ -41,8 +41,7 @@ func (s *Service) Create(
 ) (*entities.MessageTemplate, error) {
 	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
-	// buf.validate min_len=1 runs on the raw request; re-check after the trim
-	// normalizer so a whitespace-only name can't persist as an empty name.
+	// Re-check after the trim normalizer; min_len only sees the raw name.
 	if strings.TrimSpace(in.Name) == "" {
 		return nil, errs.ErrMessageTemplateNameRequired
 	}
@@ -73,8 +72,7 @@ func (s *Service) Update(
 ) (*entities.MessageTemplate, error) {
 	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
-	// A provided name that trims to empty must be rejected (UpdateTemplate has
-	// no buf.validate min_len on name, so this is the only guard).
+	// UpdateTemplate has no min_len on name, so this is the only guard.
 	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
 		return nil, errs.ErrMessageTemplateNameRequired
 	}

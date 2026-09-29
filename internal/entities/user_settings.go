@@ -77,16 +77,10 @@ type UserSettings struct {
 	Behavior *BehaviorSettings
 }
 
-// UserSettingsID is the fixed identity of the settings singleton: there is
-// exactly one UserSettings document, so unlike other entities it never gets a
-// generated UUID (a fresh random Id on every unsaved GetSettings/Update/Reset
-// call made the id unusable for caching or comparison — see UserSettingsNew).
+// UserSettingsID is the fixed Id of the single UserSettings document.
 const UserSettingsID = "user-settings"
 
-// UserSettingsNew creates a new UserSettings with fresh timestamps and the
-// fixed singleton Id (UserSettingsID) — never a generated UUID, so every call
-// (including the ephemeral default returned before anything is saved) yields
-// the same, stable identity.
+// UserSettingsNew creates a UserSettings with fresh timestamps and the fixed UserSettingsID.
 func UserSettingsNew(init ...func(*UserSettings)) *UserSettings {
 	s := &UserSettings{
 		BaseEntity: *New(),

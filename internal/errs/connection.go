@@ -25,9 +25,6 @@ var (
 	// credentials while the request also sets an explicit auth config.
 	ErrConnectionURLCredentialsConflict = errors.New("connection: credentials set both in the server URL and in auth")
 
-	// ErrConnectionURLInvalid is returned when a server URL embeds userinfo
-	// (contains "@") but cannot be parsed as a URL. Silently keeping such a URL
-	// as-is would persist its embedded credentials in plaintext instead of
-	// lifting them into the vault.
+	// ErrConnectionURLInvalid is returned when a server URL contains "@" but cannot be parsed.
 	ErrConnectionURLInvalid = errors.New("connection: server URL is invalid")
 )

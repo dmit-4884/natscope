@@ -17,11 +17,7 @@ import (
 	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
-// objectInfoToProto converts an object entry to its proto form. Link is
-// converted by hand: like Placement/Mirror/Republish elsewhere in this
-// handler, converter.Convert doesn't auto-convert a nested pointer-to-struct
-// field between two different named types, so it's excluded and mapped
-// explicitly.
+// objectInfoToProto converts an object entry to proto; Link is mapped by hand since the converter skips it.
 func objectInfoToProto(info *entities.ObjectInfo) *natspb.ObjectInfo {
 	out := converter.Convert(info, &natspb.ObjectInfo{}, protoCodecs, converter.WithIgnoreFields("Link"))
 	if info.Link != nil {

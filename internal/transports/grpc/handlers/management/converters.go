@@ -31,12 +31,10 @@ var replicasMappingToEntity = converter.WithFieldMappings(map[string]string{"Num
 
 // protoStreamSourceToEntity converts proto StreamSourceConfig;
 // OptStartTime/SubjectTransforms/External handled manually (converter gaps).
-// A malformed OptStartTime returns an error instead of being silently dropped
-// — the source would otherwise replicate its entire history instead of the
-// requested cutoff.
+// A malformed OptStartTime is an error.
 func protoStreamSourceToEntity(src *grpc_nats_management.StreamSourceConfig) (*entities.StreamSource, error) {
 	if src == nil {
-		return nil, nil //nolint:nilnil // nil input means "not configured", not an error
+		return nil, nil //nolint:nilnil // nil means not configured
 	}
 
 	result := converter.Convert(src, &entities.StreamSource{},
@@ -65,8 +63,7 @@ func protoStreamSourceToEntity(src *grpc_nats_management.StreamSourceConfig) (*e
 	return result, nil
 }
 
-// protoStreamSourcesToEntity converts a repeated StreamSourceConfig, stopping
-// at the first conversion error (see protoStreamSourceToEntity).
+// protoStreamSourcesToEntity converts a repeated StreamSourceConfig, stopping at the first error.
 func protoStreamSourcesToEntity(sources []*grpc_nats_management.StreamSourceConfig) ([]*entities.StreamSource, error) {
 	if len(sources) == 0 {
 		return nil, nil

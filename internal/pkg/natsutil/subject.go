@@ -20,24 +20,18 @@ func IsInternalSubject(subject string) bool {
 	return subject[0] == '$' || subject[0] == '_'
 }
 
-// ValidateSubjectPattern validates a NATS subject pattern used for
-// subscriptions or mappings: tokens must be non-empty, "*"/">" may only
-// appear as a whole token, and ">" may only be the last token. Whitespace and
-// control characters are rejected. Length limits are enforced elsewhere
-// (server subject/control-line caps).
+// ValidateSubjectPattern validates a subscription or mapping pattern: non-empty tokens, whole-token
+// wildcards, ">" only as the last token, and no whitespace or control characters.
 func ValidateSubjectPattern(subject string) error {
 	return validateSubjectTokens(subject, true)
 }
 
-// ValidateLiteralSubject validates a NATS subject used for publishing: no
-// wildcard tokens are allowed, since a literal publish subject must name a
-// single subject, never a pattern.
+// ValidateLiteralSubject validates a publish subject, which must contain no wildcards.
 func ValidateLiteralSubject(subject string) error {
 	return validateSubjectTokens(subject, false)
 }
 
-// validateSubjectTokens implements the shared token-level checks for both
-// subscription patterns (wildcards allowed) and literal publish subjects.
+// validateSubjectTokens runs the token checks shared by patterns and literal subjects.
 func validateSubjectTokens(subject string, allowWildcards bool) error {
 	if subject == "" {
 		return subjectValidationErr("subject must not be empty")
@@ -69,9 +63,7 @@ func validateSubjectTokens(subject string, allowWildcards bool) error {
 	return nil
 }
 
-// checkSubjectCharacters rejects whitespace and control characters, which
-// nats.go accepts client-side but the server either rejects (closing the
-// shared pool connection) or silently stores as literal bytes.
+// checkSubjectCharacters rejects whitespace and control characters, which nats.go lets through.
 func checkSubjectCharacters(subject string) error {
 	for _, r := range subject {
 		if r < 0x21 || r == 0x7f {
@@ -81,9 +73,7 @@ func checkSubjectCharacters(subject string) error {
 	return nil
 }
 
-// subjectValidationErr wraps a subject-syntax failure as the domain
-// validation type; transports map it to InvalidArgument without a per-caller
-// sentinel table.
+// subjectValidationErr wraps a subject-syntax failure in the domain validation error type.
 func subjectValidationErr(description string) error {
 	return &errs.NATSValidationError{Description: description}
 }
@@ -94,9 +84,7 @@ func MatchSubject(pattern, subject string) bool {
 	return matchSubjectTokens(pattern, strings.Split(subject, "."))
 }
 
-// matchSubjectTokens is MatchSubject with the subject already split, so a
-// caller matching one subject against many patterns (MappingResolver.Resolve)
-// splits the subject once instead of once per pattern.
+// matchSubjectTokens is MatchSubject with the subject already split into tokens.
 func matchSubjectTokens(pattern string, subjectParts []string) bool {
 	patternParts := strings.Split(pattern, ".")
 

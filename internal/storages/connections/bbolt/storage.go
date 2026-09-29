@@ -59,13 +59,8 @@ func (s *Storage) Save(ctx context.Context, in *entities.SavedConnection) error 
 	})
 }
 
-// Update atomically loads the connection, lets mutate apply the caller's
-// change to it, and persists the result — all inside one bbolt transaction, so
-// concurrent partial updates on different fields (two browser tabs, "Ping
-// all" racing an edit) serialize on bbolt's writer lock instead of one
-// clobbering the other via a stale read-modify-write. mutate reports
-// whether it explicitly replaced the Auth/TLS subtree, so stale vault secrets
-// from the previous config are pruned rather than merged forward.
+// Update loads the connection, applies mutate and persists the result in one bbolt transaction.
+// mutate reports whether it replaced the Auth/TLS subtree, so stale vault secrets are pruned.
 func (s *Storage) Update(
 	ctx context.Context,
 	id string,
@@ -89,10 +84,8 @@ func (s *Storage) Update(
 		}
 		// Secrets omitted from the request are preserved: the API never returns
 		// stored secret values, so an edit that leaves a secret field blank means
-		// "keep the existing one" rather than "clear it". But when the caller
-		// explicitly replaced the Auth/TLS subtree, stale secrets from the
-		// previous config (e.g. a password left behind after switching to
-		// token auth) must not survive the merge.
+		// "keep the existing one" rather than "clear it". A replaced Auth/TLS
+		// subtree drops its stale secrets.
 		merged, err := s.mergeSecrets(ctx, id, secs, authReplaced, tlsReplaced)
 		if err != nil {
 			return err
@@ -110,19 +103,14 @@ func (s *Storage) Update(
 	return result, nil
 }
 
-// secretPrefixes maps the subtrees that can be "explicitly replaced" on update
-// to the vault-key prefix (see the `secret:"..."` tags in entity.go) their
-// secrets live under.
+// secretPrefixes maps each replaceable subtree to its vault-key prefix (see the `secret:"..."` tags).
 var secretPrefixes = map[string]string{
 	"auth": "auth.",
 	"tls":  "tls.",
 }
 
-// mergeSecrets overlays the incoming secrets onto the ones already in the
-// vault, so unspecified secret fields retain their stored value on update. When
-// authReplaced/tlsReplaced is set, existing secrets under that subtree's prefix
-// are dropped first: incoming (from the fresh Split of the replaced subtree) is
-// the complete truth for it, not an overlay.
+// mergeSecrets overlays incoming secrets onto the stored ones. For a replaced Auth/TLS subtree it first
+// drops the stored secrets under that prefix.
 func (s *Storage) mergeSecrets(
 	ctx context.Context,
 	id string,

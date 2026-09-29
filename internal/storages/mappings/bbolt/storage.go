@@ -90,10 +90,8 @@ func (s *Storage) Exists(ctx context.Context, id string) (bool, error) {
 }
 
 // BulkSave replaces the full (pattern, sourceId) set atomically: merges by
-// key (keeps id/created_at, preserves pinned_tag/pinned_fingerprint when the
-// incoming item leaves them unset), then deletes rows absent from the new
-// set. Rejects a request with two items sharing the same (pattern, sourceId)
-// key — one would silently overwrite the other and miscount created/updated.
+// key (keeping id/created_at and unset pins), then deletes rows absent from the new set.
+// A batch with a duplicate (pattern, sourceId) key is rejected.
 func (s *Storage) BulkSave(
 	ctx context.Context,
 	mappings entities.SubjectMappings,

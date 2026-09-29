@@ -21,8 +21,6 @@ import (
 	natstypes "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
-// kvObjTestConn creates a saved connection for the KV/Object regression
-// suite and returns its id.
 func kvObjTestConn(t *testing.T, env *e2eEnv, name string) string {
 	t.Helper()
 	resp, err := env.connections.CreateConnection(t.Context(), connect.NewRequest(&connectionspb.CreateConnectionRequest{
@@ -32,9 +30,7 @@ func kvObjTestConn(t *testing.T, env *e2eEnv, name string) string {
 	return resp.Msg.GetConnection().GetId()
 }
 
-// TestKVBucketHistoryRejectsOutOfRange covers the fix: history above 64 used
-// to be silently truncated (uint32 -> uint8) instead of rejected, producing a
-// bucket with a different history depth than requested.
+// TestKVBucketHistoryRejectsOutOfRange checks that a history above 64 is rejected.
 func TestKVBucketHistoryRejectsOutOfRange(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -51,7 +47,7 @@ func TestKVBucketHistoryRejectsOutOfRange(t *testing.T) {
 		})
 	}
 
-	// 64 is still the accepted maximum.
+	// 64 is the accepted maximum.
 	created, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
 		ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "hmax", History: 64},
 	}))
@@ -59,8 +55,7 @@ func TestKVBucketHistoryRejectsOutOfRange(t *testing.T) {
 	assert.EqualValues(t, 64, created.Msg.GetBucket().GetHistory())
 }
 
-// TestKVBucketDescriptionRoundTrips covers the fix: description was saved
-// correctly on the server but Create/Get/List never returned it.
+// TestKVBucketDescriptionRoundTrips checks that Create, Get and List return the description.
 func TestKVBucketDescriptionRoundTrips(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -80,10 +75,7 @@ func TestKVBucketDescriptionRoundTrips(t *testing.T) {
 	assert.Equal(t, "qa desc kv1", got.Msg.GetBucket().GetDescription())
 }
 
-// TestKVKeyValidation covers the fix (a key with an empty path segment such
-// as "a..b" passes nats.go's own validation but is invalid as a subject,
-// previously surfacing as Internal on all five key RPCs)
-// (GetKVKeyHistory's Watch-based validator uniquely let wildcards through).
+// TestKVKeyValidation checks that every key RPC rejects empty segments and wildcards.
 func TestKVKeyValidation(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -148,9 +140,7 @@ func TestKVKeyValidation(t *testing.T) {
 	})
 }
 
-// TestEmptyBucketsReturnEmptyList covers the fix: an empty bucket used to
-// surface as not_found instead of an empty list, unlike every other
-// empty-collection response in this API (including List*Buckets itself).
+// TestEmptyBucketsReturnEmptyList checks that an empty bucket lists as empty, not NotFound.
 func TestEmptyBucketsReturnEmptyList(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -177,10 +167,7 @@ func TestEmptyBucketsReturnEmptyList(t *testing.T) {
 	assert.Empty(t, objs.Msg.GetObjects())
 }
 
-// TestBucketDeleteSealRefusesPlainStream covers the fix: Delete/Seal never
-// checked that the stream behind a KV_/OBJ_-named bucket is actually shaped
-// like one, so a plain stream that merely shared the name was deleted or
-// sealed outright.
+// TestBucketDeleteSealRefusesPlainStream checks that Delete and Seal refuse a plain stream named like a bucket.
 func TestBucketDeleteSealRefusesPlainStream(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -226,11 +213,7 @@ func TestBucketDeleteSealRefusesPlainStream(t *testing.T) {
 	})
 }
 
-// TestPutObjectCapacityGuardPreservesOriginal covers the fix: an overwrite
-// that fails because it would exceed the bucket's max_bytes used to destroy
-// the original object — nats.go's Put publishes the rollup meta and the data
-// chunks independently, so a failed write left the previous version
-// unreachable. The capacity precheck now refuses the write up front instead.
+// TestPutObjectCapacityGuardPreservesOriginal checks that an overwrite exceeding max_bytes keeps the original.
 func TestPutObjectCapacityGuardPreservesOriginal(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -266,10 +249,7 @@ func TestPutObjectCapacityGuardPreservesOriginal(t *testing.T) {
 	assert.Equal(t, originalDigest, getResp.Msg.GetInfo().GetDigest())
 }
 
-// TestConcurrentPutObjectSameName covers the fix (GetObject must never
-// return data from one Put paired with metadata from another)
-// (concurrent writers of the same name must not leave the stream full of
-// orphaned chunks from writers that "lost" the race).
+// TestConcurrentPutObjectSameName checks that concurrent Puts of one name leave consistent data and few orphaned chunks.
 func TestConcurrentPutObjectSameName(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -283,7 +263,7 @@ func TestConcurrentPutObjectSameName(t *testing.T) {
 	const (
 		writers         = 12
 		objSize         = 64 * 1024
-		maxOrphanFactor = 3 // the final object must not be paired with a stream full of stale chunks
+		maxOrphanFactor = 3
 	)
 
 	var wg sync.WaitGroup
@@ -325,9 +305,7 @@ func TestConcurrentPutObjectSameName(t *testing.T) {
 		"serialized PutObject must not leave the stream full of orphaned chunks from losing writers")
 }
 
-// TestObjectLinkReflectedInAPI covers the fix: an object link
-// (jetstream AddLink) was invisible in ObjectInfo, and GetObject on a link
-// returned the target's data paired with the link's own (empty) info.
+// TestObjectLinkReflectedInAPI checks that ListObjects flags links and GetObject follows them.
 func TestObjectLinkReflectedInAPI(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -375,9 +353,7 @@ func TestObjectLinkReflectedInAPI(t *testing.T) {
 		"info must describe the data actually returned, not the link's own (empty) meta")
 }
 
-// TestKVBucketMirrorSourcesMutuallyExclusive covers the fix: mirror and
-// sources set together used to be accepted with sources silently dropped
-// (nats.go's CreateKeyValue ignores Sources when Mirror is set).
+// TestKVBucketMirrorSourcesMutuallyExclusive checks that mirror and sources together are rejected.
 func TestKVBucketMirrorSourcesMutuallyExclusive(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()

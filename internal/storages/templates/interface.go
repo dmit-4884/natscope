@@ -18,11 +18,8 @@ type Storage interface {
 	// Get returns the template by id, or errs.ErrMessageTemplateNotFound.
 	Get(ctx context.Context, id string) (*entities.MessageTemplate, error)
 
-	// Update atomically loads the template by id, lets mutate apply the
-	// caller's change to it, and persists the result within a single storage
-	// transaction — so concurrent partial updates on different fields cannot
-	// race. Returns errs.ErrMessageTemplateNotFound if id is not
-	// present.
+	// Update loads the template by id, applies mutate and persists the result in one transaction.
+	// Returns errs.ErrMessageTemplateNotFound if id is not present.
 	Update(ctx context.Context, id string, mutate func(existing *entities.MessageTemplate)) (*entities.MessageTemplate, error)
 
 	// List returns templates with cursor-based pagination.

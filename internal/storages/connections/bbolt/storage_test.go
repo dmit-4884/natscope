@@ -225,9 +225,7 @@ func TestConnections_UpdatePreservesOmittedSecret(t *testing.T) {
 	}
 }
 
-// TestConnections_UpdateAuthReplacePrunesStaleSecret is a regression test:
-// switching auth method (authReplaced=true) must purge the previous method's
-// vault secret, not merge it forward under the new method.
+// TestConnections_UpdateAuthReplacePrunesStaleSecret checks that switching auth method drops the old method's secret.
 func TestConnections_UpdateAuthReplacePrunesStaleSecret(t *testing.T) {
 	s, vault, _ := newStorage(t)
 	ctx := t.Context()
@@ -236,8 +234,7 @@ func TestConnections_UpdateAuthReplacePrunesStaleSecret(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	// Switch to token auth: this is what ApplyUpdate produces for an update
-	// request that replaces the whole Auth subtree with a new method.
+	// Switch to token auth, as ApplyUpdate does for a request that replaces Auth.
 	if _, err := s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
 		existing.Auth = &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("new-token")}
 		return true, false
@@ -268,9 +265,7 @@ func TestConnections_UpdateAuthReplacePrunesStaleSecret(t *testing.T) {
 	}
 }
 
-// TestConnections_UpdateAuthReplaceToNoneClearsVault reproduces the bug for
-// clearing auth entirely: switching to AUTH_METHOD_UNSPECIFIED (which
-// ApplyUpdate collapses to a nil Auth) must remove every auth.* vault key.
+// TestConnections_UpdateAuthReplaceToNoneClearsVault checks that clearing auth removes every auth.* vault key.
 func TestConnections_UpdateAuthReplaceToNoneClearsVault(t *testing.T) {
 	s, vault, _ := newStorage(t)
 	ctx := t.Context()
@@ -295,9 +290,7 @@ func TestConnections_UpdateAuthReplaceToNoneClearsVault(t *testing.T) {
 	}
 }
 
-// TestConnections_UpdateTLSReplacePrunesStaleClientKey is the TLS half of
-// replacing tls (even with an empty block) must purge the previous
-// client key rather than leaving it behind in the vault.
+// TestConnections_UpdateTLSReplacePrunesStaleClientKey checks that replacing tls drops the old client key.
 func TestConnections_UpdateTLSReplacePrunesStaleClientKey(t *testing.T) {
 	s, vault, _ := newStorage(t)
 	ctx := t.Context()
@@ -321,8 +314,7 @@ func TestConnections_UpdateTLSReplacePrunesStaleClientKey(t *testing.T) {
 	if _, ok := secs["tls.clientKey"]; ok {
 		t.Fatalf("stale tls.clientKey survived: %v", secs)
 	}
-	// The unrelated auth secret from Save must be untouched (tlsReplaced only
-	// prunes tls.* keys).
+	// tlsReplaced prunes only tls.* keys.
 	if secs["auth.password"] != "super-secret-pw" {
 		t.Fatalf("unrelated auth secret was affected: %v", secs)
 	}
@@ -349,11 +341,7 @@ func TestConnections_SoftDelete(t *testing.T) {
 	}
 }
 
-// TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites is a
-// regression test: three goroutines each update one field of the same connection,
-// round after round. Since Update now does its read-modify-write inside one
-// bbolt transaction, every round must leave all three fields at that round's
-// value — none may be clobbered by a stale concurrent read.
+// TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites checks that concurrent single-field updates all persist.
 func TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
 	s, _, _ := newStorage(t)
 	ctx := t.Context()

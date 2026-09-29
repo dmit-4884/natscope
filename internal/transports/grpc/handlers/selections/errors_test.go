@@ -29,7 +29,6 @@ func TestStatusErrorConvert(t *testing.T) {
 	}{
 		{"ProtoSelectionNotFound", errs.ErrProtoSelectionNotFound, codes.NotFound, "PROTO_SELECTION_NOT_FOUND"},
 		{"ProtoDescriptorNotFound", errs.ErrProtoDescriptorNotFound, codes.NotFound, "PROTO_DESCRIPTOR_NOT_FOUND"},
-		// SelectVersion(unknownSource) must not fall through to Internal.
 		{"ProtoSourceNotFound", errs.ErrProtoSourceNotFound, codes.NotFound, "PROTO_SOURCE_NOT_FOUND"},
 		// Fallback
 		{"NotFound_viaFallback", errs.ErrNotFound, codes.NotFound, "NOT_FOUND"},

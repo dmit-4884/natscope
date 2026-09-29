@@ -69,11 +69,6 @@ func newSecretsVault(cfg *appconfig.Config) (secrets.Vault, error) {
 
 	switch cfg.SecretsBackend() {
 	case appconfig.SecretsBackendKeyring:
-		// Unlike "auto", an explicit "keyring" backend used to skip the
-		// availability probe entirely: the server started healthy and the
-		// first secret-reading RPC (e.g. ListConnections) failed as an
-		// unmapped "internal" error, with the real cause only visible in the
-		// log. Fail closed here instead, with the cause in the error itself.
 		if err := probeKeyring(keychainServiceName); err != nil {
 			return nil, errors.WrapOperation(err, "OS keychain unavailable (secrets.backend: keyring)")
 		}
@@ -94,16 +89,13 @@ func newSecretsVault(cfg *appconfig.Config) (secrets.Vault, error) {
 	}
 }
 
-// probeKeyring round-trips a throwaway entry through the OS keychain,
-// returning the underlying error verbatim — headless Linux and containers
-// commonly lack a Secret Service (e.g. "dbus-launch: executable file not
-// found"), and that detail is what makes the failure actionable.
+// probeKeyring round-trips a throwaway entry through the OS keychain and returns the raw error.
 func probeKeyring(service string) error {
 	const probeAccount = "secret/_probe/_probe"
 	if err := keyring.Set(service, probeAccount, "ok"); err != nil {
 		return err
 	}
-	_ = keyring.Delete(service, probeAccount) //nolint:errcheck // best-effort cleanup of the probe entry
+	_ = keyring.Delete(service, probeAccount) //nolint:errcheck // best-effort cleanup
 	return nil
 }
 

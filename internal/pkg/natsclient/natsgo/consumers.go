@@ -103,10 +103,7 @@ func (c *Client) CreateConsumer(
 	if err := validateConsumerRequestLengths(streamName, config.Name, config.FilterSubject, config.FilterSubjects); err != nil {
 		return nil, wrapErr(err)
 	}
-	// A whitespace-only name passes proto's min_len:1 but normalizes (trim) to
-	// "", which toJetStreamConsumerConfig then treats as "ephemeral" even
-	// though the caller asked for a durable consumer — check the trimmed name,
-	// not the raw one.
+	// Check the trimmed name; a blank durable name becomes ephemeral.
 	if !config.Ephemeral && config.Name == "" {
 		return nil, wrapErr(&errs.NATSValidationError{Description: "consumer name is required"})
 	}
@@ -146,11 +143,7 @@ func (c *Client) UpdateConsumer(
 	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
 		return nil, wrapErr(err)
 	}
-	// The stream name is validated by Stream() below, but the consumer name
-	// below goes straight into a hand-built subject: a name containing "."
-	// (or another JetStream API subject-separator/wildcard character) makes
-	// that subject match no responder, hanging until the request timeout
-	// instead of failing fast.
+	// The consumer name goes into a hand-built subject, so reject separator and wildcard characters.
 	if err := validateConsumerNameChars(consumerName); err != nil {
 		return nil, wrapErr(err)
 	}
@@ -184,9 +177,7 @@ func (c *Client) UpdateConsumer(
 		return nil, wrapErr(errors.WrapOperation(err, "unmarshal consumer info"))
 	}
 	if infoResp.Error != nil {
-		// The hand-built subject bypasses the SDK's own not-found translation,
-		// so a missing consumer surfaced as a generic NATS_API_ERROR instead of
-		// the NATS_CONSUMER_NOT_FOUND every other consumer RPC uses.
+		// The hand-built subject bypasses the SDK's not-found translation.
 		if infoResp.Error.ErrorCode == jetstream.JSErrCodeConsumerNotFound {
 			return nil, wrapErr(jetstream.ErrConsumerNotFound)
 		}
@@ -258,23 +249,13 @@ func (c *Client) PauseConsumer(
 
 	pauseUntilTime, err := time.Parse(time.RFC3339, pauseUntil)
 	if err != nil {
-		// NATSValidationError (not the generic errs.ErrInvalidRequest) so the
-		// field-specific "must be RFC3339" message reaches the caller instead
-		// of being overwritten by ErrInvalidRequest's static "invalid request"
-		// mapping.
+		// NATSValidationError keeps the field-specific message that ErrInvalidRequest would replace.
 		return nil, wrapErr(&errs.NATSValidationError{
 			Description: fmt.Sprintf("invalid pause_until %q: must be RFC3339", pauseUntil),
 			Cause:       err,
 		})
 	}
 
-	// stream.PauseConsumer validates the consumer name client-side (rejecting
-	// "." and other JetStream separators before ever building a subject —
-	// unlike the previous hand-built "$JS.API.CONSUMER.PAUSE.<stream>.<name>",
-	// which matched no responder for such a name and hung for the full
-	// request timeout) and translates a missing consumer to the same
-	// jetstream.ErrConsumerNotFound every other consumer RPC uses instead of a
-	// generic NATS_API_ERROR.
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
 		return nil, wrapErr(err)
@@ -292,8 +273,7 @@ func (c *Client) PauseConsumer(
 	}, nil
 }
 
-// ResumeConsumer resumes a paused consumer immediately and returns the
-// server's post-resume state.
+// ResumeConsumer resumes a paused consumer and returns the server's post-resume state.
 func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumerName string) (*entities.ConsumerPauseResponse, error) {
 	if err := validateNATSNameLength("stream name", streamName); err != nil {
 		return nil, wrapErr(err)
@@ -302,10 +282,6 @@ func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumer
 		return nil, wrapErr(err)
 	}
 
-	// See PauseConsumer: the SDK method validates the consumer name and maps
-	// not-found consistently, which the previous hand-built
-	// "$JS.API.CONSUMER.PAUSE.<stream>.<name>" request (pauseUntil omitted)
-	// did not.
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
 		return nil, wrapErr(err)

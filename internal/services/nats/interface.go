@@ -146,8 +146,7 @@ type ConsumerManager interface {
 		pauseUntil string,
 	) (*entities.ConsumerPauseResponse, error)
 
-	// ResumeConsumer resumes a paused consumer immediately, returning the
-	// server's actual post-resume state.
+	// ResumeConsumer resumes a paused consumer and returns the server's post-resume state.
 	ResumeConsumer(
 		ctx context.Context,
 		connectionID string,
@@ -186,8 +185,7 @@ type Subscriber interface {
 		handler entities.MessageHandler,
 	) (entities.Subscription, error)
 
-	// OnDisconnect registers fn to run whenever a pooled connection is closed
-	// or replaced, which silently ends its subscriptions.
+	// OnDisconnect registers fn to run whenever a pooled connection is closed or replaced.
 	OnDisconnect(fn func(connectionID string))
 }
 

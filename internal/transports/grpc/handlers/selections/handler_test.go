@@ -37,8 +37,7 @@ type mockProtoService struct {
 	stats        *entities.ProtoStats
 }
 
-// ListSelections mimics the storage-layer SourceID filter so handler tests can
-// exercise the request-to-filter translation without a real store.
+// ListSelections applies the SourceID filter like the storage layer.
 func (m *mockProtoService) ListSelections(
 	_ context.Context,
 	in *entities.ProtoSelectionsList,
@@ -117,7 +116,6 @@ func TestHandler_ListSelections(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// page_size/page_token must reach the service, not be discarded.
 	t.Run("ForwardsPagination", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockProtoService{}

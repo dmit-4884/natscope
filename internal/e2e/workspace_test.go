@@ -143,10 +143,7 @@ func TestWorkspaceRoundtrip(t *testing.T) {
 	})
 }
 
-// TestWorkspaceImport_DuplicateTemplateNameDeduplicates covers the fix: two
-// items sharing a name within the same import file used to both hit the
-// Create branch (byName was only seeded from pre-existing rows, never
-// updated as items were created), leaving two rows with the same name.
+// TestWorkspaceImport_DuplicateTemplateNameDeduplicates checks that duplicate names in one import file create one row.
 func TestWorkspaceImport_DuplicateTemplateNameDeduplicates(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -174,9 +171,7 @@ func TestWorkspaceImport_DuplicateTemplateNameDeduplicates(t *testing.T) {
 	assert.Equal(t, 1, count, "a duplicate name within one import file must resolve to a single row (last-wins)")
 }
 
-// TestWorkspaceImport_UnknownSectionKeyRejected covers the fix: Import/Validate
-// used to silently return an empty report for a sectionKey unknown to the
-// server, instead of the WORKSPACE_UNKNOWN_SECTION error Export already gives.
+// TestWorkspaceImport_UnknownSectionKeyRejected checks that Import and Validate reject an unknown section key.
 func TestWorkspaceImport_UnknownSectionKeyRejected(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -198,9 +193,7 @@ func TestWorkspaceImport_UnknownSectionKeyRejected(t *testing.T) {
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }
 
-// TestWorkspaceValidate_RejectsInvalidVersion covers the fix: only the upper
-// version bound was checked, so a negative (or zero) file version was
-// silently accepted as valid.
+// TestWorkspaceValidate_RejectsInvalidVersion checks that a zero or negative file version is rejected.
 func TestWorkspaceValidate_RejectsInvalidVersion(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()

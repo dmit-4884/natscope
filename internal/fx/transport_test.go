@@ -11,11 +11,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 )
 
-// TestNewHTTPServer_WideBindRequiresAllowRemote covers the fix: the internal
-// HTTP server (health/metrics/pprof) used to gate a non-loopback bind on
-// AllowInsecure alone, unlike the main listener's two-flag AllowRemote +
-// AllowInsecure gate — so ALLOW_INSECURE=true by itself exposed pprof
-// (heap/goroutine/cmdline) to the network with no other setting required.
+// TestNewHTTPServer_WideBindRequiresAllowRemote checks that AllowInsecure alone can't open a wide bind.
 func TestNewHTTPServer_WideBindRequiresAllowRemote(t *testing.T) {
 	cfg := &appconfig.Config{
 		Http:          &config.Http{ListenAddress: "0.0.0.0:9080"},
@@ -28,9 +24,7 @@ func TestNewHTTPServer_WideBindRequiresAllowRemote(t *testing.T) {
 	}
 }
 
-// TestNewHTTPServer_WideBindRequiresAllowInsecure is the other half of the
-// same gate: AllowRemote alone (no AllowInsecure) must also be refused,
-// since the internal server has no basic-auth option of its own.
+// TestNewHTTPServer_WideBindRequiresAllowInsecure checks that AllowRemote alone can't open a wide bind.
 func TestNewHTTPServer_WideBindRequiresAllowInsecure(t *testing.T) {
 	cfg := &appconfig.Config{
 		Http:        &config.Http{ListenAddress: "0.0.0.0:9080"},
@@ -43,8 +37,7 @@ func TestNewHTTPServer_WideBindRequiresAllowInsecure(t *testing.T) {
 	}
 }
 
-// TestNewHTTPServer_NotConfiguredReturnsNil is the control: no http section
-// at all must stay a no-op, not an error.
+// TestNewHTTPServer_NotConfiguredReturnsNil checks that a missing http section is a no-op.
 func TestNewHTTPServer_NotConfiguredReturnsNil(t *testing.T) {
 	srv, err := newHTTPServer(&appconfig.Config{}, nil)
 	if err != nil {

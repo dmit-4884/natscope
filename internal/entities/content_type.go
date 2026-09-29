@@ -56,12 +56,7 @@ func DetectContentType(data []byte) ContentType {
 		if b != '{' && b != '[' {
 			break
 		}
-		// A complete scan can be validated outright. A truncated scan can
-		// never be valid on its own — json.Valid always reports it as
-		// invalid — so check instead whether it is a well-formed JSON
-		// *prefix*: token-by-token parsing ran out of (truncated) bytes
-		// mid-structure rather than hitting a real syntax error. Bounded to
-		// detectScanLimit, so still cheap on multi-MB payloads.
+		// A truncated scan never passes json.Valid, so accept a well-formed JSON prefix instead.
 		if !truncated {
 			if json.Valid(scan) {
 				return ContentTypeJSON
@@ -85,12 +80,7 @@ func DetectContentType(data []byte) ContentType {
 	return ContentTypeText
 }
 
-// looksLikeJSONPrefix reports whether scan is the start of a well-formed JSON
-// document that simply ran out of (truncated) bytes, as opposed to bytes that
-// happen to start with '{'/'[' but are not JSON. It tokenizes scan and
-// accepts running out of input mid-token/mid-structure (io.EOF /
-// io.ErrUnexpectedEOF) as "still plausibly JSON"; any other error means the
-// prefix is genuinely malformed.
+// looksLikeJSONPrefix reports whether scan is well-formed JSON cut off mid-document.
 func looksLikeJSONPrefix(scan []byte) bool {
 	dec := json.NewDecoder(bytes.NewReader(scan))
 	for {

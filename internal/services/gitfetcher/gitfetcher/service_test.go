@@ -240,9 +240,7 @@ func TestValidateRepository_NonExistent(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestValidateRepository_DoesNotLeakResponseBody is a regression test: a
-// non-git HTTP server's response body (e.g. an internal service's banner)
-// must never appear in the error returned to the (unauthenticated) caller.
+// TestValidateRepository_DoesNotLeakResponseBody checks that a non-git server's response body stays out of the error.
 func TestValidateRepository_DoesNotLeakResponseBody(t *testing.T) {
 	t.Parallel()
 	const secretBanner = "server_id=SECRET-BANNER-7f3a xkey=leaked-key"
@@ -259,7 +257,7 @@ func TestValidateRepository_DoesNotLeakResponseBody(t *testing.T) {
 	assert.NotContains(t, err.Error(), "SECRET-BANNER")
 }
 
-// TestListTags_DoesNotLeakResponseBody covers the same oracle on ListTags.
+// TestListTags_DoesNotLeakResponseBody runs the same check on ListTags.
 func TestListTags_DoesNotLeakResponseBody(t *testing.T) {
 	t.Parallel()
 	const secretBanner = "server_id=SECRET-BANNER-7f3a xkey=leaked-key"
@@ -296,7 +294,6 @@ func TestFetchVersion_UnknownTag(t *testing.T) {
 
 	_, err := svc.FetchVersion(t.Context(), repoURL, "v2.0.0")
 	require.Error(t, err)
-	// an unknown tag must classify as not-found, not internal.
 	assert.ErrorIs(t, err, errs.ErrProtoVersionNotFound)
 }
 

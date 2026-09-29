@@ -17,11 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-// TestDurationSaturating_Overflow verifies that a Duration far outside
-// time.Duration's representable range saturates instead of silently wrapping
-// modulo 2^64: "18446744074s" (~584 years) used to convert to
-// 0.29s with go-atlas's plain durpb codec, instantly expiring anything using
-// it as a retention/ack-wait/etc. window.
+// TestDurationSaturating_Overflow checks that an out-of-range Duration saturates instead of wrapping.
 func TestDurationSaturating_Overflow(t *testing.T) {
 	type dst struct {
 		MaxAge time.Duration
@@ -39,10 +35,7 @@ func TestDurationSaturating_Overflow(t *testing.T) {
 	assert.Equal(t, time.Duration(math.MaxInt64), result.MaxAge)
 }
 
-// TestDurationSaturating_PointerPreservesExplicitZero verifies that a present
-// (but zero) Duration converts to a non-nil zero *time.Duration instead of
-// being treated the same as an absent field, so an Update* request field can
-// actually reset a value to zero.
+// TestDurationSaturating_PointerPreservesExplicitZero checks that a present zero Duration yields a non-nil pointer.
 func TestDurationSaturating_PointerPreservesExplicitZero(t *testing.T) {
 	type dst struct {
 		MaxAge *time.Duration
@@ -59,8 +52,6 @@ func TestDurationSaturating_PointerPreservesExplicitZero(t *testing.T) {
 	assert.Equal(t, time.Duration(0), *result.MaxAge)
 }
 
-// TestDurationSaturating_NormalValuePassesThrough confirms an in-range
-// Duration still converts correctly.
 func TestDurationSaturating_NormalValuePassesThrough(t *testing.T) {
 	type dst struct {
 		AckWait time.Duration

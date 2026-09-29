@@ -124,9 +124,7 @@ func (s *TemplatesSection) Import(
 	}
 
 	// Merge: upsert by name, updating existing IN PLACE (preserves id/CreatedAt)
-	// rather than delete-and-recreate. byName is written back to below (for
-	// same-name items within one import file to resolve last-wins), so it
-	// must never be nil — FromSliceWith returns nil for an empty input.
+	// rather than delete-and-recreate.
 	byName := maps.FromSliceWith(all, func(t *entities.MessageTemplate) (string, *entities.MessageTemplate) {
 		return t.Name, t
 	})
@@ -139,9 +137,7 @@ func (s *TemplatesSection) Import(
 			if uErr != nil {
 				return res, uErr
 			}
-			// Keep byName current: two items sharing a name within the same
-			// import file must resolve last-wins (second becomes an Update),
-			// not both hit the Create branch and land as duplicate rows.
+			// Same-name items in one file resolve last-wins.
 			byName[it.Name] = upd
 			res.Updated++
 			continue

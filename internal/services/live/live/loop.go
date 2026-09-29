@@ -38,11 +38,7 @@ const (
 	livePreviewLines = 20
 	livePreviewBytes = 2 * 1024
 
-	// emitStallTimeout bounds a single emit (stream.Send) call. A client that
-	// stopped reading TCP would otherwise block the loop indefinitely, letting
-	// msgChan back up with full-size, undecoded payloads. The
-	// underlying send typically unblocks shortly after via request-context
-	// cancellation once this ends the session.
+	// emitStallTimeout bounds a single emit (stream.Send) to a client that stopped reading.
 	emitStallTimeout = 10 * time.Second
 )
 
@@ -86,9 +82,7 @@ func nthLineIndex(s string, n int) int {
 	return -1
 }
 
-// emitWithDeadline runs emit on a goroutine and gives up after
-// emitStallTimeout, so a peer that stopped reading ends the session instead
-// of holding the loop (and the upstream message buffer) open forever.
+// emitWithDeadline runs emit on a goroutine and gives up after emitStallTimeout.
 func emitWithDeadline(ctx context.Context, emit func(*entities.LiveEvent) error, ev *entities.LiveEvent) error {
 	done := make(chan error, 1)
 	go func() {
@@ -145,16 +139,13 @@ func (s *Service) runLoop(
 		return emitWithDeadline(ctx, emit, ev)
 	}
 
-	// resetDecoderIfDirty re-initializes the decoder after a proto reload and
-	// tells the client so; checked both on a timer and per
-	// message so a quiet session still finds out within one stats tick.
+	// resetDecoderIfDirty reloads the decoder after a proto reload and notifies the client.
+	// It runs per message and per stats tick.
 	resetDecoderIfDirty := func() error {
 		if !sess.decoderDirty.CompareAndSwap(1, 0) {
 			return nil
 		}
 		decoder.Reset()
-		// The live decoder doesn't expose a registry message count from this
-		// layer; the client already refetches proto/mapping state on this event.
 		return emitWithDeadline(ctx, emit, &entities.LiveEvent{ProtoReload: &entities.LiveProtoReload{}})
 	}
 
@@ -165,7 +156,7 @@ func (s *Service) runLoop(
 			return nil
 
 		case <-sess.lost:
-			_ = flush() //nolint:errcheck // best-effort flush before ending the session
+			_ = flush() //nolint:errcheck // best-effort flush
 			return errs.ErrLiveConnectionLost
 
 		case <-statsTicker.C:

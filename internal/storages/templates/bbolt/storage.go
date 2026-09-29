@@ -40,9 +40,7 @@ func (s *Storage) Save(ctx context.Context, in *entities.MessageTemplate) error 
 	return s.store.Save(ctx, converter.Convert(in, &templateDoc{}, bbstore.Opts()...))
 }
 
-// Update atomically loads the template by id, lets mutate apply the caller's
-// change to it, and persists the result within a single storage transaction —
-// so concurrent partial updates on different fields cannot race.
+// Update loads the template by id, applies mutate and persists the result in one transaction.
 func (s *Storage) Update(
 	ctx context.Context,
 	id string,

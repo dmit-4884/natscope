@@ -19,9 +19,7 @@ import (
 	storage "github.com/dmit-4884/natscope/internal/storages/settings"
 )
 
-// Service implements settings.Service. Settings are read on every publish,
-// message list and live session, so the current value is cached in memory
-// and refreshed by Update and Reset.
+// Service implements settings.Service, caching the current settings in memory.
 type Service struct {
 	storage storage.Storage
 	logger  *slog.Logger

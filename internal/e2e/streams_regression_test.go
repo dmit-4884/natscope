@@ -23,8 +23,7 @@ import (
 	natstypes "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
-// TestStreamRepublishClearDoesNotLoop covers an empty republish update, which
-// the proto documents as the way to clear an existing republish config.
+// TestStreamRepublishClearDoesNotLoop checks that an empty republish update clears the config.
 func TestStreamRepublishClearDoesNotLoop(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -63,9 +62,7 @@ func TestStreamRepublishClearDoesNotLoop(t *testing.T) {
 		"one publish after clearing republish must add exactly one message, not trigger a self-republish loop")
 }
 
-// TestStreamConsumerLimitsInactiveThresholdPersists covers the
-// consumer_limits.inactive_threshold duration surviving both create and a
-// later update.
+// TestStreamConsumerLimitsInactiveThresholdPersists checks that inactive_threshold survives create and update.
 func TestStreamConsumerLimitsInactiveThresholdPersists(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -89,8 +86,7 @@ func TestStreamConsumerLimitsInactiveThresholdPersists(t *testing.T) {
 		"inactive_threshold must survive an update, not be silently dropped")
 }
 
-// TestStreamSubjectTransformRoundTrips covers subject_transform appearing in
-// every stream response and surviving a round trip through Update.
+// TestStreamSubjectTransformRoundTrips checks that subject_transform is returned and survives Update.
 func TestStreamSubjectTransformRoundTrips(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -124,8 +120,7 @@ func TestStreamSubjectTransformRoundTrips(t *testing.T) {
 	assert.Equal(t, "trx.>", updated.GetDestination())
 }
 
-// TestStreamSourcesReplaceNotAppend covers resending the current sources list
-// on Update replacing it instead of appending and duplicating.
+// TestStreamSourcesReplaceNotAppend checks that Update replaces the sources list.
 func TestStreamSourcesReplaceNotAppend(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -150,8 +145,7 @@ func TestStreamSourcesReplaceNotAppend(t *testing.T) {
 	assert.Len(t, update.Msg.GetStream().GetConfig().GetSources(), 1)
 }
 
-// TestConsumerUpdateKeepsBackoffWhenOmitted covers an update that only
-// touches an unrelated field not wiping the consumer's existing backoff.
+// TestConsumerUpdateKeepsBackoffWhenOmitted checks that an update without backoff keeps the existing one.
 func TestConsumerUpdateKeepsBackoffWhenOmitted(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -180,8 +174,7 @@ func TestConsumerUpdateKeepsBackoffWhenOmitted(t *testing.T) {
 	assert.Equal(t, 2*time.Second, backoff[1].AsDuration())
 }
 
-// TestStreamDollarPrefixRejected covers a "$"-prefixed stream name being
-// rejected up front instead of being created invisible to list RPCs.
+// TestStreamDollarPrefixRejected checks that a "$"-prefixed stream name is rejected.
 func TestStreamDollarPrefixRejected(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -194,8 +187,7 @@ func TestStreamDollarPrefixRejected(t *testing.T) {
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }
 
-// TestConsumerBlankNameRejected covers a whitespace-only durable consumer
-// name being rejected instead of silently creating an ephemeral consumer.
+// TestConsumerBlankNameRejected checks that a whitespace-only durable name is rejected.
 func TestConsumerBlankNameRejected(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -214,9 +206,7 @@ func TestConsumerBlankNameRejected(t *testing.T) {
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }
 
-// TestMessageMultiValueHeadersPreserved covers a repeated NATS header
-// keeping every value instead of only the first, on both the list and get
-// paths.
+// TestMessageMultiValueHeadersPreserved checks that repeated headers keep every value on list and get.
 func TestMessageMultiValueHeadersPreserved(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -258,9 +248,7 @@ func TestMessageMultiValueHeadersPreserved(t *testing.T) {
 		"GetMessage must keep every value of a repeated header too")
 }
 
-// TestStreamNameNotSilentlyTrimmed covers a padded stream name being
-// rejected instead of trimmed into a stream the caller can never look up
-// again with the exact name it sent.
+// TestStreamNameNotSilentlyTrimmed checks that a padded stream name is rejected, not trimmed.
 func TestStreamNameNotSilentlyTrimmed(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -273,8 +261,7 @@ func TestStreamNameNotSilentlyTrimmed(t *testing.T) {
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }
 
-// TestConsumerOptStartTimeReflectedInResponses covers opt_start_time being
-// echoed back by CreateConsumer and ListConsumers, not only GetAllConsumers.
+// TestConsumerOptStartTimeReflectedInResponses checks that CreateConsumer and ListConsumers return opt_start_time.
 func TestConsumerOptStartTimeReflectedInResponses(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -302,9 +289,7 @@ func TestConsumerOptStartTimeReflectedInResponses(t *testing.T) {
 	assert.Equal(t, optStartTime, list.Msg.GetConsumers()[0].GetConfig().GetOptStartTime())
 }
 
-// TestConsumerPauseValidationAndPrecision covers a malformed pause_until
-// naming the expected format instead of a generic error, and a valid one
-// keeping its fractional seconds in the response.
+// TestConsumerPauseValidationAndPrecision checks pause_until format errors and fractional-second precision.
 func TestConsumerPauseValidationAndPrecision(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -335,8 +320,7 @@ func TestConsumerPauseValidationAndPrecision(t *testing.T) {
 	assert.Equal(t, "2030-01-01T00:00:00.5Z", *resp.Msg.PauseUntil, "fractional seconds must not be truncated")
 }
 
-// TestStreamStatsSubjectsPopulated covers GetStreamStats.subjects actually
-// reporting a per-subject message count instead of always being empty.
+// TestStreamStatsSubjectsPopulated checks that GetStreamStats reports per-subject message counts.
 func TestStreamStatsSubjectsPopulated(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()

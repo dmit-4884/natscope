@@ -322,15 +322,8 @@ func maskQueryValue(s, key string) string {
 	return out
 }
 
-// classifyGitErr turns a git transport error into one of a small set of
-// fixed, bounded messages — never the underlying err.Error() text. go-git's
-// HTTP transport embeds the target server's raw response body (unbounded)
-// into errors for several status codes; when repositoryURL points at
-// something other than a git server, that body is echoed back verbatim to an
-// unauthenticated caller (SSRF response-body oracle — e.g. a NATS server's
-// INFO banner). The full error is only ever logged server-side, never
-// returned. Classification uses errors.Is against go-git's own sentinels, so
-// it survives wrapping even though the message text is discarded.
+// classifyGitErr maps a git transport error to a fixed message via go-git's sentinels. It never returns
+// err.Error(), which can embed the remote server's raw response body.
 func classifyGitErr(err error) string {
 	switch {
 	case errors.Is(err, transport.ErrRepositoryNotFound):

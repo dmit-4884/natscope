@@ -9,9 +9,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/errs"
 )
 
-// isHeaderNameByte reports whether b is a valid RFC 7230 "token" character,
-// the character class NATS headers use (they are serialized as HTTP-style
-// headers over the wire).
+// isHeaderNameByte reports whether b is an RFC 7230 token character.
 func isHeaderNameByte(b byte) bool {
 	switch {
 	case b >= 'a' && b <= 'z', b >= 'A' && b <= 'Z', b >= '0' && b <= '9':
@@ -25,9 +23,7 @@ func isHeaderNameByte(b byte) bool {
 	}
 }
 
-// ValidateHeaderName reports whether name is a valid RFC 7230 token. NATS
-// serializes headers as HTTP-style headers; a name outside this set is
-// silently dropped on encode instead of reaching the peer.
+// ValidateHeaderName reports whether name is a valid RFC 7230 token.
 func ValidateHeaderName(name string) bool {
 	if name == "" {
 		return false
@@ -40,9 +36,7 @@ func ValidateHeaderName(name string) bool {
 	return true
 }
 
-// ValidateHeaderNames rejects the first header whose key is not a valid
-// RFC 7230 token, so publishers get an immediate error instead of a silently
-// incomplete header set on the wire.
+// ValidateHeaderNames returns an error for the first header key that is not a valid RFC 7230 token.
 func ValidateHeaderNames(headers map[string]string) error {
 	for name := range headers {
 		if !ValidateHeaderName(name) {

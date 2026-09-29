@@ -11,13 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestHostHeaderAllowlist sends a DNS-rebinding style request: a foreign
-// Host name with a same-origin fetch context must be rejected before any
-// handler runs.
+// TestHostHeaderAllowlist checks that a foreign Host header is rejected before any handler runs.
 func TestHostHeaderAllowlist(t *testing.T) {
 	env := setupE2E(t)
 
-	req, err := http.NewRequest(http.MethodPost, //nolint:noctx // deliberately no context; this is a raw transport-layer probe
+	req, err := http.NewRequest(http.MethodPost, //nolint:noctx // raw transport probe
 		env.baseURL+"/natscope.nats.connections.v1.ConnectionsService/ListConnections",
 		bytes.NewBufferString("{}"))
 	require.NoError(t, err)
@@ -34,12 +32,11 @@ func TestHostHeaderAllowlist(t *testing.T) {
 		"a request with an untrusted Host header must be rejected before reaching any handler")
 }
 
-// TestHostHeaderAllowlist_AcceptsRealHost is the control: the bound IP
-// address as Host still works.
+// TestHostHeaderAllowlist_AcceptsRealHost checks that the bound IP is accepted as Host.
 func TestHostHeaderAllowlist_AcceptsRealHost(t *testing.T) {
 	env := setupE2E(t)
 
-	req, err := http.NewRequest(http.MethodPost, //nolint:noctx // deliberately no context; this is a raw transport-layer probe
+	req, err := http.NewRequest(http.MethodPost, //nolint:noctx // raw transport probe
 		env.baseURL+"/natscope.nats.connections.v1.ConnectionsService/ListConnections",
 		bytes.NewBufferString("{}"))
 	require.NoError(t, err)

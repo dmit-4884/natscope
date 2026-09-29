@@ -31,9 +31,7 @@ func (s *Service) Subscribe(
 	defer s.unregisterSession(sess)
 
 	mode, maxDisplayRate, payloadCap := s.resolveSettings(ctx)
-	// Request-level override has highest precedence over the user setting, but
-	// only when it actually requests a cap: 0 means "omitted" per the proto
-	// doc, not "unlimited". protovalidate already rejects negative.
+	// A request cap overrides the user setting; 0 means omitted, not unlimited.
 	if in.MaxPayloadBytes != nil && *in.MaxPayloadBytes > 0 {
 		payloadCap = *in.MaxPayloadBytes
 	}
@@ -52,8 +50,6 @@ func (s *Service) Subscribe(
 		return setupErr
 	}
 
-	// Some targets failed to subscribe but at least one succeeded: tell the
-	// client which targets are missing instead of silently under-delivering.
 	for _, pe := range partialErrs {
 		if err := emit(&entities.LiveEvent{
 			Error: &entities.LiveError{Code: "SUBSCRIBE_TARGET_FAILED", Message: pe.Error()},
@@ -65,9 +61,7 @@ func (s *Service) Subscribe(
 	return s.runLoop(ctx, sess, msgChan, maxDisplayRate, payloadCap, emit)
 }
 
-// validateSubscriptionTargets rejects a malformed subject pattern before any
-// NATS work happens: an invalid pattern (e.g. "a.>.b") reaches the server as
-// a raw SUB and gets the whole shared pool connection closed.
+// validateSubscriptionTargets rejects a malformed subject pattern before any NATS work happens.
 func validateSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) error {
 	for _, target := range targets {
 		if target == nil {
@@ -80,9 +74,7 @@ func validateSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) err
 	return nil
 }
 
-// dedupeSubscriptionTargets removes exact (subject, streamName) duplicates
-// and literal subjects already covered by another target's wildcard in the
-// same stream grouping, so each message is delivered once.
+// dedupeSubscriptionTargets drops exact duplicates and literal subjects covered by a wildcard in the same stream grouping.
 func dedupeSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) []*entities.LiveSubscriptionTarget {
 	type targetKey struct {
 		subject    string
@@ -137,9 +129,7 @@ func streamNameOf(t *entities.LiveSubscriptionTarget) string {
 	return *t.StreamName
 }
 
-// isLiteralSubject reports whether subject contains no wildcard tokens.
-// Subjects reaching here already passed ValidateSubjectPattern, so "*"/">"
-// only occur as whole tokens.
+// isLiteralSubject reports whether a validated subject contains no wildcard tokens.
 func isLiteralSubject(subject string) bool {
 	return !strings.ContainsAny(subject, "*>")
 }
@@ -168,9 +158,7 @@ func (s *Service) resolveSettings(ctx context.Context) (mode string, maxDisplayR
 }
 
 // startSubscriptions resolves every target into concrete NATS subscriptions;
-// per-target failures are tolerated as long as at least one target succeeds,
-// and are returned alongside so the caller can surface them as LiveError
-// events instead of dropping them.
+// it returns per-target failures as long as at least one target succeeds.
 func (s *Service) startSubscriptions(
 	ctx context.Context,
 	connectionID string,
@@ -200,11 +188,8 @@ func (s *Service) startSubscriptions(
 	return subs, partialErrs, nil
 }
 
-// buildMessageHandler builds the per-target delivery callback. allowInternal
-// is derived from the user's own subject pattern (not the delivered
-// message): a subscription explicitly targeting "$KV.>" or "_myapp.>" must
-// receive matching messages, while a broad ">" subscription keeps filtering
-// internal namespaces out to avoid an accidental firehose.
+// buildMessageHandler builds the per-target delivery callback. Internal subjects pass only when the
+// target's own pattern names an internal namespace.
 func (s *Service) buildMessageHandler(
 	targetSubject string,
 	msgChan chan<- *entities.NatsMessage,
@@ -215,9 +200,6 @@ func (s *Service) buildMessageHandler(
 		if !allowInternal && natsutil.IsInternalSubject(msg.Subject) {
 			return
 		}
-		// Counted at arrival so LiveStats.TotalMessages means the same thing
-		// regardless of which stage later drops the message (buffer-full here,
-		// or rate-limited in runLoop).
 		sess.totalMessages.Add(1)
 		size := int64(len(msg.Data))
 		if sess.bufferedBytes.Add(size) > maxBufferedBytes {

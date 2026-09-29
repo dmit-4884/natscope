@@ -19,18 +19,10 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-// unmarshalOpts decodes JSON into a dynamic message. DiscardUnknown is left
-// at its zero value (false) deliberately: it controls both unrecognized JSON
-// field names and unrecognized enum name values, and silently dropping either
-// produces a message that does not match what the caller sent (a typo'd field
-// or enum name should fail the same way a wrong type or an out-of-range
-// integer already does, not vanish without an error).
+// unmarshalOpts keeps DiscardUnknown off, so unknown JSON fields and enum names are errors.
 var unmarshalOpts = protojson.UnmarshalOptions{}
 
-// marshalOpts marshals deterministically. proto.Marshal's default field order
-// for a dynamicpb message is unspecified across calls, so the same JSON input
-// can produce different bytes on every encode — breaking byte-for-byte
-// comparisons (dedup, CAS, tests, diffing against a producer).
+// marshalOpts marshals deterministically, so the same JSON always encodes to the same bytes.
 var marshalOpts = proto.MarshalOptions{Deterministic: true}
 
 // decodeDynamic parses JSON into a fresh dynamic message for md.

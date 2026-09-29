@@ -62,9 +62,7 @@ func sourceTypeToProto(st entities.SourceType) protopb.SourceType {
 	}
 }
 
-// sourceTypeFromProto maps a wire SourceType to the domain type. ok is false
-// for SOURCE_TYPE_UNSPECIFIED or any unrecognized enum number: an
-// unknown value must be rejected, not silently treated as git.
+// sourceTypeFromProto maps a wire SourceType to the domain type; ok is false for unspecified or unknown values.
 func sourceTypeFromProto(st protopb.SourceType) (_ entities.SourceType, ok bool) {
 	switch st {
 	case protopb.SourceType_SOURCE_TYPE_GIT:

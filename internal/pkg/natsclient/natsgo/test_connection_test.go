@@ -15,9 +15,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 )
 
-// acceptAndHold accepts every connection on ln and holds it open without
-// speaking, until ln is closed by the caller. Run in a goroutine; exits once
-// Accept starts failing (ln closed).
+// acceptAndHold accepts and silently holds connections on ln until it is closed.
 func acceptAndHold(ln net.Listener) {
 	var conns []net.Conn
 	defer func() {
@@ -34,10 +32,7 @@ func acceptAndHold(ln net.Listener) {
 	}
 }
 
-// TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied is a
-// regression test: ConnectTimeout is already a time.Duration; it must not be
-// re-multiplied by time.Millisecond. A "quiet" TCP listener that accepts and
-// never speaks is used so the probe only returns once its timeout elapses.
+// TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied checks that ConnectTimeout isn't scaled by time.Millisecond.
 func TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied(t *testing.T) {
 	t.Parallel()
 
@@ -59,12 +54,7 @@ func TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied(t *testing.T) {
 	require.Less(t, elapsed, 5*time.Second, "connect timeout must be ~300ms, not ~3.5 days")
 }
 
-// TestConnection_CtxCancelCutsProbeShort is a regression test: the
-// caller's context bounds the whole call, even when ConnectTimeout itself is
-// large (today: TestConnection ignores ctx entirely and blocks for the full
-// per-URL timeout, holding the socket open the whole time — a client that
-// gives up leaves the goroutine/socket running for the requested
-// ConnectTimeout, unbounded by anything the caller controls).
+// TestConnection_CtxCancelCutsProbeShort checks that ctx cancellation ends the probe before ConnectTimeout.
 func TestConnection_CtxCancelCutsProbeShort(t *testing.T) {
 	t.Parallel()
 
@@ -81,7 +71,7 @@ func TestConnection_CtxCancelCutsProbeShort(t *testing.T) {
 	start := time.Now()
 	result, err := d.TestConnection(ctx, &entities.TestConnectionRequest{
 		URLs:           []string{"nats://" + ln.Addr().String()},
-		ConnectTimeout: durationPtr(30 * time.Second), // would hang 30s without the ctx bound
+		ConnectTimeout: durationPtr(30 * time.Second),
 	})
 	require.NoError(t, err)
 	require.False(t, result.Success)
@@ -89,10 +79,7 @@ func TestConnection_CtxCancelCutsProbeShort(t *testing.T) {
 	require.Less(t, elapsed, 5*time.Second, "ctx cancellation must cut the probe short, not wait out ConnectTimeout")
 }
 
-// TestConnection_NkeySeedErrorSurfacesAsFailure is a regression test: an
-// unparseable NKey seed must not be silently dropped (falling back to
-// anonymous auth while reporting success); it must fail with an error naming
-// the seed.
+// TestConnection_NkeySeedErrorSurfacesAsFailure checks that an unparsable NKey seed fails with an error naming it.
 func TestConnection_NkeySeedErrorSurfacesAsFailure(t *testing.T) {
 	t.Parallel()
 
@@ -109,9 +96,7 @@ func TestConnection_NkeySeedErrorSurfacesAsFailure(t *testing.T) {
 	require.Contains(t, strings.ToLower(result.Error), "seed")
 }
 
-// TestConnection_MalformedHTTPResponseIsSanitized is a regression test: a
-// non-NATS/non-WebSocket listener's raw banner must not be echoed back to the
-// caller (TestConnection was a banner-grab primitive against ws:// targets).
+// TestConnection_MalformedHTTPResponseIsSanitized checks that a foreign listener's banner isn't echoed back.
 func TestConnection_MalformedHTTPResponseIsSanitized(t *testing.T) {
 	t.Parallel()
 

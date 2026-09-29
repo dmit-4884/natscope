@@ -108,10 +108,7 @@ func TestSettings_EmptyGroupsStayNil(t *testing.T) {
 	}
 }
 
-// TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites is a
-// regression test: three goroutines each update a different setting group, round
-// after round. Since Update now does its read-modify-write inside one bbolt
-// transaction, every round must leave all three groups at that round's value.
+// TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites checks that concurrent group updates all persist.
 func TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
 	s, err := settingsbbolt.New(t.Context(), newDB(t))
 	if err != nil {

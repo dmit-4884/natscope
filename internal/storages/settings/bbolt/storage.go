@@ -18,9 +18,7 @@ import (
 	storage "github.com/dmit-4884/natscope/internal/storages/settings"
 )
 
-// settingsID is the fixed key of the singleton settings document; matches
-// entities.UserSettingsID so a loaded document and the ephemeral default
-// share the same identity.
+// settingsID is the fixed key of the settings document (entities.UserSettingsID).
 const settingsID = entities.UserSettingsID
 
 // Storage is the doc-model bbolt user-settings store (a single document).
@@ -56,10 +54,7 @@ func (s *Storage) Get(ctx context.Context) (*entities.UserSettings, error) {
 	return converter.Convert(d, &entities.UserSettings{}, bbstore.Opts()...), nil
 }
 
-// Update atomically loads settings (or a fresh default if none saved yet),
-// lets mutate apply the caller's change, and persists the result within a
-// single storage transaction, so concurrent partial updates to different
-// setting groups cannot race.
+// Update loads settings (or a fresh default), applies mutate and persists the result in one transaction.
 func (s *Storage) Update(
 	ctx context.Context,
 	mutate func(existing *entities.UserSettings),

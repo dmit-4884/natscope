@@ -22,9 +22,7 @@ import (
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
-// ListStreams returns all JetStream streams via a single paged STREAM.LIST
-// call (O(1) JetStream API requests), matching GetAllStreamsStats instead of
-// the previous STREAM.NAMES + one STREAM.INFO per stream.
+// ListStreams returns all JetStream streams via one paged STREAM.LIST call.
 func (c *Client) ListStreams(ctx context.Context) ([]entities.StreamInfo, error) {
 	streams := []entities.StreamInfo{}
 	streamLister := c.jetStream.ListStreams(ctx)
@@ -128,8 +126,7 @@ func (c *Client) GetStreamStats(ctx context.Context, streamName string) (*entiti
 		return nil, wrapErr(coreerrs.Wrap(err, "stream not found"))
 	}
 
-	// WithSubjectFilter populates State.Subjects (per-subject message counts);
-	// without it the field is always empty.
+	// WithSubjectFilter populates State.Subjects.
 	info, err := stream.Info(ctx, jetstream.WithSubjectFilter(">"))
 	if err != nil {
 		return nil, wrapErr(coreerrs.WrapOperation(err, "get stream info"))
@@ -168,9 +165,7 @@ func (c *Client) CreateStream(ctx context.Context, config entities.StreamCreateR
 	if err := validateNATSNameLength("stream name", config.Name); err != nil {
 		return nil, wrapErr(err)
 	}
-	// GetStream/DeleteStream/UpdateStream don't trim, so a padded name here
-	// created a stream the caller could never look up again with the exact
-	// string they sent — reject instead of silently trimming.
+	// Lookups don't trim, so reject a padded name instead of trimming it.
 	if rawName != config.Name {
 		return nil, wrapErr(&errs.NATSValidationError{
 			Description: fmt.Sprintf("stream name %q must not have leading/trailing whitespace", rawName),
@@ -241,20 +236,12 @@ func (c *Client) PurgeStream(ctx context.Context, name string, req entities.Stre
 		return 0, wrapErr(err)
 	}
 
-	// Resolve+validate the stream via the SDK first, instead of building the
-	// purge subject by hand against an unchecked name: it rejects a
-	// dotted/space-containing name instantly (the hand-built subject
-	// otherwise matches no JetStream API responder and hangs for the full
-	// request timeout) and gives the usual NATS_STREAM_NOT_FOUND reason for a
-	// missing stream instead of a generic NATS_API_ERROR.
 	stream, err := c.jetStream.Stream(ctx, name)
 	if err != nil {
 		return 0, wrapErr(coreerrs.WrapOperation(err, "get stream"))
 	}
 
-	// Fail fast on deny_purge/sealed with a clear precondition error rather
-	// than the server's opaque "stream purge not permitted" (mirrors
-	// DeleteMessage's deny_delete check).
+	// Fail fast on deny_purge/sealed, as DeleteMessage does for deny_delete.
 	if info := stream.CachedInfo(); info != nil && (info.Config.DenyPurge || info.Config.Sealed) {
 		return 0, errs.ErrStreamPurgeDenied
 	}
@@ -370,13 +357,7 @@ func (c *Client) mergeStreamUpdate(
 		srcDestToJetStream,
 	)
 
-	// Replace, not append: the UI round-trips the current sources back on
-	// every save (passthrough), and re-sending the existing list used to fail
-	// with "duplicate source configuration detected" — the only way to ever
-	// change a stream's sources was to hit that error. A caller that
-	// wants sources left untouched simply omits the field (nil slice); an
-	// empty (non-nil) list would need proto presence tracking to distinguish
-	// "clear all" from "not sent", which is out of scope here.
+	// Replace, not append: the UI sends back the current sources on every save; nil leaves them unchanged.
 	if len(update.Sources) > 0 {
 		current.Sources = slices.To(update.Sources, func(src *entities.StreamSource) *jetstream.StreamSource {
 			return converter.Convert(src, &jetstream.StreamSource{})
@@ -384,12 +365,7 @@ func (c *Client) mergeStreamUpdate(
 	}
 
 	if update.Republish != nil {
-		// The proto doc says "send an empty message to clear" (Republish{}),
-		// but Convert turns an empty entity into &RePublish{Source:"",
-		// Destination:""}, which NATS normalizes to a ">"→">" passthrough
-		// route instead of clearing it — every incoming message gets
-		// republished to its own subject, filling the stream with copies of
-		// itself. Treat "no src/dest" as the documented clear.
+		// An empty Republish clears it; converted as-is, NATS would treat it as a ">"→">" passthrough.
 		if update.Republish.Src == "" && update.Republish.Dest == "" {
 			current.RePublish = nil
 		} else {

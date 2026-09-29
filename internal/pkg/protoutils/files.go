@@ -61,8 +61,7 @@ func ReadFilesFromPaths(paths []string) ([]entities.ProtoFileEntry, []entities.C
 			})
 			continue
 		}
-		// Never read through symlinks, matching WalkProtoTree: a *.proto symlink
-		// could otherwise exfiltrate an arbitrary file and dodge the size cap.
+		// Never follow symlinks, matching WalkProtoTree.
 		if info.Mode()&os.ModeSymlink != 0 {
 			diags = append(diags, entities.CompileDiagnostic{
 				Severity: entities.DiagnosticError,

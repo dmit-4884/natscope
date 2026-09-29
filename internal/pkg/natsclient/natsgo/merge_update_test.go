@@ -458,9 +458,6 @@ func TestApplyStreamUpdate(t *testing.T) {
 
 	t.Run("sources replace", func(t *testing.T) {
 		t.Run("sent sources replace the current list", func(t *testing.T) {
-			// re-sending the current sources used to append them again
-			// ("duplicate source configuration detected"), making it impossible
-			// to ever change a stream's sources through Update.
 			current := jetstream.StreamConfig{
 				Sources: []*jetstream.StreamSource{{Name: "src1"}},
 			}
@@ -831,11 +828,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 
 	t.Run("republish clear semantics", func(t *testing.T) {
 		t.Run("empty republish clears it instead of routing >-to->", func(t *testing.T) {
-			// The proto doc says "send an empty message to clear"; naively
-			// converting an empty entity produces &RePublish{Source: "",
-			// Destination: ""}, which NATS normalizes into a passthrough route
-			// that republishes every message to its own subject — filling the
-			// stream with copies of itself.
+			// An empty RePublish must clear the config, not become a passthrough route.
 			current := jetstream.StreamConfig{
 				RePublish: &jetstream.RePublish{Source: ">", Destination: "mirror.>"},
 			}

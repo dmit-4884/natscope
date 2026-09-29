@@ -322,10 +322,6 @@ func TestStreamInfoConversion(t *testing.T) {
 		},
 	}
 
-	// toStreamInfo (not a bare converter.Convert) is the real production path:
-	// it converts Republish separately from the rest of Config, since the
-	// Src/Dest field mapping it needs would otherwise also (incorrectly) apply
-	// to SubjectTransform (see streamConvertOpts).
 	result := toStreamInfo(jsInfo)
 
 	assert.Equal(t, now, result.Created)

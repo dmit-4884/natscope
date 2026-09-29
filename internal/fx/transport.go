@@ -217,10 +217,7 @@ func newHTTPServer(cfg *appconfig.Config, lc fx.Lifecycle) (*httpserver.Server, 
 	lgr := slog.Default().With(slogx.Module("transport:http"))
 	wideBind := !cfg.HTTPBindsLoopback()
 
-	// Fail-closed on the same two-flag gate as the main listener: the
-	// internal server exposes unauthenticated health, metrics and pprof, and
-	// has no basic-auth option of its own (it is a separate go-atlas
-	// listener that SetBasicAuth never reaches).
+	// The internal server has no basic auth, so a wide bind needs AllowRemote and AllowInsecure.
 	if wideBind {
 		if !cfg.AllowRemote {
 			return nil, fmt.Errorf(
@@ -242,9 +239,6 @@ func newHTTPServer(cfg *appconfig.Config, lc fx.Lifecycle) (*httpserver.Server, 
 		UseLogger(lgr).
 		WithMiddlewares()
 	if wideBind {
-		// pprof leaks heap contents, goroutine stacks and cmdline
-		// unauthenticated; keep it loopback-only regardless of the
-		// pprof.enabled config value or allowInsecure.
 		builder = builder.WithoutPprof()
 		lgr.Warn("internal HTTP server is exposed beyond loopback WITHOUT authentication "+
 			"(allowInsecure=true); pprof has been disabled regardless of configuration",

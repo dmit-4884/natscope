@@ -9,7 +9,5 @@ import "errors"
 // already deleted).
 var ErrMessageTemplateNotFound = errors.New("message template: not found")
 
-// ErrMessageTemplateNameRequired is returned when a template name is empty or
-// whitespace-only. buf.validate checks min_len on the raw request, so a
-// whitespace-only name must be rejected again after normalization trims it.
+// ErrMessageTemplateNameRequired is returned when a template name is empty or whitespace-only.
 var ErrMessageTemplateNameRequired = errors.New("message template: name is required")

@@ -88,11 +88,7 @@ func TestTemplates_Update(t *testing.T) {
 	}
 }
 
-// TestTemplates_UpdateConcurrentPartialUpdatesDoNotLoseWrites is a
-// regression test: three goroutines each update a different field of the same
-// template, round after round. Since Update now does its read-modify-write
-// inside one bbolt transaction, every round must leave all three fields at
-// that round's value.
+// TestTemplates_UpdateConcurrentPartialUpdatesDoNotLoseWrites checks that concurrent field updates all persist.
 func TestTemplates_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
 	s := newStorage(t)
 	ctx := t.Context()

@@ -22,12 +22,10 @@ import (
 	corecontext "github.com/altessa-s/go-atlas/core/context"
 )
 
-// kvKeyPattern mirrors nats.go's own key charset (jetstream/kv.go validKeyRe)
-// so validateKVKey rejects nothing a successful nats.go call would accept.
+// kvKeyPattern mirrors nats.go's key charset (jetstream/kv.go validKeyRe).
 var kvKeyPattern = regexp.MustCompile(`^[-/_=.a-zA-Z0-9]+$`)
 
-// validateKVKey rejects empty path segments ("a..b") and wildcards for every
-// key RPC with the same "nats: invalid key" error nats.go uses.
+// validateKVKey rejects empty path segments and wildcards with nats.go's "invalid key" error.
 func validateKVKey(key string) error {
 	if key != "" && key[0] != '.' && key[len(key)-1] != '.' && !strings.Contains(key, "..") &&
 		kvKeyPattern.MatchString(key) {
@@ -39,11 +37,8 @@ func validateKVKey(key string) error {
 	}
 }
 
-// wrapBucketErr wraps errors from KV/Object bucket-level operations
-// (Create/Get/Delete/Seal). nats.go's own error chains for a missing bucket
-// join both jetstream.ErrBucketNotFound and jetstream.ErrStreamNotFound, and
-// wrapErr would report the stream-level sentinel first. It also maps
-// jetstream.ErrBadBucket to errs.ErrNotAKVOrObjectBucket.
+// wrapBucketErr wraps bucket-level KV/Object errors, preferring the bucket sentinel over the stream one
+// and mapping jetstream.ErrBadBucket to errs.ErrNotAKVOrObjectBucket.
 func wrapBucketErr(err error) error {
 	if err == nil {
 		return nil
@@ -111,10 +106,7 @@ func (c *Client) CreateKVBucket(ctx context.Context, config entities.KVBucketCon
 	return &result, nil
 }
 
-// DeleteKVBucket deletes a KeyValue bucket and all its data. nats.go's
-// DeleteKeyValue skips the sanity check KeyValue() itself does (history depth
-// > 0), so a stream merely named KV_<bucket> would otherwise be deleted
-// outright; KeyValue() first confirms it's really a KV bucket.
+// DeleteKVBucket deletes a KeyValue bucket and all its data after confirming the stream is a KV bucket.
 func (c *Client) DeleteKVBucket(ctx context.Context, bucket string) error {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)
 	defer cancel()

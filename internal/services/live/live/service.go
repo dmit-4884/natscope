@@ -62,18 +62,14 @@ type Service struct {
 type sessionState struct {
 	decoderDirty atomic.Int32
 
-	// totalMessages is incremented once per message as it arrives from NATS
-	// (in the subscription producer), independent of whether it is later
-	// dropped for a full buffer or rate limiting — so LiveStats.TotalMessages
-	// means the same thing regardless of which stage drops the message.
+	// totalMessages counts every message on arrival, including ones dropped later.
 	totalMessages atomic.Int64
 
 	// messagesDropped is incremented by the subscription producer (buffer full)
 	// and the runLoop rate limiter, and read by the runLoop stats emitter.
 	messagesDropped atomic.Int64
 
-	// bufferedBytes is the payload volume waiting in the message buffer; the
-	// producer drops messages that would push it past maxBufferedBytes.
+	// bufferedBytes is the payload volume in the message buffer, capped at maxBufferedBytes.
 	bufferedBytes atomic.Int64
 
 	connectionID string
@@ -107,8 +103,7 @@ func New(
 	return s
 }
 
-// endSessionsFor ends every session subscribed through connectionID, whose
-// subscriptions died with the pooled connection.
+// endSessionsFor ends every session subscribed through connectionID.
 func (s *Service) endSessionsFor(connectionID string) {
 	s.sessionsMu.RLock()
 	defer s.sessionsMu.RUnlock()

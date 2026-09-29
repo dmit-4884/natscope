@@ -35,8 +35,7 @@ type Config struct {
 	// otherwise). Off by default. Env ALLOW_INSECURE.
 	AllowInsecure bool `yaml:"allowInsecure"`
 
-	// AllowedHosts is a comma-separated list of Host names accepted besides
-	// localhost and IP literals (DNS rebinding protection). Env ALLOWED_HOSTS.
+	// AllowedHosts is a comma-separated list of extra Host names to accept (env ALLOWED_HOSTS).
 	AllowedHosts string `yaml:"allowedHosts"`
 
 	// WebAuth protects the whole listener (UI + API) with HTTP basic auth.
@@ -96,18 +95,12 @@ func Load(filePath string, logger *config.Logger) (*Config, error) {
 		}
 	}
 
-	// An env var explicitly set to "" (common in docker-compose/systemd
-	// templates that interpolate an unset variable) must not silently
-	// override a configured value with the field's zero default.
 	clearEmptyEnvOverrides()
 	normalizeBoolEnv()
 
 	opts := []loader.Option{
 		loader.WithEnvPrefix(EnvPrefix()),
-		// Strict mode turns a "$VAR" reference to an undefined environment
-		// variable into a load error instead of silently truncating the
-		// value at the "$" — the substitution has no escape/opt-out and
-		// would otherwise mangle any secret containing a literal "$".
+		// Strict mode fails the load on an undefined $VAR instead of truncating the value.
 		loader.WithStrict(),
 	}
 	if filePath != "" {
@@ -147,10 +140,7 @@ func (c *Config) Validate() error {
 	)
 }
 
-// validateHTTP validates the internal HTTP section with go-atlas's rules,
-// except that the listen address only needs to parse as host:port: go-atlas
-// rejects "[::1]:9080" and ":9080", leaving the loopback decision to the
-// fail-closed bind gate.
+// validateHTTP applies go-atlas's rules, except the listen address only has to parse as host:port.
 func validateHTTP(value any) error {
 	h, ok := value.(*config.Http)
 	if !ok || h == nil {
@@ -165,16 +155,10 @@ func validateHTTP(value any) error {
 	return probe.Validate()
 }
 
-// knownLogOutputFormats lists the output formats natscope actually supports:
-// go-atlas's own text/json, plus the "console" format registered by
-// [logconsole.Register]. go-atlas's Logger.Validate does not check
-// OutputFormat at all, so an unsupported value (typo, or the documented but
-// unimplemented "console" before this package registered it) silently fell
-// back to text.
+// knownLogOutputFormats lists go-atlas's text and json formats plus [logconsole.Format].
 var knownLogOutputFormats = []string{config.LogFormatText, config.LogFormatJSON, logconsole.Format}
 
-// validateLoggerOutputFormat rejects an OutputFormat that resolves to neither
-// go-atlas's built-in handlers nor natscope's own "console" one.
+// validateLoggerOutputFormat rejects an OutputFormat not in knownLogOutputFormats.
 func validateLoggerOutputFormat(value any) error {
 	l, ok := value.(*config.Logger)
 	if !ok || l == nil || l.OutputFormat == "" {
@@ -189,8 +173,7 @@ func validateLoggerOutputFormat(value any) error {
 		l.OutputFormat, strings.Join(knownLogOutputFormats, ", "))
 }
 
-// AllowedHostsList splits AllowedHosts on commas, trimming whitespace and
-// dropping empty entries.
+// AllowedHostsList returns the trimmed, non-empty entries of AllowedHosts.
 func (c *Config) AllowedHostsList() []string {
 	if c.AllowedHosts == "" {
 		return nil
@@ -211,10 +194,7 @@ type WebAuthConfig struct {
 	Password string `yaml:"password"`
 }
 
-// Validate requires both credentials once the section is present. A
-// whitespace-only value passes ozzo's Required (it only checks for the zero
-// value) but fails Enabled(), which would otherwise start the listener
-// without auth and without a warning; reject it here instead.
+// Validate requires both credentials to be non-blank once the section is present.
 func (c *WebAuthConfig) Validate() error {
 	return validation.ValidateStruct(c,
 		validation.Field(&c.Username, validation.Required, validation.By(notBlank)),
@@ -285,9 +265,7 @@ func (c *Config) GetLocalDataDir() string {
 const BboltDBFile = "natscope.bolt"
 
 // ResolveDataDir returns the local data directory, defaulting to ~/.natscope/data.
-// A leading "~" is expanded to the user's home directory: the configured
-// default itself is "~/.natscope/data", and without expansion that literal
-// tilde becomes a directory name under the current working directory instead.
+// A leading "~" expands to the user's home directory.
 func (c *Config) ResolveDataDir() string {
 	if dir := c.GetLocalDataDir(); dir != "" {
 		return expandHome(dir)
@@ -299,8 +277,7 @@ func (c *Config) ResolveDataDir() string {
 	return filepath.Join(home, ".natscope", "data")
 }
 
-// expandHome expands a leading "~" (or "~/...") to the user's home
-// directory; any other path is returned unchanged.
+// expandHome expands a leading "~" to the user's home directory.
 func expandHome(path string) string {
 	home, err := os.UserHomeDir()
 	if err != nil {

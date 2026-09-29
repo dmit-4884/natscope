@@ -45,7 +45,7 @@ type Transport struct {
 	authPass     string
 	loopback     bool
 	allowedHosts map[string]struct{}
-	baseCtx      context.Context //nolint:containedctx // canceled from GracefulStop to unblock in-flight streaming handlers; see Listen.
+	baseCtx      context.Context //nolint:containedctx // canceled by GracefulStop
 	cancelBase   context.CancelFunc
 }
 
@@ -66,9 +66,8 @@ var devTrustedOrigins = []string{
 }
 
 // New creates a Connect transport; frontendFS may be nil when built without an
-// embedded UI. Requests are accepted only for Host names that are localhost,
-// an IP literal, or listed in allowedHosts; with basic auth on a non-loopback
-// bind and no allowedHosts, any Host is accepted.
+// embedded UI. Host must be localhost, an IP literal or in allowedHosts, unless basic auth
+// guards a non-loopback bind with no allowedHosts.
 func New(
 	address string,
 	frontendFS fs.FS,
@@ -122,8 +121,7 @@ func hostName(host string) string {
 	return strings.ToLower(strings.TrimSuffix(strings.TrimPrefix(host, "["), "]"))
 }
 
-// hostAllowed guards against DNS rebinding, which always arrives with an
-// attacker-controlled DNS name in Host.
+// hostAllowed reports whether host passes the DNS-rebinding check.
 func (t *Transport) hostAllowed(host string) bool {
 	name := hostName(host)
 	if name == "localhost" || net.ParseIP(name) != nil {
@@ -160,14 +158,10 @@ func (t *Transport) RegisterHandlers(handlers []Handler) {
 	t.mux.HandleFunc("/", t.serveSPA)
 }
 
-// assetsPrefix holds Vite's content-hashed, immutable build output. A miss
-// under it is a deployment error (stale link, partial upload), not a client
-// route — it must 404, not silently return index.html.
+// assetsPrefix holds Vite's hashed build output; a miss under it is a 404, not index.html.
 const assetsPrefix = "/assets/"
 
-// serveSPA serves embedded files as-is; unknown "route" paths fall through to
-// index.html (404 if no dist embedded). Only GET/HEAD are served; static
-// content has no other meaningful method.
+// serveSPA serves embedded files for GET/HEAD; unknown paths fall through to index.html (404 if no dist).
 func (t *Transport) serveSPA(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
@@ -221,7 +215,7 @@ func (t *Transport) serveSPA(w http.ResponseWriter, r *http.Request) {
 // Listen binds the TCP socket and builds the http.Server; split from Serve so a
 // port-in-use error fails fx startup synchronously instead of on a goroutine.
 //
-//nolint:contextcheck // baseCtx is deliberately rooted in Background, not ctx — see its construction below.
+//nolint:contextcheck // baseCtx outlives ctx
 func (t *Transport) Listen(ctx context.Context) error {
 	if t.listener != nil {
 		return nil // already listening (idempotent)
@@ -243,14 +237,7 @@ func (t *Transport) Listen(ctx context.Context) error {
 	}
 	handler = t.checkHost(handler)
 
-	// baseCtx is the parent of every request context. GracefulStop cancels
-	// it before calling Shutdown, so a long-lived streaming handler (Live
-	// Subscribe) observes ctx.Done() and returns instead of holding the
-	// connection open until the shutdown deadline.
-	// Deliberately rooted in Background, not Listen's own ctx: this must
-	// outlive the Listen call (which only bounds the initial bind) for the
-	// server's entire run — it is canceled explicitly by GracefulStop, not
-	// by Listen's caller.
+	// baseCtx parents every request context and is canceled by GracefulStop, not by Listen's caller.
 	t.baseCtx, t.cancelBase = context.WithCancel(context.Background())
 	baseCtx := t.baseCtx
 	t.server = &http.Server{
@@ -318,10 +305,7 @@ func (t *Transport) Serve() error {
 }
 
 // GracefulStop shuts the HTTP server down, returning when in-flight requests
-// complete or ctx fires. It cancels every request's base context first, so a
-// long-lived streaming handler (Live Subscribe) observing ctx.Done() ends
-// immediately instead of holding Shutdown open until requests naturally
-// finish — which, for a live subscription, is never.
+// complete or ctx fires. It cancels the request base context first so streaming handlers end.
 func (t *Transport) GracefulStop(ctx context.Context) error {
 	if t.server == nil {
 		return nil

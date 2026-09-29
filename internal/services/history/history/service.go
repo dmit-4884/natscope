@@ -79,9 +79,7 @@ func (s *Service) List(
 	return s.storage.List(ctx, in)
 }
 
-// truncateAtRuneBoundary caps s to at most maxBytes, backing off to the start
-// of the last rune that would otherwise be split (a byte slice can land
-// mid-UTF-8-sequence, corrupting the final character into U+FFFD).
+// truncateAtRuneBoundary cuts s to at most maxBytes without splitting a UTF-8 rune.
 func truncateAtRuneBoundary(s string, maxBytes int) string {
 	if len(s) <= maxBytes {
 		return s

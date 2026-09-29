@@ -57,8 +57,6 @@ func TestWebAuthEnabled(t *testing.T) {
 	}
 }
 
-// A whitespace-only credential must fail Validate (fail-closed) instead of
-// silently starting without auth (Enabled() would return false for it).
 func TestWebAuthValidate_RejectsBlank(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -100,9 +98,6 @@ func TestAllowedHostsList(t *testing.T) {
 	}
 }
 
-// An unsupported outputFormat must be rejected at load time instead of
-// silently falling back to text — go-atlas's own Logger.Validate does not
-// check this field at all.
 func TestLoad_RejectsUnknownOutputFormat(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
@@ -114,8 +109,6 @@ func TestLoad_RejectsUnknownOutputFormat(t *testing.T) {
 	}
 }
 
-// A file whose extension isn't .yaml/.yml must fail loudly instead of the
-// loader silently skipping it and starting on an all-default configuration.
 func TestLoad_RejectsUnsupportedExtension(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.conf")
@@ -127,8 +120,6 @@ func TestLoad_RejectsUnsupportedExtension(t *testing.T) {
 	}
 }
 
-// A typo'd key must fail loudly instead of silently keeping the default
-// (e.g. "datadir" instead of "dataDir" leaves the data directory unchanged).
 func TestLoad_RejectsUnknownKey(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
@@ -141,9 +132,6 @@ func TestLoad_RejectsUnknownKey(t *testing.T) {
 	}
 }
 
-// A "$" that doesn't reference a defined environment variable must fail the
-// load instead of silently truncating the value (a real secret's password
-// generator commonly produces "$" characters).
 func TestLoad_RejectsUndefinedEnvSubstitution(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
@@ -156,8 +144,6 @@ func TestLoad_RejectsUndefinedEnvSubstitution(t *testing.T) {
 	}
 }
 
-// An env var explicitly set to the empty string must be treated as unset,
-// not as an override to the field's zero value.
 func TestLoad_EmptyEnvOverrideIgnored(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
@@ -176,9 +162,6 @@ func TestLoad_EmptyEnvOverrideIgnored(t *testing.T) {
 	}
 }
 
-// "~" in dataDir must expand to the home directory, matching the documented
-// default (~/.natscope/data) instead of creating a literal "~" directory
-// under the current working directory.
 func TestResolveDataDir_ExpandsTilde(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -192,7 +175,6 @@ func TestResolveDataDir_ExpandsTilde(t *testing.T) {
 	}
 }
 
-// Boolean env vars accept the same words the config file does.
 func TestLoad_BoolEnvMatchesYAMLWords(t *testing.T) {
 	t.Setenv("ALLOW_INSECURE", "yes")
 
@@ -205,8 +187,7 @@ func TestLoad_BoolEnvMatchesYAMLWords(t *testing.T) {
 	}
 }
 
-// The internal HTTP server accepts an IPv6 loopback address, and a bare
-// ":port" reaches the bind gate as a non-loopback bind.
+// IPv6 loopback is accepted; a bare ":port" counts as a non-loopback bind.
 func TestLoad_HTTPListenAddressForms(t *testing.T) {
 	t.Setenv("HTTP__LISTEN_ADDRESS", "[::1]:9080")
 	cfg, err := appconfig.Load("", appconfig.LoggerDefaults(false))

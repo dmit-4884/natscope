@@ -78,10 +78,7 @@ type Client struct {
 
 	defaultTimeout time.Duration
 
-	// putObjectLocks serializes PutObject by (bucket, name): nats.go's async
-	// chunk+meta publish (jetstream/object.go obs.Put) races under
-	// concurrent writers of the same name and can strand orphaned chunks or,
-	// combined with a failed write, a broken object.
+	// putObjectLocks serializes PutObject per (bucket, name).
 	putObjectLocks sync.Map
 }
 

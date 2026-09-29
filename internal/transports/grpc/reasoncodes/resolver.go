@@ -48,9 +48,7 @@ var standardFullID = map[string]string{
 }
 
 // standardSuffix maps numeric/size families by the rule ID's last segment.
-// Combined range rules (gte_lte, ...) all resolve to InvalidRange: unlike a
-// single bound, they don't need the field value to disambiguate min from
-// max — the violated field is out of the [min, max] window either way.
+// Combined range rules (gte_lte, ...) all resolve to InvalidRange.
 var standardSuffix = map[string]string{
 	"gte":       InvalidMinLengthOrValue,
 	"gt":        InvalidMinLengthOrValue,

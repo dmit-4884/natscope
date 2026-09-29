@@ -295,9 +295,7 @@ func TestPublish_MissingSourceIDForMessageType(t *testing.T) {
 	assert.Equal(t, 1, hist.called, "a rejected publish attempt must still be recorded to history")
 }
 
-// TestPublish_RejectsWildcardSubject verifies a wildcard-looking
-// subject is rejected up front as a transport error, instead of being
-// published to JetStream as a literal, unmatchable subject.
+// TestPublish_RejectsWildcardSubject checks that a wildcard subject fails as a transport error.
 func TestPublish_RejectsWildcardSubject(t *testing.T) {
 	t.Parallel()
 
@@ -315,8 +313,7 @@ func TestPublish_RejectsWildcardSubject(t *testing.T) {
 	require.Error(t, err, "a wildcard subject must be a transport error, not a soft failure")
 }
 
-// TestPublish_RejectsInvalidHeaderName verifies an invalid header
-// name is rejected up front instead of silently dropped on the wire.
+// TestPublish_RejectsInvalidHeaderName checks that an invalid header name is rejected before publishing.
 func TestPublish_RejectsInvalidHeaderName(t *testing.T) {
 	t.Parallel()
 
@@ -335,9 +332,7 @@ func TestPublish_RejectsInvalidHeaderName(t *testing.T) {
 	require.Error(t, err, "an invalid header name must be a transport error, not a silently incomplete publish")
 }
 
-// TestPublish_SkipsHistoryForUnknownConnection verifies a publish
-// attempt against a connection id that doesn't resolve isn't recorded — it
-// can never be followed up on and only pollutes the audit trail.
+// TestPublish_SkipsHistoryForUnknownConnection checks that a publish to an unknown connection id isn't recorded.
 func TestPublish_SkipsHistoryForUnknownConnection(t *testing.T) {
 	t.Parallel()
 

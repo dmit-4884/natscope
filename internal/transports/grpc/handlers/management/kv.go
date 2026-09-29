@@ -144,11 +144,7 @@ func (h *Handler) GetKVKeyHistory(
 	}), nil
 }
 
-// PutKVKey puts a key in a KeyValue bucket. value must be base64-encoded: a
-// silent "not base64, so store as plain text" fallback used to corrupt any
-// value that happened to also be valid base64 (e.g. "true", "1234") into
-// decoded garbage bytes instead — Put/Get now agree on the wire format
-// symmetrically.
+// PutKVKey puts a key in a KeyValue bucket; value must be base64-encoded.
 func (h *Handler) PutKVKey(
 	ctx context.Context,
 	req *connect.Request[managementpb.PutKVKeyRequest],

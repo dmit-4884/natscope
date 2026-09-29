@@ -129,10 +129,7 @@ func TestSplitCredentialsMixed(t *testing.T) {
 	require.ErrorIs(t, err, errs.ErrConnectionURLCredentialsMixed)
 }
 
-// TestSplitCredentialsUnparseableWithUserinfoIsRejected pins the fix: a
-// URL that embeds "@" but cannot be parsed (e.g. an invalid percent-escape in
-// the password) must be rejected, not persisted as-is with its plaintext
-// credentials intact.
+// TestSplitCredentialsUnparseableWithUserinfoIsRejected checks that an unparsable URL with "@" is rejected.
 func TestSplitCredentialsUnparseableWithUserinfoIsRejected(t *testing.T) {
 	t.Parallel()
 

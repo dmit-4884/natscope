@@ -86,8 +86,7 @@ func TestLiveSubscribe(t *testing.T) {
 	assert.True(t, found, "the published message must arrive on the live subscription")
 }
 
-// TestLiveEndsWhenConnectionReplaced checks that a session whose pooled
-// connection is dropped ends with a retryable error instead of going silent.
+// TestLiveEndsWhenConnectionReplaced checks that a session ends with a retryable error when its connection drops.
 func TestLiveEndsWhenConnectionReplaced(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()

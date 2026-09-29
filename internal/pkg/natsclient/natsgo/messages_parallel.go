@@ -113,10 +113,6 @@ func (c *Client) getMessagesParallel(
 		lastProcessedSeq = seq
 	}
 
-	// hasMore reflects whether the +1 probe message was actually collected —
-	// deriving it only from the early-break flag above missed the case where
-	// the probe was the very last entry in seqsToFetch (a stream of exactly
-	// limit+1 messages), silently losing that last message.
 	hasMore := len(messages) > limit
 
 	// Trim the extra +1 message used for hasMore detection.
@@ -124,10 +120,7 @@ func (c *Client) getMessagesParallel(
 		messages = messages[:limit]
 	}
 
-	// Cursor from the last kept message; if the window came back empty (an
-	// interior gap wider than the fetch window, or nothing but holes to the
-	// stream boundary), resume from the end of the queried window instead of
-	// falling back to 0 — which wraps nextSeq to 1 and loops forever.
+	// An empty window resumes from its end, not 0, which would wrap nextSeq to 1 and loop.
 	cursorSeq := lastProcessedSeq
 	switch {
 	case len(messages) > 0:
@@ -136,9 +129,7 @@ func (c *Client) getMessagesParallel(
 		cursorSeq = seqsToFetch[len(seqsToFetch)-1]
 	}
 
-	// The fetch window may have stopped short of the stream boundary (sized by
-	// fetchCount, not FirstSeq/LastSeq) without collecting `needed` messages —
-	// there can still be more beyond it.
+	// The fetch window may stop short of the stream boundary, so more messages can remain.
 	if !hasMore {
 		hasMore = hasMoreMessages(direction, cursorSeq, info)
 	}

@@ -15,17 +15,11 @@ import (
 	"github.com/altessa-s/go-atlas/core/runtime/appinfo"
 )
 
-// validConfigExtensions mirrors the yaml3 loader backend: only .yaml/.yml is
-// ever decoded. A single file with any other extension is silently skipped
-// by the loader (zero files loaded, so every field keeps its default) —
-// validate it up front instead of starting on an unintentionally empty
-// configuration. Directory mode already documents this skip behavior, so it
-// is left alone here.
+// validateConfigPath rejects a single config file whose extension the yaml3 loader would skip.
 func validateConfigPath(filePath string) error {
 	info, err := os.Stat(filePath)
 	if err != nil || info.IsDir() {
-		// Missing path or directory mode: let the real loader report a
-		// missing-path error, or fall through to the documented per-file skip.
+		// Missing path or directory mode: the real loader handles both.
 		return nil
 	}
 	ext := strings.ToLower(filepath.Ext(filePath))
@@ -35,15 +29,11 @@ func validateConfigPath(filePath string) error {
 	return nil
 }
 
-// checkKnownFields re-decodes the same YAML file(s) with strict field
-// checking, purely to catch a typo'd or misnamed key (e.g. "datadir" instead
-// of "dataDir", "webauth" instead of "webAuth") that the real loader — whose
-// yaml3 backend does not enable yaml.Decoder.KnownFields — otherwise accepts
-// and silently drops.
+// checkKnownFields re-decodes the config file(s) with strict field checking to catch unknown keys.
 func checkKnownFields(filePath string) error {
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return nil // the real loader already reported (or will report) this.
+		return nil // the real loader reports this
 	}
 	if !info.IsDir() {
 		return checkKnownFieldsFile(filePath)
@@ -67,13 +57,11 @@ func checkKnownFields(filePath string) error {
 	return nil
 }
 
-// checkKnownFieldsFile decodes one file into a throwaway Config with strict
-// field checking. Env-var substitution is irrelevant here — it rewrites
-// values, never keys — so the raw file content is fine for this check.
+// checkKnownFieldsFile strictly decodes one file into a throwaway Config.
 func checkKnownFieldsFile(path string) error {
-	f, err := os.Open(path) //nolint:gosec // path comes from the operator-supplied --config flag/env, not untrusted input
+	f, err := os.Open(path) //nolint:gosec // operator-supplied path
 	if err != nil {
-		return nil // unreadable; the real loader's error already covers this.
+		return nil // the real loader reports this
 	}
 	defer f.Close() //nolint:errcheck
 
@@ -81,17 +69,13 @@ func checkKnownFieldsFile(path string) error {
 	dec.KnownFields(true)
 
 	var probe Config
-	if err := dec.Decode(&probe); err != nil && err != io.EOF { //nolint:errorlint // yaml.v3 returns the sentinel directly, not wrapped
+	if err := dec.Decode(&probe); err != nil && err != io.EOF { //nolint:errorlint // yaml.v3 returns io.EOF unwrapped
 		return fmt.Errorf("config file %s: %w", path, err)
 	}
 	return nil
 }
 
-// emptyOverridableEnvKeys lists the documented flat/nested env vars whose
-// empty value should be treated as "unset" rather than as an explicit
-// override to the field's zero value — a docker-compose/systemd template
-// like "LOGGER__LEVEL: ${LOG_LEVEL}" with an unset LOG_LEVEL must not
-// silently blank a value already set in the config file.
+// emptyOverridableEnvKeys lists the env vars whose empty value counts as unset.
 var emptyOverridableEnvKeys = []string{
 	"GRPC_WEB_ADDRESS",
 	"ALLOW_REMOTE",
@@ -107,8 +91,7 @@ var emptyOverridableEnvKeys = []string{
 	"SECRETS__FILE_KEY",
 }
 
-// clearEmptyEnvOverrides unsets any of emptyOverridableEnvKeys (with the
-// build's env prefix applied) that are present but set to the empty string.
+// clearEmptyEnvOverrides unsets every prefixed emptyOverridableEnvKeys entry set to "".
 func clearEmptyEnvOverrides() {
 	for _, key := range emptyOverridableEnvKeys {
 		name := EnvPrefix() + key
@@ -121,9 +104,7 @@ func clearEmptyEnvOverrides() {
 // boolEnvKeys are the boolean config keys settable through the environment.
 var boolEnvKeys = []string{"ALLOW_REMOTE", "ALLOW_INSECURE", "LOGGER__COLORIZED"}
 
-// normalizeBoolEnv rewrites the YAML 1.1 boolean words the config file accepts
-// (yes/no, on/off, y/n) to true/false in boolean env vars, so both sources
-// follow the same rules.
+// normalizeBoolEnv rewrites yes/no, on/off and y/n in boolEnvKeys to true/false, as the config file accepts them.
 func normalizeBoolEnv() {
 	for _, key := range boolEnvKeys {
 		name := EnvPrefix() + key
@@ -140,9 +121,7 @@ func normalizeBoolEnv() {
 	}
 }
 
-// EnvPrefix returns the build's env var prefix joined with "_" (or "" for an
-// unprefixed build), so config keys use the same PREFIX_KEY form as LIB_DIR,
-// VAR_DIR and CONFIG_FILE.
+// EnvPrefix returns the build's env var prefix followed by "_", or "" for an unprefixed build.
 func EnvPrefix() string {
 	if appinfo.EnvPrefix == "" {
 		return ""

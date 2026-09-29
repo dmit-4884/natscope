@@ -106,10 +106,7 @@ func TestResolver_NilSafe(t *testing.T) {
 	}
 }
 
-// TestResolver_CacheConsistentWithLinearScan rebuilds the
-// same answer whether or not the per-subject cache was already warm, and
-// tolerates concurrent Resolve calls (the cache is shared across live
-// sessions via the atomic resolver pointer in the mappings service).
+// TestResolver_CacheConsistentWithLinearScan checks that warm and cold caches agree under concurrent Resolve calls.
 func TestResolver_CacheConsistentWithLinearScan(t *testing.T) {
 	ms := entities.SubjectMappings{
 		mapping("specific", "orders.eu.*", "T1", "src", 100),
@@ -140,8 +137,7 @@ func TestResolver_CacheConsistentWithLinearScan(t *testing.T) {
 	}
 }
 
-// TestResolver_CacheBoundedSize verifies the wildcard-lookup cache
-// does not grow past maxResolverCacheEntries under high subject cardinality.
+// TestResolver_CacheBoundedSize checks that the cache stays within maxResolverCacheEntries.
 func TestResolver_CacheBoundedSize(t *testing.T) {
 	r := NewMappingResolver(entities.SubjectMappings{
 		mapping("w", "wild.>", "T1", "src", 100),

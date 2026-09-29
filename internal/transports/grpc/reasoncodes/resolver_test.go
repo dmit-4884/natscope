@@ -52,9 +52,7 @@ func TestResolver_Resolve(t *testing.T) {
 		{"string.in", "string.in", "format", InvalidEnumValue},
 		{"enum.defined_only", "enum.defined_only", "direction", InvalidEnumValue},
 
-		// Combined range rules: the seam needs no field value to
-		// disambiguate min from max — a value outside [min, max] is InvalidRange
-		// regardless of which bound it missed.
+		// Combined range rules resolve to InvalidRange without the field value.
 		{"combined range gte_lte", "int32.gte_lte", "default_page_size", InvalidRange},
 		{"combined range gt_lt", "double.gt_lt", "rate", InvalidRange},
 

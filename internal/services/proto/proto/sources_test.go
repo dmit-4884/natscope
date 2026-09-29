@@ -635,9 +635,7 @@ func TestValidateLocalPath(t *testing.T) {
 		assert.Equal(t, localPathInvalidMessage, *result.Error)
 	})
 
-	// nonexistent path, permission-denied, not-a-directory, and an
-	// existing directory with no .proto files must all be indistinguishable —
-	// otherwise ValidateLocalPath is an unauthenticated filesystem oracle.
+	// Every failure mode must return the same error.
 	t.Run("QA073_IndistinguishableFailureModes", func(t *testing.T) {
 		t.Parallel()
 		emptyDir := t.TempDir()

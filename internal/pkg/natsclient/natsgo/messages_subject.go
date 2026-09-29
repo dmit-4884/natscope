@@ -17,10 +17,7 @@ import (
 // huge streams.
 const exactSubjectScanRange = 1000
 
-// wildcardFetchBatch is the sequence-window size per wildcard-filter fetch
-// pass; keeps the in-memory RawStreamMsg set proportional to what's actually
-// needed instead of always pulling up to DefaultSearchRange messages
-// regardless of limit.
+// wildcardFetchBatch is the sequence-window size per wildcard-filter fetch pass.
 const wildcardFetchBatch = 200
 
 // getMessagesWithSubjectFilter dispatches exact subjects to the per-subject
@@ -34,10 +31,7 @@ func (c *Client) getMessagesWithSubjectFilter(
 	limit int,
 	direction string,
 ) (*entities.MessagesResponse, error) {
-	// A never-written stream has no live sequence range to search; without
-	// this, both the exact and wildcard paths below build seq-based requests
-	// off State.FirstSeq/LastSeq that the server rejects as "bad request"
-	// instead of returning an empty page.
+	// An empty stream has no sequence range to search.
 	if info.State.Msgs == 0 {
 		return &entities.MessagesResponse{Messages: []*entities.Message{}, HasMore: false}, nil
 	}
@@ -96,9 +90,7 @@ func (c *Client) getMessagesForExactSubjectForward(
 	}, nil
 }
 
-// getMessagesForExactSubjectBackward walks backward from the latest match,
-// fetching by sequence and rejecting mismatches, capped at
-// exactSubjectScanRange.
+// getMessagesForExactSubjectBackward walks backward from the latest match, capped at exactSubjectScanRange.
 func (c *Client) getMessagesForExactSubjectBackward(
 	ctx context.Context,
 	stream jetstream.Stream,
@@ -112,9 +104,6 @@ func (c *Client) getMessagesForExactSubjectBackward(
 	if startSeq == 0 {
 		lastMsg, err := stream.GetLastMsgForSubject(ctx, subjectFilter)
 		if err != nil {
-			// No message on this subject is expected (empty result), but any
-			// other failure (permissions, transient, ...) must not be silently
-			// swallowed into a successful empty response.
 			if errors.Is(err, jetstream.ErrMsgNotFound) {
 				return &entities.MessagesResponse{
 					Messages: []*entities.Message{},
@@ -152,10 +141,7 @@ func (c *Client) getMessagesForExactSubjectBackward(
 	case len(messages) > 0:
 		nextSeq = messages[len(messages)-1].Sequence - 1
 	case hasMore:
-		// Nothing matched in this window, but the scan cap was hit before
-		// reaching FirstSeq — resume just past where we stopped instead of
-		// leaving nextSeq at its zero value, which the client reads as
-		// "restart from the newest message" and loops forever.
+		// The scan cap stopped short of FirstSeq, so resume past this window instead of leaving nextSeq at 0.
 		nextSeq = startSeq + 1
 	}
 
@@ -166,12 +152,7 @@ func (c *Client) getMessagesForExactSubjectBackward(
 	}, nil
 }
 
-// getMessagesForWildcardSubject scans in bounded batches (not the whole
-// DefaultSearchRange window in one shot), fetching matches until
-// enough are found or the scan cap / stream boundary is reached. Without
-// startSeq it now starts from the boundary matching direction — forward from
-// FirstSeq, backward from LastSeq — instead of always LastSeq, which made a
-// forward search return at most one (the newest) message.
+// getMessagesForWildcardSubject scans bounded batches from the direction's boundary until enough messages match.
 func (c *Client) getMessagesForWildcardSubject(
 	ctx context.Context,
 	stream jetstream.Stream,
@@ -229,9 +210,7 @@ func (c *Client) getMessagesForWildcardSubject(
 		last := seqsToFetch[len(seqsToFetch)-1]
 		lastProcessedSeq = last
 		if len(seqsToFetch) < batchSize {
-			// Batch came up short of what we asked for: buildSequenceList hit
-			// FirstSeq/LastSeq, so the whole stream in this direction has been
-			// scanned.
+			// A short batch means buildSequenceList hit the stream boundary.
 			break
 		}
 		if direction == DefaultDirection {

@@ -30,15 +30,8 @@ var srcDestToJetStream = converter.WithFieldMappings(map[string]string{
 	"Dest": "Destination",
 })
 
-// streamConvertOpts maps jetstream.StreamInfo → entities.StreamInfo. TimeStamp set
-// explicitly by toStreamInfo. The srcDestToEntity Source/Destination→Src/Dest
-// mapping is intentionally NOT included here: it only applies to RePublish
-// (whose entity has Src/Dest), and the converter applies field mappings
-// globally across the whole nested conversion — including
-// SubjectTransformConfig, whose entity already uses Source/Destination
-// directly. Applying the mapping there redirects those fields to a
-// nonexistent "Src"/"Dest" pair and silently drops them. RePublish is
-// converted separately below, with the mapping scoped to just that call.
+// streamConvertOpts maps jetstream.StreamInfo → entities.StreamInfo. TimeStamp is set by toStreamInfo.
+// RePublish is converted separately: its Src/Dest mapping would also hit SubjectTransformConfig.
 var streamConvertOpts = []converter.Option{
 	converter.WithIgnoreFields("TimeStamp"),
 }
@@ -49,8 +42,7 @@ var consumerConvertOpts = []converter.Option{
 	converter.WithIgnoreFields("OptStartTime", "Created", "TimeStamp"),
 }
 
-// toStreamInfo also sets Raw (JSON), TimeStamp (fetch time), and Republish
-// (converted separately from the rest of the config — see streamConvertOpts).
+// toStreamInfo converts info and sets Raw, TimeStamp and Republish (see streamConvertOpts).
 func toStreamInfo(info *jetstream.StreamInfo) *entities.StreamInfo {
 	result := converter.Convert(info, &entities.StreamInfo{}, streamConvertOpts...)
 	if info.Config.RePublish != nil {

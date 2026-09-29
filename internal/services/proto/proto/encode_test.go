@@ -15,8 +15,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// compileOrderDescriptor compiles an inline message with a string, repeated
-// string, and enum field, returning the "Order" message descriptor.
+// compileOrderDescriptor compiles an inline Order message with string, repeated string and enum fields.
 func compileOrderDescriptor(t *testing.T) protoreflect.MessageDescriptor {
 	t.Helper()
 	dir := t.TempDir()
@@ -48,8 +47,7 @@ message Order {
 	return md
 }
 
-// TestDecodeDynamic_UnknownEnumName_Errors is a regression test: an
-// unrecognized enum name string must not be silently discarded.
+// TestDecodeDynamic_UnknownEnumName_Errors checks that an unknown enum name is an error.
 func TestDecodeDynamic_UnknownEnumName_Errors(t *testing.T) {
 	t.Parallel()
 	md := compileOrderDescriptor(t)
@@ -58,8 +56,7 @@ func TestDecodeDynamic_UnknownEnumName_Errors(t *testing.T) {
 	require.Error(t, err, "unknown enum name must surface as an error, not be dropped")
 }
 
-// TestDecodeDynamic_UnknownField_Errors covers the PUB-4 part merged into
-// a typo'd JSON field name must not be silently discarded either.
+// TestDecodeDynamic_UnknownField_Errors checks that an unknown JSON field is an error.
 func TestDecodeDynamic_UnknownField_Errors(t *testing.T) {
 	t.Parallel()
 	md := compileOrderDescriptor(t)
@@ -68,9 +65,7 @@ func TestDecodeDynamic_UnknownField_Errors(t *testing.T) {
 	require.Error(t, err, "unknown JSON field name must surface as an error, not be dropped")
 }
 
-// TestDecodeDynamic_UnknownEnumNumber_StillAccepted preserves the existing,
-// correct proto3 open-enum behavior: an out-of-range enum number is valid and
-// must still round-trip, unlike an unknown enum name.
+// TestDecodeDynamic_UnknownEnumNumber_StillAccepted checks that an unknown enum number still round-trips.
 func TestDecodeDynamic_UnknownEnumNumber_StillAccepted(t *testing.T) {
 	t.Parallel()
 	md := compileOrderDescriptor(t)
@@ -82,8 +77,6 @@ func TestDecodeDynamic_UnknownEnumNumber_StillAccepted(t *testing.T) {
 	assert.NotEmpty(t, data)
 }
 
-// TestDecodeDynamic_KnownFieldsAndEnum_StillEncodes is a sanity check that
-// legitimate input still encodes successfully after tightening DiscardUnknown.
 func TestDecodeDynamic_KnownFieldsAndEnum_StillEncodes(t *testing.T) {
 	t.Parallel()
 	md := compileOrderDescriptor(t)
@@ -95,8 +88,7 @@ func TestDecodeDynamic_KnownFieldsAndEnum_StillEncodes(t *testing.T) {
 	assert.NotEmpty(t, data)
 }
 
-// TestEncodeDynamic_Deterministic is a regression test: encoding the same
-// JSON repeatedly must always produce identical bytes.
+// TestEncodeDynamic_Deterministic checks that encoding the same JSON always yields identical bytes.
 func TestEncodeDynamic_Deterministic(t *testing.T) {
 	t.Parallel()
 	md := compileOrderDescriptor(t)

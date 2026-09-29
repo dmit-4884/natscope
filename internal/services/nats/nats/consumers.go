@@ -71,8 +71,7 @@ func (s *Service) PauseConsumer(
 	return c.PauseConsumer(ctx, streamName, consumerName, pauseUntil)
 }
 
-// ResumeConsumer resumes a paused consumer immediately, returning the
-// server's actual post-resume state.
+// ResumeConsumer resumes a paused consumer and returns the server's post-resume state.
 func (s *Service) ResumeConsumer(
 	ctx context.Context,
 	connectionID string,

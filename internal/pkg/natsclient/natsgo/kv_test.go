@@ -63,9 +63,7 @@ func TestToKVBucketInfo_ReportsRealStorageAndReplicas(t *testing.T) {
 	assert.Equal(t, 3, got.Replicas, "replica count must come from the bucket config")
 }
 
-// TestToKVBucketInfo_ReportsDescription covers the fix: description was
-// dropped by every KV bucket read (Create/Get/List) even though it was saved
-// correctly on the server.
+// TestToKVBucketInfo_ReportsDescription checks that bucket reads return the description.
 func TestToKVBucketInfo_ReportsDescription(t *testing.T) {
 	t.Parallel()
 
@@ -111,11 +109,7 @@ func TestToKVBucketInfo_NormalizesDegenerateValues(t *testing.T) {
 	})
 }
 
-// TestValidateKVKey covers the fix (empty path segments such as "a..b" pass
-// nats.go's own keyValid, which only checks leading/trailing dots) and
-// (wildcards must be rejected the same way for every key RPC,
-// including GetKVKeyHistory, whose Watch-based validator otherwise lets them
-// through).
+// TestValidateKVKey checks that empty path segments and wildcards are rejected.
 func TestValidateKVKey(t *testing.T) {
 	t.Parallel()
 
@@ -138,10 +132,7 @@ func TestValidateKVKey(t *testing.T) {
 	}
 }
 
-// TestWrapBucketErr covers the fix (bucket-shaped sentinel must win over the
-// stream-shaped one nats.go's own joined error leads with)
-// (jetstream.ErrBadBucket, which plain wrapErr never maps, must translate to
-// a dedicated sentinel instead of falling through to Internal).
+// TestWrapBucketErr checks that the bucket sentinel wins and ErrBadBucket maps to ErrNotAKVOrObjectBucket.
 func TestWrapBucketErr(t *testing.T) {
 	t.Parallel()
 

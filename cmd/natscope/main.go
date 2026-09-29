@@ -11,11 +11,7 @@ import (
 	"github.com/dmit-4884/natscope/cmd/natscope/commands"
 )
 
-// dotenvOptInVar gates loading .env from the current working directory. Off
-// by default: an unrelated .env in whatever directory natscope happens to be
-// launched from (a project checkout, a home directory) would otherwise
-// silently override GRPC_WEB_ADDRESS, ALLOW_REMOTE, STORAGE__LOCAL__DATA_DIR
-// and friends with no indication a .env was even read.
+// dotenvOptInVar enables loading .env from the working directory; off by default.
 const dotenvOptInVar = "NATSCOPE_DOTENV"
 
 func init() {

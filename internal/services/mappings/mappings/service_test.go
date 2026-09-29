@@ -118,8 +118,6 @@ func TestService_Create(t *testing.T) {
 		assert.ErrorIs(t, err, errs.ErrMappingSourceIDRequired)
 	})
 
-	// a whitespace-only pattern passes proto's min_len:1 but trims to
-	// empty; it must be rejected, not saved as a mapping that can never match.
 	t.Run("WhitespaceOnlyPattern", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}
@@ -148,7 +146,7 @@ func TestService_Create(t *testing.T) {
 		assert.False(t, store.saveCalled)
 	})
 
-	// "a.>.b" passes min_len:1 but ">" must be the last token.
+	// ">" must be the last token.
 	t.Run("InvalidPatternSyntax", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}
@@ -262,8 +260,6 @@ func TestService_BulkSave(t *testing.T) {
 		assert.ErrorIs(t, err, errs.ErrMappingSourceIDRequired)
 	})
 
-	// BatchSaveMappings must trim and validate exactly like Create,
-	// instead of accepting "  " where Create would reject it.
 	t.Run("TrimsAndRejectsWhitespaceOnlySourceID", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}

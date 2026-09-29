@@ -24,9 +24,7 @@ type URLCredentials struct {
 // SplitCredentials removes the userinfo from every URL and returns the cleaned
 // URLs plus the single credential set they carried, or nil when none did. URLs
 // embedding different credentials yield [errs.ErrConnectionURLCredentialsMixed].
-// A URL that contains "@" but cannot be parsed (even after normalizing a
-// missing scheme the way nats.go does) yields [errs.ErrConnectionURLInvalid]
-// rather than being persisted as-is with its embedded credentials in plaintext.
+// A URL with "@" that fails to parse yields [errs.ErrConnectionURLInvalid].
 func SplitCredentials(urls []string) ([]string, *URLCredentials, error) {
 	if len(urls) == 0 {
 		return urls, nil, nil
@@ -91,16 +89,8 @@ func MaskURLs(urls []string) string {
 	return strings.Join(masked, ",")
 }
 
-// splitOne strips the userinfo from one URL. A URL without "@" is returned
-// unchanged. A URL with "@" but no scheme is parsed with a "nats://" prefix
-// added first, mirroring how nats.go itself accepts schemeless URLs — without
-// this, "user:pass@host" would fail to parse (scheme becomes "user", the rest
-// opaque) and its credentials would never be recognized as such. A URL that
-// still cannot be parsed, or that parses without userinfo despite the "@",
-// yields (raw, nil, nil): validating the URL's shape is the caller's job. A URL
-// that genuinely cannot be parsed even after normalization returns
-// [errs.ErrConnectionURLInvalid] instead of being handed back with its
-// credentials intact.
+// splitOne strips the userinfo from one URL, adding a missing "nats://" scheme first as nats.go does.
+// A URL with "@" that still fails to parse returns [errs.ErrConnectionURLInvalid].
 func splitOne(raw string) (string, *URLCredentials, error) {
 	if !strings.Contains(raw, "@") {
 		return raw, nil, nil

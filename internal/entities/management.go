@@ -113,10 +113,7 @@ type StreamUpdateRequest struct {
 	// Subjects is the list of subject patterns (mutable).
 	Subjects []string
 
-	// Description is the stream description (mutable). nil_on_empty is
-	// deliberately not applied here: a present-but-empty pointer is how the
-	// caller clears the description; collapsing it to nil (same as "not sent")
-	// made that impossible.
+	// Description is the stream description; a non-nil empty value clears it.
 	Description *string `normalize:"trim"`
 
 	// MaxMsgs is the maximum number of messages (mutable).
@@ -576,8 +573,7 @@ type ObjectInfo struct {
 	// Metadata is custom key-value metadata.
 	Metadata map[string]string
 
-	// Link, when non-nil, means this entry is a link to another object or
-	// bucket rather than a stored object itself.
+	// Link is set when this entry links to another object or bucket.
 	Link *ObjectLink
 }
 
@@ -586,8 +582,7 @@ type ObjectLink struct {
 	// Bucket is the name of the Object Store bucket the link points to.
 	Bucket string
 
-	// Name is the linked object's name; empty means the link points at the
-	// whole bucket.
+	// Name is the linked object's name; empty for a bucket link.
 	Name string
 }
 

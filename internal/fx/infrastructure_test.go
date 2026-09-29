@@ -12,11 +12,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 )
 
-// TestNewSecretsVault_KeyringUnavailableFailsClosed covers the fix: an
-// explicit SECRETS__BACKEND=keyring used to skip the availability probe that
-// "auto" already had, so the server started "healthy" and the first
-// secret-reading RPC failed as an unmapped internal error instead of a clear
-// startup failure naming the real cause.
+// TestNewSecretsVault_KeyringUnavailableFailsClosed checks that an unavailable explicit keyring fails at startup.
 func TestNewSecretsVault_KeyringUnavailableFailsClosed(t *testing.T) {
 	probeErr := errors.New("dbus-launch: executable file not found in $PATH")
 	keyring.MockInitWithError(probeErr)
@@ -33,8 +29,7 @@ func TestNewSecretsVault_KeyringUnavailableFailsClosed(t *testing.T) {
 	}
 }
 
-// TestNewSecretsVault_KeyringAvailableSucceeds is the control: an explicit
-// keyring backend that does work must still be usable.
+// TestNewSecretsVault_KeyringAvailableSucceeds checks that a working explicit keyring is accepted.
 func TestNewSecretsVault_KeyringAvailableSucceeds(t *testing.T) {
 	keyring.MockInit()
 	t.Cleanup(keyring.MockInit)

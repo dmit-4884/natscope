@@ -49,9 +49,7 @@ func (h *Handler) CreateStream(
 		cr.Republish = converter.Convert(in.GetRepublish(), &entities.StreamRePublish{})
 	}
 	if in.GetConsumerLimits() != nil {
-		// protoCodecs is required here: ConsumerLimits.InactiveThreshold is a
-		// Duration, and without it the converter silently drops the field
-		// instead of converting it.
+		// protoCodecs is required for the InactiveThreshold Duration.
 		cr.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{}, protoCodecs)
 	}
 

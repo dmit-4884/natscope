@@ -54,11 +54,7 @@ type e2eEnv struct {
 	natsURL string
 	baseURL string
 
-	// app is the underlying fx.App. Most tests never need it — the
-	// connect clients above and t.Cleanup's teardown are enough — but a
-	// shutdown-behavior test (e.g. graceful stop while a stream is open)
-	// needs to call Stop itself, with its own timeout, to observe how
-	// long it takes and what it returns.
+	// app lets shutdown tests call Stop directly.
 	app *fx.App
 
 	connections connectionsconnect.ConnectionsServiceClient

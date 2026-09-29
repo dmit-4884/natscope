@@ -42,10 +42,7 @@ const (
 	startTimeout = 30 * time.Second
 	// shutdownTimeout bounds graceful shutdown.
 	shutdownTimeout = 30 * time.Second
-	// sigChanBuffer holds the first shutdown signal plus one more so a
-	// second signal during shutdown is never missed by the force-exit watch
-	// in gracefulShutdown, even if it arrives before that goroutine starts
-	// reading.
+	// sigChanBuffer holds the first signal plus a second one that forces exit.
 	sigChanBuffer = 2
 )
 
@@ -58,9 +55,7 @@ type App struct {
 
 	// Service instance ID.
 	sid *id.Service
-	// sidFile is the file-backed provider behind sid, kept to check
-	// PersistenceError after the first ID() call; nil once a static
-	// Node.Id override replaces sid.
+	// sidFile backs sid; nil when a static Node.Id replaces it.
 	sidFile *id.File
 
 	dirsFallback string
@@ -68,10 +63,6 @@ type App struct {
 	logLevel  string
 	logFormat string
 
-	// sigChan is armed at the very start of Run, before any startup work
-	// (service-dir creation, bbolt lock wait, dependency construction), so a
-	// signal that arrives mid-startup is queued instead of lost — by the
-	// time gracefulShutdown reads it, it may already be waiting.
 	sigChan chan os.Signal
 }
 
@@ -84,10 +75,7 @@ func NewApp() *App {
 
 // Run resolves the config path (flag or CONFIG_FILE env) and starts the server.
 func (srv *App) Run(cmd *cobra.Command, args []string) error {
-	// Armed before ensureServiceDirs/dependency startup so a signal that
-	// arrives mid-startup (bbolt lock wait, internal HTTP server bind, …) is
-	// queued rather than terminating the process with no stop hooks run; see
-	// gracefulShutdown.
+	// Armed before startup so a signal during startup is queued, not lost.
 	srv.sigChan = make(chan os.Signal, sigChanBuffer)
 	signal.Notify(srv.sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
@@ -106,8 +94,6 @@ func (srv *App) Run(cmd *cobra.Command, args []string) error {
 
 	configFile, _ := cmd.Flags().GetString("config") //nolint:errcheck
 	if configFile != "" {
-		// GetEnvVar already expands a leading "~" for CONFIG_FILE; do the
-		// same for --config so the two sources behave identically.
 		configFile = appinfo.ExpandPath(configFile)
 	}
 	if cf := appinfo.GetEnvVar("CONFIG_FILE"); cf != "" {
@@ -192,9 +178,7 @@ func (srv *App) run(ctx context.Context) error {
 	}
 	slog.SetDefault(logger)
 
-	// PersistenceError is only populated once ID() above has attempted the
-	// lazy write; a read-only LIB_DIR would otherwise silently mint a fresh
-	// sid on every restart with nothing in the log to explain why.
+	// PersistenceError is set only after ID() has attempted the lazy write.
 	if srv.sidFile != nil {
 		if perr := srv.sidFile.PersistenceError(); perr != nil {
 			slog.Default().Warn("service id could not be persisted; a new id will be generated on next start",
@@ -202,10 +186,6 @@ func (srv *App) run(ctx context.Context) error {
 		}
 	}
 
-	// name/version/sid are omitted here: slogfactory.Build already attaches
-	// them as the "app" group (via WithServiceId) on every line from this
-	// logger, so repeating them as top-level fields just duplicated the
-	// values under two different keys.
 	slog.Default().Info("starting",
 		slog.Group("dirs",
 			"lib", appinfo.LibDir(),
@@ -254,10 +234,7 @@ func (srv *App) run(ctx context.Context) error {
 	return srv.gracefulShutdown(ctx, di)
 }
 
-// gracefulShutdown waits for a signal (or fx error) then stops cleanly. A
-// second signal received while shutdown is in progress forces an immediate
-// exit — otherwise an operator whose first Ctrl+C appears to hang (a
-// streaming handler still draining, a slow stop hook) has no way to insist.
+// gracefulShutdown waits for a signal or fx error, then stops; a second signal forces exit.
 func (srv *App) gracefulShutdown(ctx context.Context, di *fx.App) error {
 	select {
 	case sig := <-srv.sigChan:
@@ -290,11 +267,7 @@ func (srv *App) gracefulShutdown(ctx context.Context, di *fx.App) error {
 	return nil
 }
 
-// rootCause peels an error chain down to its innermost cause. fx wraps
-// constructor/config failures several layers deep (could not build
-// arguments for function "reflect".makeFuncStub: could not build value
-// group …: received non-nil error from function …), and the DI graph
-// internals in that chain hide the one line an operator needs.
+// rootCause returns the innermost error in err's chain.
 func rootCause(err error) error {
 	for {
 		next := stderrors.Unwrap(err)
@@ -333,14 +306,11 @@ func (srv *App) printBanner(w io.Writer, vault secrets.Vault) {
 // bounds arena growth when a multi-MB message decode spikes the heap.
 const defaultMemoryLimit int64 = 512 * 1024 * 1024
 
-// minMemoryLimit rejects a NATSCOPE_MEMORY_LIMIT_BYTES value low enough that
-// the GC would run continuously (e.g. a stray "1").
+// minMemoryLimit is the lowest accepted NATSCOPE_MEMORY_LIMIT_BYTES value.
 const minMemoryLimit int64 = 16 * 1024 * 1024
 
-// configureMemoryLimit applies the soft heap cap, honoring GOMEMLIMIT or
-// NATSCOPE_MEMORY_LIMIT_BYTES when set, otherwise defaultMemoryLimit. An
-// unparsable or unreasonably low NATSCOPE_MEMORY_LIMIT_BYTES is rejected
-// with a WARN instead of silently falling back with no trace in the log.
+// configureMemoryLimit applies the soft heap cap from GOMEMLIMIT, NATSCOPE_MEMORY_LIMIT_BYTES
+// or defaultMemoryLimit, logging a warning for an invalid NATSCOPE_MEMORY_LIMIT_BYTES.
 func configureMemoryLimit() {
 	if os.Getenv("GOMEMLIMIT") != "" {
 		// Runtime already parsed it.
@@ -364,8 +334,7 @@ func configureMemoryLimit() {
 	slog.Default().Debug("memory limit applied", slog.Int64("bytes", limit))
 }
 
-// memoryLimitUnits mirrors the suffixes accepted by the Go runtime's own
-// GOMEMLIMIT, largest first so e.g. "MiB" isn't shadowed by a "B" match.
+// memoryLimitUnits lists the GOMEMLIMIT suffixes, longest first so "B" can't shadow "MiB".
 var memoryLimitUnits = []struct {
 	suffix string
 	mult   int64
@@ -376,8 +345,7 @@ var memoryLimitUnits = []struct {
 	{"B", 1},
 }
 
-// parseMemoryLimit accepts a plain byte count or a GOMEMLIMIT-style value
-// with a B/KiB/MiB/GiB suffix (e.g. "256MiB").
+// parseMemoryLimit parses a byte count with an optional B/KiB/MiB/GiB suffix.
 func parseMemoryLimit(v string) (int64, error) {
 	v = strings.TrimSpace(v)
 	for _, u := range memoryLimitUnits {

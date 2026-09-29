@@ -101,8 +101,7 @@ func (e *BaseEntity) Equal(other *BaseEntity) bool {
 	}
 }
 
-// storedNow is the current UTC time at the millisecond precision storage keeps,
-// so a freshly written entity equals the one read back.
+// storedNow returns the current UTC time truncated to the millisecond precision storage keeps.
 func storedNow() time.Time {
 	return time.Now().UTC().Truncate(time.Millisecond)
 }

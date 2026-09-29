@@ -56,9 +56,7 @@ func (m *mockStorage) List(_ context.Context, _ *entities.SavedConnectionsList) 
 	return m.listResult, m.listErr
 }
 
-// Update mirrors the real storage's atomic read-modify-write: it loads
-// getResult (simulating the transactional Get), lets mutate apply the
-// caller's change, then reports updateErr as the persist outcome.
+// Update loads getResult, applies mutate and returns updateErr, like the real storage's transaction.
 func (m *mockStorage) Update(
 	_ context.Context,
 	_ string,

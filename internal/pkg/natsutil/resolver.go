@@ -15,28 +15,22 @@ import (
 	atlasslices "github.com/altessa-s/go-atlas/core/collections/slices"
 )
 
-// maxResolverCacheEntries bounds the per-subject wildcard-resolution cache so
-// a stream of high-cardinality subjects (e.g. per-tenant subjects) cannot
-// grow it without limit; entries beyond the cap fall back to the linear scan.
+// maxResolverCacheEntries bounds the wildcard-resolution cache; lookups past the cap use the linear scan.
 const maxResolverCacheEntries = 10000
 
 // MappingResolver resolves NATS subjects to SubjectMapping entries deterministically.
 // Exact match wins; wildcard ties break by specificity, then pattern, then CreatedAt.
-// A new resolver is built (via NewMappingResolver) on every mapping mutation,
-// so its wildcard-lookup cache never needs explicit invalidation.
+// A resolver is rebuilt on every mapping mutation, so its cache needs no invalidation.
 type MappingResolver struct {
 	exact map[string]*entities.SubjectMapping
 	wild  []*entities.SubjectMapping
 
-	// cache memoizes wildcard Resolve results per subject (nil results
-	// included) so repeated lookups for the same subject skip the linear
-	// scan; bounded by maxResolverCacheEntries.
+	// cache memoizes wildcard Resolve results per subject, nil included.
 	cache     sync.Map
 	cacheSize atomic.Int64
 }
 
-// resolverCacheEntry holds a (possibly nil) resolved mapping so sync.Map can
-// distinguish "no match cached" from "not cached yet".
+// resolverCacheEntry wraps a possibly nil mapping so a cached miss differs from no entry.
 type resolverCacheEntry struct {
 	mapping *entities.SubjectMapping
 }
@@ -73,9 +67,7 @@ func NewMappingResolver(ms entities.SubjectMappings) *MappingResolver {
 }
 
 // Resolve returns the best-matching mapping for a subject, or nil if no mapping matches.
-// Wildcard lookups are memoized per subject (see MappingResolver.cache) so a
-// high-throughput live session pays the linear scan once per distinct subject,
-// not once per message.
+// Wildcard lookups are memoized per subject.
 func (r *MappingResolver) Resolve(subject string) *entities.SubjectMapping {
 	if r == nil {
 		return nil

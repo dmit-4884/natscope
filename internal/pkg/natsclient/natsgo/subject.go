@@ -12,9 +12,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/errs"
 )
 
-// Length caps keep user input embedded in a JetStream API subject or a PUB
-// line under nats-server's max_control_line (4096 bytes by default); a longer
-// line makes the server close the whole shared connection.
+// Length caps keep user input in a JetStream API subject or PUB line under nats-server's max_control_line.
 const (
 	// MaxNATSNameLength is NATS's own stream/consumer name limit.
 	MaxNATSNameLength = 255
@@ -22,14 +20,12 @@ const (
 	MaxNATSSubjectLength = 1024
 )
 
-// validateNATSNameLength rejects a stream or consumer name longer than
-// MaxNATSNameLength; kind names the field in the error.
+// validateNATSNameLength rejects a stream or consumer name longer than MaxNATSNameLength.
 func validateNATSNameLength(kind, value string) error {
 	return validateLength(kind, value, MaxNATSNameLength)
 }
 
-// validateNATSSubjectLength rejects a subject, filter, KV key or object name
-// longer than MaxNATSSubjectLength; kind names the field in the error.
+// validateNATSSubjectLength rejects a subject, filter, KV key or object name longer than MaxNATSSubjectLength.
 func validateNATSSubjectLength(kind, value string) error {
 	return validateLength(kind, value, MaxNATSSubjectLength)
 }
@@ -43,8 +39,7 @@ func validateLength(kind, value string, limit int) error {
 	return nil
 }
 
-// validateConsumerRequestLengths checks the stream name, consumer name, and
-// filter subject(s) of a consumer create/update request.
+// validateConsumerRequestLengths checks the name and filter subject lengths of a consumer request.
 func validateConsumerRequestLengths(streamName, consumerName, filterSubject string, filterSubjects []string) error {
 	if err := validateNATSNameLength("stream name", streamName); err != nil {
 		return err
@@ -63,16 +58,11 @@ func validateConsumerRequestLengths(streamName, consumerName, filterSubject stri
 	return nil
 }
 
-// invalidConsumerNameChars mirrors the character denylist jetstream SDK's
-// (unexported) validateConsumerName applies before building a subject from a
-// consumer name — kept in sync so both reject the same names.
+// invalidConsumerNameChars mirrors the jetstream SDK's consumer-name denylist.
 const invalidConsumerNameChars = ">*. /\\\t\r\n"
 
-// validateConsumerNameChars rejects a consumer name containing a character
-// JetStream itself disallows there, before it is embedded by hand in a
-// "$JS.API.CONSUMER...<name>" subject. The error wraps
-// jetstream.ErrInvalidConsumerName so wrapErr classifies it exactly like the
-// SDK's own client-side rejection.
+// validateConsumerNameChars rejects characters JetStream disallows in a consumer name. The error wraps
+// jetstream.ErrInvalidConsumerName so wrapErr classifies it like the SDK's own check.
 func validateConsumerNameChars(name string) error {
 	if strings.ContainsAny(name, invalidConsumerNameChars) {
 		return fmt.Errorf("%w: %q", jetstream.ErrInvalidConsumerName, name)

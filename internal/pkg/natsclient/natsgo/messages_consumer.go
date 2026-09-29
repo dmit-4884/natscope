@@ -24,18 +24,13 @@ import (
 // browse consumer alive if our defer DeleteConsumer gets killed mid-flight.
 const browseConsumerInactiveThreshold = 10 * time.Second
 
-// backwardFetchMultiplier sizes the initial backward browse window
-// (limit*backwardFetchMultiplier sequences), since consumers can't address by
-// sequence directly (over-pull and trim client-side).
+// backwardFetchMultiplier sizes the initial backward window as limit*backwardFetchMultiplier sequences.
 const backwardFetchMultiplier = 2
 
-// backwardWidenFactor grows the backward browse window on each retry when a
-// deletion gap leaves fewer than limit+1 live messages in it.
+// backwardWidenFactor multiplies the backward window on each retry.
 const backwardWidenFactor = 4
 
-// backwardWidenAttempts bounds how many times the window widens — enough to
-// bridge realistic deletion gaps (each retry ×4's the window) without
-// unbounded ephemeral-consumer churn on a pathological stream.
+// backwardWidenAttempts bounds how many times the backward window widens.
 const backwardWidenAttempts = 6
 
 // getMessagesViaConsumer fetches via an ephemeral consumer (best for
@@ -57,9 +52,7 @@ func (c *Client) getMessagesViaConsumer(
 	if info != nil && info.Config.Retention == jetstream.WorkQueuePolicy {
 		return nil, errs.ErrWorkQueueConsumerNotAllowed
 	}
-	// A never-written stream has no valid start sequence for
-	// DeliverByStartSequencePolicy; the server rejects that with a confusing
-	// "optional start sequence is not set" instead of an empty page.
+	// An empty stream has no valid start sequence, so return an empty page.
 	if info != nil && info.State.Msgs == 0 {
 		return &entities.MessagesResponse{Messages: []*entities.Message{}, HasMore: false}, nil
 	}
@@ -99,11 +92,7 @@ func (c *Client) getMessagesViaConsumer(
 			return nil, err
 		}
 
-		// Enough live/matching messages, or the window already reaches the
-		// true start of the stream — widening further can't surface more
-		// (a deletion gap or sparse subject filter previously
-		// left the browse window undersized, and "found fewer than the window
-		// implies" was wrongly read as "reached the start of the stream").
+		// Stop once there are enough messages or the window reaches FirstSeq.
 		if len(resp.Messages) > limit || fetchStart <= info.State.FirstSeq {
 			break
 		}
@@ -113,11 +102,8 @@ func (c *Client) getMessagesViaConsumer(
 	return resp, nil
 }
 
-// consumeBrowseBatch creates a short-lived ephemeral consumer starting at
-// optStartSeq, pulls one window's worth of messages, and shapes the result
-// for direction (reversing + trimming to limit for backward). startSeq is the
-// original request's upper bound (0 = the stream's current LastSeq); for
-// backward direction, anything delivered past it is discarded.
+// consumeBrowseBatch pulls one window from an ephemeral consumer at optStartSeq and shapes it for direction.
+// startSeq is the request's upper bound (0 = LastSeq); backward results past it are dropped.
 func (c *Client) consumeBrowseBatch(
 	ctx context.Context,
 	stream jetstream.Stream,
@@ -155,11 +141,7 @@ func (c *Client) consumeBrowseBatch(
 		if endSeq == 0 {
 			endSeq = info.State.LastSeq
 		}
-		// Cover the whole requested window (endSeq-optStartSeq), not just
-		// limit*2: a widened window (see getMessagesViaConsumer) needs a
-		// matching fetch cap, or the consumer exhausts its budget delivering
-		// the oldest messages in the window before ever reaching the newer
-		// ones near endSeq that the caller actually asked for.
+		// Size the fetch cap to the whole window so a widened window reaches endSeq.
 		if endSeq >= optStartSeq {
 			span := endSeq - optStartSeq + 1
 			fetchLimit = int(min(span, uint64(DefaultSearchRange)))
@@ -179,8 +161,7 @@ func (c *Client) consumeBrowseBatch(
 			continue
 		}
 
-		// For backward direction, skip messages after the requested upper
-		// bound.
+		// For backward direction, skip messages after the requested upper bound.
 		if direction == DefaultDirection && endSeq > 0 && meta.Sequence.Stream > endSeq {
 			continue
 		}
@@ -188,7 +169,6 @@ func (c *Client) consumeBrowseBatch(
 		headers := make(map[string]string)
 		hdrs := msg.Headers()
 		for k, v := range hdrs {
-			// Join every value instead of keeping only the first.
 			headers[k] = strings.Join(v, ", ")
 		}
 

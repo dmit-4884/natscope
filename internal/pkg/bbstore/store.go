@@ -413,9 +413,7 @@ func (s *Store[M, PM]) DeleteBy(ctx context.Context, path string, val any) (int6
 	return n, nil
 }
 
-// TrimOldest deletes the oldest documents (by the store's sort field) once the
-// bucket holds more than limit+slack of them, leaving the newest limit, and
-// returns how many were removed.
+// TrimOldest keeps the newest limit documents once the bucket exceeds limit+slack and returns how many it deleted.
 func (s *Store[M, PM]) TrimOldest(ctx context.Context, limit, slack int) (int64, error) {
 	var n int64
 	err := s.db.update(ctx, func(tx *bbolt.Tx) error {

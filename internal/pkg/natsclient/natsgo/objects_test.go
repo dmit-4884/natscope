@@ -11,10 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestObjectStreamSubjectsValid covers the fix: ObjectStore(), unlike
-// KeyValue(), does no sanity check that a stream is actually shaped like an
-// Object Store, so DeleteObjectBucket/SealObjectBucket relies on this check
-// instead of trusting the stream name alone.
+// TestObjectStreamSubjectsValid checks which stream subject sets count as an Object Store.
 func TestObjectStreamSubjectsValid(t *testing.T) {
 	t.Parallel()
 
@@ -70,9 +67,7 @@ func TestObjectStreamSubjectsValid(t *testing.T) {
 	}
 }
 
-// TestToObjectInfo_MapsLink covers the fix: link metadata
-// (jetstream.ObjectInfo.Opts.Link) sits under a nested Opts pointer the
-// generic converter can't reach by field name, so it needs its own mapping.
+// TestToObjectInfo_MapsLink checks that link metadata nested under Opts is mapped.
 func TestToObjectInfo_MapsLink(t *testing.T) {
 	t.Parallel()
 

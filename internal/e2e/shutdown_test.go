@@ -16,11 +16,7 @@ import (
 	livepb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/live"
 )
 
-// TestGracefulShutdown_ClosesOpenLiveStream covers the fix: GracefulStop used
-// to only call http.Server.Shutdown, which waits for in-flight requests to
-// finish on their own — a Live Subscribe stream never finishes on its own,
-// so shutdown hung until the fx stop timeout and the process exited non-zero.
-// Canceling the request base context on stop must end the stream immediately.
+// TestGracefulShutdown_ClosesOpenLiveStream checks that Stop ends an open Live stream promptly.
 func TestGracefulShutdown_ClosesOpenLiveStream(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -43,17 +39,15 @@ func TestGracefulShutdown_ClosesOpenLiveStream(t *testing.T) {
 	streamEnded := make(chan struct{})
 	go func() {
 		defer close(streamEnded)
-		for stream.Receive() { //nolint:revive // draining the stream is the point of this goroutine
+		for stream.Receive() { //nolint:revive // drain only
 		}
 	}()
 
-	// Wait for the stream to actually be open (first server flush) before
-	// stopping, so the test exercises "stop with an open stream", not "stop
-	// racing the stream's setup".
+	// Wait for the first server flush so Stop hits an open stream.
 	require.Eventually(t, func() bool {
 		select {
 		case <-streamEnded:
-			return false // ended before we even tried to stop; something else is wrong.
+			return false
 		default:
 			return true
 		}

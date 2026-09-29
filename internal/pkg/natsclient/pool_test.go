@@ -11,9 +11,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 )
 
-// fakeClient implements Client via embedding a nil interface (panics if an
-// unexercised method is called) so the test only needs to fill in what
-// Pool.Disconnect actually touches.
+// fakeClient embeds a nil Client, so unexercised methods panic.
 type fakeClient struct {
 	Client
 	connected bool
@@ -39,10 +37,7 @@ func (d *fakeDialer) TestConnection(
 	return nil, nil //nolint:nilnil // unused by this test
 }
 
-// TestPool_OnDisconnect_NotifiesOnExplicitDisconnect verifies a
-// registered listener fires when a connection is explicitly dropped from the
-// pool — the hook a live session uses to end itself instead of silently
-// going quiet once its connection is replaced.
+// TestPool_OnDisconnect_NotifiesOnExplicitDisconnect checks that a listener fires on Disconnect.
 func TestPool_OnDisconnect_NotifiesOnExplicitDisconnect(t *testing.T) {
 	t.Parallel()
 
@@ -75,8 +70,6 @@ func TestPool_OnDisconnect_NotifiesOnExplicitDisconnect(t *testing.T) {
 	}
 }
 
-// TestPool_OnDisconnect_NoListenersIsANoop ensures the default (no
-// registered listeners) path behaves exactly as before.
 func TestPool_OnDisconnect_NoListenersIsANoop(t *testing.T) {
 	t.Parallel()
 
@@ -91,9 +84,7 @@ func TestPool_OnDisconnect_NoListenersIsANoop(t *testing.T) {
 	pool.Disconnect("conn-1") // must not panic with zero listeners
 }
 
-// TestPool_OnDisconnect_UnknownConnectionDoesNotNotify verifies Disconnect on
-// an id that was never dialed is a no-op, matching the pre-existing early
-// return.
+// TestPool_OnDisconnect_UnknownConnectionDoesNotNotify checks that Disconnect on an unknown id is a no-op.
 func TestPool_OnDisconnect_UnknownConnectionDoesNotNotify(t *testing.T) {
 	t.Parallel()
 

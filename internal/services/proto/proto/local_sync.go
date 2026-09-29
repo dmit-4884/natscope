@@ -17,11 +17,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 )
 
-// localPathInvalidMessage is returned for every ValidateLocalPath failure
-// mode (missing path, not a directory, permission denied, or a directory
-// with no .proto files). Collapsing these into one message prevents an
-// unauthenticated caller from using ValidateLocalPath as a filesystem oracle
-// that distinguishes existence/type/permissions of arbitrary paths.
+// localPathInvalidMessage covers every ValidateLocalPath failure, so the RPC can't probe arbitrary paths.
 const localPathInvalidMessage = "no .proto files found at this path"
 
 // ValidateLocalPath probes a filesystem root, counting only includable

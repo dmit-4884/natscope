@@ -85,10 +85,7 @@ func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, error)
 	return opts, nil
 }
 
-// buildAuthOptions translates the auth config into nats.Options. An NKey seed
-// that fails to parse is a hard error rather than a silently-dropped option:
-// swallowing it used to make the connection fall back to anonymous auth while
-// TestConnection still reported success.
+// buildAuthOptions translates the auth config into nats.Options; an unparsable NKey seed is an error.
 func buildAuthOptions(auth *entities.AuthConfig) ([]nats.Option, error) {
 	if auth == nil {
 		return nil, nil

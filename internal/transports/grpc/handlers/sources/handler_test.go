@@ -144,8 +144,6 @@ func TestHandler_CreateSource(t *testing.T) {
 		assert.ErrorIs(t, err, errs.ErrProtoSourceNameAlreadyInUse)
 	})
 
-	// an unspecified/unrecognized source_type must be rejected, not
-	// silently treated as git.
 	t.Run("UnknownSourceType", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockProtoService{}

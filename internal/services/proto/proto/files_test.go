@@ -157,10 +157,7 @@ message Common { string s = 1; }
 	assert.NotEmpty(t, fds, "should compile with include dirs satisfying the import")
 }
 
-// TestCompileFiles_IncludeDirs_RejectsArbitraryFileRead is a
-// regression test: an import naming a non-".proto" file under an Include
-// Directory (e.g. "passwd" with includeDirs=["/etc"]) must not be read, and
-// its content must never appear in the returned diagnostics.
+// TestCompileFiles_IncludeDirs_RejectsArbitraryFileRead checks that a non-.proto import is neither read nor echoed.
 func TestCompileFiles_IncludeDirs_RejectsArbitraryFileRead(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "passwd"), []byte("root:x:0:0:root:/root:/bin/bash"), 0o644))
@@ -184,9 +181,7 @@ message M {}
 	}
 }
 
-// TestCompileFiles_IncludeDirs_RejectsAbsoluteImport covers the second
-// repro: an absolute import path must not be resolved directly off the
-// filesystem, even with no Include Directories configured.
+// TestCompileFiles_IncludeDirs_RejectsAbsoluteImport checks that an absolute import path is not resolved.
 func TestCompileFiles_IncludeDirs_RejectsAbsoluteImport(t *testing.T) {
 	dir := t.TempDir()
 	secret := filepath.Join(dir, "secret.proto")
@@ -211,8 +206,7 @@ message M {}
 	}
 }
 
-// TestCompileFiles_IncludeDirs_RejectsSymlink is a regression test on the
-// compile path: a symlink under an Include Directory must not be followed.
+// TestCompileFiles_IncludeDirs_RejectsSymlink checks that a symlink under an Include Directory is not followed.
 func TestCompileFiles_IncludeDirs_RejectsSymlink(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "secret.txt")

@@ -97,8 +97,7 @@ func (s *Service) Update(
 
 	existing.ApplyUpdate(in)
 
-	// Validate after merge: SourceID/pattern/messageType must remain non-empty
-	// and the pattern must stay a syntactically valid subject pattern.
+	// Validate the merged result.
 	if existing.SourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
@@ -128,8 +127,7 @@ func (s *Service) List(
 // Delete deletes a mapping.
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if err := s.storage.Delete(ctx, id); err != nil {
-		// A caller deleting an already-gone (or never-existing) id is a normal
-		// client-side race, not a server fault — don't log it at ERROR.
+		// Deleting a missing id is a client race; don't log it at ERROR.
 		if errors.Is(err, errs.ErrMappingNotFound) {
 			s.logger.DebugContext(ctx, "delete mapping: not found",
 				slog.String("id", id))
@@ -159,9 +157,7 @@ func (s *Service) BulkSave(
 	prepared := make(entities.SubjectMappings, len(mappings))
 	for i, m := range mappings {
 		cp := *m
-		// BatchSaveMappings skips the CreateMappingRequest DTO (no normalize
-		// tags on the raw entity), so trim explicitly to match Create's
-		// behavior — otherwise "  " sails through here while Create rejects it.
+		// Raw entities skip the DTO normalizer, so trim here as Create does.
 		cp.Pattern = strings.TrimSpace(cp.Pattern)
 		cp.MessageType = strings.TrimSpace(cp.MessageType)
 		cp.SourceID = strings.TrimSpace(cp.SourceID)
@@ -214,8 +210,7 @@ func (s *Service) Resolver(ctx context.Context) *natsutil.MappingResolver {
 	return s.resolver.Load()
 }
 
-// SetOnChangeCallback registers cb to run after every successful mapping
-// mutation.
+// SetOnChangeCallback registers cb to run after every successful mapping mutation.
 func (s *Service) SetOnChangeCallback(cb func()) {
 	s.onChange.Store(&cb)
 }
@@ -241,10 +236,7 @@ func (s *Service) rebuildResolver(ctx context.Context) {
 	s.resolver.Store(natsutil.NewMappingResolver(all))
 }
 
-// validatePatternAndType rejects a pattern/messageType that is empty (or
-// whitespace-only, since callers trim first) and a pattern that isn't a
-// syntactically valid NATS subject pattern: min_len:1 alone
-// lets "   " through, and it trims to a mapping that can never match.
+// validatePatternAndType rejects an empty pattern or messageType and a pattern that isn't a valid NATS subject pattern.
 func validatePatternAndType(pattern, messageType string) error {
 	if pattern == "" {
 		return errs.ErrMappingPatternRequired

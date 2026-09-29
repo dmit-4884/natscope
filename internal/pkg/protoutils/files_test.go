@@ -51,10 +51,7 @@ func TestReadFilesFromPaths_RejectsMissing(t *testing.T) {
 	assert.Contains(t, diags[0].Message, "not accessible")
 }
 
-// TestReadFilesFromPaths_RejectsSymlink is a regression test: a
-// *.proto-named symlink must not be followed, matching WalkProtoTree's
-// no-follow-symlink policy — otherwise the target's content (e.g. /etc/passwd)
-// is read and can leak through compile diagnostics.
+// TestReadFilesFromPaths_RejectsSymlink checks that a *.proto symlink is not followed.
 func TestReadFilesFromPaths_RejectsSymlink(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "secret.txt")

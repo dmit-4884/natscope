@@ -18,18 +18,11 @@ import (
 	corectx "github.com/altessa-s/go-atlas/core/context"
 )
 
-// maxTestConnectionTimeout bounds how long a single TestConnection call may
-// block regardless of the caller's own deadline, the requested connect
-// timeout, or how many URLs are probed: without a cap, an unauthenticated
-// caller could park goroutines/sockets for days (see connect-timeout unit bug)
-// or for urls-count * per-url timeout.
+// maxTestConnectionTimeout caps a single TestConnection call regardless of ctx, connect timeout or URL count.
 const maxTestConnectionTimeout = 30 * time.Second
 
-// TestConnection tests a NATS connection without saving or pooling it. The
-// overall call is bounded by maxTestConnectionTimeout and aborts promptly on
-// ctx cancellation: a custom dialer tracks every socket it opens and closes
-// them all once ctx is done, so nats.go's per-URL retry loop fails fast
-// instead of blocking for urls-count * per-url timeout.
+// TestConnection tests a NATS connection without saving or pooling it. The call is bounded by
+// maxTestConnectionTimeout and closes every dialed socket once ctx is done.
 func (d *Dialer) TestConnection(
 	ctx context.Context,
 	in *entities.TestConnectionRequest,
@@ -85,11 +78,7 @@ func (d *Dialer) TestConnection(
 	return result, nil
 }
 
-// sanitizeTestError normalizes error text that would otherwise echo raw bytes
-// read from the dialed endpoint back to the caller. nats.go's websocket dialer
-// parses the initial response as HTTP; against a non-HTTP/non-NATS listener the
-// stdlib embeds the first line it read (a banner, a JSON blob, ...) verbatim in
-// the error, turning TestConnection into a banner-grab primitive.
+// sanitizeTestError removes raw bytes echoed from the dialed endpoint from the error text.
 func sanitizeTestError(err error) string {
 	msg := err.Error()
 	if strings.HasPrefix(msg, "malformed HTTP") {
@@ -98,10 +87,7 @@ func sanitizeTestError(err error) string {
 	return natsutil.MaskURL(msg)
 }
 
-// ctxDialer is a nats.CustomDialer that refuses to dial once ctx is done and
-// tracks every socket it opens so closeAll can cut them all at once. Without
-// this, closing the caller's ctx (client disconnect, RPC deadline) leaves
-// nats.go's server-list loop to run out its own per-URL timeouts one by one.
+// ctxDialer is a nats.CustomDialer that refuses dials once ctx is done and tracks sockets for closeAll.
 type ctxDialer struct {
 	ctx    context.Context
 	dialer net.Dialer
@@ -138,8 +124,7 @@ func (d *ctxDialer) Dial(network, address string) (net.Conn, error) {
 	return conn, nil
 }
 
-// closeAll closes every socket dialed so far and blocks further dials; called
-// once ctx is done.
+// closeAll closes every dialed socket and blocks further dials.
 func (d *ctxDialer) closeAll() {
 	d.mu.Lock()
 	d.closed = true

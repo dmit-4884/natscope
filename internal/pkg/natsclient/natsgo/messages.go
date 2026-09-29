@@ -85,12 +85,7 @@ func (c *Client) GetMessage(ctx context.Context, streamName string, sequence uin
 	return toMessageWithHex(msg), nil
 }
 
-// PublishToStream publishes a message to a JetStream stream. It first checks
-// that a stream actually captures subject: JetStream publish is a
-// request/reply on the subject itself, so without this check a core (non-JetStream)
-// subscriber on the same subject looks exactly like a JetStream responder —
-// either the request hangs for the full publish timeout with no subscriber,
-// or a core subscriber's unrelated reply gets misread as a PubAck.
+// PublishToStream publishes a message to a JetStream stream after checking that a stream captures subject.
 func (c *Client) PublishToStream(
 	ctx context.Context,
 	subject string,

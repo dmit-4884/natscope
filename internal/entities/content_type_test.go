@@ -75,9 +75,7 @@ func TestDetectContentType(t *testing.T) {
 	}
 }
 
-// TestDetectContentType_LargeJSON is the exact repro: a valid JSON
-// document longer than detectScanLimit must still classify as JSON, not text
-// — json.Valid on a truncated prefix is always false.
+// TestDetectContentType_LargeJSON checks that JSON longer than detectScanLimit still classifies as JSON.
 func TestDetectContentType_LargeJSON(t *testing.T) {
 	t.Parallel()
 
@@ -88,8 +86,7 @@ func TestDetectContentType_LargeJSON(t *testing.T) {
 	assert.Equal(t, ContentTypeJSON, got)
 }
 
-// TestDetectContentType_LargeJSONArray covers the "[" branch and a value
-// (not just a string) straddling the scan boundary.
+// TestDetectContentType_LargeJSONArray covers an array value straddling the scan boundary.
 func TestDetectContentType_LargeJSONArray(t *testing.T) {
 	t.Parallel()
 
@@ -104,9 +101,7 @@ func TestDetectContentType_LargeJSONArray(t *testing.T) {
 	assert.Equal(t, ContentTypeJSON, DetectContentType(data))
 }
 
-// TestDetectContentType_LargeGarbageNotMisclassifiedAsJSON ensures the
-// truncated-prefix heuristic doesn't turn into "anything starting with { is
-// JSON": a real syntax error inside the scanned prefix must still fail.
+// TestDetectContentType_LargeGarbageNotMisclassifiedAsJSON checks that a syntax error in the scanned prefix still fails.
 func TestDetectContentType_LargeGarbageNotMisclassifiedAsJSON(t *testing.T) {
 	t.Parallel()
 

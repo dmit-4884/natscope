@@ -93,9 +93,7 @@ func PublishHistoryNew(init ...func(*PublishHistory)) *PublishHistory {
 type PublishHistories []*PublishHistory
 
 // PublishHistoryList is the listing filter for publish history entries.
-// ConnectionID is the preferred filter (stable across a connection's URLs and
-// unambiguous when several saved connections share a URL or a URL is a
-// comma-joined cluster list); ConnectionURL is kept for callers without an id.
+// ConnectionID is preferred; ConnectionURL serves callers without an id.
 type PublishHistoryList struct {
 	ListBase
 	ConnectionID  *string

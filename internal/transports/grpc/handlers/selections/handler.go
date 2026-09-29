@@ -53,8 +53,7 @@ func (h *Handler) HTTPHandler(opts ...connect.HandlerOption) (string, http.Handl
 	return selectionsconnect.NewSelectionsServiceHandler(h, opts...)
 }
 
-// ListSelections returns a paginated page of proto selections, optionally
-// filtered by source.
+// ListSelections returns a page of proto selections, optionally filtered by source.
 func (h *Handler) ListSelections(
 	ctx context.Context,
 	req *connect.Request[selectionspb.ListSelectionsRequest],

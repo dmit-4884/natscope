@@ -137,8 +137,6 @@ func TestPagination(t *testing.T) {
 	})
 }
 
-// setMessagesFetchMethod updates the saved messages.fetchMethod preference
-// that ListMessages falls back to when a request doesn't pin one.
 func setMessagesFetchMethod(t *testing.T, env *e2eEnv, method string) {
 	t.Helper()
 	_, err := env.settings.UpdateSettings(t.Context(), connect.NewRequest(&settingspb.UpdateSettingsRequest{
@@ -147,10 +145,7 @@ func setMessagesFetchMethod(t *testing.T, env *e2eEnv, method string) {
 	require.NoError(t, err)
 }
 
-// walkMessages pages ListMessages from the top of the stream until hasMore
-// is false, following nextSeq, and returns every sequence number seen. It
-// fails the test on a duplicate sequence or a walk that doesn't terminate
-// within a generous page bound.
+// walkMessages pages ListMessages to the end and returns every sequence seen, failing on duplicates.
 func walkMessages(
 	t *testing.T,
 	env *e2eEnv,
@@ -195,9 +190,7 @@ func walkMessages(
 	return nil
 }
 
-// TestMessagesPaginationSurvivesDeletionGap covers a backward walk past a
-// wide deletion gap still reaching every live message instead of stopping
-// early with hasMore=false, in both fetch methods.
+// TestMessagesPaginationSurvivesDeletionGap checks that a backward walk crosses a wide deletion gap.
 func TestMessagesPaginationSurvivesDeletionGap(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -246,9 +239,7 @@ func TestMessagesPaginationSurvivesDeletionGap(t *testing.T) {
 	}
 }
 
-// TestMessagesPaginationSubjectFilterFindsOldMatches covers a subject filter
-// finding matches older than the first browse window, in both fetch
-// methods.
+// TestMessagesPaginationSubjectFilterFindsOldMatches checks that a filter finds matches older than the first window.
 func TestMessagesPaginationSubjectFilterFindsOldMatches(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -290,10 +281,7 @@ func TestMessagesPaginationSubjectFilterFindsOldMatches(t *testing.T) {
 	}
 }
 
-// TestMessagesPaginationDirectModeBoundaries covers three direct-mode edge
-// cases: an off-by-one on a page of exactly limit+1 messages, a forward walk
-// starting before FirstSeq after a purge not looping back to sequence one,
-// and a wildcard/exact subject filter honoring direction.
+// TestMessagesPaginationDirectModeBoundaries covers direct-mode page-size, post-purge and filter-direction edges.
 func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -407,9 +395,7 @@ func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 	})
 }
 
-// TestMessagesPaginationStartTimeFarFuture covers a jump-to-time far beyond
-// the last message returning nothing instead of jumping back to sequence
-// one, in both fetch methods.
+// TestMessagesPaginationStartTimeFarFuture checks that a start time past the last message returns nothing.
 func TestMessagesPaginationStartTimeFarFuture(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
@@ -444,9 +430,7 @@ func TestMessagesPaginationStartTimeFarFuture(t *testing.T) {
 	}
 }
 
-// TestMessagesPaginationEmptyStream covers a never-written stream returning
-// an empty page instead of an error, for the default direction in consumer
-// mode and a wildcard filter in direct mode.
+// TestMessagesPaginationEmptyStream checks that an empty stream returns an empty page, not an error.
 func TestMessagesPaginationEmptyStream(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()

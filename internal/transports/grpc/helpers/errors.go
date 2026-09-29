@@ -97,7 +97,7 @@ var commonDomainErrors = []struct {
 	}},
 	{errs.ErrObjectLinkToBucket, errorMapping{codes.FailedPrecondition, "object is a link to a bucket", "NATS_OBJECT_LINK_TO_BUCKET"}},
 
-	// Proto snapshot resolution (registry/codec have no per-handler converter).
+	// Proto snapshot resolution.
 	{errs.ErrMappingSourceNotFound, errorMapping{codes.NotFound, "proto source not found", "MAPPING_SOURCE_NOT_FOUND"}},
 	{errs.ErrMappingSourceDisabled, errorMapping{codes.FailedPrecondition, "proto source disabled", "MAPPING_SOURCE_DISABLED"}},
 	{errs.ErrMappingSelectionMissing, errorMapping{codes.FailedPrecondition, "no version selected for source", "MAPPING_SELECTION_MISSING"}},
@@ -182,9 +182,8 @@ const (
 	httpStatusServiceUnavailable  = 503
 )
 
-// JetStream API err_code values the server reports with a 5xx HTTP code
-// although they describe invalid input, an unsupported topology, or exhausted
-// capacity.
+// JetStream API err_code values reported with a 5xx HTTP code that mean invalid input,
+// an unsupported topology or exhausted capacity.
 const (
 	jsErrClusterNotActive           = 10006
 	jsErrClusterRequired            = 10010

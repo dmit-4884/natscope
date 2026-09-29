@@ -120,8 +120,7 @@ func TestTruncateLiveMessage_DecodedNilSafe(t *testing.T) {
 	}
 }
 
-// TestTruncateLiveMessage_ReleasesFullPayload checks the capped payload no
-// longer pins the original backing array.
+// TestTruncateLiveMessage_ReleasesFullPayload checks that the capped payload doesn't pin the original array.
 func TestTruncateLiveMessage_ReleasesFullPayload(t *testing.T) {
 	t.Parallel()
 
@@ -133,8 +132,7 @@ func TestTruncateLiveMessage_ReleasesFullPayload(t *testing.T) {
 	}
 }
 
-// TestMessageHandler_BoundsBufferedBytes checks the producer drops payloads
-// once the session's buffered volume would exceed maxBufferedBytes.
+// TestMessageHandler_BoundsBufferedBytes checks that the producer drops payloads past maxBufferedBytes.
 func TestMessageHandler_BoundsBufferedBytes(t *testing.T) {
 	t.Parallel()
 

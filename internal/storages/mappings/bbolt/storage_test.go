@@ -247,9 +247,7 @@ func TestMappings_BulkSaveDeletesAbsent(t *testing.T) {
 	}
 }
 
-// TestMappings_BulkSavePreservesPinsWhenUnset is a regression test: a
-// BatchSaveMappings item that omits pinned_tag/pinned_fingerprint for an
-// existing (pattern, sourceId) must not silently clear the pin.
+// TestMappings_BulkSavePreservesPinsWhenUnset checks that an item without pin fields keeps the existing pin.
 func TestMappings_BulkSavePreservesPinsWhenUnset(t *testing.T) {
 	s := newStorage(t)
 	ctx := t.Context()
@@ -265,8 +263,6 @@ func TestMappings_BulkSavePreservesPinsWhenUnset(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	// A bulk item for the same key with no pin fields set (nil, as the
-	// converter leaves them when the caller doesn't supply them).
 	unset := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
 		m.Pattern = "pin.me"
 		m.SourceID = "src1"
@@ -288,9 +284,7 @@ func TestMappings_BulkSavePreservesPinsWhenUnset(t *testing.T) {
 	}
 }
 
-// TestMappings_BulkSaveExplicitPinOverridesPrevious verifies a bulk item that
-// DOES set a pin field still updates it (preservation only applies when the
-// field is left unset).
+// TestMappings_BulkSaveExplicitPinOverridesPrevious checks that an explicit pin still updates it.
 func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
 	s := newStorage(t)
 	ctx := t.Context()
@@ -324,9 +318,7 @@ func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
 	}
 }
 
-// TestMappings_BulkSaveRejectsDuplicateKeyInBatch is a regression test: a
-// batch with two items sharing the same (pattern, sourceId) must be rejected,
-// instead of one silently overwriting the other with a misleading count.
+// TestMappings_BulkSaveRejectsDuplicateKeyInBatch checks that a duplicate (pattern, sourceId) in one batch is rejected.
 func TestMappings_BulkSaveRejectsDuplicateKeyInBatch(t *testing.T) {
 	s := newStorage(t)
 	ctx := t.Context()
@@ -359,9 +351,7 @@ func TestMappings_BulkSaveRejectsDuplicateKeyInBatch(t *testing.T) {
 	}
 }
 
-// TestMappings_BulkSaveEmptyListDeletesAll is a regression test for the
-// other direction: BatchSaveMappings with zero items is a deliberate "replace
-// all with nothing", not a request that should be rejected.
+// TestMappings_BulkSaveEmptyListDeletesAll checks that an empty batch deletes every mapping.
 func TestMappings_BulkSaveEmptyListDeletesAll(t *testing.T) {
 	s := newStorage(t)
 	ctx := t.Context()

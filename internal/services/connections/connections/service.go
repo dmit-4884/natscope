@@ -106,8 +106,7 @@ func (s *Service) Update(
 	}
 	in.URLs, in.Auth = urls, auth
 
-	// A lifted URL credential replaces Auth even when the request didn't send
-	// one explicitly, so it must count as a replace too.
+	// A lifted URL credential counts as an Auth replace too.
 	authReplaced := in.Auth != nil
 	tlsReplaced := in.TLS != nil
 
@@ -133,9 +132,7 @@ func (s *Service) Update(
 // Delete permanently removes a connection.
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if err := s.storage.Delete(ctx, id); err != nil {
-		// A missing connection is a routine client error (e.g. a stale UI
-		// tab, a double-click), not an operational failure; ERROR-level logs
-		// on it drown out real storage problems.
+		// A missing connection is a client error; don't log it at ERROR.
 		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
 			s.logger.DebugContext(ctx, "delete connection: not found",
 				slog.String("id", id))
@@ -229,16 +226,12 @@ func (s *Service) TestConnection(
 	return result, nil
 }
 
-// recordTestResult writes a probe result to Meta without bumping
-// timestamps/ETag (telemetry, not a config change); errors are logged. The
-// read-modify-write happens inside one storage transaction (see
-// storage.Update), so this cannot race a concurrent UpdateConnection and roll
-// back a just-saved secret.
+// recordTestResult writes a probe result to Meta in one storage transaction without bumping
+// timestamps/ETag; errors are logged.
 func (s *Service) recordTestResult(ctx context.Context, id string, result *entities.TestConnectionResult) {
 	_, err := s.storage.Update(ctx, id, func(existing *entities.SavedConnection) (bool, bool) {
 		existing.Meta = entities.NewConnectionMetaFromTestResult(result)
-		// Meta-only write: Auth/TLS are untouched, so existing vault secrets
-		// must be preserved, not pruned.
+		// Meta-only write: keep existing vault secrets.
 		return false, false
 	})
 	if err != nil {

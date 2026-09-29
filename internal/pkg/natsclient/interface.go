@@ -117,8 +117,7 @@ type ConsumerManager interface {
 	// errs.NATSValidationError.
 	PauseConsumer(ctx context.Context, streamName string, consumerName string, pauseUntil string) (*entities.ConsumerPauseResponse, error)
 
-	// ResumeConsumer resumes a paused consumer immediately, returning the
-	// server's actual post-resume state.
+	// ResumeConsumer resumes a paused consumer and returns the server's post-resume state.
 	ResumeConsumer(ctx context.Context, streamName string, consumerName string) (*entities.ConsumerPauseResponse, error)
 }
 

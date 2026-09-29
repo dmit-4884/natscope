@@ -74,10 +74,7 @@ func TestHistory_SaveAndListFilter(t *testing.T) {
 	}
 }
 
-// TestHistory_ListFilterByConnectionID is a regression test: filtering by
-// connection_id must find the entry regardless of how many URLs the saved
-// connection has, and must not conflate entries from a different connection
-// that happens to share a URL.
+// TestHistory_ListFilterByConnectionID checks that the connection_id filter ignores URLs shared across connections.
 func TestHistory_ListFilterByConnectionID(t *testing.T) {
 	s := newHistStore(t)
 	ctx := t.Context()

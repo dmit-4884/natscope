@@ -63,10 +63,8 @@ func New(
 	}
 }
 
-// Publish runs the full pipeline; every user-actionable failure becomes a
-// PublishResult.Error (see package doc). Malformed-request checks (subject
-// syntax, header names) run before any NATS work and return a transport
-// error, consistent with protovalidate's role at the boundary.
+// Publish runs the full pipeline; every user-actionable failure becomes a PublishResult.Error (see package doc).
+// A malformed subject or header name fails first with a transport error.
 func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*entities.PublishResult, error) {
 	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
@@ -163,9 +161,7 @@ func (s *Service) recordHistory(
 
 	connURL, urlErr := s.natsService.GetConnectionURL(ctx, in.ConnectionID)
 	if urlErr != nil && errors.Is(urlErr, errs.ErrSavedConnectionNotFound) {
-		// A history row for a connection id that doesn't exist can never be
-		// followed up on (no connection to link back to, no URL to show) and
-		// only pollutes the audit trail — skip it.
+		// Skip history for a connection id that doesn't exist.
 		return
 	}
 
