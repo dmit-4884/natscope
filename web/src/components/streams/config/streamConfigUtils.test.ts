@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { StreamCreateRequest } from '@/types/management'
-import { COMPRESSION_LABELS, canCreateStream, isMirrorConfigured, normalizeSubjects } from './streamConfigUtils'
+import type { StreamDetail } from '@/types/nats'
+import { COMPRESSION_LABELS, canCreateStream, isMirrorConfigured, normalizeSubjects, streamToConfig } from './streamConfigUtils'
 
 function draft(over: Partial<StreamCreateRequest> = {}): StreamCreateRequest {
   return { name: 'ORDERS', subjects: [''], ...over }
@@ -50,5 +51,42 @@ describe('canCreateStream', () => {
 
   it('does not accept a mirror with a blank name and no subjects', () => {
     expect(canCreateStream(draft({ subjects: [''], mirror: { name: '' } }))).toBe(false)
+  })
+})
+
+describe('streamToConfig', () => {
+  function detail(config: Partial<StreamDetail['config']>): StreamDetail {
+    return {
+      name: 'FLAGS',
+      subjects: ['flags.>'],
+      messages: 0,
+      bytes: 0,
+      consumer_count: 0,
+      created: 0,
+      config: { retention: 'limits', max_msgs: -1, max_bytes: -1, max_age: 0, ...config },
+      state: { messages: 0, bytes: 0, first_seq: 0, last_seq: 0, first_ts: 0, last_ts: 0 },
+      consumers: [],
+    }
+  }
+
+  it('carries the NATS 2.11–2.14 flags into the form value', () => {
+    const value = streamToConfig(
+      detail({
+        allow_msg_counter: true,
+        allow_msg_schedules: true,
+        subject_delete_marker_ttl: 60_000_000_000,
+        persist_mode: 'async',
+        allow_batched: true,
+      }),
+    )
+    expect(value.allow_msg_counter).toBe(true)
+    expect(value.allow_msg_schedules).toBe(true)
+    expect(value.subject_delete_marker_ttl).toBe(60_000_000_000)
+    expect(value.persist_mode).toBe('async')
+    expect(value.allow_batch_publish).toBe(true)
+  })
+
+  it('defaults persist mode to default', () => {
+    expect(streamToConfig(detail({})).persist_mode).toBe('default')
   })
 })

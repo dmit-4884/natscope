@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { call } from './api'
+import { call, publishRaw } from './api'
 
 // Covers Streams > Consumers: create a durable consumer with ack/delivery/
 // replay/filter fields, pause, resume, delete — its own throwaway stream.
@@ -63,5 +63,54 @@ test.describe('Stream consumers', () => {
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await page.getByPlaceholder(streamName).fill(streamName)
     await page.getByRole('button', { name: 'Delete', exact: true }).last().click()
+  })
+})
+
+const MANAGEMENT = 'natscope.nats.management.v1.ManagementService'
+
+test.describe('Consumer reset', () => {
+  test('resets a consumer to a stream sequence', async ({ page, env }) => {
+    const info = await call<{ serverInfo?: { capabilities?: { consumerReset?: boolean } } }>(
+      'natscope.nats.stats.v1.StatsService',
+      'GetServerInfo',
+      { connectionId: env.connectionId },
+    )
+    test.skip(!info.serverInfo?.capabilities?.consumerReset, 'connected NATS server predates consumer reset (2.14)')
+
+    const streamName = `E2E_RESET_${Date.now()}`
+    const subject = `${streamName.toLowerCase()}.msg`
+    await call(MANAGEMENT, 'CreateStream', {
+      connectionId: env.connectionId,
+      name: streamName,
+      subjects: [`${streamName.toLowerCase()}.>`],
+    })
+    try {
+      for (let i = 0; i < 5; i++) await publishRaw(env.connectionId, subject, subject, `{"n":${i}}`)
+      await call(MANAGEMENT, 'CreateConsumer', { connectionId: env.connectionId, streamName, name: 'replay' })
+
+      const numPending = async () => {
+        const res = await call<{ consumers?: Array<{ name: string; numPending?: string }> }>(
+          MANAGEMENT,
+          'ListConsumers',
+          { connectionId: env.connectionId, streamName },
+        )
+        return Number(res.consumers?.find((c) => c.name === 'replay')?.numPending ?? 0)
+      }
+
+      await page.goto(`/streams/${streamName}/consumers`)
+      await page.getByText('replay', { exact: true }).click()
+      await expect(page.getByRole('heading', { name: 'replay' })).toBeVisible()
+
+      await page.getByRole('button', { name: 'Reset', exact: true }).click()
+      await page.getByLabel('Start from stream sequence (optional)').fill('3')
+      await page.getByRole('button', { name: 'Reset', exact: true }).last().click()
+
+      await expect(page.getByText('Consumer "replay" reset; delivery restarts at stream sequence 3')).toBeVisible({
+        timeout: 10_000,
+      })
+      await expect.poll(numPending, { timeout: 10_000 }).toBe(3)
+    } finally {
+      await call(MANAGEMENT, 'DeleteStream', { connectionId: env.connectionId, streamName })
+    }
   })
 })

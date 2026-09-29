@@ -43,9 +43,24 @@ type ConsumerInfo struct {
 	// Cluster is the cluster info; nil if not clustered.
 	Cluster *ClusterInfo
 
+	// PriorityGroups is the live state of each priority group (NATS 2.11+).
+	PriorityGroups []PriorityGroupState
+
 	// TimeStamp is the timestamp when this info was fetched.
 	TimeStamp *time.Time
 
 	// Raw is the raw JSON representation of the original jetstream.ConsumerInfo.
 	Raw string
+}
+
+// PriorityGroupState is the live state of one consumer priority group.
+type PriorityGroupState struct {
+	// Group is the priority group name.
+	Group string
+
+	// PinnedClientID is the id of the pinned client; empty when none is pinned.
+	PinnedClientID string
+
+	// PinnedTS is when the current client was pinned.
+	PinnedTS time.Time
 }

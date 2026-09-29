@@ -53,6 +53,12 @@ service ManagementService {
   // Resumes message delivery for a previously paused consumer.
   rpc ResumeConsumer(ResumeConsumerRequest) returns (ResumeConsumerResponse) {}
 
+  // Resets a consumer's delivery state, optionally to a stream sequence (NATS 2.14+).
+  rpc ResetConsumer(ResetConsumerRequest) returns (ResetConsumerResponse) {}
+
+  // Unpins the pinned client of a consumer priority group (NATS 2.11+).
+  rpc UnpinConsumer(UnpinConsumerRequest) returns (UnpinConsumerResponse) {}
+
   // --- KeyValue ---
 
   // Retrieves all KeyValue buckets available on the connection.
@@ -225,6 +231,22 @@ message CreateStreamRequest {
 
   // Optional. Default consumer limits inherited by all consumers on this stream.
   optional .natscope.types.nats.ConsumerLimits consumer_limits = 33;
+
+  // Optional. When true, the stream is a counter stream (NATS 2.12+, immutable).
+  bool allow_msg_counter = 34;
+
+  // Optional. When true, enables message scheduling (NATS 2.12+).
+  bool allow_msg_schedules = 35;
+
+  // Optional. How long delete markers left by max_age live; at least 1s when set (NATS 2.11+).
+  google.protobuf.Duration subject_delete_marker_ttl = 36;
+
+  // Optional. Persist mode (NATS 2.12+, immutable).
+  // Values: 0 = default, 1 = async.
+  int32 persist_mode = 37 [(buf.validate.field).int32 = {in: [0, 1]}];
+
+  // Optional. When true, enables fast-ingest batch publishing (NATS 2.14+).
+  bool allow_batch_publish = 38;
 }
 
 // Defines the response message for creating a JetStream stream.
@@ -305,6 +327,15 @@ message UpdateStreamRequest {
 
   // Optional. Updated allow-atomic-publish setting.
   optional bool allow_atomic_publish = 23;
+
+  // Optional. Enables message scheduling; the server rejects disabling it once enabled.
+  optional bool allow_msg_schedules = 24;
+
+  // Optional. Updated delete marker TTL. A zero duration disables markers.
+  google.protobuf.Duration subject_delete_marker_ttl = 25;
+
+  // Optional. Updated fast-ingest batch publish setting.
+  optional bool allow_batch_publish = 26;
 }
 
 // Defines the response message for updating a JetStream stream.
@@ -478,7 +509,7 @@ message CreateConsumerRequest {
   string opt_start_time = 7;
 
   // Optional. Acknowledgement policy.
-  // Values: 0 = AckExplicit, 1 = AckNone, 2 = AckAll.
+  // Values: 0 = explicit, 1 = all, 2 = none.
   int32 ack_policy = 8 [(buf.validate.field).int32 = {in: [0, 1, 2]}];
 
   // Optional. Duration to wait for message acknowledgement before redelivery.
@@ -552,6 +583,16 @@ message CreateConsumerRequest {
   // Optional. When true, creates an ephemeral (non-durable) consumer that the
   // server removes after the inactivity threshold elapses.
   bool ephemeral = 31;
+
+  // Optional. Priority policy for pull consumers (NATS 2.11+; prioritized needs 2.12+).
+  // Values: 0 = none, 1 = pinned_client, 2 = overflow, 3 = prioritized.
+  int32 priority_policy = 32 [(buf.validate.field).int32 = {in: [0, 1, 2, 3]}];
+
+  // Optional. Priority group names; required when a priority policy is set.
+  repeated string priority_groups = 33 [(buf.validate.field).repeated.items.string.pattern = "^[a-zA-Z0-9/_=-]{1,16}$"];
+
+  // Optional. How long a pinned client may stay idle before it is unpinned (server default 2m).
+  google.protobuf.Duration pinned_ttl = 34;
 }
 
 // Defines the response message for creating a consumer.
@@ -618,6 +659,16 @@ message UpdateConsumerRequest {
   // Optional. Updated list of subject filters. A non-empty list replaces the
   // existing filters. Mutually exclusive with filterSubject. Requires NATS Server 2.10+.
   repeated string filter_subjects = 18;
+
+  // Optional. Updated priority policy; 0 (none) also clears the groups and pinned TTL.
+  // Values: 0 = none, 1 = pinned_client, 2 = overflow, 3 = prioritized.
+  optional int32 priority_policy = 19 [(buf.validate.field).int32 = {in: [0, 1, 2, 3]}];
+
+  // Optional. A non-empty list replaces the priority groups.
+  repeated string priority_groups = 20 [(buf.validate.field).repeated.items.string.pattern = "^[a-zA-Z0-9/_=-]{1,16}$"];
+
+  // Optional. Updated pinned client idle timeout.
+  google.protobuf.Duration pinned_ttl = 21;
 }
 
 // Defines the response message for updating a consumer.
@@ -687,6 +738,49 @@ message ResumeConsumerResponse {
   // Required. Indicates whether the consumer is still paused (should be false after a successful resume).
   bool paused = 1;
 }
+
+// Defines the request message for resetting a consumer's delivery state.
+message ResetConsumerRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Name of the stream the consumer belongs to.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the consumer to reset.
+  string consumer_name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Stream sequence the next delivery starts at. Unset keeps the ack floor.
+  // Only allowed with deliver policy all, by_start_sequence or by_start_time.
+  optional uint64 sequence = 4 [(buf.validate.field).uint64.gt = 0];
+}
+
+// Defines the response message for resetting a consumer.
+message ResetConsumerResponse {
+  // Required. The consumer state right after the reset.
+  .natscope.types.nats.ConsumerInfo consumer = 1;
+
+  // Required. Stream sequence delivery restarts at (ack floor + 1 when no sequence was given).
+  uint64 reset_seq = 2;
+}
+
+// Defines the request message for unpinning a priority group's pinned client.
+message UnpinConsumerRequest {
+  // Required. Identifier of the NATS connection the stream belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Name of the stream the consumer belongs to.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Name of the consumer.
+  string consumer_name = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Priority group whose pinned client is released.
+  string group = 4 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.pattern = "^[a-zA-Z0-9/_=-]{1,16}$"];
+}
+
+// Defines the response message for unpinning a consumer.
+message UnpinConsumerResponse {}
 
 // ============================================================================
 // KeyValue Management

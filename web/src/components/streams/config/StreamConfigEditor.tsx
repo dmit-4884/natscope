@@ -67,6 +67,7 @@ export function StreamConfigEditor({
             value={value}
             onChange={onChange}
             isEditMode={true}
+            originalValue={originalValue}
           />
         </div>
       ) : (

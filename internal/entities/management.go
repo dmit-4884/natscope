@@ -99,6 +99,21 @@ type StreamCreateRequest struct {
 	// AllowAtomicPublish allows atomic batch publish operations.
 	AllowAtomicPublish bool
 
+	// AllowMsgCounter makes the stream a counter stream (NATS 2.12+, immutable).
+	AllowMsgCounter bool
+
+	// AllowMsgSchedules enables message scheduling (NATS 2.12+).
+	AllowMsgSchedules bool
+
+	// SubjectDeleteMarkerTTL is how long delete markers left by MaxAge live (NATS 2.11+).
+	SubjectDeleteMarkerTTL time.Duration
+
+	// PersistMode is how writes are flushed to storage (NATS 2.12+, immutable).
+	PersistMode PersistMode
+
+	// AllowBatchPublish enables fast-ingest batch publishing (NATS 2.14+).
+	AllowBatchPublish bool
+
 	// Republish configures re-publishing of incoming messages to another subject.
 	Republish *StreamRePublish
 
@@ -172,6 +187,15 @@ type StreamUpdateRequest struct {
 
 	// AllowAtomicPublish updates atomic publish allowance (mutable).
 	AllowAtomicPublish *bool
+
+	// AllowMsgSchedules enables message scheduling (can be enabled, never disabled).
+	AllowMsgSchedules *bool
+
+	// SubjectDeleteMarkerTTL updates the delete marker TTL (mutable; 0 disables markers).
+	SubjectDeleteMarkerTTL *time.Duration
+
+	// AllowBatchPublish updates fast batch publish allowance (mutable).
+	AllowBatchPublish *bool
 }
 
 // StreamPurgeRequest is the input for purging messages from a stream.
@@ -325,6 +349,17 @@ type ConsumerCreateRequest struct {
 
 	// IdleHeartbeat is the idle heartbeat interval.
 	IdleHeartbeat time.Duration
+
+	// --- Pull Consumer Priority Groups (NATS 2.11+) ---
+
+	// PriorityPolicy is how priority groups pick pull clients.
+	PriorityPolicy PriorityPolicy
+
+	// PriorityGroups are the priority group names pull requests may target.
+	PriorityGroups []string
+
+	// PinnedTTL is how long a pinned client may stay idle before it is unpinned.
+	PinnedTTL time.Duration
 }
 
 // ConsumerUpdateRequest holds mutable consumer fields; pointers distinguish
@@ -374,6 +409,15 @@ type ConsumerUpdateRequest struct {
 
 	// FilterSubjects are the subject filters (mutable, NATS 2.10+).
 	FilterSubjects []string
+
+	// PriorityPolicy is the priority policy (mutable); PriorityNone clears groups and pinned TTL.
+	PriorityPolicy *PriorityPolicy
+
+	// PriorityGroups replace the priority groups when non-empty (mutable).
+	PriorityGroups []string
+
+	// PinnedTTL is the pinned client idle timeout (mutable).
+	PinnedTTL *time.Duration
 }
 
 // ConsumerPauseResponse is the outcome of a consumer pause request.
@@ -386,6 +430,15 @@ type ConsumerPauseResponse struct {
 
 	// PauseRemaining is the remaining pause duration.
 	PauseRemaining time.Duration
+}
+
+// ConsumerResetResponse is the outcome of a consumer reset (NATS 2.14+).
+type ConsumerResetResponse struct {
+	// Consumer is the consumer state right after the reset.
+	Consumer *ConsumerInfo
+
+	// ResetSeq is the stream sequence delivery restarts at (ack floor + 1 when no sequence was given).
+	ResetSeq uint64
 }
 
 // KVBucketConfig is the create/update config for a KeyValue bucket.

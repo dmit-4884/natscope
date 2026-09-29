@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import type { StreamCreateRequest } from '@/types/management'
 import {
+  STREAM_FIELDS,
   buildStreamCreatePayload,
   buildStreamUpdatePayload,
+  enableOnlyLockReason,
   getIgnoredUpdateKeys,
   getStreamUpdateLockedKeys,
 } from './streamFieldDefinitions'
@@ -94,5 +96,86 @@ describe('getIgnoredUpdateKeys', () => {
     const reordered: StreamCreateRequest = { storage: 'file', retention: 'limits', subjects: ['orders.>'], name: 'ORDERS', metadata: { team: 'core' } }
     expect(getIgnoredUpdateKeys(original, reordered)).toEqual([])
     expect(getIgnoredUpdateKeys(original, { ...original, mirror: undefined })).toEqual([])
+  })
+})
+
+describe('NATS 2.11–2.14 stream flags', () => {
+  const byKey = (key: string) => STREAM_FIELDS.find((f) => f.key === key)
+
+  it.each([
+    ['allow_msg_counter', 'msgCounters', false],
+    ['allow_msg_schedules', 'msgSchedules', true],
+    ['subject_delete_marker_ttl', 'messageTtl', true],
+    ['persist_mode', 'asyncPersist', false],
+    ['allow_batch_publish', 'batchPublish', true],
+  ] as const)('%s is gated by %s and editable on update: %s', (key, capability, editableOnUpdate) => {
+    const def = byKey(key)
+    expect(def?.requiresCapability).toBe(capability)
+    expect(def?.editableOnUpdate).toBe(editableOnUpdate)
+    expect(def?.editableOnCreate).toBe(true)
+  })
+
+  it('keeps create-only flags out of the update payload', () => {
+    const payload = buildStreamUpdatePayload(
+      draft({
+        allow_msg_counter: true,
+        persist_mode: 'async',
+        allow_msg_schedules: true,
+        subject_delete_marker_ttl: 60_000_000_000,
+        allow_batch_publish: true,
+      }),
+    )
+    expect(payload).not.toHaveProperty('allow_msg_counter')
+    expect(payload).not.toHaveProperty('persist_mode')
+    expect(payload.allow_msg_schedules).toBe(true)
+    expect(payload.subject_delete_marker_ttl).toBe(60_000_000_000)
+    expect(payload.allow_batch_publish).toBe(true)
+  })
+
+  it('locks create-only flags in the JSON view', () => {
+    const locked = getStreamUpdateLockedKeys()
+    expect(locked).toContain('allow_msg_counter')
+    expect(locked).toContain('persist_mode')
+    expect(locked).not.toContain('allow_msg_schedules')
+  })
+})
+
+describe('enableOnlyLockReason', () => {
+  const ttl = STREAM_FIELDS.find((f) => f.key === 'allow_msg_ttl')!
+  const schedules = STREAM_FIELDS.find((f) => f.key === 'allow_msg_schedules')!
+  const direct = STREAM_FIELDS.find((f) => f.key === 'allow_direct')!
+
+  it('locks an enable-only flag that the stream already has on', () => {
+    expect(enableOnlyLockReason(ttl, 'edit', draft({ allow_msg_ttl: true }))).toBe('Cannot be disabled once enabled.')
+    expect(enableOnlyLockReason(schedules, 'edit', draft({ allow_msg_schedules: true }))).toBe(
+      'Cannot be disabled once enabled.',
+    )
+  })
+
+  it('leaves the flag editable while it is still off', () => {
+    expect(enableOnlyLockReason(ttl, 'edit', draft({ allow_msg_ttl: false }))).toBeUndefined()
+    expect(enableOnlyLockReason(schedules, 'edit', draft())).toBeUndefined()
+  })
+
+  it('never locks in create mode or without the original config', () => {
+    expect(enableOnlyLockReason(ttl, 'create', draft({ allow_msg_ttl: true }))).toBeUndefined()
+    expect(enableOnlyLockReason(ttl, 'edit', null)).toBeUndefined()
+  })
+
+  it('ignores fields that are not enable-only', () => {
+    expect(enableOnlyLockReason(direct, 'edit', draft({ allow_direct: true }))).toBeUndefined()
+  })
+})
+
+describe('duration field labels', () => {
+  it('names nanoseconds on every duration field, like Max Age', () => {
+    for (const def of STREAM_FIELDS.filter((f) => f.type === 'duration_ns')) {
+      expect(def.label).toMatch(/\(ns\)$/)
+    }
+  })
+
+  it('does not tell the user to type seconds into a nanosecond field', () => {
+    const marker = STREAM_FIELDS.find((f) => f.key === 'subject_delete_marker_ttl')!
+    expect(marker.helperText).toContain('1000000000')
   })
 })

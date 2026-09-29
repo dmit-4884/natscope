@@ -294,6 +294,9 @@ func (c *Client) CreateStream(ctx context.Context, config entities.StreamCreateR
 	}
 
 	jsConfig := converter.Convert(config, &jetstream.StreamConfig{}, srcDestToJetStream)
+	if err := c.requireFeatures(streamConfigFeatures(*jsConfig)...); err != nil {
+		return nil, err
+	}
 
 	stream, err := c.jetStream.CreateStream(ctx, *jsConfig)
 	if err != nil {
@@ -322,6 +325,9 @@ func (c *Client) UpdateStream(
 
 	currentInfo := stream.CachedInfo()
 	updatedConfig := c.mergeStreamUpdate(currentInfo.Config, config)
+	if err = c.requireFeatures(streamConfigFeatures(updatedConfig)...); err != nil {
+		return nil, err
+	}
 
 	stream, err = c.jetStream.UpdateStream(ctx, updatedConfig)
 	if err != nil {

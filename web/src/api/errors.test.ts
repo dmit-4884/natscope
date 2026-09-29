@@ -77,6 +77,12 @@ describe('domain reason labels', () => {
     expect(rendered).not.toBe('raw server text')
     expect(rendered).not.toBe('')
   })
+
+  it('keeps the server text for NATS_FEATURE_UNSUPPORTED so the version hint survives', () => {
+    const text = 'consumer reset requires NATS 2.14+ (connected server v2.12.3)'
+    const rendered = getErrorMessage(domainError(Code.FailedPrecondition, text, 'NATS_FEATURE_UNSUPPORTED'))
+    expect(rendered).toBe(text)
+  })
 })
 
 describe('getErrorReason', () => {

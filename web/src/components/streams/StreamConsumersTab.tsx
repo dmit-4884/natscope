@@ -8,6 +8,8 @@ import {
   useDeleteConsumer,
   usePauseConsumer,
   useResumeConsumer,
+  useResetConsumer,
+  useUnpinConsumer,
 } from '@/contexts/streams'
 import { Button, PlusIcon, UsersIcon } from '@/components/ui'
 import { useServerCapabilities } from '@/contexts/connection'
@@ -19,7 +21,7 @@ import { ConsumerList } from './consumers/ConsumerList'
 import { ConsumerEditor } from './consumers/ConsumerEditor'
 import { ConsumerView } from './consumers/ConsumerView'
 import { ConsumerConfirmDialog, type ConsumerConfirmAction } from './consumers/ConsumerConfirmDialog'
-import { consumerToConfig, defaultConsumerConfig, toConsumerUpdateRequest } from './consumers/consumerUtils'
+import { consumerToConfig, defaultConsumerConfig, parseResetSequence, toConsumerUpdateRequest } from './consumers/consumerUtils'
 
 export default function StreamConsumersTab() {
   const { scope, connectionId, streamName } = useOutletContext<StreamViewOutletContext>()
@@ -39,9 +41,14 @@ export default function StreamConsumersTab() {
   const deleteConsumer = useDeleteConsumer(connectionId, streamName)
   const pauseConsumer = usePauseConsumer(connectionId, streamName)
   const resumeConsumer = useResumeConsumer(connectionId, streamName)
+  const resetConsumer = useResetConsumer(connectionId, streamName)
+  const unpinConsumer = useUnpinConsumer(connectionId, streamName)
 
   const { unsupportedReason } = useServerCapabilities(connectionId)
   const pauseUnsupportedReason = unsupportedReason('consumerPause')
+  const resetUnsupportedReason = unsupportedReason('consumerReset')
+  const unpinUnsupportedReason = unsupportedReason('priorityGroups')
+  const prioritizedUnsupportedReason = unsupportedReason('priorityPrioritized')
 
   const deleteConfirmation = useConfirmation('deleteConsumer')
 
@@ -150,6 +157,15 @@ export default function StreamConsumersTab() {
       } catch {
         /* toasted by the mutation hook */
       }
+    } else if (confirmAction.type === 'reset') {
+      try {
+        await resetConsumer.mutateAsync({
+          name: confirmAction.consumer.name,
+          sequence: parseResetSequence(confirmAction.resetSequence) ?? undefined,
+        })
+      } catch {
+        /* toasted by the mutation hook */
+      }
     }
     setConfirmAction(null)
   }
@@ -200,6 +216,8 @@ export default function StreamConsumersTab() {
             isSaving={createConsumer.isPending}
             onCancel={() => setEditorState({ isCreating: false, formDraft: null })}
             onCreate={handleCreate}
+            priorityUnsupportedReason={unpinUnsupportedReason}
+            prioritizedUnsupportedReason={prioritizedUnsupportedReason}
           />
         ) : selectedConsumer ? (
           isEditing ? (
@@ -218,6 +236,8 @@ export default function StreamConsumersTab() {
                 setEditorState({ isEditing: false, editorMode: 'form', formDraft: null })
               }}
               onShowDiff={() => setShowDiffModal(true)}
+              priorityUnsupportedReason={unpinUnsupportedReason}
+              prioritizedUnsupportedReason={prioritizedUnsupportedReason}
             />
           ) : (
             <ConsumerView
@@ -234,10 +254,16 @@ export default function StreamConsumersTab() {
                 })
               }
               onResume={() => handleResume(selectedConsumer)}
+              onReset={() => setConfirmAction({ type: 'reset', consumer: selectedConsumer })}
+              onUnpin={(group) => unpinConsumer.mutate({ name: selectedConsumer.name, group })}
               onDelete={() => requestDeleteConsumer(selectedConsumer)}
               isResuming={resumeConsumer.isPending}
               isPausing={pauseConsumer.isPending}
+              isResetting={resetConsumer.isPending}
+              isUnpinning={unpinConsumer.isPending}
               pauseUnsupportedReason={pauseUnsupportedReason}
+              resetUnsupportedReason={resetUnsupportedReason}
+              unpinUnsupportedReason={unpinUnsupportedReason}
             />
           )
         ) : (

@@ -36,17 +36,33 @@ type listConnectionsOutput struct {
 }
 
 type serverView struct {
-	ServerName   string         `json:"serverName"`
-	Version      string         `json:"version"`
-	Host         string         `json:"host"`
-	Port         int32          `json:"port"`
-	ClusterName  string         `json:"clusterName,omitempty"`
-	MaxPayload   int64          `json:"maxPayload"`
-	Jetstream    bool           `json:"jetstream"`
-	AuthRequired bool           `json:"authRequired"`
-	TlsRequired  bool           `json:"tlsRequired"`
-	ConnectUrls  []string       `json:"clusterUrls,omitempty"`
-	JsAccount    *jsAccountView `json:"jetstreamAccount,omitempty"`
+	ServerName   string            `json:"serverName"`
+	Version      string            `json:"version"`
+	Host         string            `json:"host"`
+	Port         int32             `json:"port"`
+	ClusterName  string            `json:"clusterName,omitempty"`
+	MaxPayload   int64             `json:"maxPayload"`
+	Jetstream    bool              `json:"jetstream"`
+	AuthRequired bool              `json:"authRequired"`
+	TlsRequired  bool              `json:"tlsRequired"`
+	ConnectUrls  []string          `json:"clusterUrls,omitempty"`
+	JsAccount    *jsAccountView    `json:"jetstreamAccount,omitempty"`
+	Capabilities *capabilitiesView `json:"capabilities,omitempty"`
+}
+
+type capabilitiesView struct {
+	ApiLevel            int32 `json:"apiLevel" jsonschema:"JetStream API level: 1 = NATS 2.11, 2 = 2.12, 4 = 2.14, 5 = 2.15"`
+	ConsumerPause       bool  `json:"consumerPause"`
+	MessageTtl          bool  `json:"messageTtl"`
+	AtomicPublish       bool  `json:"atomicPublish"`
+	PriorityGroups      bool  `json:"priorityGroups"`
+	MsgCounters         bool  `json:"msgCounters"`
+	MsgSchedules        bool  `json:"msgSchedules"`
+	PriorityPrioritized bool  `json:"priorityPrioritized"`
+	AsyncPersist        bool  `json:"asyncPersist"`
+	ConsumerReset       bool  `json:"consumerReset"`
+	CronSchedules       bool  `json:"cronSchedules"`
+	BatchPublish        bool  `json:"batchPublish"`
 }
 
 type jsAccountView struct {

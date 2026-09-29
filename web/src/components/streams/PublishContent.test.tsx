@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@/test/utils'
+import { render, screen, fireEvent, act, waitFor } from '@/test/utils'
 import PublishContent from './PublishContent'
 import type { HeaderEntry } from './publish/HeadersEditor'
+import type { OptionAvailability } from './publish/publishOptions'
 
 interface TemplateLoadValues {
   name: string
@@ -65,10 +66,12 @@ function Harness({
   initialPattern = 'orders.created',
   initialJson = '{}',
   initialHeaders = [],
+  jetStreamOptions,
 }: {
   initialPattern?: string
   initialJson?: string
   initialHeaders?: HeaderEntry[]
+  jetStreamOptions?: OptionAvailability
 }) {
   const [subjectPattern, setSubjectPattern] = useState(initialPattern)
   const [wildcardValues, setWildcardValues] = useState<string[]>([])
@@ -88,11 +91,16 @@ function Harness({
       onMessageJsonChange={setMessageJson}
       headers={headers}
       onHeadersChange={setHeaders}
+      jetStreamOptions={jetStreamOptions}
     />
   )
 }
 
 const publishButton = () => screen.getByRole('button', { name: /publish message/i })
+
+function openJetStreamOptions() {
+  fireEvent.click(screen.getByRole('button', { name: /JetStream options/ }))
+}
 
 async function renderPublish(props: Partial<Parameters<typeof Harness>[0]> = {}) {
   render(<Harness {...props} />)
@@ -207,5 +215,111 @@ describe('PublishContent header name validation', () => {
 
     expect(screen.queryByTestId('header-invalid-name')).toBeNull()
     expect(publishButton()).toBeEnabled()
+  })
+})
+
+describe('PublishContent JetStream options', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('publishes a counter increment without a body', async () => {
+    const { publishMessage } = await import('@/api/publish')
+    await renderPublish({ initialJson: '{"ignored":true}' })
+
+    openJetStreamOptions()
+    fireEvent.change(screen.getByLabelText('Counter increment'), { target: { value: '3' } })
+    fireEvent.click(publishButton())
+
+    await waitFor(() => expect(publishMessage).toHaveBeenCalled())
+    expect(vi.mocked(publishMessage).mock.calls[0][0]).toEqual(
+      expect.objectContaining({ data: null, headers: { 'Nats-Incr': '+3' }, message_type: undefined }),
+    )
+  })
+
+  it('lets a counter increment publish with an empty body', async () => {
+    const editor = await renderPublish({ initialJson: '{}' })
+
+    fireEvent.change(editor, { target: { value: '' } })
+    expect(publishButton()).toBeDisabled()
+    openJetStreamOptions()
+    fireEvent.change(screen.getByLabelText('Counter increment'), { target: { value: '+1' } })
+
+    expect(publishButton()).toBeEnabled()
+  })
+
+  it('blocks publishing on an invalid option and says why', async () => {
+    await renderPublish({ initialJson: '{}' })
+
+    openJetStreamOptions()
+    fireEvent.change(screen.getByLabelText('Message TTL'), { target: { value: 'soon' } })
+
+    expect(publishButton()).toBeDisabled()
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('TTL must be a duration like 30s, 5m or 1h')
+  })
+
+  it('adds the ttl header to a regular publish', async () => {
+    const { publishMessage } = await import('@/api/publish')
+    await renderPublish({ initialJson: '{"a":1}', initialHeaders: [{ key: 'X-Trace', value: 't' }] })
+
+    openJetStreamOptions()
+    fireEvent.change(screen.getByLabelText('Message TTL'), { target: { value: '5m' } })
+    fireEvent.click(publishButton())
+
+    await waitFor(() => expect(publishMessage).toHaveBeenCalled())
+    expect(vi.mocked(publishMessage).mock.calls[0][0]).toEqual(
+      expect.objectContaining({ data: { a: 1 }, headers: { 'X-Trace': 't', 'Nats-TTL': '5m' } }),
+    )
+  })
+
+  it('reports the counter total after an increment', async () => {
+    const { publishMessage } = await import('@/api/publish')
+    const { toast } = await import('@/utils/toast')
+    vi.mocked(publishMessage).mockResolvedValueOnce({ stream: 'HITS', sequence: 3, counter_value: '12' })
+    await renderPublish({ initialJson: '{}' })
+
+    openJetStreamOptions()
+    fireEvent.change(screen.getByLabelText('Counter increment'), { target: { value: '+1' } })
+    await act(async () => {
+      fireEvent.click(publishButton())
+    })
+
+    expect(toast.success).toHaveBeenCalledWith('Message published to HITS, sequence: 3 · counter is now 12')
+  })
+
+  it('locks options the stream or server cannot take', async () => {
+    render(<Harness jetStreamOptions={{ incrementUnavailable: 'Only counter streams accept increments' }} />)
+    await screen.findByTestId('json-editor')
+
+    openJetStreamOptions()
+    expect(screen.getByLabelText('Counter increment')).toBeDisabled()
+    expect(screen.getByText('Only counter streams accept increments')).toBeInTheDocument()
+  })
+})
+
+describe('PublishContent increment loaded from history', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('republishes a hand-typed Nats-Incr header as a bodiless increment', async () => {
+    const { publishMessage } = await import('@/api/publish')
+    const editor = await renderPublish({ initialJson: '', initialHeaders: [{ key: 'Nats-Incr', value: '+5' }] })
+
+    expect(editor).toHaveValue('')
+    expect(publishButton()).toBeEnabled()
+    fireEvent.click(publishButton())
+
+    await waitFor(() => expect(publishMessage).toHaveBeenCalled())
+    expect(vi.mocked(publishMessage).mock.calls[0][0]).toEqual(
+      expect.objectContaining({ data: null, headers: { 'Nats-Incr': '+5' } }),
+    )
+  })
+
+  it('does not treat a differently cased header as an increment', async () => {
+    await renderPublish({ initialJson: '', initialHeaders: [{ key: 'nats-incr', value: '+5' }] })
+
+    expect(publishButton()).toBeDisabled()
+    expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('Message body is empty')
   })
 })

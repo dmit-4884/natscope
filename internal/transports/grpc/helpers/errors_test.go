@@ -203,6 +203,20 @@ func TestNATSValidationErrorMessage(t *testing.T) {
 	assert.Equal(t, `nats: invalid stream name: "bad name"`, st.Message())
 }
 
+func TestFeatureUnsupportedErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	featErr := fmt.Errorf("reset consumer: %w", &errs.FeatureUnsupportedError{
+		Feature: "consumer reset", MinVersion: "2.14", ServerVersion: "2.12.3",
+	})
+	result := StatusErrorConvert(t.Context(), featErr)
+	assertGRPCError(t, result, codes.FailedPrecondition, "NATS_FEATURE_UNSUPPORTED")
+	st, ok := status.FromError(result)
+	require.True(t, ok)
+	assert.Equal(t, "consumer reset requires NATS 2.14+ (connected server v2.12.3)", st.Message())
+	assert.ErrorIs(t, featErr, errs.ErrFeatureUnsupported)
+}
+
 func TestProtoEncodeErrorMessage(t *testing.T) {
 	t.Parallel()
 

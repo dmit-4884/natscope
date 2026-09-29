@@ -1,5 +1,7 @@
 // Management types for streams, consumers, KV, and Object stores
 
+import type { ConsumerInfo, PriorityPolicy } from './nats'
+
 // Stream Types
 
 export interface PlacementConfig {
@@ -62,6 +64,11 @@ export interface StreamCreateRequest {
   no_ack?: boolean
   allow_msg_ttl?: boolean
   allow_atomic_publish?: boolean
+  allow_msg_counter?: boolean
+  allow_msg_schedules?: boolean
+  subject_delete_marker_ttl?: number
+  persist_mode?: 'default' | 'async'
+  allow_batch_publish?: boolean
   compression?: 'none' | 's2'
   first_seq?: number
   placement?: PlacementConfig
@@ -95,6 +102,9 @@ export interface StreamUpdateRequest {
   consumer_limits?: ConsumerLimitsConfig
   allow_msg_ttl?: boolean
   allow_atomic_publish?: boolean
+  allow_msg_schedules?: boolean
+  subject_delete_marker_ttl?: number
+  allow_batch_publish?: boolean
 }
 
 export interface StreamPurgeRequest {
@@ -137,6 +147,10 @@ export interface ConsumerCreateRequest {
   deliver_group?: string
   flow_control?: boolean
   idle_heartbeat?: number
+  // Pull consumer priority groups
+  priority_policy?: PriorityPolicy
+  priority_groups?: string[]
+  priority_timeout?: number
 }
 
 export interface ConsumerUpdateRequest {
@@ -155,12 +169,20 @@ export interface ConsumerUpdateRequest {
   metadata?: Record<string, string>
   filter_subject?: string
   filter_subjects?: string[]
+  priority_policy?: PriorityPolicy
+  priority_groups?: string[]
+  priority_timeout?: number
 }
 
 export interface ConsumerPauseResponse {
   paused: boolean
   pause_until?: string
   pause_remaining?: number
+}
+
+export interface ConsumerResetResponse {
+  reset_seq: number
+  consumer?: ConsumerInfo
 }
 
 // Immutable fields that cannot be changed after consumer creation

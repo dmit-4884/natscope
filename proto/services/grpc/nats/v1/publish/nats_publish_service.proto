@@ -30,6 +30,11 @@ message PublishMessageRequest {
     message: "source_id is required when message_type is set"
     expression: "!has(this.message_type) || this.message_type == '' || (has(this.source_id) && this.source_id != '')"
   };
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.publish.data_required_without_incr"
+    message: "data is required unless the Nats-Incr header is set"
+    expression: "this.data != '' || 'Nats-Incr' in this.headers"
+  };
 
   // Required. Identifier of the NATS connection to publish through.
   string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
@@ -40,8 +45,8 @@ message PublishMessageRequest {
   // Optional. Fully qualified protobuf message type name for encoding. If empty, data is published as raw JSON bytes.
   optional string message_type = 3;
 
-  // Required. JSON-encoded message payload to encode and publish.
-  string data = 4 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+  // Required unless the Nats-Incr header is set (a counter increment carries no body). JSON-encoded message payload.
+  string data = 4;
 
   // Optional. Custom NATS headers to include with the published message. Key-value pairs.
   map<string, string> headers = 5;
@@ -70,6 +75,9 @@ message PublishMessageResponse {
 
   // Indicates if this message was a duplicate (matched Nats-Msg-Id within the dedup window).
   bool duplicate = 4;
+
+  // Optional. New counter total after a Nats-Incr publish to a counter stream (NATS 2.12+).
+  optional string counter_value = 5;
 }
 
 // Defines the request message for a core NATS request-reply exchange.

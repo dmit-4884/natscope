@@ -95,6 +95,50 @@ func TestStoreCompression_IsValid(t *testing.T) {
 	}
 }
 
+func TestPriorityPolicy_IsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		p    PriorityPolicy
+		want bool
+	}{
+		{name: "None", p: PriorityNone, want: true},
+		{name: "PinnedClient", p: PriorityPinnedClient, want: true},
+		{name: "Overflow", p: PriorityOverflow, want: true},
+		{name: "Prioritized", p: PriorityPrioritized, want: true},
+		{name: "Invalid", p: PriorityPolicy(99), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.p.IsValid())
+		})
+	}
+}
+
+func TestPersistMode_IsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		m    PersistMode
+		want bool
+	}{
+		{name: "Default", m: PersistDefault, want: true},
+		{name: "Async", m: PersistAsync, want: true},
+		{name: "Invalid", m: PersistMode(99), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.m.IsValid())
+		})
+	}
+}
+
 func TestDeliverPolicy_IsValid(t *testing.T) {
 	t.Parallel()
 

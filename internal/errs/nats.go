@@ -3,7 +3,10 @@
 
 package errs
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Connection-level domain sentinels from the [services/nats] pool; SDK
 // sentinels they shadow never escape that package.
@@ -81,6 +84,32 @@ var ErrObjectTooLargeToRetrieve = errors.New("nats: object exceeds the maximum s
 
 // ErrObjectLinkToBucket GetObject was called on a link to a whole bucket.
 var ErrObjectLinkToBucket = errors.New("nats: object is a link to a bucket, not a single object")
+
+// ErrFeatureUnsupported the connected server's JetStream API level is below
+// the minimum a requested feature needs; see [FeatureUnsupportedError].
+var ErrFeatureUnsupported = errors.New("nats: feature not supported by the connected server")
+
+// FeatureUnsupportedError names the rejected feature, the NATS release that
+// introduced it and the connected server version.
+type FeatureUnsupportedError struct {
+	Feature       string
+	MinVersion    string
+	ServerVersion string
+}
+
+// Error implements the error interface.
+func (e *FeatureUnsupportedError) Error() string {
+	server := "connected server version unknown"
+	if e.ServerVersion != "" {
+		server = "connected server v" + e.ServerVersion
+	}
+	return fmt.Sprintf("%s requires NATS %s+ (%s)", e.Feature, e.MinVersion, server)
+}
+
+// Is reports whether target is ErrFeatureUnsupported.
+func (e *FeatureUnsupportedError) Is(target error) bool {
+	return target == ErrFeatureUnsupported
+}
 
 // NATSValidationError is the domain form of a client-side NATS validation failure.
 type NATSValidationError struct {

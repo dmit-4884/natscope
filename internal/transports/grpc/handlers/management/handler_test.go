@@ -47,13 +47,27 @@ type mockNatsService struct {
 	deletedStream   string
 	deletedConsumer string
 	deletedBucket   string
+
+	createdStream entities.StreamCreateRequest
+	updatedStream entities.StreamUpdateRequest
 }
 
 func (m *mockNatsService) CreateStream(
 	_ context.Context,
 	_ string,
-	_ entities.StreamCreateRequest,
+	req entities.StreamCreateRequest,
 ) (*entities.StreamInfo, error) {
+	m.createdStream = req
+	return m.streamInfo, m.streamErr
+}
+
+func (m *mockNatsService) UpdateStream(
+	_ context.Context,
+	_ string,
+	_ string,
+	req entities.StreamUpdateRequest,
+) (*entities.StreamInfo, error) {
+	m.updatedStream = req
 	return m.streamInfo, m.streamErr
 }
 

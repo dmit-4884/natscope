@@ -37,7 +37,12 @@ export function StreamConfigView({
     streamDetail.config.allow_direct ||
     streamDetail.config.mirror_direct ||
     streamDetail.config.allow_msg_ttl ||
-    streamDetail.config.allow_atomic
+    streamDetail.config.allow_atomic ||
+    streamDetail.config.allow_msg_counter ||
+    streamDetail.config.allow_msg_schedules ||
+    !!streamDetail.config.subject_delete_marker_ttl ||
+    streamDetail.config.persist_mode === 'async' ||
+    streamDetail.config.allow_batched
 
   return (
     <div className="p-4">
@@ -238,6 +243,17 @@ export function StreamConfigView({
                     {streamDetail.config.allow_rollup_hdrs && <Flag label="Rollup" color="green" hint="Message rollup via Nats-Rollup header is enabled" />}
                     {streamDetail.config.allow_msg_ttl && <Flag label="Per-Msg TTL" color="green" hint="Per-message TTL via Nats-TTL header is enabled" />}
                     {streamDetail.config.allow_atomic && <Flag label="Atomic Publish" color="green" hint="Atomic batch publishing is enabled" />}
+                    {streamDetail.config.allow_msg_counter && <Flag label="Counter" color="green" hint="Counter stream: messages carry Nats-Incr and the stream keeps a running total per subject" />}
+                    {streamDetail.config.allow_msg_schedules && <Flag label="Schedules" color="green" hint="Messages with a Nats-Schedule header are published to their target later" />}
+                    {!!streamDetail.config.subject_delete_marker_ttl && (
+                      <Flag
+                        label={`Delete Markers ${formatNsDuration(streamDetail.config.subject_delete_marker_ttl)}`}
+                        color="green"
+                        hint="Max Age leaves a delete marker for the last message of a subject, kept for this long"
+                      />
+                    )}
+                    {streamDetail.config.persist_mode === 'async' && <Flag label="Async Persist" color="green" hint="Writes are flushed to storage asynchronously" />}
+                    {streamDetail.config.allow_batched && <Flag label="Fast Batch" color="green" hint="Fast-ingest batch publishing is enabled" />}
                   </div>
                 </div>
               )}

@@ -3,6 +3,7 @@ import { parseIntOr } from '@/utils/numbers'
 import { Input, Badge, ImmutableField, Dropdown, Toggle } from '@/components/ui'
 import { CONSUMER_IMMUTABLE_FIELDS } from '@/types/management'
 import type { ConsumerCreateRequest } from '@/types/management'
+import type { PriorityPolicy } from '@/types/nats'
 import { SectionPanel } from './SectionPanel'
 import { StringArrayInput } from './inputs/StringArrayInput'
 import { NumberArrayInput } from './inputs/NumberArrayInput'
@@ -13,7 +14,20 @@ export interface ConsumerFormFieldsProps {
   onChange: (value: ConsumerCreateRequest) => void
   isEditMode: boolean
   immutableFields?: string[]
+  /** When set, the server doesn't support priority groups — the section is locked with this reason. */
+  priorityUnsupportedReason?: string
+  /** When set, the server doesn't support the prioritized policy — that option is disabled. */
+  prioritizedUnsupportedReason?: string
 }
+
+const PRIORITY_POLICY_OPTIONS: ReadonlyArray<{ value: PriorityPolicy; label: string }> = [
+  { value: 'none', label: 'None' },
+  { value: 'pinned_client', label: 'Pinned client' },
+  { value: 'overflow', label: 'Overflow' },
+  { value: 'prioritized', label: 'Prioritized' },
+]
+
+const NS_PER_SECOND = 1_000_000_000
 
 function utcToLocalInput(iso: string | undefined): string {
   if (!iso) return ''
@@ -33,6 +47,8 @@ export function ConsumerFormFields({
   onChange,
   isEditMode,
   immutableFields = [],
+  priorityUnsupportedReason,
+  prioritizedUnsupportedReason,
 }: ConsumerFormFieldsProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     basic: true,
@@ -40,6 +56,7 @@ export function ConsumerFormFields({
     ack: false,
     limits: false,
     push: false,
+    priority: false,
     replication: false,
     metadata: false,
   })
@@ -63,6 +80,15 @@ export function ConsumerFormFields({
   const isEphemeral = value.ephemeral ?? false
   const filterSubjects = value.filter_subjects ?? []
   const singleFilterLocked = isImmutable('filter_subject') || filterSubjects.length > 0
+  const priorityPolicy = value.priority_policy ?? 'none'
+  const priorityLocked = !!priorityUnsupportedReason || isPushConsumer
+
+  const setPriorityPolicy = (next: PriorityPolicy) =>
+    onChange(
+      next === 'none'
+        ? { ...value, priority_policy: next, priority_groups: undefined, priority_timeout: undefined }
+        : { ...value, priority_policy: next },
+    )
 
   return (
     <div className="space-y-4">
@@ -456,6 +482,81 @@ export function ConsumerFormFields({
                 </ImmutableField>
               </>
             )}
+        </div>
+      </SectionPanel>
+
+      <SectionPanel
+        label="Priority Groups"
+        isOpen={openSections.priority}
+        onToggle={() => toggleSection('priority')}
+        badge={priorityPolicy !== 'none' ? <Badge variant="primary" size="sm">Active</Badge> : undefined}
+      >
+        <div className="space-y-4">
+          {priorityUnsupportedReason ? (
+            <p className="text-xs text-status-warning-text">{priorityUnsupportedReason}</p>
+          ) : isPushConsumer ? (
+            <p className="text-xs text-content-tertiary">Priority groups apply to pull consumers only.</p>
+          ) : (
+            <p className="text-xs text-content-tertiary">
+              Pull requests name a group. Pinned client sends all messages to one client until it goes idle; overflow
+              serves a client only when others fall behind; prioritized prefers clients with a lower priority number.
+            </p>
+          )}
+
+          <ImmutableField label="Priority Policy" isImmutable={false}>
+            <Dropdown
+              value={priorityPolicy}
+              onChange={(v) => setPriorityPolicy(v as PriorityPolicy)}
+              disabled={priorityLocked}
+              options={PRIORITY_POLICY_OPTIONS.map((o) =>
+                o.value === 'prioritized' && prioritizedUnsupportedReason
+                  ? { ...o, disabled: true }
+                  : o,
+              )}
+            />
+          </ImmutableField>
+          {prioritizedUnsupportedReason && !priorityLocked && (
+            <p className="text-xs text-content-tertiary -mt-3">Prioritized: {prioritizedUnsupportedReason}</p>
+          )}
+
+          {priorityPolicy !== 'none' && (
+            <>
+              <ImmutableField
+                label="Groups"
+                isImmutable={false}
+                helpText="Letters, digits and / _ = - only, up to 16 characters each."
+              >
+                <StringArrayInput
+                  value={value.priority_groups}
+                  onChange={(next) => updateField('priority_groups', next)}
+                  placeholder="jobs"
+                  disabled={priorityLocked}
+                />
+              </ImmutableField>
+
+              {priorityPolicy === 'pinned_client' && (
+                <div>
+                  <label htmlFor="consumer-pinned-ttl" className="block text-sm font-medium text-gray-700 mb-1">
+                    Pinned TTL (seconds)
+                  </label>
+                  <Input
+                    id="consumer-pinned-ttl"
+                    type="number"
+                    min={0}
+                    value={value.priority_timeout ? value.priority_timeout / NS_PER_SECOND : 0}
+                    onChange={(e) => {
+                      const seconds = parseIntOr(e.target.value, 0)
+                      updateField('priority_timeout', seconds > 0 ? seconds * NS_PER_SECOND : undefined)
+                    }}
+                    disabled={priorityLocked}
+                  />
+                  <p className="text-xs text-content-tertiary mt-1">
+                    Idle time before another client is pinned. 0 = server default (2 minutes).
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </SectionPanel>
 

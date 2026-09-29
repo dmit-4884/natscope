@@ -28,6 +28,7 @@ func TestResolver_Resolve(t *testing.T) {
 
 		// Domain catalog wins over everything else.
 		{"catalog cross-field", "natscope.nats.messages.start_seq_xor_start_time", "", "MUTUALLY_EXCLUSIVE_FIELDS"},
+		{"catalog publish data", "natscope.nats.publish.data_required_without_incr", "", "DATA_REQUIRED"},
 
 		// Required derives the code from the field name.
 		{"required with field", ruleIDRequired, "connection_id", "CONNECTION_ID_REQUIRED"},

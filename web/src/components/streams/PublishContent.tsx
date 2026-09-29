@@ -22,6 +22,15 @@ import { ValidationResultDisplay } from './publish/ValidationResultDisplay'
 import { TemplateMenu } from './publish/TemplateMenu'
 import { PublishActionBar, type ValidationState } from './publish/PublishActionBar'
 import { hasWildcards, parsePattern, buildSubject, countWildcards } from './publish/subjectPatternUtils'
+import { JetStreamOptions } from './publish/JetStreamOptions'
+import {
+  EMPTY_PUBLISH_OPTIONS,
+  INCREMENT_HEADER,
+  buildOptionHeaders,
+  isIncrement,
+  type OptionAvailability,
+  type PublishOptions,
+} from './publish/publishOptions'
 
 interface PublishContentProps {
   subjects: string[]
@@ -38,6 +47,8 @@ interface PublishContentProps {
   /** Stream max_msg_size in bytes (0/undefined = unlimited). */
   maxMsgSize?: number
   onOpenMappings?: (subjectPattern: string) => void
+  /** Why each JetStream publish option is unavailable on this stream/server. */
+  jetStreamOptions?: OptionAvailability
 }
 
 const AUTO_VALIDATE_DEBOUNCE_MS = 600
@@ -57,7 +68,9 @@ export default function PublishContent({
   onHeadersChange,
   maxMsgSize,
   onOpenMappings,
+  jetStreamOptions,
 }: PublishContentProps) {
+  const [publishOptions, setPublishOptions] = useState<PublishOptions>(EMPTY_PUBLISH_OPTIONS)
   const [helperJsonCheck, setHelperJsonCheck] = useState<{ value: string; error: string | null } | null>(null)
   const [exampleLoading, setExampleLoading] = useState(false)
   const [prefillLoading, setPrefillLoading] = useState(false)
@@ -117,7 +130,8 @@ export default function PublishContent({
   const publishMutation = useMutation({
     mutationFn: publishMessage,
     onSuccess: (response) => {
-      toast.success(`Message published to ${response.stream}, sequence: ${response.sequence}`)
+      const counter = response.counter_value !== undefined ? ` · counter is now ${response.counter_value}` : ''
+      toast.success(`Message published to ${response.stream}, sequence: ${response.sequence}${counter}`)
       if (response.duplicate) {
         toast.warning('Message was a duplicate (matched Nats-Msg-Id within the dedup window)')
       }
@@ -264,14 +278,31 @@ export default function PublishContent({
     [headers],
   )
 
+  const headersAsMap = useMemo(() => {
+    const out: Record<string, string> = {}
+    for (const h of headers) {
+      const k = h.key.trim()
+      if (k) out[k] = h.value
+    }
+    return out
+  }, [headers])
+
+  const incrementMode = isIncrement(publishOptions) || INCREMENT_HEADER in headersAsMap
+
+  const optionsError = useMemo(
+    () => buildOptionHeaders(publishOptions, finalSubject, headersAsMap).error,
+    [publishOptions, finalSubject, headersAsMap],
+  )
+
   const publishDisabledReason = useMemo(() => {
     if (!subjectPattern) return 'Select a subject pattern'
     if (unfilledWildcards > 0) return `Fill ${plural(unfilledWildcards, 'wildcard slot')}`
-    if (!messageJson.trim()) return 'Message body is empty'
-    if (jsonError) return 'Fix the JSON syntax error below'
+    if (!incrementMode && !messageJson.trim()) return 'Message body is empty'
+    if (!incrementMode && jsonError) return 'Fix the JSON syntax error below'
     if (hasInvalidHeaderName) return 'Fix the invalid header name below'
+    if (optionsError) return optionsError
     return null
-  }, [subjectPattern, unfilledWildcards, messageJson, jsonError, hasInvalidHeaderName])
+  }, [subjectPattern, unfilledWildcards, incrementMode, messageJson, jsonError, hasInvalidHeaderName, optionsError])
 
   const canPublish = publishDisabledReason === null
 
@@ -280,20 +311,25 @@ export default function PublishContent({
     try {
       const shared: Record<string, string> = {}
       const processedSubject = processHelpers(finalSubject, shared)
-      const processedJson = processHelpers(messageJson, shared)
-      const data = JSON.parse(processedJson)
+      const data = incrementMode ? null : JSON.parse(processHelpers(messageJson, shared))
       // Headers share the SAME `shared` map as subject/body so {{uuid}}
       // expands per-publish (else JetStream dedups it away).
-      const headersMap = Object.fromEntries(
+      const userHeaders = Object.fromEntries(
         headers.filter((h) => h.key.trim()).map((h) => [h.key.trim(), processHelpers(h.value, shared)]),
       )
+      const options = buildOptionHeaders(publishOptions, processedSubject, userHeaders)
+      if (options.error) {
+        toast.error(options.error)
+        return
+      }
+      const headersMap = { ...userHeaders, ...options.headers }
 
       publishMutation.mutate({
         connection_id: connectionId,
         subject: processedSubject,
         subject_pattern: subjectPattern,
-        message_type: messageType || undefined,
-        source_id: sourceId || undefined,
+        message_type: incrementMode ? undefined : messageType || undefined,
+        source_id: incrementMode ? undefined : sourceId || undefined,
         data,
         headers: Object.keys(headersMap).length > 0 ? headersMap : undefined,
       })
@@ -362,15 +398,6 @@ export default function PublishContent({
       },
     })
   }
-
-  const headersAsMap = useMemo(() => {
-    const out: Record<string, string> = {}
-    for (const h of headers) {
-      const k = h.key.trim()
-      if (k) out[k] = h.value
-    }
-    return out
-  }, [headers])
 
   // Schema-aware key completion in the editor (proto mode only).
   const completionFields = useMemo(() => {
@@ -459,9 +486,16 @@ export default function PublishContent({
               </div>
             )}
             <ValidationResultDisplay result={validationResult} />
+            {incrementMode && (
+              <p className="mt-2 text-xs text-content-tertiary" data-testid="increment-body-note">
+                Counter increments are published without a body; the editor content is not sent.
+              </p>
+            )}
           </div>
 
           <HeadersEditor headers={headers} onAdd={addHeader} onRemove={removeHeader} onUpdate={updateHeader} />
+
+          <JetStreamOptions value={publishOptions} onChange={setPublishOptions} {...jetStreamOptions} />
 
           <PublishActionBar
             validationState={validationState}

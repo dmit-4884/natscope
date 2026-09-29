@@ -4,6 +4,7 @@ import { ConfigField, type ConfigFieldMode } from '@/components/streams/config/C
 import {
   STREAM_FIELDS,
   STREAM_SECTIONS,
+  enableOnlyLockReason,
   type StreamFieldDef,
   type StreamFieldSection,
 } from '@/components/streams/config/streamFieldDefinitions'
@@ -23,6 +24,7 @@ export interface StreamFormFieldsProps {
   onChange: (value: StreamCreateRequest) => void
   isEditMode: boolean
   defaultExpanded?: boolean
+  originalValue?: StreamCreateRequest | null
 }
 
 // Sections beyond the declarative STREAM_FIELDS registry: nested-object
@@ -51,6 +53,7 @@ export function StreamFormFields({
   onChange,
   isEditMode,
   defaultExpanded = false,
+  originalValue,
 }: StreamFormFieldsProps) {
   const mode: ConfigFieldMode = isEditMode ? 'edit' : 'create'
 
@@ -111,7 +114,9 @@ export function StreamFormFields({
                     def.requiresCapability ? unsupportedReason(def.requiresCapability) : undefined
                   }
                   lockedReason={
-                    def.key === 'subjects' && mirrorConfigured ? MIRROR_SUBJECTS_REASON : undefined
+                    def.key === 'subjects' && mirrorConfigured
+                      ? MIRROR_SUBJECTS_REASON
+                      : enableOnlyLockReason(def as StreamFieldDef, mode, originalValue)
                   }
                 />
               ))}

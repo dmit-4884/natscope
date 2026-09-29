@@ -21,6 +21,8 @@ interface Props {
   onCancel: () => void
   onShowDiff?: () => void
   onCreate?: () => void
+  priorityUnsupportedReason?: string
+  prioritizedUnsupportedReason?: string
 }
 
 export function ConsumerEditor({
@@ -37,6 +39,8 @@ export function ConsumerEditor({
   onCancel,
   onShowDiff,
   onCreate,
+  priorityUnsupportedReason,
+  prioritizedUnsupportedReason,
 }: Props) {
   return (
     <>
@@ -90,6 +94,8 @@ export function ConsumerEditor({
           onChange={onChange}
           isEditMode={isEditMode}
           immutableFields={isEditMode ? (CONSUMER_IMMUTABLE_FIELDS as unknown as string[]) : undefined}
+          priorityUnsupportedReason={priorityUnsupportedReason}
+          prioritizedUnsupportedReason={prioritizedUnsupportedReason}
         />
       </div>
       <div

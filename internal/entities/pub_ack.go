@@ -15,4 +15,7 @@ type PubAck struct {
 
 	// Duplicate indicates a duplicate message.
 	Duplicate bool
+
+	// Value is the new counter total after a Nats-Incr publish (NATS 2.12+).
+	Value string
 }

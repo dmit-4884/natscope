@@ -12,4 +12,6 @@ export {
   useDeleteConsumer,
   usePauseConsumer,
   useResumeConsumer,
+  useResetConsumer,
+  useUnpinConsumer,
 } from './useConsumerMutations'

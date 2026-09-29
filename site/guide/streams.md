@@ -39,6 +39,22 @@ The form covers the name and subjects, retention policy, storage backend, limits
 policy, compression and the advanced flags (deny delete/purge, allow direct, rollup, per-message TTL).
 The JSON view accepts a full JetStream config document. Click **Create Stream** when you are done.
 
+### Newer JetStream options
+
+| Option                   | Needs      | Notes                                                                        |
+|--------------------------|------------|------------------------------------------------------------------------------|
+| Allow Per-Message TTL    | NATS 2.11+ | Can be switched on later, never off                                          |
+| Delete Marker TTL        | NATS 2.11+ | Leaves a marker when Max Age removes a subject's last message; not on mirrors |
+| Atomic Publish           | NATS 2.12+ | Batch publishes that commit together                                         |
+| Counter Stream           | NATS 2.12+ | Set at creation only; every message carries `Nats-Incr`                      |
+| Allow Message Schedules  | NATS 2.12+ | Can be switched on later, never off; no sources or mirror                    |
+| Persist Mode: Async      | NATS 2.12+ | Set at creation only; file storage, one replica                             |
+| Allow Fast Batch Publish | NATS 2.14+ | High-throughput batch publishing                                             |
+
+Natscope reads the server's JetStream API level when it connects. An option the server cannot handle
+stays visible but disabled, and its hint names the NATS version it needs. **Server information** in the
+header lists what the connected server supports.
+
 <Shot src="/media/stream-create.png" alt="Create stream" />
 
 ## Inspect and edit config

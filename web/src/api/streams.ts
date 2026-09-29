@@ -1,7 +1,7 @@
 import { durToNanos, tsToMillis } from '@/utils/timestamp'
-import type { StreamInfo as ProtoStreamInfo, StreamConfig as ProtoStreamConfig, StreamState as ProtoStreamState, ConsumerInfo as ProtoConsumerInfo, ConsumerConfig as ProtoConsumerConfig, ClusterInfo as ProtoClusterInfo, ConsumerLimits as ProtoConsumerLimits, ExternalStream as ProtoExternalStream, StreamSourceRef as ProtoStreamSourceRef, RePublish as ProtoRePublish, StreamRelationEdge as ProtoStreamRelationEdge } from '../gen/types/nats/nats_stream_pb'
+import type { StreamInfo as ProtoStreamInfo, StreamConfig as ProtoStreamConfig, StreamState as ProtoStreamState, ConsumerInfo as ProtoConsumerInfo, ConsumerConfig as ProtoConsumerConfig, ClusterInfo as ProtoClusterInfo, ConsumerLimits as ProtoConsumerLimits, ExternalStream as ProtoExternalStream, StreamSourceRef as ProtoStreamSourceRef, RePublish as ProtoRePublish, StreamRelationEdge as ProtoStreamRelationEdge, PriorityGroupState as ProtoPriorityGroupState } from '../gen/types/nats/nats_stream_pb'
 import { StreamRelationKind as ProtoStreamRelationKind, StreamNodeKind as ProtoStreamNodeKind } from '../gen/types/nats/nats_stream_pb'
-import type { StreamInfo, StreamDetail, StreamConfig, StreamConsumerLimits, StreamState, ConsumerInfo, ConsumerConfig, ClusterInfo, ExternalStreamRef, StreamSourceRef, StreamRePublish, StreamRelations, StreamRelationEdge, StreamRelationKind, StreamNodeKind } from '../types/nats'
+import type { StreamInfo, StreamDetail, StreamConfig, StreamConsumerLimits, StreamState, ConsumerInfo, ConsumerConfig, ClusterInfo, ExternalStreamRef, StreamSourceRef, StreamRePublish, StreamRelations, StreamRelationEdge, StreamRelationKind, StreamNodeKind, PriorityGroupState, PriorityPolicy } from '../types/nats'
 import { streamsClient } from './grpc/clients'
 
 export interface GetStreamsParams {
@@ -26,11 +26,17 @@ export const DISCARD_INT: Record<string, number> = { old: 0, new: 1 }
 const COMPRESSION_STR: Record<number, string> = { 0: 'none', 1: 's2' }
 export const COMPRESSION_INT: Record<string, number> = { none: 0, s2: 1 }
 
+const PERSIST_MODE_STR: Record<number, 'default' | 'async'> = { 0: 'default', 1: 'async' }
+export const PERSIST_MODE_INT: Record<string, number> = { default: 0, async: 1 }
+
 const DELIVER_POLICY_STR: Record<number, string> = { 0: 'all', 1: 'last', 2: 'new', 3: 'by_start_sequence', 4: 'by_start_time', 5: 'last_per_subject' }
 export const DELIVER_POLICY_INT: Record<string, number> = { all: 0, last: 1, new: 2, by_start_sequence: 3, by_start_time: 4, last_per_subject: 5 }
 
-const ACK_POLICY_STR: Record<number, string> = { 0: 'explicit', 1: 'all', 2: 'none' }
+const ACK_POLICY_STR: Record<number, string> = { 0: 'explicit', 1: 'all', 2: 'none', 3: 'flow_control' }
 export const ACK_POLICY_INT: Record<string, number> = { explicit: 0, all: 1, none: 2 }
+
+const PRIORITY_POLICY_STR: Record<number, PriorityPolicy> = { 0: 'none', 1: 'pinned_client', 2: 'overflow', 3: 'prioritized' }
+export const PRIORITY_POLICY_INT: Record<PriorityPolicy, number> = { none: 0, pinned_client: 1, overflow: 2, prioritized: 3 }
 
 const REPLAY_POLICY_STR: Record<number, string> = { 0: 'instant', 1: 'original' }
 export const REPLAY_POLICY_INT: Record<string, number> = { instant: 0, original: 1 }
@@ -78,7 +84,19 @@ function toConsumerConfig(c: ProtoConsumerConfig | undefined): ConsumerConfig | 
     num_replicas: c.replicas || undefined,
     mem_storage: c.memoryStorage || undefined,
     metadata: Object.keys(c.metadata).length > 0 ? c.metadata : undefined,
+    priority_policy: c.priorityPolicy ? PRIORITY_POLICY_STR[c.priorityPolicy] : undefined,
+    priority_groups: c.priorityGroups.length > 0 ? c.priorityGroups : undefined,
+    priority_timeout: durToNanos(c.pinnedTtl) || undefined,
   }
+}
+
+function toPriorityGroups(groups: ProtoPriorityGroupState[]): PriorityGroupState[] | undefined {
+  if (groups.length === 0) return undefined
+  return groups.map((g) => ({
+    group: g.group,
+    pinned_client_id: g.pinnedClientId || undefined,
+    pinned_ts: g.pinnedTs ? tsToMillis(g.pinnedTs) : undefined,
+  }))
 }
 
 /**
@@ -129,6 +147,7 @@ export function toConsumerInfo(c: ProtoConsumerInfo): ConsumerInfo {
     paused: pause.paused,
     pause_until: pause.pauseUntil,
     cluster: toClusterInfo(c.cluster),
+    priority_groups: toPriorityGroups(c.priorityGroups),
     raw,
   }
 }
@@ -158,6 +177,11 @@ function toStreamConfig(c: ProtoStreamConfig | undefined): StreamConfig {
     metadata: Object.keys(c.metadata).length > 0 ? c.metadata : undefined,
     allow_msg_ttl: c.allowMsgTtl || undefined,
     allow_atomic: c.allowAtomicPublish || undefined,
+    allow_msg_counter: c.allowMsgCounter || undefined,
+    allow_msg_schedules: c.allowMsgSchedules || undefined,
+    subject_delete_marker_ttl: durToNanos(c.subjectDeleteMarkerTtl) || undefined,
+    persist_mode: PERSIST_MODE_STR[c.persistMode],
+    allow_batched: c.allowBatchPublish || undefined,
     mirror: c.mirror ? toSourceRef(c.mirror) : undefined,
     sources: c.sources?.length ? c.sources.map(toSourceRef) : undefined,
     republish: c.republish ? toRePublish(c.republish) : undefined,

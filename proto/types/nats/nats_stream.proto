@@ -154,6 +154,21 @@ message StreamConfig {
 
   // Optional. Default consumer limits inherited by all consumers on this stream.
   optional ConsumerLimits consumer_limits = 32;
+
+  // Required. Whether the stream is a counter stream (NATS 2.12+).
+  bool allow_msg_counter = 33;
+
+  // Required. Whether message scheduling is enabled (NATS 2.12+).
+  bool allow_msg_schedules = 34;
+
+  // Optional. How long delete markers left by max_age live; unset = no markers (NATS 2.11+).
+  google.protobuf.Duration subject_delete_marker_ttl = 35;
+
+  // Required. Persist mode (0 = default, 1 = async) (NATS 2.12+).
+  int32 persist_mode = 36;
+
+  // Required. Whether fast-ingest batch publishing is enabled (NATS 2.14+).
+  bool allow_batch_publish = 37;
 }
 
 // Default consumer limits applied to all consumers created on a stream.
@@ -319,6 +334,21 @@ message ConsumerInfo {
 
   // Required. Raw JSON representation of the consumer info from the NATS server.
   string raw = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Live state of each priority group (NATS 2.11+).
+  repeated PriorityGroupState priority_groups = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the live state of one consumer priority group.
+message PriorityGroupState {
+  // Required. Priority group name.
+  string group = 1;
+
+  // Optional. Id of the pinned client; empty when none is pinned.
+  string pinned_client_id = 2;
+
+  // Optional. When the current client was pinned.
+  google.protobuf.Timestamp pinned_ts = 3;
 }
 
 // Defines the sequence tracking information for a consumer.
@@ -350,7 +380,7 @@ message ConsumerConfig {
   // Optional. Starting time (RFC 3339 format) when deliver_policy is DeliverByStartTime.
   string opt_start_time = 6;
 
-  // Required. Acknowledgement policy (0 = AckExplicit, 1 = AckNone, 2 = AckAll).
+  // Required. Acknowledgement policy (0 = explicit, 1 = all, 2 = none, 3 = flow_control, server-created since NATS 2.14).
   int32 ack_policy = 7;
 
   // Required. Duration to wait for acknowledgement before redelivery.
@@ -418,6 +448,15 @@ message ConsumerConfig {
 
   // Optional. Queue group for load-balanced delivery (push consumers only).
   string deliver_group = 29;
+
+  // Required. Priority policy (0 = none, 1 = pinned_client, 2 = overflow, 3 = prioritized) (NATS 2.11+).
+  int32 priority_policy = 30;
+
+  // Optional. Priority group names pull requests may target.
+  repeated string priority_groups = 31;
+
+  // Optional. How long a pinned client may stay idle before it is unpinned.
+  google.protobuf.Duration pinned_ttl = 32;
 }
 
 // How messages move from one stream to another.

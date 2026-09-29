@@ -35,4 +35,6 @@ type PublishResult struct {
 	Sequence  uint64
 	Duplicate bool
 	Error     *string
+	// CounterValue is the new counter total after a Nats-Incr publish.
+	CounterValue *string
 }

@@ -40,7 +40,26 @@ export function consumerToConfig(consumer: ConsumerInfo): ConsumerCreateRequest 
     flow_control: consumer.config?.flow_control,
     idle_heartbeat: consumer.config?.idle_heartbeat,
     metadata: consumer.config?.metadata,
+    priority_policy: consumer.config?.priority_policy ?? 'none',
+    priority_groups: consumer.config?.priority_groups,
+    priority_timeout: consumer.config?.priority_timeout,
   }
+}
+
+type ConsumerPriorityUpdate = Pick<ConsumerUpdateRequest, 'priority_policy' | 'priority_groups' | 'priority_timeout'>
+
+function diffConsumerPriority(original: ConsumerCreateRequest, next: ConsumerCreateRequest): ConsumerPriorityUpdate {
+  const policy = next.priority_policy ?? 'none'
+  const out: ConsumerPriorityUpdate = {}
+  if (policy !== (original.priority_policy ?? 'none')) out.priority_policy = policy
+  if (policy === 'none') return out
+
+  const groups = (next.priority_groups ?? []).filter((g) => g !== '')
+  const originalGroups = original.priority_groups ?? []
+  const groupsChanged = groups.length !== originalGroups.length || groups.some((g, i) => g !== originalGroups[i])
+  if (groupsChanged && groups.length > 0) out.priority_groups = groups
+  if ((next.priority_timeout ?? 0) !== (original.priority_timeout ?? 0)) out.priority_timeout = next.priority_timeout ?? 0
+  return out
 }
 
 type ConsumerFilterUpdate = Pick<ConsumerUpdateRequest, 'filter_subject' | 'filter_subjects'>
@@ -85,6 +104,7 @@ export function toConsumerUpdateRequest(
     max_expires: next.max_expires,
     metadata: next.metadata,
     ...diffConsumerFilters(original, next),
+    ...diffConsumerPriority(original, next),
   }
 }
 
@@ -96,4 +116,12 @@ export function getFilterSubjectsArray(consumer: ConsumerInfo): string[] {
     return [consumer.config.filter_subject]
   }
   return []
+}
+
+export function parseResetSequence(raw: string | undefined): number | undefined | null {
+  const value = raw?.trim() ?? ''
+  if (value === '') return undefined
+  if (!/^\d+$/.test(value)) return null
+  const seq = Number(value)
+  return seq > 0 && Number.isSafeInteger(seq) ? seq : null
 }

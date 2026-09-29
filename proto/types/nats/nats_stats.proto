@@ -173,6 +173,30 @@ message ServerCapabilities {
 
   // Required. Atomic batch publish support (NATS 2.12+).
   bool atomic_publish = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Pinned-client/overflow priority groups and unpin support (NATS 2.11+).
+  bool priority_groups = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Counter stream support (NATS 2.12+).
+  bool msg_counters = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Single delayed message schedule support (NATS 2.12+).
+  bool msg_schedules = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Prioritized priority policy support (NATS 2.12+).
+  bool priority_prioritized = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Async stream persist mode support (NATS 2.12+).
+  bool async_persist = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Consumer reset support (NATS 2.14+).
+  bool consumer_reset = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Repeating and cron message schedule support (NATS 2.14+).
+  bool cron_schedules = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Fast-ingest batch publish support (NATS 2.14+).
+  bool batch_publish = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the health status of a NATS connection.

@@ -97,11 +97,15 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 	}
 
 	s.recordHistory(ctx, in, ack, len(data), nil)
-	return &entities.PublishResult{
+	result := &entities.PublishResult{
 		Stream:    ack.Stream,
 		Sequence:  ack.Sequence,
 		Duplicate: ack.Duplicate,
-	}, nil
+	}
+	if ack.Value != "" {
+		result.CounterValue = &ack.Value
+	}
+	return result, nil
 }
 
 // resolvePayload returns the bytes to publish: Data proto-encoded when

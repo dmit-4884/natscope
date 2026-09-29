@@ -90,6 +90,43 @@ func TestHandler_GetServerInfo(t *testing.T) {
 		assert.Equal(t, int64(10), si.JsAccount.Consumers)
 	})
 
+	t.Run("Capabilities", func(t *testing.T) {
+		t.Parallel()
+
+		svc := &serverInfoNATSSvc{
+			getServerInfoResult: &entities.ServerInfo{
+				Version:   "2.14.2",
+				Jetstream: true,
+				Capabilities: &entities.ServerCapabilities{
+					ApiLevel: 4, ConsumerPause: true, MessageTtl: true, AtomicPublish: true,
+					PriorityGroups: true, MsgCounters: true, MsgSchedules: true, PriorityPrioritized: true,
+					AsyncPersist: true, ConsumerReset: true, CronSchedules: true, BatchPublish: true,
+				},
+			},
+		}
+		h := New(svc, svc)
+
+		resp, err := h.GetServerInfo(t.Context(), connect.NewRequest(&statspb.GetServerInfoRequest{
+			ConnectionId: "conn1",
+		}))
+
+		require.NoError(t, err)
+		caps := resp.Msg.ServerInfo.GetCapabilities()
+		require.NotNil(t, caps)
+		assert.Equal(t, int32(4), caps.GetApiLevel())
+		assert.True(t, caps.GetConsumerPause())
+		assert.True(t, caps.GetMessageTtl())
+		assert.True(t, caps.GetAtomicPublish())
+		assert.True(t, caps.GetPriorityGroups())
+		assert.True(t, caps.GetMsgCounters())
+		assert.True(t, caps.GetMsgSchedules())
+		assert.True(t, caps.GetPriorityPrioritized())
+		assert.True(t, caps.GetAsyncPersist())
+		assert.True(t, caps.GetConsumerReset())
+		assert.True(t, caps.GetCronSchedules())
+		assert.True(t, caps.GetBatchPublish())
+	})
+
 	t.Run("WithoutJetStream", func(t *testing.T) {
 		t.Parallel()
 

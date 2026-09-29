@@ -753,3 +753,89 @@ func TestConsumerUpdateMerge_MaxRequestMaxBytes(t *testing.T) {
 	result := svc.mergeConsumerUpdate(current, update)
 	assert.Equal(t, 4096, result.MaxRequestMaxBytes, "*int64 → int")
 }
+
+// TestStreamConversion_FeatureFlags verifies the NATS 2.11–2.14 stream flags
+// survive create and info conversion.
+func TestStreamConversion_FeatureFlags(t *testing.T) {
+	t.Run("create request to jetstream config", func(t *testing.T) {
+		req := entities.StreamCreateRequest{
+			Name:                   "flags",
+			Subjects:               []string{"flags.>"},
+			AllowMsgCounter:        true,
+			AllowMsgSchedules:      true,
+			SubjectDeleteMarkerTTL: 5 * time.Minute,
+			PersistMode:            entities.PersistAsync,
+			AllowBatchPublish:      true,
+		}
+		js := converter.Convert(req, &jetstream.StreamConfig{}, srcDestToJetStream)
+		assert.True(t, js.AllowMsgCounter)
+		assert.True(t, js.AllowMsgSchedules)
+		assert.Equal(t, 5*time.Minute, js.SubjectDeleteMarkerTTL)
+		assert.Equal(t, jetstream.AsyncPersistMode, js.PersistMode)
+		assert.True(t, js.AllowBatchPublish)
+	})
+
+	t.Run("jetstream info to entity", func(t *testing.T) {
+		info := toStreamInfo(&jetstream.StreamInfo{Config: jetstream.StreamConfig{
+			Name:                   "flags",
+			AllowMsgCounter:        true,
+			AllowMsgSchedules:      true,
+			SubjectDeleteMarkerTTL: time.Minute,
+			PersistMode:            jetstream.AsyncPersistMode,
+			AllowBatchPublish:      true,
+		}})
+		require.NotNil(t, info.Config)
+		assert.True(t, info.Config.AllowMsgCounter)
+		assert.True(t, info.Config.AllowMsgSchedules)
+		assert.Equal(t, time.Minute, info.Config.SubjectDeleteMarkerTTL)
+		assert.Equal(t, entities.PersistAsync, info.Config.PersistMode)
+		assert.True(t, info.Config.AllowBatchPublish)
+	})
+}
+
+// TestConsumerConversion_PriorityGroups verifies priority settings and pinned
+// state survive create and info conversion.
+func TestConsumerConversion_PriorityGroups(t *testing.T) {
+	t.Run("create request to jetstream config", func(t *testing.T) {
+		js, err := toJetStreamConsumerConfig(entities.ConsumerCreateRequest{
+			Name:           "worker",
+			PriorityPolicy: entities.PriorityPinnedClient,
+			PriorityGroups: []string{"jobs"},
+			PinnedTTL:      time.Minute,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, jetstream.PriorityPolicyPinned, js.PriorityPolicy)
+		assert.Equal(t, []string{"jobs"}, js.PriorityGroups)
+		assert.Equal(t, time.Minute, js.PinnedTTL)
+	})
+
+	t.Run("jetstream info to entity", func(t *testing.T) {
+		pinnedAt := time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)
+		info := toConsumerInfo(&jetstream.ConsumerInfo{
+			Name: "worker",
+			Config: jetstream.ConsumerConfig{
+				PriorityPolicy: jetstream.PriorityPolicyPrioritized,
+				PriorityGroups: []string{"jobs"},
+				PinnedTTL:      2 * time.Minute,
+			},
+			PriorityGroups: []jetstream.PriorityGroupState{{Group: "jobs", PinnedClientID: "pin-1", PinnedTS: pinnedAt}},
+		}, "ORDERS")
+		require.NotNil(t, info.Config)
+		assert.Equal(t, entities.PriorityPrioritized, info.Config.PriorityPolicy)
+		assert.Equal(t, []string{"jobs"}, info.Config.PriorityGroups)
+		assert.Equal(t, 2*time.Minute, info.Config.PinnedTTL)
+		require.Len(t, info.PriorityGroups, 1)
+		assert.Equal(t, "jobs", info.PriorityGroups[0].Group)
+		assert.Equal(t, "pin-1", info.PriorityGroups[0].PinnedClientID)
+		assert.Equal(t, pinnedAt, info.PriorityGroups[0].PinnedTS)
+	})
+
+	t.Run("server-created flow control ack policy", func(t *testing.T) {
+		info := toConsumerInfo(&jetstream.ConsumerInfo{
+			Name:   "sourcing",
+			Config: jetstream.ConsumerConfig{AckPolicy: jetstream.AckFlowControlPolicy},
+		}, "ORDERS")
+		require.NotNil(t, info.Config)
+		assert.Equal(t, entities.AckFlowControl, info.Config.AckPolicy)
+	})
+}

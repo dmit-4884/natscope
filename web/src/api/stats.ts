@@ -50,6 +50,14 @@ export interface ServerInfoResponse {
     consumer_pause: boolean
     message_ttl: boolean
     atomic_publish: boolean
+    priority_groups: boolean
+    msg_counters: boolean
+    msg_schedules: boolean
+    priority_prioritized: boolean
+    async_persist: boolean
+    consumer_reset: boolean
+    cron_schedules: boolean
+    batch_publish: boolean
   }
 }
 
@@ -102,6 +110,14 @@ export async function getServerInfo(
           consumer_pause: info.capabilities.consumerPause,
           message_ttl: info.capabilities.messageTtl,
           atomic_publish: info.capabilities.atomicPublish,
+          priority_groups: info.capabilities.priorityGroups,
+          msg_counters: info.capabilities.msgCounters,
+          msg_schedules: info.capabilities.msgSchedules,
+          priority_prioritized: info.capabilities.priorityPrioritized,
+          async_persist: info.capabilities.asyncPersist,
+          consumer_reset: info.capabilities.consumerReset,
+          cron_schedules: info.capabilities.cronSchedules,
+          batch_publish: info.capabilities.batchPublish,
         }
       : undefined,
   }

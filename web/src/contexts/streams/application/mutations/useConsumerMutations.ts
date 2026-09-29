@@ -126,3 +126,44 @@ export function useResumeConsumer(
     },
   })
 }
+
+export function useResetConsumer(
+  connectionId: string | undefined,
+  streamName: string | undefined,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ name, sequence }: { name: string; sequence?: number }) => {
+      if (!connectionId || !streamName) throw new Error('No connection or stream')
+      return api.resetConsumer(connectionId, streamName, name, sequence)
+    },
+    onSuccess: (result, { name }) => {
+      toast.success(`Consumer "${name}" reset; delivery restarts at stream sequence ${result.reset_seq}`)
+      queryClient.invalidateQueries({ queryKey: streamDetailKey(connectionId, streamName) })
+      queryClient.invalidateQueries({ queryKey: consumersListKey(connectionId, streamName) })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to reset consumer: ${getErrorMessage(error)}`)
+    },
+  })
+}
+
+export function useUnpinConsumer(
+  connectionId: string | undefined,
+  streamName: string | undefined,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ name, group }: { name: string; group: string }) => {
+      if (!connectionId || !streamName) throw new Error('No connection or stream')
+      return api.unpinConsumer(connectionId, streamName, name, group)
+    },
+    onSuccess: (_, { group }) => {
+      toast.success(`Unpinned the client of group "${group}"`)
+      queryClient.invalidateQueries({ queryKey: consumersListKey(connectionId, streamName) })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to unpin: ${getErrorMessage(error)}`)
+    },
+  })
+}

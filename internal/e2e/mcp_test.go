@@ -169,11 +169,20 @@ func TestMCPReadOnly(t *testing.T) {
 
 	t.Run("server info", func(t *testing.T) {
 		out := callTool[struct {
-			Jetstream bool   `json:"jetstream"`
-			Version   string `json:"version"`
+			Jetstream    bool   `json:"jetstream"`
+			Version      string `json:"version"`
+			Capabilities *struct {
+				ApiLevel      int32 `json:"apiLevel"`
+				ConsumerReset bool  `json:"consumerReset"`
+				MsgCounters   bool  `json:"msgCounters"`
+			} `json:"capabilities"`
 		}](t, cs, "get_server_info", map[string]any{"connection": "MCP-LOCAL"})
 		assert.True(t, out.Jetstream)
 		assert.NotEmpty(t, out.Version)
+		require.NotNil(t, out.Capabilities)
+		assert.GreaterOrEqual(t, out.Capabilities.ApiLevel, int32(4))
+		assert.True(t, out.Capabilities.ConsumerReset)
+		assert.True(t, out.Capabilities.MsgCounters)
 	})
 
 	t.Run("streams", func(t *testing.T) {

@@ -4,17 +4,38 @@
 package natsgo
 
 import (
+	"errors"
 	"testing"
+	"time"
 
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 )
 
 // TestComputeCapabilities verifies API-level gating with semver fallback for
 // servers that don't advertise a level (< 2.12 advertise 0).
 func TestComputeCapabilities(t *testing.T) {
+	level1 := entities.ServerCapabilities{
+		ApiLevel: 1, ConsumerPause: true, MessageTtl: true, PriorityGroups: true,
+	}
+	level2 := entities.ServerCapabilities{
+		ApiLevel: 2, ConsumerPause: true, MessageTtl: true, PriorityGroups: true,
+		AtomicPublish: true, MsgCounters: true, MsgSchedules: true, PriorityPrioritized: true, AsyncPersist: true,
+	}
+	level3 := level2
+	level3.ApiLevel = 3
+	level4 := entities.ServerCapabilities{
+		ApiLevel: 4, ConsumerPause: true, MessageTtl: true, PriorityGroups: true,
+		AtomicPublish: true, MsgCounters: true, MsgSchedules: true, PriorityPrioritized: true, AsyncPersist: true,
+		ConsumerReset: true, CronSchedules: true, BatchPublish: true,
+	}
+	level5 := level4
+	level5.ApiLevel = 5
+
 	tests := []struct {
 		name      string
 		version   string
@@ -22,22 +43,12 @@ func TestComputeCapabilities(t *testing.T) {
 		apiLevel  int
 		want      entities.ServerCapabilities
 	}{
-		{
-			name: "2.14 advertises level 4", version: "2.14.2", jsEnabled: true, apiLevel: 4,
-			want: entities.ServerCapabilities{ApiLevel: 4, ConsumerPause: true, MessageTtl: true, AtomicPublish: true},
-		},
-		{
-			name: "2.12 advertises level 2", version: "2.12.0", jsEnabled: true, apiLevel: 2,
-			want: entities.ServerCapabilities{ApiLevel: 2, ConsumerPause: true, MessageTtl: true, AtomicPublish: true},
-		},
-		{
-			name: "2.11 without advertised level falls back to semver", version: "2.11.3", jsEnabled: true, apiLevel: 0,
-			want: entities.ServerCapabilities{ApiLevel: 1, ConsumerPause: true, MessageTtl: true, AtomicPublish: false},
-		},
-		{
-			name: "v-prefixed version string", version: "v2.11.0", jsEnabled: true, apiLevel: 0,
-			want: entities.ServerCapabilities{ApiLevel: 1, ConsumerPause: true, MessageTtl: true, AtomicPublish: false},
-		},
+		{name: "2.15 advertises level 5", version: "2.15.0", jsEnabled: true, apiLevel: 5, want: level5},
+		{name: "2.14 advertises level 4", version: "2.14.2", jsEnabled: true, apiLevel: 4, want: level4},
+		{name: "2.12.5+ advertises level 3", version: "2.12.15", jsEnabled: true, apiLevel: 3, want: level3},
+		{name: "2.12 advertises level 2", version: "2.12.0", jsEnabled: true, apiLevel: 2, want: level2},
+		{name: "2.11 without advertised level falls back to semver", version: "2.11.3", jsEnabled: true, apiLevel: 0, want: level1},
+		{name: "v-prefixed version string", version: "v2.11.0", jsEnabled: true, apiLevel: 0, want: level1},
 		{
 			name: "2.10 without advertised level has no gated features", version: "2.10.24", jsEnabled: true, apiLevel: 0,
 			want: entities.ServerCapabilities{ApiLevel: 0},
@@ -63,4 +74,158 @@ func TestComputeCapabilities(t *testing.T) {
 			assert.Equal(t, tt.want, *got)
 		})
 	}
+}
+
+// TestCheckFeatures verifies the backend guard rejects features above the
+// server's API level with ErrFeatureUnsupported and a version hint.
+func TestCheckFeatures(t *testing.T) {
+	tests := []struct {
+		name     string
+		level    int32
+		version  string
+		features []feature
+		wantErr  string
+	}{
+		{name: "no features", level: 0, version: "2.10.0"},
+		{name: "supported at exact level", level: 4, version: "2.14.0", features: []feature{featConsumerReset}},
+		{name: "supported above level", level: 5, version: "2.15.0", features: []feature{featMsgCounters, featConsumerReset}},
+		{
+			name: "unsupported reports first failing feature", level: 2, version: "2.12.3",
+			features: []feature{featMsgCounters, featConsumerReset},
+			wantErr:  "consumer reset requires NATS 2.14+ (connected server v2.12.3)",
+		},
+		{
+			name: "unknown version", level: 0, version: "",
+			features: []feature{featMessageTTL},
+			wantErr:  "per-message TTL requires NATS 2.11+ (connected server version unknown)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkFeatures(tt.level, tt.version, tt.features...)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, errs.ErrFeatureUnsupported))
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+// TestHeaderFeatures verifies which version-gated features a publish's headers
+// use; keys match exactly because the server looks headers up case-sensitively.
+func TestHeaderFeatures(t *testing.T) {
+	tests := []struct {
+		name    string
+		headers map[string]string
+		want    []feature
+	}{
+		{name: "no headers", headers: nil, want: nil},
+		{name: "unrelated headers", headers: map[string]string{"Nats-Msg-Id": "a", "X-Trace": "b"}, want: nil},
+		{name: "message ttl", headers: map[string]string{"Nats-TTL": "5s"}, want: []feature{featMessageTTL}},
+		{name: "counter increment", headers: map[string]string{"Nats-Incr": "+1"}, want: []feature{featMsgCounters}},
+		{
+			name:    "single delayed schedule",
+			headers: map[string]string{"Nats-Schedule": "@at 2030-01-01T00:00:00Z", "Nats-Schedule-Target": "orders"},
+			want:    []feature{featMsgSchedules},
+		},
+		{
+			name:    "schedule ttl needs message ttl",
+			headers: map[string]string{"Nats-Schedule": "@at 2030-01-01T00:00:00Z", "Nats-Schedule-TTL": "5m"},
+			want:    []feature{featMsgSchedules, featMessageTTL},
+		},
+		{
+			name:    "interval schedule",
+			headers: map[string]string{"Nats-Schedule": "@every 5m"},
+			want:    []feature{featMsgSchedules, featCronSchedules},
+		},
+		{
+			name:    "cron schedule with time zone",
+			headers: map[string]string{"Nats-Schedule": "0 0 * * * *", "Nats-Schedule-Time-Zone": "Europe/Amsterdam"},
+			want:    []feature{featMsgSchedules, featCronSchedules},
+		},
+		{
+			name:    "subject sampling",
+			headers: map[string]string{"Nats-Schedule": "@at 2030-01-01T00:00:00Z", "Nats-Schedule-Source": "sensors.temp"},
+			want:    []feature{featMsgSchedules, featCronSchedules},
+		},
+		{
+			name:    "scheduled rollup",
+			headers: map[string]string{"Nats-Schedule": "@hourly", "Nats-Schedule-Rollup": "sub"},
+			want:    []feature{featMsgSchedules, featCronSchedules},
+		},
+		{name: "lowercase keys are not recognized by the server", headers: map[string]string{"nats-ttl": "5s", "nats-incr": "1"}, want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.ElementsMatch(t, tt.want, headerFeatures(tt.headers))
+		})
+	}
+}
+
+// TestStreamConfigFeatures mirrors the server's setStaticStreamMetadata: every
+// flag an older server would silently drop maps to its feature.
+func TestStreamConfigFeatures(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  jetstream.StreamConfig
+		want []feature
+	}{
+		{name: "plain stream", cfg: jetstream.StreamConfig{Name: "S"}, want: nil},
+		{name: "message ttl", cfg: jetstream.StreamConfig{AllowMsgTTL: true}, want: []feature{featMessageTTL}},
+		{name: "delete markers", cfg: jetstream.StreamConfig{SubjectDeleteMarkerTTL: time.Minute}, want: []feature{featMessageTTL}},
+		{name: "counter", cfg: jetstream.StreamConfig{AllowMsgCounter: true}, want: []feature{featMsgCounters}},
+		{name: "atomic", cfg: jetstream.StreamConfig{AllowAtomicPublish: true}, want: []feature{featAtomicPublish}},
+		{name: "schedules", cfg: jetstream.StreamConfig{AllowMsgSchedules: true}, want: []feature{featMsgSchedules}},
+		{name: "async persist", cfg: jetstream.StreamConfig{PersistMode: jetstream.AsyncPersistMode}, want: []feature{featAsyncPersist}},
+		{name: "fast batch", cfg: jetstream.StreamConfig{AllowBatchPublish: true}, want: []feature{featBatchPublish}},
+		{
+			name: "several",
+			cfg:  jetstream.StreamConfig{AllowMsgTTL: true, SubjectDeleteMarkerTTL: time.Minute, AllowMsgSchedules: true},
+			want: []feature{featMessageTTL, featMsgSchedules},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.ElementsMatch(t, tt.want, streamConfigFeatures(tt.cfg))
+		})
+	}
+}
+
+// TestConsumerConfigFeatures mirrors the server's setStaticConsumerMetadata.
+func TestConsumerConfigFeatures(t *testing.T) {
+	pauseUntil := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		cfg  jetstream.ConsumerConfig
+		want []feature
+	}{
+		{name: "plain consumer", cfg: jetstream.ConsumerConfig{Durable: "c"}, want: nil},
+		{name: "pinned client", cfg: jetstream.ConsumerConfig{PriorityPolicy: jetstream.PriorityPolicyPinned}, want: []feature{featPriorityGroups}},
+		{name: "overflow", cfg: jetstream.ConsumerConfig{PriorityPolicy: jetstream.PriorityPolicyOverflow}, want: []feature{featPriorityGroups}},
+		{
+			name: "prioritized",
+			cfg:  jetstream.ConsumerConfig{PriorityPolicy: jetstream.PriorityPolicyPrioritized},
+			want: []feature{featPriorityGroups, featPriorityPrioritized},
+		},
+		{name: "paused at creation", cfg: jetstream.ConsumerConfig{PauseUntil: &pauseUntil}, want: []feature{featConsumerPause}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.ElementsMatch(t, tt.want, consumerConfigFeatures(tt.cfg))
+		})
+	}
+}
+
+// TestRequireFeatures_UnknownServerFailsOpen verifies the guard stays out of
+// the way while disconnected, so the call fails with its real connection error.
+func TestRequireFeatures_UnknownServerFailsOpen(t *testing.T) {
+	c := &Client{}
+	assert.NoError(t, c.requireFeatures(featConsumerReset, featMsgCounters))
 }

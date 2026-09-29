@@ -47,6 +47,11 @@ export interface StreamConfig {
   allow_msg_ttl?: boolean
   consumer_limits?: StreamConsumerLimits
   allow_atomic?: boolean
+  allow_msg_counter?: boolean
+  allow_msg_schedules?: boolean
+  subject_delete_marker_ttl?: number
+  persist_mode?: 'default' | 'async'
+  allow_batched?: boolean
   mirror?: StreamSourceRef
   sources?: StreamSourceRef[]
   republish?: StreamRePublish
@@ -151,6 +156,17 @@ export interface ConsumerConfig {
   num_replicas?: number
   mem_storage?: boolean
   metadata?: Record<string, string>
+  priority_policy?: PriorityPolicy
+  priority_groups?: string[]
+  priority_timeout?: number
+}
+
+export type PriorityPolicy = 'none' | 'pinned_client' | 'overflow' | 'prioritized'
+
+export interface PriorityGroupState {
+  group: string
+  pinned_client_id?: string
+  pinned_ts?: number // Unix milliseconds
 }
 
 interface SequenceInfo {
@@ -174,6 +190,7 @@ export interface ConsumerInfo {
   /** RFC3339 instant the pause lifts; only meaningful while paused. */
   pause_until?: string
   cluster?: ClusterInfo
+  priority_groups?: PriorityGroupState[]
   raw?: Record<string, unknown>
 }
 

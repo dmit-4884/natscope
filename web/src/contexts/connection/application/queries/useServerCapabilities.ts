@@ -1,24 +1,38 @@
 import { getServerInfo } from '@/api/stats'
 import { useConnectionQuery } from '@/hooks/useConnectionQuery'
 
-export type CapabilityKey = 'consumerPause' | 'messageTtl' | 'atomicPublish'
+export type CapabilityKey =
+  | 'consumerPause'
+  | 'messageTtl'
+  | 'atomicPublish'
+  | 'priorityGroups'
+  | 'msgCounters'
+  | 'msgSchedules'
+  | 'priorityPrioritized'
+  | 'asyncPersist'
+  | 'consumerReset'
+  | 'cronSchedules'
+  | 'batchPublish'
 
 /**
  * Display-only requirement labels for tooltips. The boolean truth always
- * comes from the backend (internal/services/nats/nats/capabilities.go).
+ * comes from the backend (internal/pkg/natsclient/natsgo/capabilities.go).
  */
 const CAPABILITY_REQUIREMENTS: Record<CapabilityKey, string> = {
   consumerPause: 'NATS 2.11+',
   messageTtl: 'NATS 2.11+',
   atomicPublish: 'NATS 2.12+',
+  priorityGroups: 'NATS 2.11+',
+  msgCounters: 'NATS 2.12+',
+  msgSchedules: 'NATS 2.12+',
+  priorityPrioritized: 'NATS 2.12+',
+  asyncPersist: 'NATS 2.12+',
+  consumerReset: 'NATS 2.14+',
+  cronSchedules: 'NATS 2.14+',
+  batchPublish: 'NATS 2.14+',
 }
 
-interface ServerCapabilities {
-  apiLevel: number
-  consumerPause: boolean
-  messageTtl: boolean
-  atomicPublish: boolean
-}
+type ServerCapabilities = Record<CapabilityKey, boolean> & { apiLevel: number }
 
 export interface UseServerCapabilitiesResult {
   /** undefined until loaded or when the backend predates capabilities. */
@@ -48,12 +62,21 @@ export function useServerCapabilities(
     staleTime: CAPABILITIES_STALE_TIME_MS,
   })
 
-  const capabilities: ServerCapabilities | undefined = data?.capabilities
+  const caps = data?.capabilities
+  const capabilities: ServerCapabilities | undefined = caps
     ? {
-        apiLevel: data.capabilities.api_level,
-        consumerPause: data.capabilities.consumer_pause,
-        messageTtl: data.capabilities.message_ttl,
-        atomicPublish: data.capabilities.atomic_publish,
+        apiLevel: caps.api_level,
+        consumerPause: caps.consumer_pause,
+        messageTtl: caps.message_ttl,
+        atomicPublish: caps.atomic_publish,
+        priorityGroups: caps.priority_groups,
+        msgCounters: caps.msg_counters,
+        msgSchedules: caps.msg_schedules,
+        priorityPrioritized: caps.priority_prioritized,
+        asyncPersist: caps.async_persist,
+        consumerReset: caps.consumer_reset,
+        cronSchedules: caps.cron_schedules,
+        batchPublish: caps.batch_publish,
       }
     : undefined
 

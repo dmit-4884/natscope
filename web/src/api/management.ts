@@ -16,6 +16,7 @@ import type {
   ConsumerCreateRequest,
   ConsumerUpdateRequest,
   ConsumerPauseResponse,
+  ConsumerResetResponse,
   KVBucketConfig,
   KVBucketInfo,
   KVEntry,
@@ -28,7 +29,7 @@ import type {
   RevisionResponse,
 } from '../types/management'
 import { managementClient } from './grpc/clients'
-import { toStreamInfo, toConsumerInfo, RETENTION_INT, STORAGE_INT, STORAGE_STR, DISCARD_INT, COMPRESSION_INT, DELIVER_POLICY_INT, ACK_POLICY_INT, REPLAY_POLICY_INT } from './streams'
+import { toStreamInfo, toConsumerInfo, RETENTION_INT, STORAGE_INT, STORAGE_STR, DISCARD_INT, COMPRESSION_INT, PERSIST_MODE_INT, DELIVER_POLICY_INT, ACK_POLICY_INT, REPLAY_POLICY_INT, PRIORITY_POLICY_INT } from './streams'
 
 function toPlacementInit(p: PlacementConfig) {
   return { cluster: p.cluster ?? '', tags: p.tags ?? [] }
@@ -91,6 +92,11 @@ export async function createStream(
     noAck: config.no_ack ?? false,
     allowMsgTtl: config.allow_msg_ttl ?? false,
     allowAtomicPublish: config.allow_atomic_publish ?? false,
+    allowMsgCounter: config.allow_msg_counter ?? false,
+    allowMsgSchedules: config.allow_msg_schedules ?? false,
+    subjectDeleteMarkerTtl: config.subject_delete_marker_ttl ? nanosToDur(config.subject_delete_marker_ttl) : undefined,
+    persistMode: PERSIST_MODE_INT[config.persist_mode ?? ''] ?? 0,
+    allowBatchPublish: config.allow_batch_publish ?? false,
     compression: COMPRESSION_INT[config.compression ?? ''] ?? 0,
     firstSeq: config.first_seq != null ? BigInt(config.first_seq) : BigInt(0),
     placement: config.placement ? toPlacementInit(config.placement) : undefined,
@@ -132,6 +138,9 @@ export async function updateStream(
     consumerLimits: config.consumer_limits ? toConsumerLimitsInit(config.consumer_limits) : undefined,
     allowMsgTtl: config.allow_msg_ttl,
     allowAtomicPublish: config.allow_atomic_publish,
+    allowMsgSchedules: config.allow_msg_schedules,
+    subjectDeleteMarkerTtl: config.subject_delete_marker_ttl != null ? nanosToDur(config.subject_delete_marker_ttl) : undefined,
+    allowBatchPublish: config.allow_batch_publish,
     metadata: config.metadata ?? {},
   })
   return toStreamInfo(response.stream!)
@@ -236,6 +245,9 @@ export async function createConsumer(
     flowControl: config.flow_control ?? false,
     idleHeartbeat: config.idle_heartbeat != null ? nanosToDur(config.idle_heartbeat) : undefined,
     ephemeral: config.ephemeral ?? false,
+    priorityPolicy: PRIORITY_POLICY_INT[config.priority_policy ?? 'none'],
+    priorityGroups: config.priority_groups ?? [],
+    pinnedTtl: config.priority_timeout ? nanosToDur(config.priority_timeout) : undefined,
   })
   return toConsumerInfo(response.consumer!)
 }
@@ -265,6 +277,9 @@ export async function updateConsumer(
     metadata: config.metadata ?? {},
     filterSubject: config.filter_subject,
     filterSubjects: config.filter_subjects?.length ? config.filter_subjects : [],
+    priorityPolicy: config.priority_policy != null ? PRIORITY_POLICY_INT[config.priority_policy] : undefined,
+    priorityGroups: config.priority_groups?.length ? config.priority_groups : [],
+    pinnedTtl: config.priority_timeout != null ? nanosToDur(config.priority_timeout) : undefined,
   })
   return toConsumerInfo(response.consumer!)
 }
@@ -297,6 +312,33 @@ export async function pauseConsumer(
     paused: response.paused,
     pause_until: response.pauseUntil || undefined,
   }
+}
+
+export async function resetConsumer(
+  connectionId: string,
+  streamName: string,
+  consumerName: string,
+  sequence?: number
+): Promise<ConsumerResetResponse> {
+  const response = await managementClient.resetConsumer({
+    connectionId,
+    streamName,
+    consumerName,
+    sequence: sequence != null ? BigInt(sequence) : undefined,
+  })
+  return {
+    reset_seq: Number(response.resetSeq),
+    consumer: response.consumer ? toConsumerInfo(response.consumer) : undefined,
+  }
+}
+
+export async function unpinConsumer(
+  connectionId: string,
+  streamName: string,
+  consumerName: string,
+  group: string
+): Promise<void> {
+  await managementClient.unpinConsumer({ connectionId, streamName, consumerName, group })
 }
 
 export async function resumeConsumer(

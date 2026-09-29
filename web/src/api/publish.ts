@@ -10,7 +10,8 @@ export interface PublishRequest {
   message_type?: string
   source_id?: string
   source_tag?: string
-  data: Record<string, unknown>
+  /** null publishes without a body (counter increments). */
+  data: Record<string, unknown> | null
   headers?: Record<string, string>
 }
 
@@ -18,6 +19,7 @@ export interface PublishResponse {
   stream?: string
   sequence?: number
   duplicate?: boolean
+  counter_value?: string
 }
 
 export interface ValidationResult {
@@ -46,7 +48,7 @@ export async function publishMessage(request: PublishRequest): Promise<PublishRe
     messageType: request.message_type || undefined,
     sourceId: request.source_id || undefined,
     sourceTag: request.source_tag || undefined,
-    data: JSON.stringify(request.data),
+    data: request.data === null ? '' : JSON.stringify(request.data),
     headers: request.headers ?? {},
     subjectPattern: request.subject_pattern || undefined,
   })
@@ -57,6 +59,7 @@ export async function publishMessage(request: PublishRequest): Promise<PublishRe
     stream: response.stream || undefined,
     sequence: Number(response.sequence) || undefined,
     duplicate: response.duplicate || false,
+    counter_value: response.counterValue,
   }
 }
 

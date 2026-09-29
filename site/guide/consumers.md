@@ -39,7 +39,26 @@ Changes** with a field-level diff before it sends anything to the server.
 ## Pause and resume
 
 **Pause** stops delivery until a chosen time. Paused consumers carry a paused-until badge in the list.
-**Resume** lifts it early.
+**Resume** lifts it early. Needs NATS 2.11+.
+
+## Reset
+
+**Reset** clears the delivery state so unacknowledged messages are delivered again, without deleting the
+consumer. Leave the sequence empty to keep the ack floor, or enter a stream sequence to replay from it.
+Replaying from a sequence works for consumers that deliver all messages or start at a sequence or time.
+Needs NATS 2.14+.
+
+## Priority groups
+
+Pull consumers can split work between clients through priority groups (NATS 2.11+). Set them in the
+**Priority Groups** section of the form:
+
+- **Pinned client** sends every message to one client until it stays idle longer than the pinned TTL
+- **Overflow** serves a client only when the others fall behind
+- **Prioritized** prefers clients with a lower priority number (NATS 2.12+)
+
+The consumer view shows which client each group is pinned to. **Unpin** releases it, so the next pull
+request gets pinned instead.
 
 ## Delete
 

@@ -84,3 +84,33 @@ func (s *Service) ResumeConsumer(
 	}
 	return c.ResumeConsumer(ctx, streamName, consumerName)
 }
+
+// ResetConsumer resets a consumer's delivery state, optionally to a stream sequence.
+func (s *Service) ResetConsumer(
+	ctx context.Context,
+	connectionID string,
+	streamName string,
+	consumerName string,
+	sequence *uint64,
+) (*entities.ConsumerResetResponse, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.ResetConsumer(ctx, streamName, consumerName, sequence)
+}
+
+// UnpinConsumer releases the pinned client of a consumer priority group.
+func (s *Service) UnpinConsumer(
+	ctx context.Context,
+	connectionID string,
+	streamName string,
+	consumerName string,
+	group string,
+) error {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return err
+	}
+	return c.UnpinConsumer(ctx, streamName, consumerName, group)
+}

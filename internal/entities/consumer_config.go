@@ -93,4 +93,13 @@ type ConsumerConfig struct {
 
 	// DeliverGroup is the queue group for load balancing.
 	DeliverGroup string
+
+	// PriorityPolicy is how priority groups pick pull clients (NATS 2.11+).
+	PriorityPolicy PriorityPolicy
+
+	// PriorityGroups are the priority group names pull requests may target.
+	PriorityGroups []string
+
+	// PinnedTTL is how long a pinned client may stay idle before it is unpinned.
+	PinnedTTL time.Duration
 }

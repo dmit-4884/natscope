@@ -86,6 +86,21 @@ func TestHandler_PublishMessage(t *testing.T) {
 		assert.Equal(t, "orders", resp.Msg.Stream)
 		assert.Equal(t, uint64(42), resp.Msg.Sequence)
 		assert.True(t, svc.called)
+		assert.Nil(t, resp.Msg.CounterValue)
+	})
+
+	t.Run("CounterValue", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockPublishService{result: &entities.PublishResult{Stream: "HITS", Sequence: 3, CounterValue: new("12")}}
+		handler := New(svc, &stubProtoService{})
+
+		resp, err := handler.PublishMessage(t.Context(), connect.NewRequest(&publishpb.PublishMessageRequest{
+			ConnectionId: "conn-1",
+			Subject:      "hits.page",
+			Headers:      map[string]string{"Nats-Incr": "+1"},
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, "12", resp.Msg.GetCounterValue())
 	})
 
 	t.Run("ServiceError", func(t *testing.T) {

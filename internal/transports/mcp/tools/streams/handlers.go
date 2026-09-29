@@ -107,13 +107,7 @@ func (t *Toolset) consumers(ctx context.Context, connID, stream string) ([]consu
 		if err != nil {
 			return nil, err
 		}
-		return slices.To(infos, func(c entities.ConsumerInfo) consumerView {
-			v := converter.Convert(&c, &consumerView{}, mcptransport.ViewCodecs)
-			if c.Config != nil {
-				v = converter.Convert(c.Config, v, mcptransport.ViewCodecs, converter.WithIgnoreFields("Name"))
-			}
-			return *v
-		}), nil
+		return slices.To(infos, consumerViewOf), nil
 	}
 	stats, err := t.stats.GetAllConsumers(ctx, connID)
 	if err != nil {
@@ -122,4 +116,18 @@ func (t *Toolset) consumers(ctx context.Context, connID, stream string) ([]consu
 	return slices.To(stats, func(c entities.ConsumerStats) consumerView {
 		return *converter.Convert(&c, &consumerView{}, mcptransport.ViewCodecs)
 	}), nil
+}
+
+// consumerViewOf merges a consumer's state and config into one view.
+func consumerViewOf(c entities.ConsumerInfo) consumerView {
+	v := converter.Convert(&c, &consumerView{}, mcptransport.ViewCodecs, converter.WithIgnoreFields("PriorityGroups"))
+	if c.Config != nil {
+		v = converter.Convert(c.Config, v, mcptransport.ViewCodecs, converter.WithIgnoreFields("Name"))
+	}
+	for _, state := range c.PriorityGroups {
+		if state.PinnedClientID != "" {
+			v.Pinned = append(v.Pinned, *converter.Convert(&state, &priorityGroupView{}))
+		}
+	}
+	return *v
 }

@@ -136,3 +136,43 @@ func (h *Handler) ResumeConsumer(
 	}
 	return connect.NewResponse(&managementpb.ResumeConsumerResponse{Paused: resp.Paused}), nil
 }
+
+// ResetConsumer resets a consumer's delivery state, optionally to a stream sequence.
+func (h *Handler) ResetConsumer(
+	ctx context.Context,
+	req *connect.Request[managementpb.ResetConsumerRequest],
+) (*connect.Response[managementpb.ResetConsumerResponse], error) {
+	in := req.Msg
+	resp, err := h.natsService.ResetConsumer(
+		ctx,
+		in.GetConnectionId(),
+		in.GetStreamName(),
+		in.GetConsumerName(),
+		in.Sequence,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&managementpb.ResetConsumerResponse{
+		Consumer: converter.Convert(resp.Consumer, &natspb.ConsumerInfo{}, protoCodecs),
+		ResetSeq: resp.ResetSeq,
+	}), nil
+}
+
+// UnpinConsumer releases the pinned client of a consumer priority group.
+func (h *Handler) UnpinConsumer(
+	ctx context.Context,
+	req *connect.Request[managementpb.UnpinConsumerRequest],
+) (*connect.Response[managementpb.UnpinConsumerResponse], error) {
+	in := req.Msg
+	if err := h.natsService.UnpinConsumer(
+		ctx,
+		in.GetConnectionId(),
+		in.GetStreamName(),
+		in.GetConsumerName(),
+		in.GetGroup(),
+	); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&managementpb.UnpinConsumerResponse{}), nil
+}

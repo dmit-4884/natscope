@@ -49,6 +49,8 @@ export interface StreamFieldDef {
   defaultValue?: unknown
   /** Server capability required to use this field; resolved by the form via useServerCapabilities. */
   requiresCapability?: CapabilityKey
+  /** Boolean the server lets you turn on but never off; locked in edit mode once the stream has it on. */
+  enableOnly?: boolean
   /** Backed by a proto int32; the value is clamped to the int32 range. */
   int32?: boolean
 }
@@ -273,6 +275,18 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
     editableOnUpdate: true,
     helperText: 'Enables Nats-TTL header to expire individual messages. Requires NATS 2.11+.',
     requiresCapability: 'messageTtl',
+    enableOnly: true,
+  },
+  {
+    key: 'subject_delete_marker_ttl',
+    label: 'Delete Marker TTL (ns)',
+    type: 'duration_ns',
+    section: 'advanced',
+    editableOnCreate: true,
+    editableOnUpdate: true,
+    helperText:
+      'Leave a delete marker when Max Age removes the last message of a subject, kept this long (at least 1000000000 = 1s, 0 = off). Turns on per-message TTL and rollups; not allowed on mirrors. Requires NATS 2.11+.',
+    requiresCapability: 'messageTtl',
   },
   {
     key: 'allow_atomic_publish',
@@ -283,6 +297,57 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
     editableOnUpdate: true,
     helperText: 'Enables atomic batch publish API. Requires NATS 2.12+.',
     requiresCapability: 'atomicPublish',
+  },
+  {
+    key: 'allow_msg_counter',
+    label: 'Counter Stream',
+    type: 'boolean',
+    section: 'advanced',
+    editableOnCreate: true,
+    editableOnUpdate: false,
+    immutableReason: 'Cannot be changed after creation.',
+    helperText:
+      'Every message must carry a Nats-Incr header and the stream keeps a running total per subject. Needs limits retention and discard old; no per-message TTL or schedules. Requires NATS 2.12+.',
+    requiresCapability: 'msgCounters',
+  },
+  {
+    key: 'allow_msg_schedules',
+    label: 'Allow Message Schedules',
+    type: 'boolean',
+    section: 'advanced',
+    editableOnCreate: true,
+    editableOnUpdate: true,
+    helperText:
+      'Messages with a Nats-Schedule header are published to their target later. Turns on rollups; not allowed with sources, mirrors or discard new. Requires NATS 2.12+.',
+    requiresCapability: 'msgSchedules',
+    enableOnly: true,
+  },
+  {
+    key: 'persist_mode',
+    label: 'Persist Mode',
+    type: 'select',
+    section: 'advanced',
+    editableOnCreate: true,
+    editableOnUpdate: false,
+    immutableReason: 'Cannot be changed after creation.',
+    helperText:
+      'Async flushes writes in the background for higher throughput at the risk of losing recent writes on a crash. File storage, 1 replica, no atomic publish. Requires NATS 2.12+.',
+    defaultValue: 'default',
+    options: [
+      { value: 'default', label: 'Default' },
+      { value: 'async', label: 'Async' },
+    ],
+    requiresCapability: 'asyncPersist',
+  },
+  {
+    key: 'allow_batch_publish',
+    label: 'Allow Fast Batch Publish',
+    type: 'boolean',
+    section: 'advanced',
+    editableOnCreate: true,
+    editableOnUpdate: true,
+    helperText: 'Enables high-throughput batch publishing from supporting clients. Requires NATS 2.14+.',
+    requiresCapability: 'batchPublish',
   },
   {
     key: 'discard_new_per_subject',
@@ -348,6 +413,17 @@ const STREAM_CREATE_PASSTHROUGH_KEYS: ReadonlyArray<keyof StreamCreateRequest> =
 ]
 
 const STREAM_UPDATE_LOCKED_EXTRA_KEYS: ReadonlyArray<string> = ['mirror', 'placement', 'first_seq', 'no_ack']
+
+const ENABLE_ONLY_REASON = 'Cannot be disabled once enabled.'
+
+export function enableOnlyLockReason(
+  def: StreamFieldDef,
+  mode: 'create' | 'edit',
+  original: StreamCreateRequest | null | undefined,
+): string | undefined {
+  if (mode !== 'edit' || !def.enableOnly || !original) return undefined
+  return (original as unknown as Record<string, unknown>)[def.key as string] === true ? ENABLE_ONLY_REASON : undefined
+}
 
 /** Field keys that cannot be changed when updating an existing stream. */
 export function getStreamUpdateLockedKeys(): readonly string[] {

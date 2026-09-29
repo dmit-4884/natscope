@@ -121,6 +121,9 @@ func StatusErrorConvert(_ context.Context, err error) error {
 	if encErr, ok := errors.AsType[*errs.ProtoEncodeError](err); ok && encErr != nil {
 		return NewStatus(codes.InvalidArgument, encErr.Error(), "PROTO_ENCODE_FAILED")
 	}
+	if featErr, ok := errors.AsType[*errs.FeatureUnsupportedError](err); ok && featErr != nil {
+		return NewStatus(codes.FailedPrecondition, featErr.Error(), "NATS_FEATURE_UNSUPPORTED")
+	}
 
 	// Per-handler errors are matched upstream; here we handle only the common set.
 	for _, m := range commonDomainErrors {

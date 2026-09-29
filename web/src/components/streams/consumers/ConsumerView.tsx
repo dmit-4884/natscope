@@ -6,6 +6,7 @@ import { formatDateTime, formatNsDuration } from '@/utils/formatters'
 import { consumerConfigToNatsCli } from '../natsCli'
 import { StatCard, ConfigRow } from './consumerHelpers'
 import { getFilterSubjectsArray } from './consumerUtils'
+import { ConsumerPriority } from './ConsumerPriority'
 
 interface Props {
   consumer: ConsumerInfo
@@ -15,11 +16,19 @@ interface Props {
   onEdit: () => void
   onPause: () => void
   onResume: () => void
+  onReset: () => void
+  onUnpin: (group: string) => void
   onDelete: () => void
   isResuming: boolean
   isPausing: boolean
+  isResetting: boolean
+  isUnpinning: boolean
   /** When set, the server doesn't support pause/resume — buttons are disabled with this tooltip. */
   pauseUnsupportedReason?: string
+  /** When set, the server doesn't support consumer reset — the button is disabled with this tooltip. */
+  resetUnsupportedReason?: string
+  /** When set, the server doesn't support priority groups — unpin is disabled with this tooltip. */
+  unpinUnsupportedReason?: string
 }
 
 function formatPauseUntil(pauseUntil: string | undefined): string | null {
@@ -36,10 +45,16 @@ export function ConsumerView({
   onEdit,
   onPause,
   onResume,
+  onReset,
+  onUnpin,
   onDelete,
   isResuming,
   isPausing,
+  isResetting,
+  isUnpinning,
   pauseUnsupportedReason,
+  resetUnsupportedReason,
+  unpinUnsupportedReason,
 }: Props) {
   const isPaused = consumer.paused === true
   const pauseUntilLabel = formatPauseUntil(consumer.pause_until)
@@ -205,6 +220,12 @@ export function ConsumerView({
                     />
                   )}
                 </div>
+                <ConsumerPriority
+                  consumer={consumer}
+                  onUnpin={onUnpin}
+                  isUnpinning={isUnpinning}
+                  unpinUnsupportedReason={unpinUnsupportedReason}
+                />
               </div>
             </div>
 
@@ -234,6 +255,16 @@ export function ConsumerView({
                   </Tooltip>
                 </>
               )}
+              <Tooltip content={resetUnsupportedReason ?? 'Clear the delivery state and redeliver unacknowledged messages'}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onReset}
+                  disabled={!!resetUnsupportedReason || isResetting}
+                >
+                  Reset
+                </Button>
+              </Tooltip>
               <Button variant="danger" size="sm" onClick={onDelete}>
                 Delete
               </Button>

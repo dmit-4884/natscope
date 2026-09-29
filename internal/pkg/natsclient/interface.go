@@ -125,6 +125,14 @@ type ConsumerManager interface {
 
 	// ResumeConsumer resumes a paused consumer and returns the server's post-resume state.
 	ResumeConsumer(ctx context.Context, streamName string, consumerName string) (*entities.ConsumerPauseResponse, error)
+
+	// ResetConsumer resets a consumer's delivery state, optionally to a stream
+	// sequence (NATS 2.14+; older servers yield errs.ErrFeatureUnsupported).
+	ResetConsumer(ctx context.Context, streamName, consumerName string, sequence *uint64) (*entities.ConsumerResetResponse, error)
+
+	// UnpinConsumer releases the pinned client of a priority group (NATS 2.11+;
+	// older servers yield errs.ErrFeatureUnsupported).
+	UnpinConsumer(ctx context.Context, streamName, consumerName, group string) error
 }
 
 // Publisher publishes messages to JetStream streams.

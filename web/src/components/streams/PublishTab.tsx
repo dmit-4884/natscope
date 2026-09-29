@@ -1,5 +1,7 @@
 import { useOutletContext } from 'react-router-dom'
+import { useServerCapabilities } from '@/contexts/connection'
 import PublishContent from './PublishContent'
+import { optionAvailability } from './publish/publishOptions'
 import type { StreamViewOutletContext } from './StreamView'
 
 export default function PublishTab() {
@@ -16,8 +18,10 @@ export default function PublishTab() {
     publishHeaders,
     setPublishHeaders,
     streamMaxMsgSize,
+    streamPublishFeatures,
     handleOpenMappings,
   } = useOutletContext<StreamViewOutletContext>()
+  const { unsupportedReason } = useServerCapabilities(connectionId)
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -36,6 +40,7 @@ export default function PublishTab() {
           onHeadersChange={setPublishHeaders}
           maxMsgSize={streamMaxMsgSize}
           onOpenMappings={handleOpenMappings}
+          jetStreamOptions={optionAvailability(unsupportedReason, streamPublishFeatures)}
         />
       </div>
     </div>

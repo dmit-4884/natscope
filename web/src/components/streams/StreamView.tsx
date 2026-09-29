@@ -25,6 +25,7 @@ import PublishHistory from './PublishHistory'
 import StreamNotFoundState from './StreamNotFoundState'
 import { isStreamNotFound } from './streamErrors'
 import { subjectMatchesStream } from './publish/subjectPatternUtils'
+import type { StreamPublishFeatures } from './publish/publishOptions'
 
 const RIGHT_PANEL_WIDTH_KEY = 'nats_right_panel_width'
 const EMPTY_HEADERS: HeaderDraft[] = []
@@ -53,6 +54,8 @@ export interface StreamViewOutletContext {
   subjects: string[]
   /** Stream's max_msg_size limit in bytes (0/undefined = unlimited). */
   streamMaxMsgSize?: number
+  /** Stream flags that gate JetStream publish options; undefined until the stream loads. */
+  streamPublishFeatures?: StreamPublishFeatures
 }
 
 export default function StreamView() {
@@ -369,6 +372,13 @@ export default function StreamView() {
           setPublishHeaders,
           subjects: streamDetail?.subjects || [],
           streamMaxMsgSize: streamDetail?.config?.max_msg_size,
+          streamPublishFeatures: streamDetail?.config
+            ? {
+                msgTtl: !!streamDetail.config.allow_msg_ttl,
+                msgSchedules: !!streamDetail.config.allow_msg_schedules,
+                msgCounter: !!streamDetail.config.allow_msg_counter,
+              }
+            : undefined,
         } satisfies StreamViewOutletContext} />
       </main>
 

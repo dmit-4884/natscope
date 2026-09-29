@@ -54,30 +54,36 @@ type streamView struct {
 }
 
 type streamConfigView struct {
-	Name              string            `json:"name"`
-	Description       string            `json:"description,omitempty"`
-	Subjects          []string          `json:"subjects"`
-	Retention         string            `json:"retention"`
-	Storage           string            `json:"storage"`
-	Replicas          int               `json:"replicas"`
-	Discard           string            `json:"discard"`
-	MaxMsgs           int64             `json:"maxMsgs" jsonschema:"-1 means unlimited"`
-	MaxBytes          int64             `json:"maxBytes" jsonschema:"-1 means unlimited"`
-	MaxAge            string            `json:"maxAge,omitempty"`
-	MaxMsgSize        int32             `json:"maxMsgSize" jsonschema:"-1 means unlimited"`
-	MaxMsgsPerSubject int64             `json:"maxMsgsPerSubject" jsonschema:"-1 means unlimited"`
-	MaxConsumers      int               `json:"maxConsumers" jsonschema:"-1 means unlimited"`
-	Duplicates        string            `json:"duplicateWindow,omitempty"`
-	Compression       string            `json:"compression"`
-	Sealed            bool              `json:"sealed"`
-	DenyDelete        bool              `json:"denyDelete"`
-	DenyPurge         bool              `json:"denyPurge"`
-	AllowRollup       bool              `json:"allowRollup"`
-	AllowDirect       bool              `json:"allowDirect"`
-	AllowMsgTTL       bool              `json:"allowMsgTtl"`
-	Mirror            *sourceView       `json:"mirror,omitempty"`
-	Sources           []*sourceView     `json:"sources,omitempty"`
-	Metadata          map[string]string `json:"metadata,omitempty"`
+	Name                   string            `json:"name"`
+	Description            string            `json:"description,omitempty"`
+	Subjects               []string          `json:"subjects"`
+	Retention              string            `json:"retention"`
+	Storage                string            `json:"storage"`
+	Replicas               int               `json:"replicas"`
+	Discard                string            `json:"discard"`
+	MaxMsgs                int64             `json:"maxMsgs" jsonschema:"-1 means unlimited"`
+	MaxBytes               int64             `json:"maxBytes" jsonschema:"-1 means unlimited"`
+	MaxAge                 string            `json:"maxAge,omitempty"`
+	MaxMsgSize             int32             `json:"maxMsgSize" jsonschema:"-1 means unlimited"`
+	MaxMsgsPerSubject      int64             `json:"maxMsgsPerSubject" jsonschema:"-1 means unlimited"`
+	MaxConsumers           int               `json:"maxConsumers" jsonschema:"-1 means unlimited"`
+	Duplicates             string            `json:"duplicateWindow,omitempty"`
+	Compression            string            `json:"compression"`
+	Sealed                 bool              `json:"sealed"`
+	DenyDelete             bool              `json:"denyDelete"`
+	DenyPurge              bool              `json:"denyPurge"`
+	AllowRollup            bool              `json:"allowRollup"`
+	AllowDirect            bool              `json:"allowDirect"`
+	AllowMsgTTL            bool              `json:"allowMsgTtl"`
+	AllowAtomicPublish     bool              `json:"allowAtomicPublish"`
+	AllowMsgCounter        bool              `json:"allowMsgCounter"`
+	AllowMsgSchedules      bool              `json:"allowMsgSchedules"`
+	AllowBatchPublish      bool              `json:"allowBatchPublish"`
+	SubjectDeleteMarkerTTL string            `json:"subjectDeleteMarkerTtl,omitempty"`
+	PersistMode            string            `json:"persistMode"`
+	Mirror                 *sourceView       `json:"mirror,omitempty"`
+	Sources                []*sourceView     `json:"sources,omitempty"`
+	Metadata               map[string]string `json:"metadata,omitempty"`
 }
 
 type sourceView struct {
@@ -107,26 +113,36 @@ type listConsumersInput struct {
 }
 
 type consumerView struct {
-	Stream         string            `json:"stream"`
-	Name           string            `json:"name"`
-	Description    string            `json:"description,omitempty"`
-	Durable        string            `json:"durable,omitempty"`
-	FilterSubject  string            `json:"filterSubject,omitempty"`
-	FilterSubjects []string          `json:"filterSubjects,omitempty"`
-	DeliverPolicy  string            `json:"deliverPolicy"`
-	AckPolicy      string            `json:"ackPolicy"`
-	AckWait        string            `json:"ackWait,omitempty"`
-	MaxDeliver     int               `json:"maxDeliver"`
-	MaxAckPending  int               `json:"maxAckPending"`
-	PushBound      bool              `json:"pushBound,omitempty"`
-	NumPending     uint64            `json:"numPending"`
-	NumAckPending  int               `json:"numAckPending"`
-	NumRedelivered int               `json:"numRedelivered"`
-	NumWaiting     int               `json:"numWaiting"`
-	Delivered      sequenceView      `json:"delivered"`
-	AckFloor       sequenceView      `json:"ackFloor"`
-	Created        *time.Time        `json:"created,omitempty"`
-	Metadata       map[string]string `json:"metadata,omitempty"`
+	Stream         string              `json:"stream"`
+	Name           string              `json:"name"`
+	Description    string              `json:"description,omitempty"`
+	Durable        string              `json:"durable,omitempty"`
+	FilterSubject  string              `json:"filterSubject,omitempty"`
+	FilterSubjects []string            `json:"filterSubjects,omitempty"`
+	DeliverPolicy  string              `json:"deliverPolicy"`
+	AckPolicy      string              `json:"ackPolicy"`
+	AckWait        string              `json:"ackWait,omitempty"`
+	MaxDeliver     int                 `json:"maxDeliver"`
+	MaxAckPending  int                 `json:"maxAckPending"`
+	PushBound      bool                `json:"pushBound,omitempty"`
+	NumPending     uint64              `json:"numPending"`
+	NumAckPending  int                 `json:"numAckPending"`
+	NumRedelivered int                 `json:"numRedelivered"`
+	NumWaiting     int                 `json:"numWaiting"`
+	Delivered      sequenceView        `json:"delivered"`
+	AckFloor       sequenceView        `json:"ackFloor"`
+	Created        *time.Time          `json:"created,omitempty"`
+	Metadata       map[string]string   `json:"metadata,omitempty"`
+	PriorityPolicy string              `json:"priorityPolicy"`
+	PinnedTTL      string              `json:"pinnedTtl,omitempty"`
+	PriorityGroups []string            `json:"priorityGroups,omitempty"`
+	Pinned         []priorityGroupView `json:"pinned,omitempty" jsonschema:"priority groups whose pull requests are currently pinned to one client"`
+}
+
+type priorityGroupView struct {
+	Group          string    `json:"group"`
+	PinnedClientID string    `json:"pinnedClientId,omitempty"`
+	PinnedTS       time.Time `json:"pinnedAt,omitzero"`
 }
 
 type sequenceView struct {

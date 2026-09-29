@@ -76,6 +76,44 @@ func (c StoreCompression) IsValid() bool {
 	}
 }
 
+// PriorityPolicy defines how a pull consumer's priority groups pick clients (NATS 2.11+).
+type PriorityPolicy int
+
+const (
+	PriorityNone         PriorityPolicy = iota // none
+	PriorityPinnedClient                       // pinned_client
+	PriorityOverflow                           // overflow
+	PriorityPrioritized                        // prioritized
+)
+
+// IsValid checks if the priority policy is a known value.
+func (p PriorityPolicy) IsValid() bool {
+	switch p {
+	case PriorityNone, PriorityPinnedClient, PriorityOverflow, PriorityPrioritized:
+		return true
+	default:
+		return false
+	}
+}
+
+// PersistMode defines how stream writes are flushed to storage (NATS 2.12+).
+type PersistMode int
+
+const (
+	PersistDefault PersistMode = iota // default
+	PersistAsync                      // async
+)
+
+// IsValid checks if the persist mode is a known value.
+func (m PersistMode) IsValid() bool {
+	switch m {
+	case PersistDefault, PersistAsync:
+		return true
+	default:
+		return false
+	}
+}
+
 // DeliverPolicy defines where to start delivering messages from.
 type DeliverPolicy int
 
@@ -102,15 +140,16 @@ func (p DeliverPolicy) IsValid() bool {
 type AckPolicy int
 
 const (
-	AckExplicit AckPolicy = iota // explicit
-	AckAll                       // all
-	AckNone                      // none
+	AckExplicit    AckPolicy = iota // explicit
+	AckAll                          // all
+	AckNone                         // none
+	AckFlowControl                  // flow_control
 )
 
 // IsValid checks if the ack policy is a known value.
 func (p AckPolicy) IsValid() bool {
 	switch p {
-	case AckExplicit, AckNone, AckAll:
+	case AckExplicit, AckNone, AckAll, AckFlowControl:
 		return true
 	default:
 		return false

@@ -117,6 +117,9 @@ func (c *Client) CreateConsumer(
 	if err != nil {
 		return nil, wrapErr(err)
 	}
+	if err = c.requireFeatures(consumerConfigFeatures(*jsConfig)...); err != nil {
+		return nil, err
+	}
 
 	consumer, err := stream.CreateConsumer(ctx, *jsConfig)
 	if err != nil {
@@ -191,18 +194,9 @@ func (c *Client) UpdateConsumer(
 		return nil, wrapErr(errs.ErrConsumerNotFound)
 	}
 
-	updatedConfig := *infoResp.Config
-	converter.Convert(config, &updatedConfig,
-		converter.WithIgnoreNilValues(),
-		converter.WithIgnoreFields("FilterSubject", "FilterSubjects"),
-	)
-	if config.FilterSubject != nil {
-		updatedConfig.FilterSubject = *config.FilterSubject
-		updatedConfig.FilterSubjects = nil
-	}
-	if len(config.FilterSubjects) > 0 {
-		updatedConfig.FilterSubjects = config.FilterSubjects
-		updatedConfig.FilterSubject = ""
+	updatedConfig := applyConsumerUpdate(*infoResp.Config, config)
+	if err = c.requireFeatures(consumerConfigFeatures(updatedConfig)...); err != nil {
+		return nil, err
 	}
 
 	consumer, err := stream.UpdateConsumer(ctx, updatedConfig)
@@ -297,4 +291,90 @@ func (c *Client) ResumeConsumer(ctx context.Context, streamName string, consumer
 		PauseUntil:     &resp.PauseUntil,
 		PauseRemaining: resp.PauseRemaining,
 	}, nil
+}
+
+// ResetConsumer resets a consumer's delivery state; a nil sequence keeps the
+// ack floor, a sequence makes the next delivery start at it.
+func (c *Client) ResetConsumer(
+	ctx context.Context,
+	streamName, consumerName string,
+	sequence *uint64,
+) (*entities.ConsumerResetResponse, error) {
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return nil, wrapErr(err)
+	}
+	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
+		return nil, wrapErr(err)
+	}
+	if err := c.requireFeatures(featConsumerReset); err != nil {
+		return nil, err
+	}
+
+	stream, err := c.jetStream.Stream(ctx, streamName)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	if _, err = stream.Consumer(ctx, consumerName); err != nil {
+		return nil, wrapErr(err)
+	}
+
+	var resp *jetstream.ConsumerResetResponse
+	if sequence != nil {
+		resp, err = stream.ResetConsumerToSequence(ctx, consumerName, *sequence)
+	} else {
+		resp, err = stream.ResetConsumer(ctx, consumerName)
+	}
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+
+	out := &entities.ConsumerResetResponse{ResetSeq: resp.ResetSeq}
+	if resp.ConsumerInfo != nil {
+		out.Consumer = toConsumerInfo(resp.ConsumerInfo, streamName)
+	}
+	return out, nil
+}
+
+// applyConsumerUpdate merges the set fields of update onto the server's
+// current config.
+func applyConsumerUpdate(current jetstream.ConsumerConfig, update entities.ConsumerUpdateRequest) jetstream.ConsumerConfig {
+	converter.Convert(update, &current,
+		converter.WithIgnoreNilValues(),
+		converter.WithIgnoreFields("FilterSubject", "FilterSubjects"),
+	)
+	if update.FilterSubject != nil {
+		current.FilterSubject = *update.FilterSubject
+		current.FilterSubjects = nil
+	}
+	if len(update.FilterSubjects) > 0 {
+		current.FilterSubjects = update.FilterSubjects
+		current.FilterSubject = ""
+	}
+	if update.PriorityPolicy != nil && *update.PriorityPolicy == entities.PriorityNone {
+		current.PriorityGroups = nil
+		current.PinnedTTL = 0
+	}
+	return current
+}
+
+// UnpinConsumer releases the pinned client of a consumer priority group.
+func (c *Client) UnpinConsumer(ctx context.Context, streamName, consumerName, group string) error {
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return wrapErr(err)
+	}
+	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
+		return wrapErr(err)
+	}
+	if err := c.requireFeatures(featPriorityGroups); err != nil {
+		return err
+	}
+
+	stream, err := c.jetStream.Stream(ctx, streamName)
+	if err != nil {
+		return wrapErr(err)
+	}
+	if err := stream.UnpinConsumer(ctx, consumerName, group); err != nil {
+		return wrapErr(err)
+	}
+	return nil
 }

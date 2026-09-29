@@ -1442,3 +1442,86 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		})
 	})
 }
+
+// TestMergeStreamUpdate_FeatureFlags verifies unrelated updates keep the
+// create-only flags and the mutable ones apply.
+func TestMergeStreamUpdate_FeatureFlags(t *testing.T) {
+	svc := &Client{}
+	base := jetstream.StreamConfig{
+		Name:                   "flags",
+		AllowMsgCounter:        true,
+		AllowMsgSchedules:      true,
+		SubjectDeleteMarkerTTL: 10 * time.Second,
+		PersistMode:            jetstream.AsyncPersistMode,
+		AllowBatchPublish:      true,
+	}
+
+	t.Run("unrelated update preserves flags", func(t *testing.T) {
+		result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{Description: ptr.Wrap("changed")})
+		assert.True(t, result.AllowMsgCounter)
+		assert.True(t, result.AllowMsgSchedules)
+		assert.Equal(t, 10*time.Second, result.SubjectDeleteMarkerTTL)
+		assert.Equal(t, jetstream.AsyncPersistMode, result.PersistMode)
+		assert.True(t, result.AllowBatchPublish)
+	})
+
+	t.Run("mutable flags apply", func(t *testing.T) {
+		result := svc.mergeStreamUpdate(jetstream.StreamConfig{Name: "flags"}, entities.StreamUpdateRequest{
+			AllowMsgSchedules:      ptr.Wrap(true),
+			SubjectDeleteMarkerTTL: ptr.Wrap(time.Minute),
+			AllowBatchPublish:      ptr.Wrap(true),
+		})
+		assert.True(t, result.AllowMsgSchedules)
+		assert.Equal(t, time.Minute, result.SubjectDeleteMarkerTTL)
+		assert.True(t, result.AllowBatchPublish)
+	})
+
+	t.Run("zero delete marker ttl clears it", func(t *testing.T) {
+		result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{SubjectDeleteMarkerTTL: ptr.Wrap(time.Duration(0))})
+		assert.Zero(t, result.SubjectDeleteMarkerTTL)
+		assert.True(t, result.AllowBatchPublish)
+	})
+}
+
+// TestApplyConsumerUpdate_Priority verifies priority updates, including the
+// clean-up the server requires when switching the policy off.
+func TestApplyConsumerUpdate_Priority(t *testing.T) {
+	pinned := jetstream.ConsumerConfig{
+		Description:    "d",
+		PriorityPolicy: jetstream.PriorityPolicyPinned,
+		PriorityGroups: []string{"jobs"},
+		PinnedTTL:      time.Minute,
+	}
+
+	t.Run("unrelated update keeps priority settings", func(t *testing.T) {
+		result := applyConsumerUpdate(pinned, entities.ConsumerUpdateRequest{Description: ptr.Wrap("x")})
+		assert.Equal(t, jetstream.PriorityPolicyPinned, result.PriorityPolicy)
+		assert.Equal(t, []string{"jobs"}, result.PriorityGroups)
+		assert.Equal(t, time.Minute, result.PinnedTTL)
+	})
+
+	t.Run("switching the policy off clears groups and pinned ttl", func(t *testing.T) {
+		result := applyConsumerUpdate(pinned, entities.ConsumerUpdateRequest{PriorityPolicy: ptr.Wrap(entities.PriorityNone)})
+		assert.Equal(t, jetstream.PriorityPolicyNone, result.PriorityPolicy)
+		assert.Nil(t, result.PriorityGroups)
+		assert.Zero(t, result.PinnedTTL)
+	})
+
+	t.Run("groups and ttl replace", func(t *testing.T) {
+		result := applyConsumerUpdate(pinned, entities.ConsumerUpdateRequest{
+			PriorityPolicy: ptr.Wrap(entities.PriorityOverflow),
+			PriorityGroups: []string{"a", "b"},
+			PinnedTTL:      ptr.Wrap(30 * time.Second),
+		})
+		assert.Equal(t, jetstream.PriorityPolicyOverflow, result.PriorityPolicy)
+		assert.Equal(t, []string{"a", "b"}, result.PriorityGroups)
+		assert.Equal(t, 30*time.Second, result.PinnedTTL)
+	})
+
+	t.Run("filter subject handling is unchanged", func(t *testing.T) {
+		result := applyConsumerUpdate(jetstream.ConsumerConfig{FilterSubjects: []string{"a", "b"}},
+			entities.ConsumerUpdateRequest{FilterSubject: ptr.Wrap("c")})
+		assert.Equal(t, "c", result.FilterSubject)
+		assert.Nil(t, result.FilterSubjects)
+	})
+}

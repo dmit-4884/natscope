@@ -18,6 +18,11 @@ import (
 // plain strings without a sentinel.
 const permissionViolationSubstr = "permissions violation"
 
+// invalidResetDescription replaces the SDK's bare "invalid reset" for a
+// consumer reset the server refuses.
+const invalidResetDescription = "consumer reset refused: a consumer can only be reset to a sequence when its deliver policy is " +
+	"all, by_start_sequence or by_start_time, and never to a sequence before its start sequence or start time"
+
 // natsSentinelMap maps NATS/JetStream SDK sentinels → domain errs sentinels,
 // matched via errors.Is.
 var natsSentinelMap = []struct {
@@ -99,6 +104,10 @@ func wrapErr(err error) error {
 		if errors.Is(err, src) {
 			return &errs.NATSValidationError{Description: err.Error(), Cause: err}
 		}
+	}
+
+	if errors.Is(err, jetstream.ErrConsumerInvalidReset) {
+		return &errs.NATSValidationError{Description: invalidResetDescription, Cause: err}
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {

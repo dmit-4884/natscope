@@ -126,6 +126,47 @@ func TestPublish_RawJSON(t *testing.T) {
 	assert.Equal(t, uint64(42), *hist.last.Sequence)
 }
 
+func TestPublish_CounterIncrement(t *testing.T) {
+	t.Parallel()
+
+	hist := &recordedHistory{}
+	natsm := &mockNATSService{
+		publishFn: func(_ context.Context, _, _ string, data []byte, headers map[string]string) (*entities.PubAck, error) {
+			assert.Empty(t, data, "a counter increment carries no body")
+			assert.Equal(t, "+5", headers["Nats-Incr"])
+			return &entities.PubAck{Stream: "HITS", Sequence: 3, Value: "12"}, nil
+		},
+	}
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+
+	resp, err := s.Publish(t.Context(), &entities.PublishRequest{
+		ConnectionID: "conn-1",
+		Subject:      "hits.page",
+		Headers:      map[string]string{"Nats-Incr": "+5"},
+	})
+
+	require.NoError(t, err)
+	require.Nil(t, resp.Error)
+	require.NotNil(t, resp.CounterValue)
+	assert.Equal(t, "12", *resp.CounterValue)
+}
+
+func TestPublish_NoCounterValueForPlainMessages(t *testing.T) {
+	t.Parallel()
+
+	natsm := &mockNATSService{
+		publishFn: func(context.Context, string, string, []byte, map[string]string) (*entities.PubAck, error) {
+			return &entities.PubAck{Stream: "ORDERS", Sequence: 1}, nil
+		},
+	}
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{})
+
+	resp, err := s.Publish(t.Context(), &entities.PublishRequest{ConnectionID: "conn-1", Subject: "orders.x", Data: `{}`})
+
+	require.NoError(t, err)
+	assert.Nil(t, resp.CounterValue)
+}
+
 func TestPublish_ProtoEncoded(t *testing.T) {
 	t.Parallel()
 

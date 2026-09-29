@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { ConsumerInfo } from '@/types/nats'
 import type { ConsumerCreateRequest } from '@/types/management'
-import { consumerToConfig, toConsumerUpdateRequest } from './consumerUtils'
+import { consumerToConfig, parseResetSequence, toConsumerUpdateRequest } from './consumerUtils'
 
 const base: ConsumerCreateRequest = {
   name: 'orders-worker',
@@ -93,5 +93,75 @@ describe('toConsumerUpdateRequest', () => {
     const request = toConsumerUpdateRequest(base, { ...base, description: 'renamed', max_deliver: 5 })
     expect(request.description).toBe('renamed')
     expect(request.max_deliver).toBe(5)
+  })
+})
+
+describe('parseResetSequence', () => {
+  it.each([
+    [undefined, undefined],
+    ['', undefined],
+    ['  ', undefined],
+    ['42', 42],
+    [' 7 ', 7],
+    ['0', null],
+    ['-1', null],
+    ['1.5', null],
+    ['abc', null],
+    ['99999999999999999999', null],
+  ])('parses %j as %j', (raw, want) => {
+    expect(parseResetSequence(raw)).toBe(want)
+  })
+})
+
+describe('consumer priority groups', () => {
+  const withPriority: ConsumerCreateRequest = {
+    ...base,
+    priority_policy: 'pinned_client',
+    priority_groups: ['jobs'],
+    priority_timeout: 60_000_000_000,
+  }
+
+  it('carries priority settings into the form value', () => {
+    const consumer = {
+      name: 'worker',
+      config: {
+        durable_name: 'worker',
+        priority_policy: 'overflow',
+        priority_groups: ['jobs'],
+        priority_timeout: 60_000_000_000,
+      },
+    } as ConsumerInfo
+    const value = consumerToConfig(consumer)
+    expect(value.priority_policy).toBe('overflow')
+    expect(value.priority_groups).toEqual(['jobs'])
+    expect(value.priority_timeout).toBe(60_000_000_000)
+  })
+
+  it('defaults the form to no priority policy', () => {
+    expect(consumerToConfig({ name: 'w', config: {} } as ConsumerInfo).priority_policy).toBe('none')
+  })
+
+  it('leaves priority out of an update that does not change it', () => {
+    const update = toConsumerUpdateRequest(withPriority, { ...withPriority, description: 'x' })
+    expect(update).not.toHaveProperty('priority_policy')
+    expect(update).not.toHaveProperty('priority_groups')
+    expect(update).not.toHaveProperty('priority_timeout')
+  })
+
+  it('sends only the changed priority fields', () => {
+    const update = toConsumerUpdateRequest(withPriority, {
+      ...withPriority,
+      priority_policy: 'overflow',
+      priority_groups: ['jobs', 'bulk'],
+    })
+    expect(update.priority_policy).toBe('overflow')
+    expect(update.priority_groups).toEqual(['jobs', 'bulk'])
+    expect(update).not.toHaveProperty('priority_timeout')
+  })
+
+  it('switching the policy off sends only the policy', () => {
+    const update = toConsumerUpdateRequest(withPriority, { ...withPriority, priority_policy: 'none' })
+    expect(update.priority_policy).toBe('none')
+    expect(update).not.toHaveProperty('priority_groups')
   })
 })

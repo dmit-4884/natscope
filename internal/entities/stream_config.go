@@ -88,6 +88,21 @@ type StreamConfig struct {
 	// AllowAtomicPublish enables atomic publish operations.
 	AllowAtomicPublish bool
 
+	// AllowMsgCounter makes the stream a counter stream (NATS 2.12+).
+	AllowMsgCounter bool
+
+	// AllowMsgSchedules enables message scheduling (NATS 2.12+).
+	AllowMsgSchedules bool
+
+	// SubjectDeleteMarkerTTL is how long delete markers left by MaxAge live (NATS 2.11+).
+	SubjectDeleteMarkerTTL time.Duration
+
+	// PersistMode is how writes are flushed to storage (NATS 2.12+).
+	PersistMode PersistMode
+
+	// AllowBatchPublish enables fast-ingest batch publishing (NATS 2.14+).
+	AllowBatchPublish bool
+
 	// ConsumerLimits is the per-consumer limit set inherited from this stream.
 	ConsumerLimits *StreamConsumerLimits
 

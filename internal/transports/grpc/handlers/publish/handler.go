@@ -58,10 +58,11 @@ func (h *Handler) PublishMessage(
 		return nil, err
 	}
 	return connect.NewResponse(&publishpb.PublishMessageResponse{
-		Stream:    result.Stream,
-		Sequence:  result.Sequence,
-		Duplicate: result.Duplicate,
-		Error:     result.Error,
+		Stream:       result.Stream,
+		Sequence:     result.Sequence,
+		Duplicate:    result.Duplicate,
+		Error:        result.Error,
+		CounterValue: result.CounterValue,
 	}), nil
 }
 

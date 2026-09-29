@@ -95,6 +95,9 @@ func (c *Client) PublishToStream(
 	if err := validateNATSSubjectLength("subject", subject); err != nil {
 		return nil, wrapErr(err)
 	}
+	if err := c.requireFeatures(headerFeatures(headers)...); err != nil {
+		return nil, err
+	}
 	if _, err := c.jetStream.StreamNameBySubject(ctx, subject); err != nil {
 		return nil, wrapErr(errors.WrapOperation(err, "resolve stream for subject"))
 	}
@@ -121,5 +124,6 @@ func (c *Client) PublishToStream(
 		Sequence:  ack.Sequence,
 		Domain:    ack.Domain,
 		Duplicate: ack.Duplicate,
+		Value:     ack.Value,
 	}, nil
 }

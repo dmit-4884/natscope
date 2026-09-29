@@ -1,5 +1,5 @@
 import { getErrorMessage } from '@/api/errors'
-import { getServerInfo } from '@/api/stats'
+import { getServerInfo, type ServerInfoResponse } from '@/api/stats'
 import { useConnectionHealth, type ConnectionStatus } from '@/contexts/connection'
 import { useConnectionQuery } from '@/hooks/useConnectionQuery'
 import { formatBytes, formatNumber } from '@/utils/formatters'
@@ -16,6 +16,22 @@ const STATUS_META: Record<ConnectionStatus, { dot: string; text: string; label: 
   reconnecting: { dot: 'bg-status-warning-border', text: 'text-status-warning-text', label: 'reconnecting' },
   disconnected: { dot: 'bg-status-error-border', text: 'text-status-error-text', label: 'disconnected' },
 }
+
+type CapabilityFlag = Exclude<keyof NonNullable<ServerInfoResponse['capabilities']>, 'api_level'>
+
+const CAPABILITY_BADGES: ReadonlyArray<{ key: CapabilityFlag; label: string }> = [
+  { key: 'consumer_pause', label: 'Consumer pause' },
+  { key: 'priority_groups', label: 'Priority groups' },
+  { key: 'message_ttl', label: 'Message TTL' },
+  { key: 'atomic_publish', label: 'Atomic publish' },
+  { key: 'msg_counters', label: 'Counters' },
+  { key: 'msg_schedules', label: 'Schedules' },
+  { key: 'priority_prioritized', label: 'Prioritized policy' },
+  { key: 'async_persist', label: 'Async persist' },
+  { key: 'consumer_reset', label: 'Consumer reset' },
+  { key: 'cron_schedules', label: 'Cron schedules' },
+  { key: 'batch_publish', label: 'Fast batch' },
+]
 
 function securityLabel(tlsRequired: boolean, authRequired: boolean): string {
   if (tlsRequired && authRequired) return 'Auth · TLS'
@@ -180,15 +196,11 @@ export default function ServerInfo({ connectionId, onClose }: Props) {
                     <div className="flex items-center justify-between gap-3 py-2">
                       <span className="text-xs text-content-tertiary shrink-0">Capabilities</span>
                       <div className="flex flex-wrap gap-1.5 justify-end">
-                        <Badge variant={data.capabilities.consumer_pause ? 'success' : 'default'} shape="pill" size="sm">
-                          Consumer pause
-                        </Badge>
-                        <Badge variant={data.capabilities.message_ttl ? 'success' : 'default'} shape="pill" size="sm">
-                          Message TTL
-                        </Badge>
-                        <Badge variant={data.capabilities.atomic_publish ? 'success' : 'default'} shape="pill" size="sm">
-                          Atomic publish
-                        </Badge>
+                        {CAPABILITY_BADGES.map(({ key, label }) => (
+                          <Badge key={key} variant={data.capabilities?.[key] ? 'success' : 'default'} shape="pill" size="sm">
+                            {label}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
                   )}

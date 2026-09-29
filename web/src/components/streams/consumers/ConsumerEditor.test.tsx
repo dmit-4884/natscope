@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import { render, screen, fireEvent } from '@/test/utils'
 import type { ConsumerCreateRequest } from '@/types/management'
 import { ConsumerEditor } from './ConsumerEditor'
@@ -92,5 +92,111 @@ describe('ConsumerEditor filter subjects', () => {
     const { jsonEditor } = renderEditor({ ...defaultConsumerConfig, filter_subject: 'orders.>' })
     fireEvent.change(screen.getByLabelText('Filter Subject'), { target: { value: '' } })
     expect(JSON.parse(jsonEditor.value).filter_subject).toBe('')
+  })
+})
+
+function PriorityHarness({
+  initial = defaultConsumerConfig,
+  priorityUnsupportedReason,
+  prioritizedUnsupportedReason,
+}: {
+  initial?: ConsumerCreateRequest
+  priorityUnsupportedReason?: string
+  prioritizedUnsupportedReason?: string
+}) {
+  const [value, setValue] = useState(initial)
+  return (
+    <>
+      <ConsumerEditor
+        title="Create New Consumer"
+        subtitle="Create a consumer"
+        mode="form"
+        onModeChange={vi.fn()}
+        value={value}
+        onChange={setValue}
+        isEditMode={false}
+        isSaving={false}
+        onCancel={vi.fn()}
+        onCreate={vi.fn()}
+        priorityUnsupportedReason={priorityUnsupportedReason}
+        prioritizedUnsupportedReason={prioritizedUnsupportedReason}
+      />
+      <output data-testid="value">{JSON.stringify(value)}</output>
+    </>
+  )
+}
+
+function currentValue(): ConsumerCreateRequest {
+  return JSON.parse(screen.getByTestId('value').textContent ?? '{}')
+}
+
+function openPrioritySection() {
+  fireEvent.click(screen.getByRole('button', { name: /Priority Groups/ }))
+}
+
+function choosePolicy(label: string) {
+  fireEvent.click(screen.getByLabelText('Priority Policy'))
+  fireEvent.click(screen.getByRole('option', { name: label }))
+}
+
+describe('ConsumerEditor priority groups', () => {
+  const originalScrollIntoView = Element.prototype.scrollIntoView
+  beforeAll(() => {
+    Element.prototype.scrollIntoView = vi.fn()
+  })
+  afterAll(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView
+  })
+
+  it('reveals groups and pinned ttl for a pinned client policy', () => {
+    render(<PriorityHarness />)
+    openPrioritySection()
+
+    choosePolicy('Pinned client')
+
+    expect(currentValue().priority_policy).toBe('pinned_client')
+    expect(screen.getByText('Groups')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Pinned TTL (seconds)'), { target: { value: '90' } })
+    expect(currentValue().priority_timeout).toBe(90_000_000_000)
+  })
+
+  it('clears groups and ttl when the policy is switched off', () => {
+    render(
+      <PriorityHarness
+        initial={{ ...defaultConsumerConfig, priority_policy: 'pinned_client', priority_groups: ['jobs'], priority_timeout: 60_000_000_000 }}
+      />,
+    )
+    openPrioritySection()
+
+    choosePolicy('None')
+
+    expect(currentValue().priority_policy).toBe('none')
+    expect(currentValue().priority_groups).toBeUndefined()
+    expect(currentValue().priority_timeout).toBeUndefined()
+  })
+
+  it('disables the prioritized policy on servers before 2.12', () => {
+    render(<PriorityHarness prioritizedUnsupportedReason="Requires NATS 2.12+" />)
+    openPrioritySection()
+
+    fireEvent.click(screen.getByLabelText('Priority Policy'))
+
+    expect(screen.getByRole('option', { name: 'Prioritized' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('locks the section on servers without priority groups', () => {
+    render(<PriorityHarness priorityUnsupportedReason="Requires NATS 2.11+ (connected server is v2.10.24)" />)
+    openPrioritySection()
+
+    expect(screen.getByText('Requires NATS 2.11+ (connected server is v2.10.24)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Priority Policy')).toBeDisabled()
+  })
+
+  it('locks the section for push consumers', () => {
+    render(<PriorityHarness initial={{ ...defaultConsumerConfig, deliver_subject: 'push.here' }} />)
+    openPrioritySection()
+
+    expect(screen.getByText('Priority groups apply to pull consumers only.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Priority Policy')).toBeDisabled()
   })
 })

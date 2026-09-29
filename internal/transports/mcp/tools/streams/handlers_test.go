@@ -45,6 +45,27 @@ func TestStreamViewRendersEnumsAndDurations(t *testing.T) {
 	assert.Equal(t, []string{"orders.>"}, summary.Config.Subjects)
 }
 
+func TestStreamViewRendersFeatureFlags(t *testing.T) {
+	t.Parallel()
+	info := &entities.StreamInfo{Config: entities.StreamConfig{
+		Name: "FLAGS", AllowMsgCounter: true, AllowMsgSchedules: true, AllowAtomicPublish: true,
+		SubjectDeleteMarkerTTL: 90 * time.Second, PersistMode: entities.PersistAsync, AllowBatchPublish: true,
+	}}
+
+	v := converter.Convert(info, &streamView{}, mcptransport.ViewCodecs)
+
+	assert.True(t, v.Config.AllowMsgCounter)
+	assert.True(t, v.Config.AllowMsgSchedules)
+	assert.True(t, v.Config.AllowAtomicPublish)
+	assert.Equal(t, "1m30s", v.Config.SubjectDeleteMarkerTTL)
+	assert.Equal(t, "async", v.Config.PersistMode)
+	assert.True(t, v.Config.AllowBatchPublish)
+
+	plain := converter.Convert(&entities.StreamInfo{Config: entities.StreamConfig{Name: "PLAIN"}}, &streamView{}, mcptransport.ViewCodecs)
+	assert.Equal(t, "default", plain.Config.PersistMode)
+	assert.Empty(t, plain.Config.SubjectDeleteMarkerTTL)
+}
+
 func TestConsumerViewMergesConfig(t *testing.T) {
 	t.Parallel()
 	info := entities.ConsumerInfo{
@@ -67,6 +88,40 @@ func TestConsumerViewMergesConfig(t *testing.T) {
 	stats := converter.Convert(&entities.ConsumerStats{Name: "w2", Stream: "S", AckPolicy: entities.AckNone}, &consumerView{}, mcptransport.ViewCodecs)
 	assert.Equal(t, "none", stats.AckPolicy)
 	assert.Equal(t, "all", stats.DeliverPolicy)
+}
+
+func TestConsumerViewRendersPriorityGroups(t *testing.T) {
+	t.Parallel()
+	pinnedAt := time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)
+	info := entities.ConsumerInfo{
+		Name: "worker", Stream: "ORDERS",
+		Config: &entities.ConsumerConfig{
+			PriorityPolicy: entities.PriorityPinnedClient, PriorityGroups: []string{"jobs", "bulk"}, PinnedTTL: 2 * time.Minute,
+		},
+		PriorityGroups: []entities.PriorityGroupState{
+			{Group: "jobs", PinnedClientID: "pin-1", PinnedTS: pinnedAt},
+			{Group: "bulk"},
+		},
+	}
+
+	v := consumerViewOf(info)
+
+	assert.Equal(t, "pinned_client", v.PriorityPolicy)
+	assert.Equal(t, "2m0s", v.PinnedTTL)
+	assert.Equal(t, []string{"jobs", "bulk"}, v.PriorityGroups, "every configured group, not only the ones with state")
+	require.Len(t, v.Pinned, 1, "only groups with a pinned client")
+	assert.Equal(t, "jobs", v.Pinned[0].Group)
+	assert.Equal(t, "pin-1", v.Pinned[0].PinnedClientID)
+	assert.Equal(t, pinnedAt, v.Pinned[0].PinnedTS)
+
+	plain := consumerViewOf(entities.ConsumerInfo{Name: "w", Config: &entities.ConsumerConfig{}})
+	assert.Equal(t, "none", plain.PriorityPolicy)
+	assert.Empty(t, plain.PinnedTTL)
+	assert.Empty(t, plain.PriorityGroups)
+	assert.Empty(t, plain.Pinned)
+
+	flow := consumerViewOf(entities.ConsumerInfo{Name: "s", Config: &entities.ConsumerConfig{AckPolicy: entities.AckFlowControl}})
+	assert.Equal(t, "flow_control", flow.AckPolicy)
 }
 
 func TestRelationsView(t *testing.T) {
