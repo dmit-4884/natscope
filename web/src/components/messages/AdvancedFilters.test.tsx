@@ -7,7 +7,6 @@ const baseFilters: FilterValues = { subject: '', startSequence: null, startDate:
 describe('AdvancedFilters', () => {
   afterEach(() => {
     cleanup()
-    vi.unstubAllEnvs()
     vi.useRealTimers()
   })
 
@@ -22,7 +21,7 @@ describe('AdvancedFilters', () => {
   })
 
   it('fills a time-only entry with the local date, not the UTC date', () => {
-    vi.stubEnv('TZ', 'Pacific/Kiritimati')
+    expect(new Date('2026-06-12T23:30:00Z').getDate()).toBe(13)
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-12T23:30:00Z'))
 

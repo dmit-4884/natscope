@@ -2,6 +2,8 @@ import path from 'path'
 import { defineConfig, configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
+process.env.TZ = 'Pacific/Kiritimati'
+
 export default defineConfig({
   plugins: [react()],
   test: {
