@@ -1,6 +1,7 @@
 import { durToNanos, tsToMillis } from '@/utils/timestamp'
-import type { StreamInfo as ProtoStreamInfo, StreamConfig as ProtoStreamConfig, StreamState as ProtoStreamState, ConsumerInfo as ProtoConsumerInfo, ConsumerConfig as ProtoConsumerConfig, ClusterInfo as ProtoClusterInfo, ConsumerLimits as ProtoConsumerLimits } from '../gen/types/nats/nats_stream_pb'
-import type { StreamInfo, StreamDetail, StreamConfig, StreamConsumerLimits, StreamState, ConsumerInfo, ConsumerConfig, ClusterInfo } from '../types/nats'
+import type { StreamInfo as ProtoStreamInfo, StreamConfig as ProtoStreamConfig, StreamState as ProtoStreamState, ConsumerInfo as ProtoConsumerInfo, ConsumerConfig as ProtoConsumerConfig, ClusterInfo as ProtoClusterInfo, ConsumerLimits as ProtoConsumerLimits, ExternalStream as ProtoExternalStream, StreamSourceRef as ProtoStreamSourceRef, RePublish as ProtoRePublish, StreamRelationEdge as ProtoStreamRelationEdge } from '../gen/types/nats/nats_stream_pb'
+import { StreamRelationKind as ProtoStreamRelationKind, StreamNodeKind as ProtoStreamNodeKind } from '../gen/types/nats/nats_stream_pb'
+import type { StreamInfo, StreamDetail, StreamConfig, StreamConsumerLimits, StreamState, ConsumerInfo, ConsumerConfig, ClusterInfo, ExternalStreamRef, StreamSourceRef, StreamRePublish, StreamRelations, StreamRelationEdge, StreamRelationKind, StreamNodeKind } from '../types/nats'
 import { streamsClient } from './grpc/clients'
 
 export interface GetStreamsParams {
@@ -157,35 +158,37 @@ function toStreamConfig(c: ProtoStreamConfig | undefined): StreamConfig {
     metadata: Object.keys(c.metadata).length > 0 ? c.metadata : undefined,
     allow_msg_ttl: c.allowMsgTtl || undefined,
     allow_atomic: c.allowAtomicPublish || undefined,
-    mirror: c.mirror ? {
-      name: c.mirror.name,
-      opt_start_seq: Number(c.mirror.optStartSeq) || undefined,
-      filter_subject: c.mirror.filterSubject || undefined,
-      external: c.mirror.external ? {
-        api_prefix: c.mirror.external.apiPrefix,
-        deliver_prefix: c.mirror.external.deliverPrefix,
-      } : undefined,
-    } : undefined,
-    sources: c.sources?.length ? c.sources.map(s => ({
-      name: s.name,
-      opt_start_seq: Number(s.optStartSeq) || undefined,
-      filter_subject: s.filterSubject || undefined,
-      external: s.external ? {
-        api_prefix: s.external.apiPrefix,
-        deliver_prefix: s.external.deliverPrefix,
-      } : undefined,
-    })) : undefined,
-    republish: c.republish ? {
-      src: c.republish.src,
-      dest: c.republish.dest,
-      headers_only: c.republish.headersOnly || undefined,
-    } : undefined,
+    mirror: c.mirror ? toSourceRef(c.mirror) : undefined,
+    sources: c.sources?.length ? c.sources.map(toSourceRef) : undefined,
+    republish: c.republish ? toRePublish(c.republish) : undefined,
     subject_transform: c.subjectTransform ? {
       src: c.subjectTransform.source,
       dest: c.subjectTransform.destination,
     } : undefined,
     consumer_limits: toStreamConsumerLimits(c.consumerLimits),
   }
+}
+
+function toExternal(e: ProtoExternalStream | undefined): ExternalStreamRef | undefined {
+  if (!e) return undefined
+  return { api_prefix: e.apiPrefix, deliver_prefix: e.deliverPrefix }
+}
+
+function toSourceRef(s: ProtoStreamSourceRef): StreamSourceRef {
+  return {
+    name: s.name,
+    opt_start_seq: Number(s.optStartSeq) || undefined,
+    opt_start_time: s.optStartTime ? tsToMillis(s.optStartTime) : undefined,
+    filter_subject: s.filterSubject || undefined,
+    subject_transforms: s.subjectTransforms.length > 0
+      ? s.subjectTransforms.map(t => ({ src: t.source, dest: t.destination }))
+      : undefined,
+    external: toExternal(s.external),
+  }
+}
+
+function toRePublish(r: ProtoRePublish): StreamRePublish {
+  return { src: r.src, dest: r.dest, headers_only: r.headersOnly || undefined }
 }
 
 function toStreamConsumerLimits(l: ProtoConsumerLimits | undefined): StreamConsumerLimits | undefined {
@@ -243,6 +246,52 @@ export async function getStreams(
 export async function getStreamNames(connectionId: string, signal?: AbortSignal): Promise<string[]> {
   const response = await streamsClient.listStreamNames({ connectionId }, { signal })
   return response.names
+}
+
+const RELATION_KIND: Partial<Record<ProtoStreamRelationKind, StreamRelationKind>> = {
+  [ProtoStreamRelationKind.SOURCE]: 'source',
+  [ProtoStreamRelationKind.MIRROR]: 'mirror',
+  [ProtoStreamRelationKind.REPUBLISH]: 'republish',
+}
+
+const NODE_KIND: Partial<Record<ProtoStreamNodeKind, StreamNodeKind>> = {
+  [ProtoStreamNodeKind.STREAM]: 'stream',
+  [ProtoStreamNodeKind.KV]: 'kv',
+  [ProtoStreamNodeKind.OBJECT_STORE]: 'object_store',
+  [ProtoStreamNodeKind.EXTERNAL]: 'external',
+  [ProtoStreamNodeKind.MISSING]: 'missing',
+  [ProtoStreamNodeKind.SUBJECT]: 'subject',
+}
+
+function toRelationEdge(e: ProtoStreamRelationEdge): StreamRelationEdge | null {
+  const kind = RELATION_KIND[e.kind]
+  if (!kind) return null
+  return {
+    kind,
+    from: e.from,
+    to: e.to,
+    source: e.source ? toSourceRef(e.source) : undefined,
+    state: e.state ? {
+      lag: Number(e.state.lag),
+      active_ns: durToNanos(e.state.active),
+      error: e.state.error || undefined,
+    } : undefined,
+    republish: e.republish ? toRePublish(e.republish) : undefined,
+  }
+}
+
+export async function getStreamRelations(connectionId: string, signal?: AbortSignal): Promise<StreamRelations> {
+  const response = await streamsClient.getStreamRelations({ connectionId }, { signal })
+  return {
+    nodes: response.nodes.map(n => ({
+      id: n.id,
+      name: n.name,
+      kind: NODE_KIND[n.kind] ?? 'stream',
+      info: n.info ? toStreamInfo(n.info) : undefined,
+      external: toExternal(n.external),
+    })),
+    edges: response.edges.map(toRelationEdge).filter((e): e is StreamRelationEdge => e !== null),
+  }
 }
 
 export async function getStreamDetail(

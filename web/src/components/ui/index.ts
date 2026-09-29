@@ -74,4 +74,8 @@ export {
   StarSolidIcon,
   DragHandleIcon,
   DotsHorizontalIcon,
+  MinusIcon,
+  FitViewIcon,
+  RelationsIcon,
+  GlobeIcon,
 } from './icons'

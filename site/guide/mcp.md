@@ -39,6 +39,7 @@ once at startup: restart the client after changing `mcp.allowWrites`.
 | `list_connections` | Saved connections with URLs and the last test result, no credentials |
 | `get_server_info` | Server version, cluster, max payload, JetStream account usage |
 | `list_streams`, `get_stream` | Streams with subjects, limits and state |
+| `get_stream_relations` | Sources, mirrors and republish targets with filters, transforms, lag, last activity and errors; one stream's links when `stream` is set |
 | `list_consumers` | Consumer progress, most pending first: pending, ack pending, redeliveries; all streams when `stream` is omitted |
 | `find_messages` | A page of stored messages, newest first, with subject, time and content filters |
 | `get_message` | One message by sequence with headers and the full payload |

@@ -16,7 +16,7 @@ const (
 	maxConsumersLimit     = 1000
 )
 
-// Toolset serves list_streams, get_stream and list_consumers.
+// Toolset serves list_streams, get_stream, get_stream_relations and list_consumers.
 type Toolset struct {
 	conns   *mcptransport.Connections
 	streams natssvc.StreamReader
@@ -41,6 +41,13 @@ func (t *Toolset) Register(s *mcp.Server) {
 		Description: "Show one stream's full configuration (limits, retention, mirror/sources, flags) and current state.",
 		Annotations: mcptransport.ReadOnly("Get stream"),
 	}, t.getStream)
+
+	mcptransport.AddTool(s, &mcp.Tool{
+		Name: "get_stream_relations",
+		Description: "Show how streams feed each other: sources, mirrors and republish targets, with each link's filters, " +
+			"subject transforms, lag, last activity and error. Pass `stream` for the links that touch it; omit it for all of them.",
+		Annotations: mcptransport.ReadOnly("Get stream relations"),
+	}, t.getStreamRelations)
 
 	mcptransport.AddTool(s, &mcp.Tool{
 		Name: "list_consumers",

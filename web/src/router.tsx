@@ -15,6 +15,7 @@ import PublishTab from './components/streams/PublishTab'
 const CreateStreamPage = lazy(() => import('./components/streams/CreateStreamPage'))
 const StreamConfigTab = lazy(() => import('./components/streams/StreamConfigTab'))
 const StreamConsumersTab = lazy(() => import('./components/streams/StreamConsumersTab'))
+const StreamRelationsTab = lazy(() => import('./components/streams/StreamRelationsTab'))
 const KVStorePage = lazy(() => import('./components/kv/KVStorePage'))
 const CreateKVPage = lazy(() => import('./components/kv/CreateKVPage'))
 const KVOverviewPage = lazy(() => import('./components/kv/KVOverviewPage'))
@@ -69,6 +70,7 @@ export const router = createBrowserRouter([
                   { path: 'messages', element: <MessagesTab /> },
                   { path: 'config', element: <LazyRoute><StreamConfigTab /></LazyRoute> },
                   { path: 'consumers', element: <LazyRoute><StreamConsumersTab /></LazyRoute> },
+                  { path: 'relations', element: <LazyRoute><StreamRelationsTab /></LazyRoute> },
                   { path: 'publish', element: <PublishTab /> },
                   // Redirect old 'info' route to 'config'
                   { path: 'info', element: <Navigate to="../config" replace /> },

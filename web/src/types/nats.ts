@@ -53,14 +53,21 @@ export interface StreamConfig {
   subject_transform?: StreamSubjectTransform
 }
 
+export interface ExternalStreamRef {
+  api_prefix: string
+  deliver_prefix: string
+}
+
 export interface StreamSourceRef {
   name: string
   opt_start_seq?: number
+  opt_start_time?: number
   filter_subject?: string
-  external?: { api_prefix: string; deliver_prefix: string }
+  subject_transforms?: StreamSubjectTransform[]
+  external?: ExternalStreamRef
 }
 
-interface StreamRePublish {
+export interface StreamRePublish {
   src: string
   dest: string
   headers_only?: boolean
@@ -69,6 +76,38 @@ interface StreamRePublish {
 interface StreamSubjectTransform {
   src: string
   dest: string
+}
+
+export type StreamRelationKind = 'source' | 'mirror' | 'republish'
+
+export type StreamNodeKind = 'stream' | 'kv' | 'object_store' | 'external' | 'missing' | 'subject'
+
+export interface StreamRelationNode {
+  id: string
+  name: string
+  kind: StreamNodeKind
+  info?: StreamInfo
+  external?: ExternalStreamRef
+}
+
+interface StreamLinkState {
+  lag: number
+  active_ns: number
+  error?: string
+}
+
+export interface StreamRelationEdge {
+  kind: StreamRelationKind
+  from: string
+  to: string
+  source?: StreamSourceRef
+  state?: StreamLinkState
+  republish?: StreamRePublish
+}
+
+export interface StreamRelations {
+  nodes: StreamRelationNode[]
+  edges: StreamRelationEdge[]
 }
 
 export interface StreamConsumerLimits {

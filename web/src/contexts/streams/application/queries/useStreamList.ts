@@ -1,4 +1,4 @@
-import { getStreams, getStreamDetail, getStreamNames } from '@/api/streams'
+import { getStreams, getStreamDetail, getStreamNames, getStreamRelations } from '@/api/streams'
 import { useConnectionQuery } from '@/hooks/useConnectionQuery'
 import { Stream } from '../../domain/entities/Stream'
 
@@ -24,6 +24,16 @@ export function useStreamNames(connectionId: string | null) {
     key: ['streams', 'names'],
     connectionId,
     fetcher: (signal) => getStreamNames(connectionId!, signal),
+    refetchOnWindowFocus: true,
+  })
+}
+
+export function useStreamRelations(connectionId: string | null) {
+  return useConnectionQuery({
+    key: ['streams', 'relations'],
+    connectionId,
+    fetcher: (signal) => getStreamRelations(connectionId!, signal),
+    staleTime: 30_000,
     refetchOnWindowFocus: true,
   })
 }

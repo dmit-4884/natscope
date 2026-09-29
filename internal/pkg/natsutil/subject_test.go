@@ -147,3 +147,58 @@ func TestMatchSubject(t *testing.T) {
 		})
 	}
 }
+
+func TestSubjectsCollide(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{name: "Equal", a: "orders.new", b: "orders.new", want: true},
+		{name: "DifferentLiterals", a: "orders.new", b: "orders.old", want: false},
+		{name: "StarMatchesToken", a: "orders.*", b: "orders.new", want: true},
+		{name: "StarNeedsSameLength", a: "orders.*", b: "orders.new.eu", want: false},
+		{name: "TailMatchesRest", a: "orders.>", b: "orders.new.eu", want: true},
+		{name: "TailNeedsOneToken", a: "orders.>", b: "orders", want: false},
+		{name: "TailAgainstStar", a: "orders.>", b: "*.new", want: true},
+		{name: "StarAgainstStar", a: "*.new", b: "orders.*", want: true},
+		{name: "FullWildcard", a: ">", b: "anything.at.all", want: true},
+		{name: "PrefixMismatch", a: "repub.>", b: "orders.>", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, SubjectsCollide(tt.a, tt.b))
+			assert.Equal(t, tt.want, SubjectsCollide(tt.b, tt.a))
+		})
+	}
+}
+
+func TestTransformDestinationPattern(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		dest string
+		want string
+	}{
+		{name: "Literal", dest: "audit.orders", want: "audit.orders"},
+		{name: "Tail", dest: "repub.>", want: "repub.>"},
+		{name: "DollarWildcard", dest: "repub.$1.done", want: "repub.*.done"},
+		{name: "WildcardFunction", dest: "repub.{{wildcard(1)}}.done", want: "repub.*.done"},
+		{name: "PartitionFunction", dest: "part.{{ partition(3,1) }}.x", want: "part.*.x"},
+		{name: "SplitFunction", dest: "a.{{SplitFromLeft(1,2)}}.b", want: "a.>"},
+		{name: "SliceFunction", dest: "{{sliceFromRight(1,2)}}", want: ">"},
+		{name: "DollarWithoutDigits", dest: "$KV.bucket.>", want: "$KV.bucket.>"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, TransformDestinationPattern(tt.dest))
+		})
+	}
+}

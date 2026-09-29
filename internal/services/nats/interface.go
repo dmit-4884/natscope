@@ -40,6 +40,9 @@ type StreamReader interface {
 	// ListStreamNames returns the names of all JetStream streams, sorted.
 	ListStreamNames(ctx context.Context, connectionID string) ([]string, error)
 
+	// GetStreamRelations returns which streams source, mirror or republish into which.
+	GetStreamRelations(ctx context.Context, connectionID string) (*entities.StreamRelations, error)
+
 	// GetStreamInfo returns detail for one stream.
 	GetStreamInfo(ctx context.Context, connectionID string, streamName string) (*entities.StreamInfo, error)
 

@@ -272,3 +272,39 @@ export function DotsHorizontalIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+export function MinusIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+    </svg>
+  )
+}
+
+export function FitViewIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 9V5a1 1 0 011-1h4M15 4h4a1 1 0 011 1v4M20 15v4a1 1 0 01-1 1h-4M9 20H5a1 1 0 01-1-1v-4" />
+    </svg>
+  )
+}
+
+export function RelationsIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>
+      <rect x="3" y="4" width="6" height="5" rx="1" />
+      <rect x="3" y="15" width="6" height="5" rx="1" />
+      <rect x="15" y="9.5" width="6" height="5" rx="1" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.5h2a2 2 0 012 2v7a2 2 0 01-2 2H9m4-5.5h2" />
+    </svg>
+  )
+}
+
+export function GlobeIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" />
+    </svg>
+  )
+}

@@ -22,14 +22,16 @@ const noneName = "none"
 var ViewCodecs = converter.WithCodecs(
 	convcodecs.DurationString,
 	convcodecs.EnumNames(map[reflect.Type][]string{
-		reflect.TypeFor[entities.RetentionPolicy]():  {"limits", "interest", "workqueue"},
-		reflect.TypeFor[entities.StorageType]():      {"file", "memory"},
-		reflect.TypeFor[entities.DiscardPolicy]():    {"old", "new"},
-		reflect.TypeFor[entities.StoreCompression](): {noneName, "s2"},
-		reflect.TypeFor[entities.DeliverPolicy]():    {"all", "last", "new", "by_start_sequence", "by_start_time", "last_per_subject"},
-		reflect.TypeFor[entities.AckPolicy]():        {"explicit", "all", noneName},
-		reflect.TypeFor[entities.ReplayPolicy]():     {"instant", "original"},
-		reflect.TypeFor[entities.AuthMethod]():       {noneName, "user_pass", "token", "nkey", "credentials"},
+		reflect.TypeFor[entities.RetentionPolicy]():    {"limits", "interest", "workqueue"},
+		reflect.TypeFor[entities.StorageType]():        {"file", "memory"},
+		reflect.TypeFor[entities.DiscardPolicy]():      {"old", "new"},
+		reflect.TypeFor[entities.StoreCompression]():   {noneName, "s2"},
+		reflect.TypeFor[entities.DeliverPolicy]():      {"all", "last", "new", "by_start_sequence", "by_start_time", "last_per_subject"},
+		reflect.TypeFor[entities.AckPolicy]():          {"explicit", "all", noneName},
+		reflect.TypeFor[entities.ReplayPolicy]():       {"instant", "original"},
+		reflect.TypeFor[entities.AuthMethod]():         {noneName, "user_pass", "token", "nkey", "credentials"},
+		reflect.TypeFor[entities.StreamRelationKind](): {"unspecified", "source", "mirror", "republish"},
+		reflect.TypeFor[entities.StreamNodeKind]():     {"unspecified", "stream", "kv", "object_store", "external", "missing", "subject"},
 	}),
 )
 

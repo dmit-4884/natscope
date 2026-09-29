@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/pkg/streamgraph"
 )
 
 // ListStreams returns all JetStream streams.
@@ -25,6 +26,19 @@ func (s *Service) ListStreamNames(ctx context.Context, connectionID string) ([]s
 		return nil, err
 	}
 	return c.ListStreamNames(ctx)
+}
+
+// GetStreamRelations returns which streams source, mirror or republish into which.
+func (s *Service) GetStreamRelations(ctx context.Context, connectionID string) (*entities.StreamRelations, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	streams, err := c.ListStreamTopology(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return streamgraph.Build(streams), nil
 }
 
 // GetStreamInfo returns detailed information about a specific stream.

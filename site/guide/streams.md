@@ -6,7 +6,7 @@ description: Create, inspect and edit JetStream streams from the Natscope sideba
 # Streams
 
 The sidebar lists every JetStream stream on the connected server. Selecting one opens a stream view with
-four tabs: **Messages**, **Config**, **Consumers** and **Publish**.
+five tabs: **Messages**, **Config**, **Consumers**, **Relations** and **Publish**.
 
 You can create a stream, edit its config, purge it, seal it and delete it without dropping to the
 `nats` CLI.
@@ -48,6 +48,33 @@ diff first: **Confirm Stream Configuration Changes** lists exactly which fields 
 reaches the server.
 
 <Shot src="/media/streams-info.png" alt="Stream config" />
+
+## Relations
+
+The **Relations** tab draws how messages move between streams, with the open stream highlighted. Upstreams sit
+on the left and data flows to the right:
+
+- **Source** (orange): a stream collects messages from one or more streams, optionally filtered or with subject
+  transforms.
+- **Mirror** (blue): a stream keeps an exact copy of another one, sequence numbers included.
+- **Republish** (violet): a stream republishes stored messages to a subject. The link points at every stream whose
+  subjects capture that subject, or at the subject itself when none does.
+
+Each card shows the stream's messages, size, subjects, replicas, storage, retention and consumers. Click a card to
+center the graph on that stream. KV and object store buckets appear as their `KV_` and `OBJ_` streams.
+
+Click a link's label for its details: filter subjects and transforms, start sequence or time, the external API
+for cross-account or cross-domain links, lag, when the upstream was last heard from, and the last error the
+server reported. A red dashed link has an error; a dashed link has never reached its upstream. Drag the details
+panel by its header to move it, double-click the header to dock it again, and press `Esc` to close it.
+
+Some upstreams cannot be shown as streams:
+
+- A dashed card with a globe is a stream in another account or JetStream domain.
+- A red card is a source or mirror whose stream does not exist on this connection.
+
+**Depth** limits how many links away from the open stream the graph reaches. Click a type in the legend to hide
+its links. Drag or use the arrow keys to pan. Scroll or press `+` and `-` to zoom, and press `0` to fit the graph.
 
 ## Purge, seal, delete
 

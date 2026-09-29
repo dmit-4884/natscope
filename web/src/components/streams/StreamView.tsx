@@ -16,7 +16,7 @@ import {
   type HeaderDraft,
 } from '@/stores/streamTabState/publishDraftStore'
 import { useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
-import { UsersIcon } from '@/components/ui'
+import { RelationsIcon, UsersIcon } from '@/components/ui'
 import type { SelectedMessage } from '../messages/UnifiedMessageList'
 import { useMessageNavigation } from '../messages/unified/useMessageNavigation'
 import UnifiedMessageViewer from '../messages/UnifiedMessageViewer'
@@ -225,9 +225,10 @@ export default function StreamView() {
   const isPublishTab = location.pathname.endsWith('/publish')
   const isConfigTab = location.pathname.endsWith('/config')
   const isConsumersTab = location.pathname.endsWith('/consumers')
+  const isRelationsTab = location.pathname.endsWith('/relations')
 
-  // Config and Consumers tabs use full width (no right panel)
-  const isFullWidthTab = isConfigTab || isConsumersTab
+  // Config, Consumers and Relations tabs use full width (no right panel)
+  const isFullWidthTab = isConfigTab || isConsumersTab || isRelationsTab
 
   const streamMissing = isStreamNotFound(streamError)
 
@@ -317,6 +318,19 @@ export default function StreamView() {
               >
                 <UsersIcon className="w-4 h-4" />
                 Consumers
+              </NavLink>
+              <NavLink
+                to={`${baseUrl}/relations`}
+                className={({ isActive }) =>
+                  `px-4 py-2 text-sm font-medium rounded-t transition-colors flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-surface-primary text-accent border-t border-x border-border'
+                      : 'text-content-secondary hover:text-content-primary hover:bg-surface-tertiary'
+                  }`
+                }
+              >
+                <RelationsIcon className="w-4 h-4" />
+                Relations
               </NavLink>
               <NavLink
                 to={`${baseUrl}/publish`}

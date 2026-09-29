@@ -138,3 +138,59 @@ type listConsumersOutput struct {
 	Consumers []consumerView `json:"consumers"`
 	Total     int            `json:"total" jsonschema:"consumers found before the limit"`
 }
+
+type relationsInput struct {
+	mcptransport.ConnectionArg
+	Stream string `json:"stream,omitempty" jsonschema:"stream name; omit for every relation of the connection"`
+}
+
+type relationsOutput struct {
+	Nodes     []relationNodeView `json:"nodes"`
+	Relations []relationView     `json:"relations"`
+}
+
+type relationNodeView struct {
+	ID       string        `json:"id" jsonschema:"the stream name for local streams; placeholders carry a prefix"`
+	Name     string        `json:"name"`
+	Kind     string        `json:"kind" jsonschema:"stream, kv, object_store, external (other account or domain), missing, or subject (uncaptured republish)"`
+	External *externalView `json:"external,omitempty"`
+}
+
+type externalView struct {
+	APIPrefix     string `json:"apiPrefix"`
+	DeliverPrefix string `json:"deliverPrefix,omitempty"`
+}
+
+type relationView struct {
+	Kind      string         `json:"kind" jsonschema:"source, mirror or republish"`
+	From      string         `json:"from" jsonschema:"id of the upstream node"`
+	To        string         `json:"to" jsonschema:"id of the downstream node"`
+	Source    *linkView      `json:"source,omitempty"`
+	State     *linkStateView `json:"state,omitempty"`
+	Republish *republishView `json:"republish,omitempty"`
+}
+
+type linkView struct {
+	FilterSubject     string          `json:"filterSubject,omitempty"`
+	SubjectTransforms []transformView `json:"subjectTransforms,omitempty"`
+	OptStartSeq       uint64          `json:"startSeq,omitempty"`
+	OptStartTime      *time.Time      `json:"startTime,omitempty"`
+	External          *externalView   `json:"external,omitempty"`
+}
+
+type linkStateView struct {
+	Lag    uint64 `json:"lag"`
+	Active string `json:"lastActive" jsonschema:"time since the upstream was last heard from; negative when it never was"`
+	Error  string `json:"error,omitempty"`
+}
+
+type transformView struct {
+	Source      string `json:"src"`
+	Destination string `json:"dest,omitempty" jsonschema:"empty when the subject is kept as is"`
+}
+
+type republishView struct {
+	Src         string `json:"src"`
+	Dest        string `json:"dest"`
+	HeadersOnly bool   `json:"headersOnly,omitempty"`
+}

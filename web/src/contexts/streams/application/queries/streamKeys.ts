@@ -11,6 +11,8 @@ export const streamKeys = {
   // Nested under list() so every stream-list invalidation refreshes the names too.
   names: (connectionId: string | null | undefined) =>
     [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'streams', 'names'] as const,
+  relations: (connectionId: string | null | undefined) =>
+    [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'streams', 'relations'] as const,
   detail: (connectionId: string | null | undefined, name: string) =>
     [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'stream', name] as const,
   consumers: (connectionId: string | null | undefined, name: string) =>

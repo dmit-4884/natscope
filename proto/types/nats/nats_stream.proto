@@ -25,6 +25,36 @@ message StreamInfo {
 
   // Required. Raw JSON representation of the stream info from the NATS server.
   string raw = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Live state of the mirror link; unset unless the stream is a mirror.
+  optional StreamSourceInfo mirror = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Live state of each source link, in no particular order.
+  repeated StreamSourceInfo sources = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Live state of a mirror or source link, as reported by the downstream stream.
+message StreamSourceInfo {
+  // Required. Name of the upstream stream.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. API of an upstream in another account or JetStream domain.
+  optional ExternalStream external = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Messages the link is behind the upstream; accurate only while the link is active.
+  uint64 lag = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Time since the upstream was last heard from; negative when it never was.
+  google.protobuf.Duration active = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Subject filter of the link.
+  string filter_subject = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Filters and transforms of the link; an empty destination means untransformed.
+  repeated SubjectTransformConfig subject_transforms = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Last error the server hit setting the link up; empty while the link is healthy.
+  string error = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the configuration parameters for a NATS JetStream stream.
@@ -157,6 +187,12 @@ message StreamSourceRef {
 
   // Optional. External stream access configuration (cross-account/domain).
   optional ExternalStream external = 4;
+
+  // Optional. Starting time.
+  google.protobuf.Timestamp opt_start_time = 5;
+
+  // Optional. Subject filters with transforms; an empty destination means untransformed.
+  repeated SubjectTransformConfig subject_transforms = 6;
 }
 
 // External stream reference for cross-account or cross-domain access.
@@ -382,4 +418,82 @@ message ConsumerConfig {
 
   // Optional. Queue group for load-balanced delivery (push consumers only).
   string deliver_group = 29;
+}
+
+// How messages move from one stream to another.
+enum StreamRelationKind {
+  // Unknown relation.
+  STREAM_RELATION_KIND_UNSPECIFIED = 0;
+
+  // The downstream stream sources messages from the upstream one.
+  STREAM_RELATION_KIND_SOURCE = 1;
+
+  // The downstream stream is a mirror of the upstream one.
+  STREAM_RELATION_KIND_MIRROR = 2;
+
+  // The upstream stream republishes its messages to subjects the downstream node captures.
+  STREAM_RELATION_KIND_REPUBLISH = 3;
+}
+
+// What a node of the relations graph stands for.
+enum StreamNodeKind {
+  // Unknown node.
+  STREAM_NODE_KIND_UNSPECIFIED = 0;
+
+  // A regular stream.
+  STREAM_NODE_KIND_STREAM = 1;
+
+  // The stream behind a KV bucket (KV_<bucket>).
+  STREAM_NODE_KIND_KV = 2;
+
+  // The stream behind an object store bucket (OBJ_<bucket>).
+  STREAM_NODE_KIND_OBJECT_STORE = 3;
+
+  // An upstream in another account or JetStream domain, not visible from this connection.
+  STREAM_NODE_KIND_EXTERNAL = 4;
+
+  // An upstream that no stream on this connection matches.
+  STREAM_NODE_KIND_MISSING = 5;
+
+  // A republish destination no stream captures.
+  STREAM_NODE_KIND_SUBJECT = 6;
+}
+
+// A node of the stream relations graph.
+message StreamRelationNode {
+  // Required. Unique within the graph: the stream name for local streams, prefixed for placeholders.
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Stream name, or the subject for a republish destination no stream captures.
+  string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. What the node stands for.
+  StreamNodeKind kind = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Stream info without its raw JSON; unset for placeholders.
+  optional StreamInfo info = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. API of an upstream in another account or domain.
+  optional ExternalStream external = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// A link of the stream relations graph, pointing from the upstream node to the downstream one.
+message StreamRelationEdge {
+  // Required. How messages move along the link.
+  StreamRelationKind kind = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. ID of the upstream node.
+  string from = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. ID of the downstream node.
+  string to = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Source or mirror config of the downstream stream; unset for republish links.
+  optional StreamSourceRef source = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Live state of a source or mirror link; unset when the server reports none.
+  optional StreamSourceInfo state = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Republish config of the upstream stream; unset for source and mirror links.
+  optional RePublish republish = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

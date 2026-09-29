@@ -19,6 +19,12 @@ type StreamInfo struct {
 	// Cluster is the cluster info; nil for standalone deployments.
 	Cluster *ClusterInfo
 
+	// Mirror is the live state of the mirror link; nil unless the stream is a mirror.
+	Mirror *StreamSourceInfo
+
+	// Sources is the live state of each source link, in no particular order.
+	Sources []*StreamSourceInfo
+
 	// TimeStamp is the timestamp when this info was fetched.
 	TimeStamp *time.Time
 

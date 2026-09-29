@@ -59,6 +59,101 @@ func (c *Client) ListStreamNames(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
+// streamListSubject is the JetStream API that pages full stream infos.
+const streamListSubject = "$JS.API.STREAM.LIST"
+
+// streamListPage is one page of the STREAM.LIST response; streams stay raw so each keeps the server's JSON.
+type streamListPage struct {
+	Total   int                 `json:"total"`
+	Streams []json.RawMessage   `json:"streams"`
+	Error   *jetstream.APIError `json:"error,omitempty"`
+}
+
+// streamTopologyInfo is a stream info whose mirror and source states keep the external and error
+// fields that jetstream.StreamSourceInfo drops.
+type streamTopologyInfo struct {
+	jetstream.StreamInfo
+	Mirror  *streamLinkInfo   `json:"mirror,omitempty"`
+	Sources []*streamLinkInfo `json:"sources,omitempty"`
+}
+
+type streamLinkInfo struct {
+	jetstream.StreamSourceInfo
+	External *jetstream.ExternalStream `json:"external,omitempty"`
+	Error    *jetstream.APIError       `json:"error,omitempty"`
+}
+
+// ListStreamTopology returns every stream with the live state of its mirror and source links (lag,
+// last activity, errors). It pages STREAM.LIST itself: the SDK lister drops the link errors.
+func (c *Client) ListStreamTopology(ctx context.Context) ([]entities.StreamInfo, error) {
+	streams := []entities.StreamInfo{}
+	for offset := 0; ; {
+		page, err := c.streamListPage(ctx, offset)
+		if err != nil {
+			return nil, err
+		}
+		for _, raw := range page.Streams {
+			var s streamTopologyInfo
+			if err := json.Unmarshal(raw, &s); err != nil {
+				return nil, wrapErr(coreerrs.WrapOperation(err, "unmarshal stream info"))
+			}
+			if strings.HasPrefix(s.Config.Name, "$") {
+				continue
+			}
+			info := toStreamInfo(&s.StreamInfo)
+			info.Raw = string(raw)
+			info.Mirror = toSourceInfo(s.Mirror)
+			info.Sources = slices.To(s.Sources, toSourceInfo)
+			streams = append(streams, *info)
+		}
+		offset += len(page.Streams)
+		if len(page.Streams) == 0 || offset >= page.Total {
+			return streams, nil
+		}
+	}
+}
+
+func (c *Client) streamListPage(ctx context.Context, offset int) (*streamListPage, error) {
+	reqData, err := json.Marshal(struct {
+		Offset int `json:"offset"`
+	}{Offset: offset})
+	if err != nil {
+		return nil, wrapErr(coreerrs.WrapOperation(err, "marshal stream list request"))
+	}
+
+	msg, err := c.request(ctx, streamListSubject, reqData)
+	if err != nil {
+		return nil, wrapErr(coreerrs.WrapOperation(err, "list streams"))
+	}
+
+	var page streamListPage
+	if err := json.Unmarshal(msg.Data, &page); err != nil {
+		return nil, wrapErr(coreerrs.WrapOperation(err, "unmarshal stream list"))
+	}
+	if page.Error != nil {
+		return nil, wrapErr(&errs.NATSAPIError{
+			Code:        page.Error.Code,
+			ErrorCode:   uint16(page.Error.ErrorCode),
+			Description: page.Error.Description,
+		})
+	}
+	return &page, nil
+}
+
+func toSourceInfo(link *streamLinkInfo) *entities.StreamSourceInfo {
+	if link == nil {
+		return nil
+	}
+	info := converter.Convert(&link.StreamSourceInfo, &entities.StreamSourceInfo{})
+	if link.External != nil {
+		info.External = converter.Convert(link.External, &entities.ExternalStreamRef{})
+	}
+	if link.Error != nil {
+		info.Error = link.Error.Description
+	}
+	return info
+}
+
 // GetStreamInfo returns detailed information about a specific stream.
 func (c *Client) GetStreamInfo(ctx context.Context, streamName string) (*entities.StreamInfo, error) {
 	if err := validateNATSNameLength("stream name", streamName); err != nil {

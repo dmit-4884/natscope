@@ -44,6 +44,46 @@ func (t *Toolset) getStream(ctx context.Context, _ *mcp.CallToolRequest, in stre
 	return nil, *converter.Convert(info, &streamView{}, mcptransport.ViewCodecs), nil
 }
 
+func (t *Toolset) getStreamRelations(
+	ctx context.Context,
+	_ *mcp.CallToolRequest,
+	in relationsInput,
+) (*mcp.CallToolResult, relationsOutput, error) {
+	connID, err := t.conns.Resolve(ctx, in.Connection)
+	if err != nil {
+		return nil, relationsOutput{}, err
+	}
+	relations, err := t.streams.GetStreamRelations(ctx, connID)
+	if err != nil {
+		return nil, relationsOutput{}, err
+	}
+	return nil, relationsView(relations, strings.TrimSpace(in.Stream)), nil
+}
+
+// relationsView keeps the links touching stream (all of them when it is empty) and the nodes they reach.
+func relationsView(relations *entities.StreamRelations, stream string) relationsOutput {
+	touches := func(e entities.StreamRelationEdge) bool { return stream == "" || e.From == stream || e.To == stream }
+	reached := map[string]bool{}
+	for _, e := range relations.Edges {
+		if touches(e) {
+			reached[e.From], reached[e.To] = true, true
+		}
+	}
+	return relationsOutput{
+		Nodes: mcptransport.Items(slices.ToWithFilter(relations.Nodes,
+			func(n entities.StreamRelationNode) bool { return reached[n.ID] },
+			func(n entities.StreamRelationNode) relationNodeView {
+				return *converter.Convert(&n, &relationNodeView{}, mcptransport.ViewCodecs)
+			},
+		)),
+		Relations: mcptransport.Items(slices.ToWithFilter(relations.Edges, touches,
+			func(e entities.StreamRelationEdge) relationView {
+				return *converter.Convert(&e, &relationView{}, mcptransport.ViewCodecs)
+			},
+		)),
+	}
+}
+
 func (t *Toolset) listConsumers(ctx context.Context, _ *mcp.CallToolRequest, in listConsumersInput) (*mcp.CallToolResult, listConsumersOutput, error) {
 	connID, err := t.conns.Resolve(ctx, in.Connection)
 	if err != nil {

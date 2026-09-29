@@ -17,6 +17,10 @@ service StreamsService {
 
   // Returns detailed information about a single JetStream stream.
   rpc GetStream(GetStreamRequest) returns (GetStreamResponse) {}
+
+  // Returns the relations graph of the connection's streams: which streams source, mirror or
+  // republish into which. Streams without any relation are left out.
+  rpc GetStreamRelations(GetStreamRelationsRequest) returns (GetStreamRelationsResponse) {}
 }
 
 // Defines the request message for listing JetStream streams.
@@ -56,4 +60,19 @@ message GetStreamRequest {
 message GetStreamResponse {
   // Required. Detailed information about the requested stream.
   .natscope.types.nats.StreamInfo stream = 1;
+}
+
+// Defines the request message for getting the stream relations graph.
+message GetStreamRelationsRequest {
+  // Required. Identifier of the NATS connection to query.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+}
+
+// Defines the response message for getting the stream relations graph.
+message GetStreamRelationsResponse {
+  // Required. Streams and placeholders taking part in at least one relation, sorted by id.
+  repeated .natscope.types.nats.StreamRelationNode nodes = 1;
+
+  // Required. Relations, each pointing from the upstream node to the downstream one.
+  repeated .natscope.types.nats.StreamRelationEdge edges = 2;
 }

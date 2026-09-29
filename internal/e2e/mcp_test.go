@@ -110,7 +110,7 @@ type mcpMessagesPage struct {
 
 var readOnlyTools = []string{
 	"decode_payload", "describe_message_type", "find_messages", "get_kv_entry", "get_kv_history", "get_message",
-	"get_schema_status", "get_server_info", "get_stream", "list_connections", "list_consumers", "list_kv_buckets",
+	"get_schema_status", "get_server_info", "get_stream", "get_stream_relations", "list_connections", "list_consumers", "list_kv_buckets",
 	"list_kv_keys", "list_mappings", "list_message_types", "list_streams", "resolve_subject", "tail_subject", "validate_payload",
 }
 

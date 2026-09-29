@@ -81,3 +81,15 @@ func (h *Handler) GetStream(
 		Stream: converter.Convert(stream, &natspb.StreamInfo{}, grpchelpers.ProtoCodecs),
 	}), nil
 }
+
+// GetStreamRelations returns which streams source, mirror or republish into which.
+func (h *Handler) GetStreamRelations(
+	ctx context.Context,
+	req *connect.Request[streamspb.GetStreamRelationsRequest],
+) (*connect.Response[streamspb.GetStreamRelationsResponse], error) {
+	relations, err := h.natsService.GetStreamRelations(ctx, req.Msg.ConnectionId)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(converter.Convert(relations, &streamspb.GetStreamRelationsResponse{}, grpchelpers.ProtoCodecs)), nil
+}

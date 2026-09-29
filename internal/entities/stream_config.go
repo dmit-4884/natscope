@@ -115,10 +115,12 @@ type StreamConsumerLimits struct {
 
 // StreamSourceRef is a reference to a source or mirror stream.
 type StreamSourceRef struct {
-	Name          string
-	OptStartSeq   uint64
-	FilterSubject string
-	External      *ExternalStreamRef
+	Name              string
+	OptStartSeq       uint64
+	OptStartTime      *time.Time
+	FilterSubject     string
+	SubjectTransforms []SubjectTransformConfig
+	External          *ExternalStreamRef
 }
 
 // ExternalStreamRef is an external stream reference for cross-account access.

@@ -103,3 +103,55 @@ func matchSubjectTokens(pattern string, subjectParts []string) bool {
 
 	return pi == len(patternParts) && si == len(subjectParts)
 }
+
+// SubjectsCollide reports whether some literal subject matches both patterns, like nats-server's
+// SubjectsCollide: "*" is compatible with any one token and ">" with one or more.
+func SubjectsCollide(a, b string) bool {
+	if a == b {
+		return true
+	}
+	aTokens, bTokens := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(aTokens) && i < len(bTokens); i++ {
+		at, bt := aTokens[i], bTokens[i]
+		if at == ">" || bt == ">" {
+			return true
+		}
+		if at != bt && at != "*" && bt != "*" {
+			return false
+		}
+	}
+	return len(aTokens) == len(bTokens)
+}
+
+// TransformDestinationPattern turns a subject-transform destination into a pattern matching every
+// subject it can produce: "$1", {{wildcard(1)}}, {{partition(...)}} and {{random(...)}} yield one
+// token ("*"), while split and slice functions yield any number of them, so the rest becomes ">".
+func TransformDestinationPattern(dest string) string {
+	tokens := strings.Split(dest, ".")
+	for i, token := range tokens {
+		if !isTransformFunction(token) {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(token, "{{")))
+		if strings.HasPrefix(name, "split") || strings.HasPrefix(name, "slice") {
+			return strings.Join(append(tokens[:i:i], ">"), ".")
+		}
+		tokens[i] = "*"
+	}
+	return strings.Join(tokens, ".")
+}
+
+func isTransformFunction(token string) bool {
+	if strings.Contains(token, "{{") {
+		return true
+	}
+	if len(token) < 2 || token[0] != '$' {
+		return false
+	}
+	for _, r := range token[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}

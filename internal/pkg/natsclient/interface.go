@@ -65,6 +65,9 @@ type StreamReader interface {
 	// ListStreamNames returns the names of all JetStream streams, sorted.
 	ListStreamNames(ctx context.Context) ([]string, error)
 
+	// ListStreamTopology returns all streams with the live state of their mirror and source links.
+	ListStreamTopology(ctx context.Context) ([]entities.StreamInfo, error)
+
 	// GetStreamInfo returns detail for one stream.
 	GetStreamInfo(ctx context.Context, streamName string) (*entities.StreamInfo, error)
 
