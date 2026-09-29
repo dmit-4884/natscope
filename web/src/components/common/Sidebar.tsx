@@ -149,7 +149,7 @@ export default function Sidebar({ connectionId }: SidebarProps) {
       role="navigation"
       aria-label="Streams navigation"
     >
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto scrollbar-thin">
         <CollapsibleSection
           title="Streams"
           icon={STREAMS_ICON}

@@ -100,9 +100,16 @@
 
 @layer components {
   /* Scrollbar styling */
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: theme('colors.gray.300') transparent;
+  @supports not selector(::-webkit-scrollbar) {
+    .scrollbar-thin {
+      scrollbar-width: thin;
+      scrollbar-color: theme('colors.gray.300') transparent;
+    }
+
+    .scrollbar-dark {
+      scrollbar-width: thin;
+      scrollbar-color: theme('colors.gray.700') transparent;
+    }
   }
 
   .scrollbar-thin::-webkit-scrollbar {
@@ -124,11 +131,6 @@
   }
 
   /* Dark scrollbar for dark backgrounds */
-  .scrollbar-dark {
-    scrollbar-width: thin;
-    scrollbar-color: theme('colors.gray.700') transparent;
-  }
-
   .scrollbar-dark::-webkit-scrollbar {
     width: 6px;
     height: 6px;
