@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect, publishUrl, PATTERN, PLAIN_SUBJECT, STREAM } from './fixtures'
-import { publishMessage, deleteTemplatesByPrefix } from './api'
+import { call, publishMessage, deleteTemplatesByPrefix } from './api'
 
 const TPL_PREFIX = 'E2E-TPL'
 
@@ -230,3 +230,51 @@ test.afterAll(async () => {
 
 // Keep STREAM referenced for documentation purposes in test titles/reports.
 void STREAM
+
+test.describe('publish tab layout', () => {
+  test('the publish button can be scrolled into view on a short window', async ({ page, env: _env }) => {
+    await page.setViewportSize({ width: 1280, height: 700 })
+    await openPublish(page)
+    await selectPattern(page, PLAIN_SUBJECT)
+
+    const button = page.getByRole('button', { name: /publish message/i })
+    await page.locator('#main-content').getByText('Subject Pattern', { exact: true }).hover()
+    await page.mouse.wheel(0, 5000)
+    await expect.poll(() => page.locator('#main-content').evaluate((el) => el.scrollTop)).toBe(0)
+
+    const main = await page.locator('#main-content').boundingBox()
+    const box = await button.boundingBox()
+    expect(main).not.toBeNull()
+    expect(box).not.toBeNull()
+    expect(box!.y + box!.height).toBeLessThanOrEqual(main!.y + main!.height)
+  })
+})
+
+test.describe('publish tab menus', () => {
+  test('the templates menu is not cut off before a subject is chosen', async ({ page, env: _env }) => {
+    const prefix = `E2E-TPL-MENU-${Date.now()}`
+    for (let i = 0; i < 5; i++) {
+      await call('natscope.templates.v1.TemplatesService', 'CreateTemplate', {
+        name: `${prefix}-${i}`,
+        subject: PLAIN_SUBJECT,
+        data: '{}',
+      })
+    }
+    try {
+      await openPublish(page)
+      await expect(page.getByText('Select a subject to publish a message')).toBeVisible()
+
+      await page.getByTestId('templates-trigger').click()
+      const menu = page.getByPlaceholder(/Search by name/).locator('xpath=ancestor::div[contains(@class,"absolute")][1]')
+      await expect(menu).toBeVisible()
+
+      const bottomIsReachable = await menu.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        return el.contains(document.elementFromPoint(r.left + r.width / 2, r.bottom - 8))
+      })
+      expect(bottomIsReachable).toBe(true)
+    } finally {
+      await deleteTemplatesByPrefix(prefix)
+    }
+  })
+})
