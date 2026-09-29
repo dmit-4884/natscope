@@ -61,8 +61,7 @@ message KVBucketConfig {
   // Optional. Maximum total size of the bucket in bytes (-1 for unlimited).
   int64 max_bytes = 4;
 
-  // Optional. Maximum number of history entries kept per key (1-64; the
-  // server rejects anything above 64).
+  // Optional. Maximum number of history entries kept per key (1-64).
   uint32 history = 5 [(buf.validate.field).uint32.lte = 64];
 
   // Optional. Time-to-live for entries (unset for no expiry).

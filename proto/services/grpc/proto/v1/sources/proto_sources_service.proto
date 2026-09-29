@@ -59,8 +59,7 @@ service SourcesService {
 // --- Create ---
 
 message CreateSourceRequest {
-  // Required. Human-readable display name. No control characters (the name is
-  // written to logs verbatim); capped well below any storage/UI limit.
+  // Required. Human-readable display name without control characters.
   string name = 1 [
     (buf.validate.field).required = true,
     (buf.validate.field).string.min_len = 1,

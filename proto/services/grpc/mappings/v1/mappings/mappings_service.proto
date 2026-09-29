@@ -103,8 +103,7 @@ message DeleteMappingResponse {}
 // Defines the request message for bulk saving subject mappings.
 message BatchSaveMappingsRequest {
   // Required. List of mapping items to save. Replaces all existing mappings
-  // atomically. An empty list replaces the full set with nothing (deletes all
-  // mappings) — a deliberate "replace all" call, not a no-op.
+  // atomically; an empty list deletes them all.
   repeated MappingBulkItem mappings = 1;
 }
 
@@ -122,13 +121,10 @@ message MappingBulkItem {
   string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
   // Optional. Pin resolution to a specific tag of the source, overriding the
-  // active selection. When a mapping with the same (pattern, source_id) key
-  // already exists and this field is unset, its current pin is preserved
-  // rather than cleared.
+  // active selection; unset keeps an existing mapping's pin.
   optional string pinned_tag = 4;
 
-  // Optional. Pin resolution to a specific descriptor by content hash. Same
-  // preserve-when-unset behavior as pinned_tag.
+  // Optional. Pin resolution to a specific descriptor by content hash; unset keeps an existing pin.
   optional string pinned_fingerprint = 5;
 }
 

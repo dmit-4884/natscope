@@ -176,9 +176,7 @@ message TestConnectionRequest {
   // Optional. TLS configuration.
   optional .natscope.types.nats.TlsConfig tls = 11;
 
-  // Optional. Connection timeout. Default: 10s. Capped at 60s regardless of
-  // caller-requested value; the whole TestConnection call is additionally
-  // bounded independent of this field (see ConnectionsService.TestConnection).
+  // Optional. Connection timeout. Default: 10s, max 60s.
   google.protobuf.Duration connect_timeout = 12 [(buf.validate.field).duration.lte = {seconds: 60}];
 
   // Optional. ID of an existing saved connection. When set, the probe result

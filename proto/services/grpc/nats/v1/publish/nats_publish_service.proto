@@ -61,8 +61,7 @@ message PublishMessageResponse {
   // Required. Sequence number assigned to the published message by JetStream.
   uint64 sequence = 2;
 
-  // Optional. Why the message was not published (encoding or publish failure);
-  // when set, stream and sequence are empty.
+  // Optional. Why the message was not published; when set, stream and sequence are empty.
   optional string error = 3;
 
   // Indicates if this message was a duplicate (matched Nats-Msg-Id within the dedup window).

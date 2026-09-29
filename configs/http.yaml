@@ -4,12 +4,9 @@
 # Built-in endpoints are served under the internal prefix (default /internal).
 # All parameters are commented out by default (template mode).
 #
-# A non-loopback listenAddress is fail-closed on the same two flags as
-# grpcWebAddress: allowRemote (env ALLOW_REMOTE) AND allowInsecure (env
-# ALLOW_INSECURE) must both be set, since this listener has no basic-auth
-# option of its own. pprof is additionally force-disabled on a non-loopback
-# bind regardless of pprof.enabled or allowInsecure — it leaks heap
-# contents, goroutine stacks, and cmdline, and nothing here authenticates it.
+# A non-loopback listenAddress needs both allowRemote (env ALLOW_REMOTE) and
+# allowInsecure (env ALLOW_INSECURE), since this listener has no basic auth.
+# pprof stays off on a non-loopback bind regardless of pprof.enabled.
 
 # http:
 #   # Bind to loopback: the endpoints expose runtime internals and are

@@ -196,17 +196,16 @@ Natscope works with zero configuration. When you need to tweak it:
 | Listen address | `GRPC_WEB_ADDRESS` (default `127.0.0.1:4280`, loopback only) |
 | Config file | `--config` flag or `CONFIG_FILE` env var (templates in `configs/`) |
 | Logging | Logs go to stderr. Level: `--log-level error\|warning\|info\|debug` or `LOGGER__LEVEL` (default `warning` in a terminal, `info` otherwise). Format: `--log-format console\|text\|json` or `LOGGER__OUTPUT_FORMAT` (default `console` in a terminal, `text` otherwise) |
-| Env overrides | any config field; nested keys use double underscores (`LOGGER__LEVEL`); an env var explicitly set to the empty string is treated as unset, not as an override |
+| Env overrides | any config field; nested keys use double underscores (`LOGGER__LEVEL`); an env var set to the empty string counts as unset |
 | Data directory | `STORAGE__LOCAL__DATA_DIR` (default `~/.natscope/data/`; a leading `~` is expanded) |
 | Service state dirs | `LIB_DIR` / `VAR_DIR` — instance id and cert cache (default `/var/lib/natscope`; falls back to `~/.natscope/{lib,var}` automatically when the system path is not writable) |
 | Secret vault | `SECRETS__BACKEND=auto\|keyring\|file`; for `file`, supply `SECRETS__FILE_KEY` (64 hex chars, AES-256) out-of-band |
-| Memory limit | `NATSCOPE_MEMORY_LIMIT_BYTES` (default 512 MiB); accepts a plain byte count or a `256MiB`/`1GiB`-style value; `GOMEMLIMIT` takes priority when set |
-| `.env` file | Not loaded by default. Set `NATSCOPE_DOTENV=1` to load `.env` from the current working directory (via `godotenv`) before any other config source |
+| Memory limit | `NATSCOPE_MEMORY_LIMIT_BYTES` (default 512 MiB); a byte count or a `256MiB`/`1GiB`-style value; `GOMEMLIMIT` wins when set |
+| `.env` file | Loaded from the working directory before any other source, only when `NATSCOPE_DOTENV=1` is set |
 
-Any string value in the config file or environment that contains a literal `$` is treated as an
-environment-variable reference (`$NAME` / `${NAME}`) and substituted — a `$` in, say, a generated
-password must be escaped as `$$`, or the load fails outright naming the undefined variable rather than
-silently truncating the value.
+A `$NAME` or `${NAME}` in a config value, from the file or the environment, is replaced with that
+environment variable, and an undefined one fails the load. Write a literal `$` (for example in a password)
+as `$$`.
 
 ## Remote access
 
@@ -222,16 +221,15 @@ WEB_AUTH__USERNAME=admin WEB_AUTH__PASSWORD=change-me natscope
 loopback. Without it Natscope refuses to start on a non-loopback bind; `ALLOW_INSECURE=true` overrides
 that and accepts the risk (with a prominent warning in the log).
 
-Every request's `Host` header is checked as a defense against DNS rebinding: `localhost` and IP literals are
-always accepted; any other name (e.g. a reverse proxy's public host) must be listed in `allowedHosts` (env
-`ALLOWED_HOSTS`, comma-separated) — unless `webAuth` is set on a wide bind and the list is empty.
+Every request's `Host` header is checked against DNS rebinding. `localhost` and IP literals always pass. Any
+other name, such as a reverse proxy's public host, must be listed in `allowedHosts` (env `ALLOWED_HOSTS`,
+comma-separated). With `webAuth` set on a wide bind and an empty list, any name is accepted.
 
 The listener itself has **no TLS** — it speaks cleartext h2c, so credentials and API responses travel
 unencrypted. Any remote exposure must sit behind a TLS-terminating reverse proxy (nginx, caddy, traefik).
 
-The optional internal HTTP server (`http:` section — health/metrics/pprof, see `configs/http.yaml`) is
-gated the same way: a non-loopback `listenAddress` needs both `allowRemote` and `allowInsecure`, and
-pprof stays disabled on any non-loopback bind regardless of configuration.
+The optional internal HTTP server (`http:` section with health, metrics and pprof; see `configs/http.yaml`)
+needs both `allowRemote` and `allowInsecure` for a non-loopback `listenAddress`, and pprof stays off there.
 
 ## Where it came from
 

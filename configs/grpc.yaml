@@ -13,11 +13,10 @@
 # Env: ALLOW_REMOTE=true
 # allowRemote: false   # (default: false)
 
-# <string> Comma-separated host names accepted in the Host header, a defense
-# against DNS rebinding. localhost and IP literals are always accepted on any
-# port. Other names (e.g. a reverse proxy's public name) must be listed here —
-# except on a non-loopback bind with webAuth, where any name is accepted while
-# this list is empty. Ports in entries are ignored.
+# <string> Comma-separated host names accepted in the Host header besides
+# localhost and IP literals (DNS rebinding defense). With webAuth on a
+# non-loopback bind and an empty list, any name is accepted. Ports in
+# entries are ignored.
 # Env: ALLOWED_HOSTS=natscope.example.com,natscope.internal
 # allowedHosts: ""   # (default: none)
 

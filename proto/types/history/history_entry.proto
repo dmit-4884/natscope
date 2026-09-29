@@ -37,8 +37,7 @@ message PublishHistory {
   google.protobuf.Timestamp created_at = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Required. Last update timestamp.
   google.protobuf.Timestamp updated_at = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // Required. Whether payload_json was truncated from the original payload
-  // (see payload_size for the original length).
+  // Required. Whether payload_json was truncated (see payload_size for the original length).
   bool payload_truncated = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Required. Whether JetStream deduplicated the message (matched Nats-Msg-Id).
   bool duplicate = 17;

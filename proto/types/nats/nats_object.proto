@@ -94,8 +94,7 @@ message ObjectInfo {
   // Optional. User-defined metadata as key-value pairs.
   map<string, string> metadata = 9;
 
-  // Optional. Set when this entry is a link to another object or bucket
-  // rather than a stored object itself.
+  // Optional. Set when this entry links to another object or bucket.
   optional ObjectLink link = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
@@ -104,7 +103,6 @@ message ObjectLink {
   // Required. Name of the Object Store bucket the link points to.
   string bucket = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Optional. Name of the linked object. Empty means the link points at the
-  // whole bucket rather than a single object within it.
+  // Optional. Name of the linked object; empty for a link to the whole bucket.
   string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

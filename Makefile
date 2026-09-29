@@ -5,16 +5,11 @@ PROJECT_ROOT := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 APP_NAME = natscope
 APP_PROJECT =
 APP_ENV_PREFIX ?=
-# The `|| echo` fallback must sit directly on git describe's own exit code —
-# piping through sed first (as this used to) makes the pipeline's exit code
-# sed's, which always succeeds, so a repo with no tags silently fell through
-# to APP_VERSION=v instead of v0.0.0. Tags are already "v"-prefixed (v1.2.3).
+# Tags are "v"-prefixed. `|| echo` must follow git describe directly so a tagless repo gets v0.0.0.
 APP_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
 APP_VERSION_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-# `go env` reports Go's own GOOS/GOARCH names (amd64, arm64, darwin, linux);
-# `uname -m`/`uname -s` don't (e.g. "x86_64", "Darwin"), which `go build`
-# then rejects outright ("unsupported GOOS/GOARCH pair").
+# `go env` gives the GOOS/GOARCH names `go build` accepts; `uname` doesn't.
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 GO_RACE_DETECTOR_ENABLE ?= 0
@@ -34,12 +29,7 @@ endif
 
 APP_BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-# Shared appinfo -X flags: every build target must set these, or the binary
-# reports Version 0.0.0 / an empty env prefix regardless of what APP_VERSION
-# etc. were set to (this bit build-backend, and the Docker image it feeds).
-# BuildTime specifically: unset, appinfo falls back to the vcs.time build
-# info (the HEAD commit's time), which `version --full` then mislabels as
-# "Build Time" even though the binary was built well after that commit.
+# appinfo -X flags shared by every build target. Without BuildTime, appinfo reports the HEAD commit time.
 LDFLAGS_X = \
 	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Name=${APP_NAME} \
 	-X github.com/altessa-s/go-atlas/core/runtime/appinfo.Project=${APP_PROJECT} \

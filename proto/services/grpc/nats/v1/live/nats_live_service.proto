@@ -18,8 +18,6 @@ message SubscribeRequest {
   string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
   // Required. List of subscriptions to activate. At least one subscription must be provided.
-  // Capped so a single request cannot open an unbounded number of NATS
-  // subscriptions (each spawns its own goroutine server-side).
   repeated LiveSubscription subscriptions = 2 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).repeated.min_items = 1,
