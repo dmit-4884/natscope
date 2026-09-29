@@ -48,7 +48,7 @@ message CreateConnectionRequest {
     (buf.validate.field).repeated = {
       min_items: 1,
       max_items: 32,
-      items: {string: {min_len: 1, max_len: 2048, pattern: "^(nats|tls|ws|wss)://[^ \t\n\r<>]+$"}}
+      items: {string: {min_len: 1, max_len: 2048, pattern: "^(?:(?:nats|tls|ws|wss)://[^ \t\n\r<>]+|(?:[^ \t\n\r<>/@]+@)?(?:[A-Za-z0-9._-]+|\\[[0-9A-Fa-f:.]+\\])(?::[0-9]{1,5})?)$"}}
     }
   ];
 
@@ -108,7 +108,7 @@ message UpdateConnectionRequest {
   // Optional. Updated NATS server URLs. Replaces all existing URLs.
   repeated string urls = 4 [(buf.validate.field).repeated = {
     max_items: 32,
-    items: {string: {min_len: 1, max_len: 2048, pattern: "^(nats|tls|ws|wss)://[^ \t\n\r<>]+$"}}
+    items: {string: {min_len: 1, max_len: 2048, pattern: "^(?:(?:nats|tls|ws|wss)://[^ \t\n\r<>]+|(?:[^ \t\n\r<>/@]+@)?(?:[A-Za-z0-9._-]+|\\[[0-9A-Fa-f:.]+\\])(?::[0-9]{1,5})?)$"}}
   }];
 
   // Optional. Updated authentication configuration. Replaces the entire auth config.
@@ -166,7 +166,7 @@ message TestConnectionRequest {
     (buf.validate.field).repeated = {
       min_items: 1,
       max_items: 32,
-      items: {string: {min_len: 1, max_len: 2048, pattern: "^(nats|tls|ws|wss)://[^ \t\n\r<>]+$"}}
+      items: {string: {min_len: 1, max_len: 2048, pattern: "^(?:(?:nats|tls|ws|wss)://[^ \t\n\r<>]+|(?:[^ \t\n\r<>/@]+@)?(?:[A-Za-z0-9._-]+|\\[[0-9A-Fa-f:.]+\\])(?::[0-9]{1,5})?)$"}}
     }
   ];
 
