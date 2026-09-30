@@ -2,7 +2,7 @@
 
 # Natscope
 
-**A single-binary web GUI for NATS JetStream with first-class Protobuf support.**
+**A web UI for NATS JetStream that decodes Protobuf payloads.**
 
 [![Release](https://img.shields.io/github/v/release/dmit-4884/natscope)](https://github.com/dmit-4884/natscope/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/dmit-4884/natscope/ci.yml?branch=main&label=CI)](https://github.com/dmit-4884/natscope/actions/workflows/ci.yml)
@@ -14,11 +14,11 @@
 
 </div>
 
-- **Single binary.** The UI is embedded and all state lives in one local file — no database, nothing to provision.
-- **Protobuf-native.** Point it at your `.proto` files and binary payloads read as JSON in history, live tail and publish.
-- **All of JetStream.** Streams, consumers, Key/Value and Object Store — browse, edit, purge, pause.
-- **Secrets stay secret.** Credentials live in the OS keychain, never in the database.
-- **AI agents.** Claude Code or Cursor can read your streams, decoded, over MCP.
+- Natscope ships as one binary with the UI inside and keeps its state in a single local file.
+- Point it at your `.proto` files and binary payloads show up as JSON in history, live tail and publish.
+- Browse, edit and purge streams, pause consumers, manage Key/Value buckets and object stores.
+- Credentials go to the OS keychain or an encrypted file vault, apart from the database.
+- Claude Code or Cursor can read your streams over MCP, with payloads decoded.
 
 ## Install
 
@@ -31,8 +31,8 @@ natscope
 docker run -d -p 127.0.0.1:4280:4280 -v natscope-data:/data ghcr.io/dmit-4884/natscope:latest
 ```
 
-Open <http://localhost:4280> and add a connection. Natscope listens on loopback only — read
-[remote access](https://natscope.app/reference/remote-access) before exposing it.
+Open <http://localhost:4280> and add a connection. Natscope binds to loopback; read
+[remote access](https://natscope.app/reference/remote-access) before you open it to a network.
 
 [Configuration](https://natscope.app/reference/configuration) · [Building from source](CONTRIBUTING.md) ·
 [Apache 2.0](LICENSE)
