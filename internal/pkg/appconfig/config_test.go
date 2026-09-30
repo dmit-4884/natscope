@@ -6,6 +6,7 @@ package appconfig_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
@@ -184,6 +185,19 @@ func TestLoad_BoolEnvMatchesYAMLWords(t *testing.T) {
 	}
 	if !cfg.AllowInsecure {
 		t.Error("ALLOW_INSECURE=yes must enable allowInsecure")
+	}
+}
+
+func TestLoad_SecretsFileKeyFromEnv(t *testing.T) {
+	key := strings.Repeat("ab", 32)
+	t.Setenv("SECRETS__FILE_KEY", key)
+
+	cfg, err := appconfig.Load("", appconfig.LoggerDefaults(false))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := cfg.SecretsFileKey(); got != key {
+		t.Errorf("SecretsFileKey() = %q, want %q", got, key)
 	}
 }
 

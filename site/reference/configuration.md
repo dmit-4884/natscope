@@ -68,7 +68,7 @@ One listener speaks Connect, gRPC-Web and gRPC, and serves the SPA. There is no 
 | Key | Env | Default | What it does |
 |-----|-----|---------|--------------|
 | `secrets.backend` | `SECRETS__BACKEND` | `auto` | Vault backend: `auto`, `keyring` or `file` |
-| | `SECRETS__FILE_KEY` | unset | AES-256 key for the file vault, 64 hex characters |
+| `secrets.fileKey` | `SECRETS__FILE_KEY` | unset | AES-256 key for the file vault, 64 hex characters; prefer the env var |
 
 See [Secrets](/reference/secrets).
 

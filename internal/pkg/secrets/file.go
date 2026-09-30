@@ -4,7 +4,6 @@
 package secrets
 
 import (
-	"cmp"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -18,8 +17,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"github.com/altessa-s/go-atlas/core/runtime/appinfo"
 
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
@@ -36,9 +33,8 @@ const (
 
 	keyLen = 32 // AES-256
 
-	// fileKeyEnv supplies the hex AES key out-of-band, so it need not sit on
-	// disk beside the ciphertext. Empty -> co-located key file.
-	fileKeyEnv = "SECRETS__FILE_KEY"
+	// fileKeySetting names where an out-of-band key comes from, for error messages.
+	fileKeySetting = "SECRETS__FILE_KEY"
 )
 
 // ErrVaultKeyMismatch is returned when the key cannot decrypt the vault file.
@@ -63,13 +59,14 @@ type File struct {
 	data map[string]map[string]string
 }
 
-// NewFile opens (or initializes) the encrypted vault under dir: a missing key
-// file is generated, a missing vault file yields an empty vault.
-func NewFile(dir string) (*File, error) {
+// NewFile opens (or initializes) the encrypted vault under dir. hexKey is an
+// out-of-band hex AES-256 key; empty uses the key file beside the vault,
+// generated when missing. A missing vault file yields an empty vault.
+func NewFile(dir, hexKey string) (*File, error) {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return nil, coreerrs.WrapOperation(err, "create vault directory")
 	}
-	key, err := loadOrCreateKey(filepath.Join(dir, fileKeyName))
+	key, err := loadOrCreateKey(filepath.Join(dir, fileKeyName), hexKey)
 	if err != nil {
 		return nil, err
 	}
@@ -208,20 +205,18 @@ func syncDir(dir string) {
 	_ = fh.Close() //nolint:errcheck // read-only handle
 }
 
-// loadOrCreateKey returns the AES key: an out-of-band hex key from fileKeyEnv
-// wins; otherwise a co-located key file is read or generated.
-func loadOrCreateKey(path string) ([]byte, error) {
-	// Honor the derived env prefix (as the config loader does) so
-	// <PREFIX>SECRETS__FILE_KEY works; fall back to the bare name.
-	if env := strings.TrimSpace(cmp.Or(os.Getenv(envPrefix()+fileKeyEnv), os.Getenv(fileKeyEnv))); env != "" {
-		key, decErr := hex.DecodeString(env)
+// loadOrCreateKey returns the AES key: an out-of-band hexKey wins; otherwise a
+// co-located key file is read or generated.
+func loadOrCreateKey(path, hexKey string) ([]byte, error) {
+	if hexKey = strings.TrimSpace(hexKey); hexKey != "" {
+		key, decErr := hex.DecodeString(hexKey)
 		if decErr != nil || len(key) != keyLen {
-			return nil, fmt.Errorf("%s must be %d hex-encoded bytes: %w", fileKeyEnv, keyLen, ErrVaultKeyInvalid)
+			return nil, fmt.Errorf("%s must be %d hex-encoded bytes: %w", fileKeySetting, keyLen, ErrVaultKeyInvalid)
 		}
 		return key, nil
 	}
 	// Co-located key is obfuscation only: whoever reads the vault file can read
-	// the key beside it. Set fileKeyEnv for real at-rest protection.
+	// the key beside it. Set fileKeySetting for real at-rest protection.
 	raw, err := os.ReadFile(path)
 	switch {
 	case err == nil:
@@ -246,11 +241,3 @@ func loadOrCreateKey(path string) ([]byte, error) {
 }
 
 var _ Vault = (*File)(nil)
-
-// envPrefix mirrors appconfig.EnvPrefix: the build prefix joined with "_".
-func envPrefix() string {
-	if appinfo.EnvPrefix == "" {
-		return ""
-	}
-	return strings.TrimRight(appinfo.EnvPrefix, "_") + "_"
-}

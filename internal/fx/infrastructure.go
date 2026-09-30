@@ -77,7 +77,7 @@ func newSecretsVault(cfg *appconfig.Config) (secrets.Vault, error) {
 	case appconfig.SecretsBackendFile:
 		lgr.Info("using encrypted file vault for secrets",
 			slog.String("dir", cfg.ResolveDataDir()))
-		return secrets.NewFile(cfg.ResolveDataDir())
+		return secrets.NewFile(cfg.ResolveDataDir(), cfg.SecretsFileKey())
 	default: // auto
 		kr := secrets.NewKeyring(keychainServiceName)
 		if kr.Available() {
@@ -86,7 +86,7 @@ func newSecretsVault(cfg *appconfig.Config) (secrets.Vault, error) {
 		lgr.Warn("OS keychain unavailable — falling back to the encrypted file vault; "+
 			"keep secrets.vault and vault.key private (both are user-only)",
 			slog.String("dir", cfg.ResolveDataDir()))
-		return secrets.NewFile(cfg.ResolveDataDir())
+		return secrets.NewFile(cfg.ResolveDataDir(), cfg.SecretsFileKey())
 	}
 }
 

@@ -15,7 +15,7 @@ import (
 
 func TestFileRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	v, err := secrets.NewFile(dir)
+	v, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestFilePersistsAcrossReopen(t *testing.T) {
 	dir := t.TempDir()
 	ctx := t.Context()
 
-	v1, err := secrets.NewFile(dir)
+	v1, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestFilePersistsAcrossReopen(t *testing.T) {
 		t.Fatalf("put: %v", err)
 	}
 
-	v2, err := secrets.NewFile(dir)
+	v2, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestFilePersistsAcrossReopen(t *testing.T) {
 func TestFileVaultIsEncryptedOnDisk(t *testing.T) {
 	dir := t.TempDir()
 	ctx := t.Context()
-	v, err := secrets.NewFile(dir)
+	v, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestFileVaultIsEncryptedOnDisk(t *testing.T) {
 func TestFilePutEmptyDeletes(t *testing.T) {
 	dir := t.TempDir()
 	ctx := t.Context()
-	v, err := secrets.NewFile(dir)
+	v, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestFilePutEmptyDeletes(t *testing.T) {
 
 func TestFileDeleteIdempotent(t *testing.T) {
 	dir := t.TempDir()
-	v, err := secrets.NewFile(dir)
+	v, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -109,11 +109,44 @@ func TestFileDeleteIdempotent(t *testing.T) {
 	}
 }
 
-func TestFileWrongKeyFailsClearly(t *testing.T) {
-	t.Setenv("SECRETS__FILE_KEY", "") // force the co-located key path
+func TestFileUsesSuppliedKey(t *testing.T) {
 	dir := t.TempDir()
 	ctx := t.Context()
-	v, err := secrets.NewFile(dir)
+	key := strings.Repeat("cd", 32)
+
+	v, err := secrets.NewFile(dir, key)
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	if err := v.Put(ctx, "connections", "c1", map[string]string{"auth.password": "pw"}); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "vault.key")); !os.IsNotExist(err) {
+		t.Fatalf("a supplied key must not be written beside the vault: %v", err)
+	}
+
+	reopened, err := secrets.NewFile(dir, key)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	if got, _ := reopened.Get(ctx, "connections", "c1"); got["auth.password"] != "pw" {
+		t.Fatalf("want secret readable with the same key, got %v", got)
+	}
+	if _, err := secrets.NewFile(dir, strings.Repeat("ef", 32)); !errors.Is(err, secrets.ErrVaultKeyMismatch) {
+		t.Fatalf("want ErrVaultKeyMismatch for another key, got %v", err)
+	}
+}
+
+func TestFileRejectsMalformedSuppliedKey(t *testing.T) {
+	if _, err := secrets.NewFile(t.TempDir(), "not-hex"); !errors.Is(err, secrets.ErrVaultKeyInvalid) {
+		t.Fatalf("want ErrVaultKeyInvalid, got %v", err)
+	}
+}
+
+func TestFileWrongKeyFailsClearly(t *testing.T) {
+	dir := t.TempDir()
+	ctx := t.Context()
+	v, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -126,7 +159,7 @@ func TestFileWrongKeyFailsClearly(t *testing.T) {
 	if err := os.WriteFile(keyPath, []byte(strings.Repeat("ab", 32)+"\n"), 0o600); err != nil {
 		t.Fatalf("swap key: %v", err)
 	}
-	if _, err := secrets.NewFile(dir); !errors.Is(err, secrets.ErrVaultKeyMismatch) {
+	if _, err := secrets.NewFile(dir, ""); !errors.Is(err, secrets.ErrVaultKeyMismatch) {
 		t.Fatalf("want ErrVaultKeyMismatch, got %v", err)
 	}
 }
@@ -135,7 +168,7 @@ func TestFileWrongKeyFailsClearly(t *testing.T) {
 // the vault file: a stray .tmp means the atomic replace did not run to the end.
 func TestFilePersistLeavesNoTempFile(t *testing.T) {
 	dir := t.TempDir()
-	v, err := secrets.NewFile(dir)
+	v, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("NewFile: %v", err)
 	}
@@ -155,7 +188,7 @@ func TestFilePersistLeavesNoTempFile(t *testing.T) {
 // just the in-memory map.
 func TestFilePersistSurvivesReopen(t *testing.T) {
 	dir := t.TempDir()
-	v, err := secrets.NewFile(dir)
+	v, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("NewFile: %v", err)
 	}
@@ -163,7 +196,7 @@ func TestFilePersistSurvivesReopen(t *testing.T) {
 		t.Fatalf("Put: %v", err)
 	}
 
-	reopened, err := secrets.NewFile(dir)
+	reopened, err := secrets.NewFile(dir, "")
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}

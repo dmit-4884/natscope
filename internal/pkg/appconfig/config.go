@@ -72,6 +72,8 @@ const (
 type SecretsConfig struct {
 	// Backend: auto | keyring | file.
 	Backend string `yaml:"backend" default:"auto"`
+	// FileKey: hex AES-256 key for the file vault (64 chars); empty keeps vault.key beside the vault.
+	FileKey string `yaml:"fileKey"`
 }
 
 // Validate restricts Backend to the known vault backends.
@@ -88,6 +90,14 @@ func (c *Config) SecretsBackend() string {
 		return c.Secrets.Backend
 	}
 	return SecretsBackendAuto
+}
+
+// SecretsFileKey returns the hex AES key for the file vault, or "" to use the key file beside the vault.
+func (c *Config) SecretsFileKey() string {
+	if c.Secrets == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.Secrets.FileKey)
 }
 
 // Load loads the configuration from the specified file or files.

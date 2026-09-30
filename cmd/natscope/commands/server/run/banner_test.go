@@ -102,9 +102,9 @@ func TestVersionLabel(t *testing.T) {
 }
 
 func TestSecretsLabel(t *testing.T) {
-	t.Setenv("SECRETS__FILE_KEY", "")
+	t.Parallel()
 
-	fileVault, err := secrets.NewFile(t.TempDir())
+	fileVault, err := secrets.NewFile(t.TempDir(), "")
 	require.NoError(t, err)
 
 	require.Equal(t, keyringLabel(runtime.GOOS), secretsLabel(secrets.NewKeyring("natscope-test")))
