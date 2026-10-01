@@ -1,7 +1,28 @@
 import type { StreamCreateRequest, StreamSource } from '@/types/management'
-import type { StreamDetail, StreamSourceRef } from '@/types/nats'
+import type { ReplicaInfo, StreamDetail, StreamSourceRef } from '@/types/nats'
+import { formatNsDuration, formatNumber } from '@/utils/formatters'
+import { plural } from '@/utils/plural'
 
 export const COMPRESSION_LABELS: Record<string, string> = { none: 'None', s2: 'S2' }
+
+export interface ReplicaState {
+  variant: 'success' | 'warning' | 'error'
+  label: string | undefined
+  detail: string
+}
+
+export function replicaState(replica: ReplicaInfo): ReplicaState {
+  if (replica.offline) {
+    const detail = replica.active > 0 ? `Offline, last seen ${formatNsDuration(replica.active)} ago` : 'Offline'
+    return { variant: 'error', label: 'offline', detail }
+  }
+  if (!replica.current) {
+    return replica.lag > 0
+      ? { variant: 'warning', label: `${formatNumber(replica.lag)} behind`, detail: `${plural(replica.lag, 'operation')} behind the leader` }
+      : { variant: 'warning', label: 'catching up', detail: 'Catching up with the leader' }
+  }
+  return { variant: 'success', label: undefined, detail: 'In sync with the leader' }
+}
 
 /** Format camelCase/PascalCase to readable text: "DiscardOld" → "Discard Old". */
 export function formatConfigValue(value: string): string {

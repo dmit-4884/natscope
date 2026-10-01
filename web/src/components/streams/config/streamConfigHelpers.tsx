@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import Tooltip from '@/components/common/Tooltip'
-import { InfoIcon } from '@/components/ui'
+import { Badge, InfoIcon } from '@/components/ui'
+import type { ReplicaInfo } from '@/types/nats'
+import { replicaState } from './streamConfigUtils'
 
 /** Small stat card rendered in the stream config header. */
 export function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -45,6 +47,19 @@ export function Flag({ label, color, hint }: { label: string; color: 'red' | 'gr
     )
   }
   return badge
+}
+
+export function ReplicaBadge({ replica }: { replica: ReplicaInfo }) {
+  const state = replicaState(replica)
+  return (
+    <Tooltip content={state.detail} position="bottom">
+      <Badge variant={state.variant} className="gap-1.5" data-testid={`replica-${replica.name}`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" aria-hidden="true" />
+        {replica.name}
+        {state.label && <span className="font-normal">{state.label}</span>}
+      </Badge>
+    </Tooltip>
+  )
 }
 
 function HelpIcon({ hint }: { hint: string }): ReactNode {

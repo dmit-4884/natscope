@@ -51,7 +51,9 @@ function toClusterInfo(c: ProtoClusterInfo | undefined): ClusterInfo | undefined
     replicas: c.replicas.length > 0 ? c.replicas.map(r => ({
       name: r.name,
       current: r.current,
+      offline: r.offline,
       active: durToNanos(r.active),
+      lag: Number(r.lag),
     })) : undefined,
   }
 }

@@ -1,11 +1,15 @@
 export interface ClusterInfo {
   name?: string
   leader?: string
-  replicas?: Array<{
-    name: string
-    current: boolean
-    active: number
-  }>
+  replicas?: ReplicaInfo[]
+}
+
+export interface ReplicaInfo {
+  name: string
+  current: boolean
+  offline: boolean
+  active: number
+  lag: number
 }
 
 export interface StreamInfo {

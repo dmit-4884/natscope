@@ -1,8 +1,30 @@
 import { describe, it, expect } from 'vitest'
 import { create } from '@bufbuild/protobuf'
 import { DurationSchema, TimestampSchema } from '@bufbuild/protobuf/wkt'
-import { ConsumerInfoSchema } from '../gen/types/nats/nats_stream_pb'
-import { readConsumerPauseState, toConsumerInfo } from './streams'
+import { ConsumerInfoSchema, StreamInfoSchema } from '../gen/types/nats/nats_stream_pb'
+import { readConsumerPauseState, toConsumerInfo, toStreamInfo } from './streams'
+
+describe('toStreamInfo cluster replicas', () => {
+  it('maps whether each replica is offline and how far it lags', () => {
+    const info = toStreamInfo(
+      create(StreamInfoSchema, {
+        cluster: {
+          name: 'hub',
+          leader: 'hub-2',
+          replicas: [
+            { name: 'hub-1', current: true, active: create(DurationSchema, { nanos: 170_000_000 }) },
+            { name: 'hub-3', offline: true, lag: 42n, active: create(DurationSchema, { seconds: 34_710n }) },
+          ],
+        },
+      }),
+    )
+
+    expect(info.cluster?.replicas).toEqual([
+      { name: 'hub-1', current: true, offline: false, active: 170_000_000, lag: 0 },
+      { name: 'hub-3', current: false, offline: true, active: 34_710_000_000_000, lag: 42 },
+    ])
+  })
+})
 
 describe('readConsumerPauseState', () => {
   it('reports not paused without raw consumer info', () => {

@@ -1,7 +1,61 @@
 import { describe, it, expect } from 'vitest'
 import type { StreamCreateRequest } from '@/types/management'
-import type { StreamDetail } from '@/types/nats'
-import { COMPRESSION_LABELS, canCreateStream, isMirrorConfigured, normalizeSubjects, streamToConfig } from './streamConfigUtils'
+import type { ReplicaInfo, StreamDetail } from '@/types/nats'
+import {
+  COMPRESSION_LABELS,
+  canCreateStream,
+  isMirrorConfigured,
+  normalizeSubjects,
+  replicaState,
+  streamToConfig,
+} from './streamConfigUtils'
+
+describe('replicaState', () => {
+  const replica = (over: Partial<ReplicaInfo> = {}): ReplicaInfo => ({
+    name: 'hub-1',
+    current: true,
+    offline: false,
+    active: 170_000_000,
+    lag: 0,
+    ...over,
+  })
+
+  it('reports a current replica as in sync', () => {
+    expect(replicaState(replica())).toEqual({ variant: 'success', label: undefined, detail: 'In sync with the leader' })
+  })
+
+  it('reports how far a lagging replica is behind', () => {
+    expect(replicaState(replica({ current: false, lag: 1234 }))).toEqual({
+      variant: 'warning',
+      label: '1.2K behind',
+      detail: '1234 operations behind the leader',
+    })
+  })
+
+  it('says a replica is catching up when the server reports no lag', () => {
+    expect(replicaState(replica({ current: false }))).toEqual({
+      variant: 'warning',
+      label: 'catching up',
+      detail: 'Catching up with the leader',
+    })
+  })
+
+  it('reports an offline replica with the time it was last seen', () => {
+    expect(replicaState(replica({ current: false, offline: true, active: 34_710_171_151_042 }))).toEqual({
+      variant: 'error',
+      label: 'offline',
+      detail: 'Offline, last seen 9h 38m ago',
+    })
+  })
+
+  it('reports an offline replica that was never seen', () => {
+    expect(replicaState(replica({ current: false, offline: true, active: 0 }))).toEqual({
+      variant: 'error',
+      label: 'offline',
+      detail: 'Offline',
+    })
+  })
+})
 
 function draft(over: Partial<StreamCreateRequest> = {}): StreamCreateRequest {
   return { name: 'ORDERS', subjects: [''], ...over }

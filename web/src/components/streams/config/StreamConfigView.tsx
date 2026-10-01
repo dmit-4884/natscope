@@ -1,10 +1,10 @@
-import { Button, CopyButton, CheckIcon, PauseIcon, PencilIcon, RefreshIcon } from '@/components/ui'
+import { Button, CopyButton, PencilIcon, RefreshIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import { formatBytes, formatDateTime, formatNsDuration, formatNumber } from '@/utils/formatters'
 import type { StreamDetail } from '@/types/nats'
 import JsonViewer from '@/components/common/JsonViewer'
 import { streamConfigToNatsCli } from '../natsCli'
-import { StatCard, ConfigRow, Flag } from './streamConfigHelpers'
+import { StatCard, ConfigRow, Flag, ReplicaBadge } from './streamConfigHelpers'
 import { COMPRESSION_LABELS, formatConfigValue, hasMetadata } from './streamConfigUtils'
 
 interface Props {
@@ -266,7 +266,7 @@ export function StreamConfigView({
                       <ConfigRow
                         label="Republish"
                         value={`${republish.src} → ${republish.dest}`}
-                        hint="Every stored message is republished from the source subject to the destination subject"
+                        hint="Stored messages whose subject matches the source are republished to the destination subject"
                       />
                     )}
                     {republish?.headers_only && (
@@ -338,16 +338,8 @@ export function StreamConfigView({
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <div className="text-xs text-content-tertiary mb-2">Replicas</div>
                       <div className="flex flex-wrap gap-2">
-                        {streamDetail.cluster.replicas.map((replica, idx) => (
-                          <span
-                            key={idx}
-                            className={`px-2 py-1 text-xs rounded ${
-                              replica.current ? 'bg-status-success-bg text-green-700' : 'bg-yellow-50 text-yellow-700'
-                            }`}
-                            title={replica.current ? 'In sync' : `Lag: ${replica.active}ns`}
-                          >
-                            {replica.name} {replica.current ? <CheckIcon className="w-3.5 h-3.5" /> : <PauseIcon className="w-3.5 h-3.5" />}
-                          </span>
+                        {streamDetail.cluster.replicas.map((replica) => (
+                          <ReplicaBadge key={replica.name} replica={replica} />
                         ))}
                       </div>
                     </div>
