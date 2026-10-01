@@ -30,10 +30,22 @@ Select a bucket, then a key. The editor gives you:
 
 **New key** or **Create New Key** adds one. In create mode the save button reads **Create Key**.
 
+## Protobuf values
+
+A value decodes when a [subject mapping](/guide/protobuf) matches `$KV.<bucket>.<key>`, for example
+`$KV.config.>` for a whole bucket, or when [type detection](/guide/protobuf#type-detection) recognizes it.
+A bar above the editor names the type, and the editor holds the value as JSON.
+**Save Value** encodes the JSON back to Protobuf, with the mapping's framing. **Raw bytes** shows the
+stored bytes field by field instead.
+
+A detected type carries an **Auto-detected** badge. **Save as mapping** maps the whole bucket to it.
+When you create a key that a mapping covers, the form says which type the JSON becomes.
+
 ## Revision history
 
 **History** lists every revision of a key with its operation badge: **put**, **delete** or **purge**.
-Walk back through them to see what a value looked like and when it changed.
+Walk back through them to see what a value looked like and when it changed. Protobuf revisions show as
+decoded JSON.
 
 ## Confirmations
 

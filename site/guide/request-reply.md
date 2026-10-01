@@ -43,8 +43,8 @@ When no reply arrives, the panel tells you why:
 ## Protobuf
 
 When a [subject mapping](/guide/protobuf) matches the request subject, the JSON payload is encoded to
-that Protobuf type before it is sent, just like in the Publish tab. The editor offers field completion
-and an example message.
+that Protobuf type before it is sent, with the mapping's framing and pinned schema, just like in the
+Publish tab. The editor completes fields at any depth and enum values, and offers an example message.
 
 Replies arrive on an inbox subject, so no mapping applies to them. Pick the reply type in **Decode as**.
 If the request type ends in `Request` and the same source has a matching `Response` or `Reply` type,

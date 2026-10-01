@@ -47,13 +47,15 @@ once at startup: restart the client after changing `mcp.allowWrites`.
 | `list_message_types`, `describe_message_type` | Compiled Protobuf types, their fields and an example payload |
 | `list_mappings`, `resolve_subject` | Subject mappings and why a subject decodes, or does not |
 | `decode_payload`, `validate_payload` | Decode base64 bytes, check JSON against a type and its `buf.validate` rules |
+| `detect_message_type` | Rank every loaded type by how well base64 bytes decode as it, for payloads no mapping covers |
 | `get_schema_status` | Loaded types and conflicts between proto sources |
-| `list_kv_buckets`, `list_kv_keys`, `get_kv_entry`, `get_kv_history` | Key/Value buckets, keys and revisions |
+| `list_kv_buckets`, `list_kv_keys`, `get_kv_entry`, `get_kv_history` | Key/Value buckets, keys and revisions, Protobuf values decoded |
 | `publish_message` | Publish JSON (encoded to Protobuf when the subject is mapped) or text. Only with `mcp.allowWrites` |
 | `request_message` | Send a core NATS request and return the first reply. Only with `mcp.allowWrites` |
 
 Tools that talk to NATS take a `connection` argument, a saved connection's name or id. With a single saved
-connection it can be omitted. Payloads are clipped to a byte budget (a page or tail carries at most 256 KiB);
+connection it can be omitted. A payload or value decoded by [type detection](/guide/protobuf#type-detection)
+rather than a mapping carries `decodedAuto`, so the agent knows the type is a guess. Payloads are clipped to a byte budget (a page or tail carries at most 256 KiB);
 a clipped message is marked `truncated` and `get_message` fetches more of it.
 
 ## Writes

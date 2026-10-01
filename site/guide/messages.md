@@ -26,10 +26,12 @@ Click **Filters** in the toolbar to open the filter panel:
 
 The payload viewer has several views of the same bytes:
 
-- **Decoded JSON** when a [Protobuf mapping](/guide/protobuf) matches the subject
-- **Raw text**
+- **Decoded** when a [Protobuf mapping](/guide/protobuf) matches the subject, or
+  [type detection](/guide/protobuf#type-detection) recognizes the payload
+- **JSON** for a JSON payload
+- **Raw** text
 - **Hex**
-- **Base64**
+- **Wire**, the Protobuf fields read without a schema
 
 NATS headers sit alongside the payload.
 
