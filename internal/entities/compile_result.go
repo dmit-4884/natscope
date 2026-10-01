@@ -3,10 +3,12 @@
 
 package entities
 
-// CompileResult holds the result of a proto compilation operation.
-type CompileResult struct {
+// CompileOutcome is the result of one compile pass.
+type CompileOutcome struct {
+	Valid           bool
 	MessageTypes    int
 	FileDescriptors int
+	Diagnostics     []CompileDiagnostic
 }
 
 // DiagnosticSeverity classifies a compile diagnostic.

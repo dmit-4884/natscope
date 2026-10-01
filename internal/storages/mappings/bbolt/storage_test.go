@@ -39,7 +39,7 @@ func TestMappings_SaveGetRoundTrip(t *testing.T) {
 		m.Pattern = "orders.>"
 		m.MessageType = "api.v1.OrderEvent"
 		m.SourceID = "src-1"
-		m.PinnedTag = ptr.Wrap("v1.2.3")
+		m.PinnedFingerprint = ptr.Wrap("fp-123")
 	})
 	if err := s.Save(ctx, in); err != nil {
 		t.Fatalf("save: %v", err)
@@ -55,11 +55,8 @@ func TestMappings_SaveGetRoundTrip(t *testing.T) {
 	if got.Etag != in.Etag {
 		t.Fatalf("etag mismatch: %q vs %q", got.Etag, in.Etag)
 	}
-	if got.PinnedTag == nil || *got.PinnedTag != "v1.2.3" {
-		t.Fatalf("pinned tag mismatch: %v", got.PinnedTag)
-	}
-	if got.PinnedFingerprint != nil {
-		t.Fatalf("expected nil pinned fingerprint, got %v", *got.PinnedFingerprint)
+	if got.PinnedFingerprint == nil || *got.PinnedFingerprint != "fp-123" {
+		t.Fatalf("pinned fingerprint mismatch: %v", got.PinnedFingerprint)
 	}
 	// time.Time <-> ms round-trip is lossless at ms precision.
 	if !got.CreatedAt.Equal(in.CreatedAt.Truncate(0)) && got.CreatedAt.UnixMilli() != in.CreatedAt.UnixMilli() {
@@ -256,7 +253,6 @@ func TestMappings_BulkSavePreservesPinsWhenUnset(t *testing.T) {
 		m.Pattern = "pin.me"
 		m.SourceID = "src1"
 		m.MessageType = "T"
-		m.PinnedTag = ptr.Wrap("local")
 		m.PinnedFingerprint = ptr.Wrap("deadbeef")
 	})
 	if err := s.Save(ctx, pinned); err != nil {
@@ -276,9 +272,6 @@ func TestMappings_BulkSavePreservesPinsWhenUnset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if got.PinnedTag == nil || *got.PinnedTag != "local" {
-		t.Fatalf("pinned tag was cleared by an unrelated batch save: %v", got.PinnedTag)
-	}
 	if got.PinnedFingerprint == nil || *got.PinnedFingerprint != "deadbeef" {
 		t.Fatalf("pinned fingerprint was cleared by an unrelated batch save: %v", got.PinnedFingerprint)
 	}
@@ -293,7 +286,7 @@ func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
 		m.Pattern = "pin.me"
 		m.SourceID = "src1"
 		m.MessageType = "T"
-		m.PinnedTag = ptr.Wrap("v1")
+		m.PinnedFingerprint = ptr.Wrap("fp-1")
 	})
 	if err := s.Save(ctx, pinned); err != nil {
 		t.Fatalf("save: %v", err)
@@ -303,7 +296,7 @@ func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
 		m.Pattern = "pin.me"
 		m.SourceID = "src1"
 		m.MessageType = "T"
-		m.PinnedTag = ptr.Wrap("v2")
+		m.PinnedFingerprint = ptr.Wrap("fp-2")
 	})
 	if _, err := s.BulkSave(ctx, entities.SubjectMappings{repinned}); err != nil {
 		t.Fatalf("bulk: %v", err)
@@ -313,8 +306,8 @@ func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if got.PinnedTag == nil || *got.PinnedTag != "v2" {
-		t.Fatalf("explicit pin update was ignored: %v", got.PinnedTag)
+	if got.PinnedFingerprint == nil || *got.PinnedFingerprint != "fp-2" {
+		t.Fatalf("explicit pin update was ignored: %v", got.PinnedFingerprint)
 	}
 }
 

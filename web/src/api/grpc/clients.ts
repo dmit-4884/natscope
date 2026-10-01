@@ -11,7 +11,6 @@ import { LiveService } from "../../gen/services/grpc/nats/v1/live/nats_live_serv
 import { RegistryService } from "../../gen/services/grpc/proto/v1/registry/proto_registry_service_pb"
 import { CodecService } from "../../gen/services/grpc/proto/v1/codec/proto_codec_service_pb"
 import { SourcesService } from "../../gen/services/grpc/proto/v1/sources/proto_sources_service_pb"
-import { SelectionsService } from "../../gen/services/grpc/proto/v1/selections/proto_selections_service_pb"
 import { MappingsService } from "../../gen/services/grpc/mappings/v1/mappings/mappings_service_pb"
 import { HistoryService } from "../../gen/services/grpc/history/v1/history/history_service_pb"
 import { SettingsService } from "../../gen/services/grpc/settings/v1/settings/settings_service_pb"
@@ -32,7 +31,6 @@ export const liveClient = createClient(LiveService, transport)
 export const registryClient = createClient(RegistryService, transport)
 export const codecClient = createClient(CodecService, transport)
 export const sourcesClient = createClient(SourcesService, transport)
-export const selectionsClient = createClient(SelectionsService, transport)
 
 // Other services
 export const mappingsClient = createClient(MappingsService, transport)

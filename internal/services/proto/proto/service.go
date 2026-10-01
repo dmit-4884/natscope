@@ -20,9 +20,8 @@ import (
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	conflictsstorage "github.com/dmit-4884/natscope/internal/storages/proto/conflicts"
 	descriptorsstorage "github.com/dmit-4884/natscope/internal/storages/proto/descriptors"
-	selectionsstorage "github.com/dmit-4884/natscope/internal/storages/proto/selections"
+	filesetsstorage "github.com/dmit-4884/natscope/internal/storages/proto/filesets"
 	sourcesstorage "github.com/dmit-4884/natscope/internal/storages/proto/sources"
-	versionsstorage "github.com/dmit-4884/natscope/internal/storages/proto/versions"
 )
 
 // ProtoReloadCallback runs synchronously inside notifyReload after a recompile
@@ -33,9 +32,8 @@ type ProtoReloadCallback func(messageCount int)
 type Service struct {
 	logger             *slog.Logger
 	sourcesStorage     sourcesstorage.Storage
-	versionsStorage    versionsstorage.Storage
+	fileSetsStorage    filesetsstorage.Storage
 	descriptorsStorage descriptorsstorage.Storage
-	selectionsStorage  selectionsstorage.Storage
 	conflictsStorage   conflictsstorage.Storage
 	gitFetcher         gitfetchersvc.Service
 	mappingsService    mappingssvc.Service
@@ -53,9 +51,8 @@ type Service struct {
 // New creates a new proto service.
 func New(
 	sourcesStorage sourcesstorage.Storage,
-	versionsStorage versionsstorage.Storage,
+	fileSetsStorage filesetsstorage.Storage,
 	descriptorsStorage descriptorsstorage.Storage,
-	selectionsStorage selectionsstorage.Storage,
 	conflictsStorage conflictsstorage.Storage,
 	gitFetcher gitfetchersvc.Service,
 	mappingsService mappingssvc.Service,
@@ -64,9 +61,8 @@ func New(
 	s := &Service{
 		logger:             slog.Default().With(slogx.Module("service:proto")),
 		sourcesStorage:     sourcesStorage,
-		versionsStorage:    versionsStorage,
+		fileSetsStorage:    fileSetsStorage,
 		descriptorsStorage: descriptorsStorage,
-		selectionsStorage:  selectionsStorage,
 		conflictsStorage:   conflictsStorage,
 		gitFetcher:         gitFetcher,
 		mappingsService:    mappingsService,
@@ -124,7 +120,7 @@ func (s *Service) recomputeConflicts(ctx context.Context) {
 		}
 		inputs = append(inputs, protoutils.SchemaInput{
 			SourceID: snap.SourceID,
-			Tag:      snap.Tag,
+			Revision: snap.Revision,
 			Bytes:    snap.Descriptor.DescriptorSet,
 		})
 	}
@@ -148,12 +144,8 @@ func (s *Service) recordCompile(
 	ctx context.Context, sourceID string, ok bool, errMsg string,
 	messageCount, fileCount int,
 	diags []entities.CompileDiagnostic, roots []string, origin string,
+	active *entities.SchemaRevision,
 ) {
-	source, err := s.sourcesStorage.Get(ctx, sourceID, false)
-	if err != nil {
-		// Source vanished mid-flight (race with delete) — nothing to write to.
-		return
-	}
 	if len(diags) > maxStoredDiagnostics {
 		diags = diags[:maxStoredDiagnostics]
 	}
@@ -169,9 +161,22 @@ func (s *Service) recordCompile(
 	if !ok && errMsg != "" {
 		result.Error = &errMsg
 	}
-	source.LastCompile = result
+	s.patchSource(ctx, sourceID, func(src *entities.ProtoSource) {
+		src.LastCompile = result
+		if active != nil {
+			src.ActiveSchema = active
+		}
+	})
+}
+
+func (s *Service) patchSource(ctx context.Context, sourceID string, fn func(*entities.ProtoSource)) {
+	source, err := s.sourcesStorage.Get(ctx, sourceID, false)
+	if err != nil {
+		return
+	}
+	fn(source)
 	if err := s.sourcesStorage.Update(ctx, source); err != nil {
-		s.logger.WarnContext(ctx, "failed to persist compile telemetry",
+		s.logger.WarnContext(ctx, "failed to update proto source",
 			slog.String("source_id", sourceID),
 			slogx.Error(err))
 	}
@@ -179,8 +184,7 @@ func (s *Service) recordCompile(
 
 // Compile-time checks that Service satisfies every segregated proto role.
 var (
-	_ protosvc.Registry         = (*Service)(nil)
-	_ protosvc.Codec            = (*Service)(nil)
-	_ protosvc.SourceManager    = (*Service)(nil)
-	_ protosvc.SelectionManager = (*Service)(nil)
+	_ protosvc.Registry      = (*Service)(nil)
+	_ protosvc.Codec         = (*Service)(nil)
+	_ protosvc.SourceManager = (*Service)(nil)
 )

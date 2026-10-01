@@ -35,6 +35,27 @@ message FlowMessage {
 }
 `
 
+func createLocalSource(t *testing.T, env *e2eEnv, name string, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for p, content := range files {
+		full := filepath.Join(dir, filepath.FromSlash(p))
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
+		require.NoError(t, os.WriteFile(full, []byte(content), 0o600))
+	}
+	createResp, err := env.sources.CreateSource(t.Context(), connect.NewRequest(&sourcespb.CreateSourceRequest{
+		Name: name, SourceType: protopb.SourceType_SOURCE_TYPE_LOCAL, LocalPath: &dir, WatcherEnabled: new(false),
+	}))
+	require.NoError(t, err)
+	sourceID := createResp.Msg.GetSource().GetId()
+	refreshResp, err := env.sources.RefreshSource(t.Context(), connect.NewRequest(&sourcespb.RefreshSourceRequest{SourceId: sourceID}))
+	require.NoError(t, err)
+	outcome := refreshResp.Msg.GetOutcome()
+	require.True(t, outcome.GetValid(), "compile diagnostics: %v", outcome.GetDiagnostics())
+	require.NotEmpty(t, refreshResp.Msg.GetSource().GetActiveSchema().GetFingerprint())
+	return sourceID
+}
+
 // TestProtoFlow drives the full proto pipeline end-to-end: create, compile,
 // mapping, and server-side decode — the path TestE2E's registry_codec_sources
 // subtest explicitly skips for lack of a real proto source.
@@ -42,25 +63,7 @@ func TestProtoFlow(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
 
-	dir := t.TempDir()
-	protoPath := filepath.Join(dir, "flow.proto")
-	require.NoError(t, os.WriteFile(protoPath, []byte(testProtoContent), 0o600))
-
-	createResp, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
-		Name:       "flow-source",
-		SourceType: protopb.SourceType_SOURCE_TYPE_FILES,
-		Files:      []string{protoPath},
-	}))
-	require.NoError(t, err)
-	sourceID := createResp.Msg.GetSource().GetId()
-	require.NotEmpty(t, sourceID)
-
-	compileResp, err := env.sources.CompileFiles(ctx, connect.NewRequest(&sourcespb.CompileFilesRequest{
-		SourceId: sourceID,
-	}))
-	require.NoError(t, err)
-	assert.True(t, compileResp.Msg.GetValid(), "compile diagnostics: %v", compileResp.Msg.GetDiagnostics())
-	assert.Greater(t, compileResp.Msg.GetMessageTypes(), int32(0))
+	sourceID := createLocalSource(t, env, "flow-source", map[string]string{"flow.proto": testProtoContent})
 
 	const fullName = "e2eflow.FlowMessage"
 
@@ -129,7 +132,7 @@ func TestProtoFlow(t *testing.T) {
 
 	t.Run("mapping health follows the pinned version", func(t *testing.T) {
 		pinnedResp, err := env.mappings.CreateMapping(ctx, connect.NewRequest(&mappingspb.CreateMappingRequest{
-			Pattern: "flow.pinned", MessageType: fullName, SourceId: sourceID, PinnedTag: new("no-such-tag"),
+			Pattern: "flow.pinned", MessageType: fullName, SourceId: sourceID, PinnedFingerprint: new("no-such-fingerprint"),
 		}))
 		require.NoError(t, err)
 

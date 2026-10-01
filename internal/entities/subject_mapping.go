@@ -49,12 +49,8 @@ type SubjectMapping struct {
 	// active selection.
 	SourceID string
 
-	// PinnedTag overrides the source's active selection — decode historical
-	// messages from an older still-compiled tag.
-	PinnedTag *string
-
 	// PinnedFingerprint pins resolution to a descriptor by content hash (survives
-	// identical recompiles); takes precedence over PinnedTag.
+	// identical recompiles).
 	PinnedFingerprint *string
 }
 
@@ -97,7 +93,6 @@ type SubjectMappingCreate struct {
 	Pattern           string  `normalize:"trim"`
 	MessageType       string  `normalize:"trim"`
 	SourceID          string  `normalize:"trim"`
-	PinnedTag         *string `normalize:"trim,nil_on_empty"`
 	PinnedFingerprint *string `normalize:"trim,nil_on_empty"`
 }
 
@@ -107,7 +102,6 @@ type SubjectMappingUpdate struct {
 	Pattern           *string `normalize:"trim"`
 	MessageType       *string `normalize:"trim"`
 	SourceID          *string `normalize:"trim"`
-	PinnedTag         *string `normalize:"trim"`
 	PinnedFingerprint *string `normalize:"trim"`
 }
 

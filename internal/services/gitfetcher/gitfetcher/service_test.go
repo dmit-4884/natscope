@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -158,90 +159,201 @@ func TestEnsureSemverPrefix(t *testing.T) {
 	assert.Equal(t, "vmain", ensureSemverPrefix("main"))
 }
 
-// --- Integration tests with a real local git repo ---
-
-// newFileService returns a Service that accepts file:// remotes for local
-// test repositories.
 func newFileService() *Service {
 	s := New()
 	s.allowFileScheme = true
 	return s
 }
 
-// makeRepo creates a local git repo with one .proto file and tags it.
-// Returns the repo's filesystem URL suitable for go-git operations.
-func makeRepo(t *testing.T, tags []string) string {
-	t.Helper()
+type testRepo struct {
+	t    *testing.T
+	dir  string
+	repo *git.Repository
+	wt   *git.Worktree
+}
 
+func newTestRepo(t *testing.T) *testRepo {
+	t.Helper()
 	dir := t.TempDir()
 	repo, err := git.PlainInit(dir, false)
 	require.NoError(t, err)
-
 	wt, err := repo.Worktree()
 	require.NoError(t, err)
+	return &testRepo{t: t, dir: dir, repo: repo, wt: wt}
+}
 
-	// One proto file, committed once and tagged for each requested tag.
-	protoPath := filepath.Join(dir, "schema.proto")
-	require.NoError(t, os.WriteFile(protoPath, []byte(`syntax = "proto3"; message X { string a = 1; }`), 0o644))
+func (r *testRepo) url() string { return "file://" + r.dir }
 
-	_, err = wt.Add("schema.proto")
-	require.NoError(t, err)
-
-	commit, err := wt.Commit("initial", &git.CommitOptions{
-		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
-	})
-	require.NoError(t, err)
-
-	for _, tag := range tags {
-		_, err := repo.CreateTag(tag, commit, nil)
-		require.NoError(t, err)
+func (r *testRepo) commit(files map[string]string) plumbing.Hash {
+	r.t.Helper()
+	for p, content := range files {
+		full := filepath.Join(r.dir, filepath.FromSlash(p))
+		require.NoError(r.t, os.MkdirAll(filepath.Dir(full), 0o755))
+		require.NoError(r.t, os.WriteFile(full, []byte(content), 0o644))
+		_, err := r.wt.Add(p)
+		require.NoError(r.t, err)
 	}
-
-	return "file://" + dir
+	hash, err := r.wt.Commit("change", &git.CommitOptions{
+		Author: &object.Signature{Name: "t", Email: "t@x", When: time.Now()},
+	})
+	require.NoError(r.t, err)
+	return hash
 }
 
-func TestListTags_Integration(t *testing.T) {
-	t.Parallel()
-
-	repoURL := makeRepo(t, []string{"v0.1.0", "v0.2.0", "v0.10.0", "v1.0.0-alpha", "v1.0.0"})
-	svc := newFileService()
-
-	tags, err := svc.ListTags(t.Context(), repoURL)
-	require.NoError(t, err)
-
-	// Sorted newest-first by semver (prerelease sorts below its release).
-	require.Equal(t, []string{"v1.0.0", "v1.0.0-alpha", "v0.10.0", "v0.2.0", "v0.1.0"}, tags)
+func (r *testRepo) tag(name string, hash plumbing.Hash, annotated bool) {
+	r.t.Helper()
+	var opts *git.CreateTagOptions
+	if annotated {
+		opts = &git.CreateTagOptions{Message: name, Tagger: &object.Signature{Name: "t", Email: "t@x", When: time.Now()}}
+	}
+	_, err := r.repo.CreateTag(name, hash, opts)
+	require.NoError(r.t, err)
 }
 
-func TestListTags_EmptyRepo(t *testing.T) {
+func (r *testRepo) branch(name string, hash plumbing.Hash) {
+	r.t.Helper()
+	require.NoError(r.t, r.repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName(name), hash)))
+}
+
+const schemaV1 = `syntax = "proto3"; message X { string a = 1; }`
+
+const schemaV2 = `syntax = "proto3"; message X { string a = 1; int32 b = 2; }`
+
+func refNames(refs []entities.ProtoRef) []string {
+	out := make([]string, len(refs))
+	for i, r := range refs {
+		out[i] = string(r.Kind) + ":" + r.Name
+	}
+	return out
+}
+
+func TestListRefs_TagsNewestFirstThenBranches(t *testing.T) {
 	t.Parallel()
-	repoURL := makeRepo(t, nil)
+	r := newTestRepo(t)
+	c := r.commit(map[string]string{"schema.proto": schemaV1})
+	for _, tag := range []string{"v0.1.0", "v0.2.0", "v0.10.0", "v1.0.0-alpha", "v1.0.0"} {
+		r.tag(tag, c, false)
+	}
+	r.branch("develop", c)
+	r.branch("main", c)
+
+	refs, err := newFileService().ListRefs(t.Context(), r.url())
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"tag:v1.0.0", "tag:v1.0.0-alpha", "tag:v0.10.0", "tag:v0.2.0", "tag:v0.1.0",
+		"branch:main", "branch:master", "branch:develop",
+	}, refNames(refs))
+	for _, ref := range refs {
+		assert.Equal(t, c.String(), ref.Revision, ref.Name)
+	}
+}
+
+func TestListRefs_AnnotatedTagPointsAtCommit(t *testing.T) {
+	t.Parallel()
+	r := newTestRepo(t)
+	c := r.commit(map[string]string{"schema.proto": schemaV1})
+	r.tag("v1.0.0", c, true)
+
+	refs, err := newFileService().ListRefs(t.Context(), r.url())
+	require.NoError(t, err)
+	require.Equal(t, "tag:v1.0.0", refNames(refs)[0])
+	assert.Equal(t, c.String(), refs[0].Revision, "annotated tags resolve to the commit, not the tag object")
+}
+
+func TestResolveRef(t *testing.T) {
+	t.Parallel()
+	r := newTestRepo(t)
+	first := r.commit(map[string]string{"schema.proto": schemaV1})
+	r.tag("v1.0.0", first, false)
+	second := r.commit(map[string]string{"schema.proto": schemaV2})
 	svc := newFileService()
 
-	tags, err := svc.ListTags(t.Context(), repoURL)
-	require.NoError(t, err)
-	assert.Empty(t, tags)
+	tests := []struct {
+		name    string
+		ref     string
+		want    entities.ProtoRef
+		wantErr error
+	}{
+		{name: "tag", ref: "v1.0.0", want: entities.ProtoRef{Name: "v1.0.0", Kind: entities.RefKindTag, Revision: first.String()}},
+		{name: "full tag ref", ref: "refs/tags/v1.0.0", want: entities.ProtoRef{Name: "v1.0.0", Kind: entities.RefKindTag, Revision: first.String()}},
+		{name: "branch", ref: " master ", want: entities.ProtoRef{Name: "master", Kind: entities.RefKindBranch, Revision: second.String()}},
+		{name: "full commit sha", ref: strings.ToUpper(first.String()), want: entities.ProtoRef{Name: first.String(), Kind: entities.RefKindCommit, Revision: first.String()}},
+		{name: "short sha", ref: first.String()[:7], wantErr: errs.ErrProtoRefNotFound},
+		{name: "unknown", ref: "v9.9.9", wantErr: errs.ErrProtoRefNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := svc.ResolveRef(t.Context(), r.url(), tt.ref)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestFetch_TagBranchAndCommit(t *testing.T) {
+	t.Parallel()
+	r := newTestRepo(t)
+	first := r.commit(map[string]string{"schema.proto": schemaV1})
+	r.tag("v1.0.0", first, true)
+	second := r.commit(map[string]string{"schema.proto": schemaV2})
+	svc := newFileService()
+
+	tests := []struct {
+		name     string
+		ref      entities.ProtoRef
+		revision plumbing.Hash
+		content  string
+	}{
+		{name: "annotated tag", ref: entities.ProtoRef{Name: "v1.0.0", Kind: entities.RefKindTag}, revision: first, content: schemaV1},
+		{name: "branch", ref: entities.ProtoRef{Name: "master", Kind: entities.RefKindBranch}, revision: second, content: schemaV2},
+		{name: "commit", ref: entities.ProtoRef{Name: first.String(), Kind: entities.RefKindCommit, Revision: first.String()}, revision: first, content: schemaV1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			res, err := svc.Fetch(t.Context(), r.url(), tt.ref)
+			require.NoError(t, err)
+			assert.Equal(t, tt.revision.String(), res.Revision)
+			require.Len(t, res.Files, 1)
+			assert.Equal(t, "schema.proto", res.Files[0].Path)
+			assert.Equal(t, tt.content, res.Files[0].Content)
+		})
+	}
+}
+
+func TestFetch_MissingRefs(t *testing.T) {
+	t.Parallel()
+	r := newTestRepo(t)
+	r.commit(map[string]string{"schema.proto": schemaV1})
+	svc := newFileService()
+
+	_, err := svc.Fetch(t.Context(), r.url(), entities.ProtoRef{Name: "v2.0.0", Kind: entities.RefKindTag})
+	require.ErrorIs(t, err, errs.ErrProtoRefNotFound)
+
+	missing := strings.Repeat("a", 40)
+	_, err = svc.Fetch(t.Context(), r.url(), entities.ProtoRef{Name: missing, Kind: entities.RefKindCommit, Revision: missing})
+	require.ErrorIs(t, err, errs.ErrProtoRefNotFound)
 }
 
 func TestValidateRepository_Valid(t *testing.T) {
 	t.Parallel()
-	repoURL := makeRepo(t, []string{"v1.0.0"})
-	svc := newFileService()
+	r := newTestRepo(t)
+	r.commit(map[string]string{"schema.proto": schemaV1})
 
-	err := svc.ValidateRepository(t.Context(), repoURL)
-	require.NoError(t, err)
+	require.NoError(t, newFileService().ValidateRepository(t.Context(), r.url()))
 }
 
 func TestValidateRepository_NonExistent(t *testing.T) {
 	t.Parallel()
-	svc := newFileService()
-
-	err := svc.ValidateRepository(t.Context(), "file:///nonexistent/path/to/repo")
-	require.Error(t, err)
+	require.Error(t, newFileService().ValidateRepository(t.Context(), "file:///nonexistent/path/to/repo"))
 }
 
-// TestValidateRepository_DoesNotLeakResponseBody checks that a non-git server's response body stays out of the error.
-func TestValidateRepository_DoesNotLeakResponseBody(t *testing.T) {
+func TestRemoteErrors_DoNotLeakResponseBody(t *testing.T) {
 	t.Parallel()
 	const secretBanner = "server_id=SECRET-BANNER-7f3a xkey=leaked-key"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -249,137 +361,36 @@ func TestValidateRepository_DoesNotLeakResponseBody(t *testing.T) {
 		_, _ = w.Write([]byte(secretBanner))
 	}))
 	defer srv.Close()
-
 	svc := New()
+
 	err := svc.ValidateRepository(t.Context(), srv.URL)
 	require.Error(t, err)
-	assert.NotContains(t, err.Error(), secretBanner)
+	assert.NotContains(t, err.Error(), "SECRET-BANNER")
+
+	_, err = svc.ListRefs(t.Context(), srv.URL)
+	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "SECRET-BANNER")
 }
 
-// TestListTags_DoesNotLeakResponseBody runs the same check on ListTags.
-func TestListTags_DoesNotLeakResponseBody(t *testing.T) {
+func TestFetch_SkipsOversizeAndCollectsConfigs(t *testing.T) {
 	t.Parallel()
-	const secretBanner = "server_id=SECRET-BANNER-7f3a xkey=leaked-key"
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(secretBanner))
-	}))
-	defer srv.Close()
-
-	svc := New()
-	_, err := svc.ListTags(t.Context(), srv.URL)
-	require.Error(t, err)
-	assert.NotContains(t, err.Error(), secretBanner)
-	assert.NotContains(t, err.Error(), "SECRET-BANNER")
-}
-
-func TestFetchVersion_LoadsProtoFile(t *testing.T) {
-	t.Parallel()
-	repoURL := makeRepo(t, []string{"v1.0.0"})
-	svc := newFileService()
-
-	res, err := svc.FetchVersion(t.Context(), repoURL, "v1.0.0")
-	require.NoError(t, err)
-	require.Len(t, res.Files, 1)
-	assert.Equal(t, "schema.proto", res.Files[0].Path)
-	assert.Contains(t, res.Files[0].Content, "message X")
-	assert.Greater(t, res.Files[0].Size, int64(0))
-}
-
-func TestFetchVersion_UnknownTag(t *testing.T) {
-	t.Parallel()
-	repoURL := makeRepo(t, []string{"v1.0.0"})
-	svc := newFileService()
-
-	_, err := svc.FetchVersion(t.Context(), repoURL, "v2.0.0")
-	require.Error(t, err)
-	assert.ErrorIs(t, err, errs.ErrProtoVersionNotFound)
-}
-
-func TestFetchVersion_SkipsLargeProtoFile(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	repo, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
-	wt, err := repo.Worktree()
-	require.NoError(t, err)
-
-	// File > MaxFileSize
-	bigContent := make([]byte, MaxFileSize+1)
-	for i := range bigContent {
-		bigContent[i] = 'x'
-	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "big.proto"), bigContent, 0o644))
-
-	_, err = wt.Add("big.proto")
-	require.NoError(t, err)
-	commit, err := wt.Commit("initial", &git.CommitOptions{
-		Author: &object.Signature{Name: "t", Email: "t@x", When: time.Now()},
-	})
-	require.NoError(t, err)
-	_, err = repo.CreateTag("v1", commit, nil)
-	require.NoError(t, err)
-
-	repoURL := "file://" + dir
-
-	svc := newFileService()
-	res, err := svc.FetchVersion(t.Context(), repoURL, "v1")
-	require.NoError(t, err, "oversize no longer aborts the fetch")
-	assert.Empty(t, res.Files)
-	require.Len(t, res.Skipped, 1)
-	assert.Equal(t, "big.proto", res.Skipped[0].Path)
-	assert.Contains(t, res.Skipped[0].Reason, "exceeds")
-}
-
-func TestFetchVersionCollectsConfigsAndSkipsOversize(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	repo, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
-	wt, err := repo.Worktree()
-	require.NoError(t, err)
-
-	files := map[string]string{
+	r := newTestRepo(t)
+	c := r.commit(map[string]string{
 		"a.proto":     `syntax = "proto3";`,
 		"buf.yaml":    "version: v2",
 		"buf.lock":    "version: v2\ndeps: []",
 		"sub/b.proto": `syntax = "proto3";`,
-	}
-	for p, content := range files {
-		full := filepath.Join(dir, filepath.FromSlash(p))
-		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
-		require.NoError(t, os.WriteFile(full, []byte(content), 0o644))
-	}
-	big := make([]byte, MaxFileSize+1)
-	for i := range big {
-		big[i] = 'x'
-	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "big.proto"), big, 0o644))
-
-	// Stage every file (use slash paths; go-git uses forward slashes in-repo).
-	for p := range files {
-		_, addErr := wt.Add(p)
-		require.NoError(t, addErr)
-	}
-	_, err = wt.Add("big.proto")
-	require.NoError(t, err)
-
-	commit, err := wt.Commit("initial", &git.CommitOptions{
-		Author: &object.Signature{Name: "t", Email: "t@x", When: time.Now()},
+		"big.proto":   strings.Repeat("x", MaxFileSize+1),
 	})
-	require.NoError(t, err)
-	_, err = repo.CreateTag("v1.0.0", commit, nil)
-	require.NoError(t, err)
+	r.tag("v1.0.0", c, false)
 
-	svc := newFileService()
-	res, err := svc.FetchVersion(t.Context(), "file://"+dir, "v1.0.0")
-	require.NoError(t, err, "oversize no longer aborts the fetch")
+	res, err := newFileService().Fetch(t.Context(), r.url(), entities.ProtoRef{Name: "v1.0.0", Kind: entities.RefKindTag})
+	require.NoError(t, err, "oversize files do not abort the fetch")
 	assert.ElementsMatch(t, []string{"a.proto", "sub/b.proto"}, entryPathsGF(res.Files))
 	assert.ElementsMatch(t, []string{"buf.yaml", "buf.lock"}, entryPathsGF(res.Configs))
 	require.Len(t, res.Skipped, 1)
 	assert.Equal(t, "big.proto", res.Skipped[0].Path)
+	assert.Contains(t, res.Skipped[0].Reason, "exceeds")
 }
 
 func TestExtractAuth_TokenContainingAtSign(t *testing.T) {

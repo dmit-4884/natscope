@@ -7,7 +7,7 @@ export interface ProtoMessage {
   package: string
   fields: ProtoField[]
   source_id: string
-  source_tag: string
+  source_revision: string
 }
 
 interface ProtoField {
@@ -36,7 +36,7 @@ export async function getProtoMessages(): Promise<ProtoMessagesResponse> {
     proto_file: m.protoFile,
     package: m.package,
     source_id: m.sourceId,
-    source_tag: m.sourceTag,
+    source_revision: m.sourceRevision,
     fields: m.fields.map((f) => ({
       name: f.name,
       type: f.type,
@@ -68,7 +68,7 @@ export async function getProtoMessage(sourceId: string, messageName: string): Pr
     proto_file: m.protoFile,
     package: m.package,
     source_id: m.sourceId,
-    source_tag: m.sourceTag,
+    source_revision: m.sourceRevision,
     fields: m.fields.map((f) => ({
       name: f.name,
       type: f.type,

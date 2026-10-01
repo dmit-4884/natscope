@@ -14,7 +14,7 @@ import (
 )
 
 // ListMessages returns all messages from active snapshots, each annotated
-// with SourceID + SourceTag so the UI can disambiguate same-FQN sources.
+// with SourceID + SourceRevision so the UI can disambiguate same-FQN sources.
 func (s *Service) ListMessages(ctx context.Context) []entities.ProtoMessageInfo {
 	snaps := s.activeSnapshots(ctx)
 	if len(snaps) == 0 {
@@ -26,7 +26,7 @@ func (s *Service) ListMessages(ctx context.Context) []entities.ProtoMessageInfo 
 		for _, md := range snap.Schema.Messages {
 			info := protoutils.Info(md)
 			info.SourceID = snap.SourceID
-			info.SourceTag = snap.Tag
+			info.SourceRevision = snap.Revision
 			messages = append(messages, info)
 		}
 	}
@@ -56,7 +56,7 @@ func (s *Service) GetMessage(ctx context.Context, sourceID, messageType string) 
 	}
 	info := protoutils.Info(md)
 	info.SourceID = snap.SourceID
-	info.SourceTag = snap.Tag
+	info.SourceRevision = snap.Revision
 	return &info, nil
 }
 

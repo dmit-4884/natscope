@@ -16,8 +16,8 @@ message ProtoMessageInfo {
   repeated ProtoFieldInfo fields = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Required. Identifier of the proto source that owns this message type.
   string source_id = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // Required. Active tag of the source snapshot ("local" for local sources, e.g. "v1.0.0" for git).
-  string source_tag = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Required. Revision of the schema the type comes from.
+  string source_revision = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines metadata about a single field in a protobuf message.

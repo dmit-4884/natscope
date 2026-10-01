@@ -19,7 +19,11 @@ const (
 	// filesystem nudge; safety net for pathological disks.
 	fileWatcherDebounceTimeout = 60 * time.Second
 
-	// LocalTag is the synthetic tag for descriptors from a local-filesystem source
-	// (no git versions).
-	LocalTag = "local"
+	// LocalRevision is the revision of a local directory source's schema.
+	LocalRevision = "local"
+
+	// FilesRevision is the revision of a Files-type source's schema.
+	FilesRevision = "files"
+
+	startupCompileTimeout = 5 * time.Minute
 )

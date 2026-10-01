@@ -124,8 +124,8 @@ func (s *Service) resolvePayload(ctx context.Context, in *entities.PublishReques
 		SourceID:    *in.SourceID,
 		MessageType: *in.MessageType,
 	}
-	if in.SourceTag != nil {
-		req.Tag = *in.SourceTag
+	if in.SchemaFingerprint != nil {
+		req.Fingerprint = *in.SchemaFingerprint
 	}
 
 	encoded, err := s.protoService.EncodeRaw(ctx, req)

@@ -29,7 +29,7 @@ func (s *Schema) Validate(md protoreflect.MessageDescriptor, data []byte) *entit
 	}
 
 	msg := dynamicpb.NewMessage(md)
-	if decodeErr := s.UnmarshalBinary(data, msg); decodeErr != nil {
+	if decodeErr := s.ParseBinary(data, msg); decodeErr != nil {
 		return &entities.ValidationResult{Error: fmt.Sprintf("Cannot decode message: %v", decodeErr)}
 	}
 

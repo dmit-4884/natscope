@@ -4,12 +4,14 @@
 package gitfetcher
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -19,6 +21,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 
+	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 
@@ -40,7 +43,11 @@ const (
 
 	// MaxFileSize is the maximum file size to read (1MB).
 	MaxFileSize = 1024 * 1024
+
+	validateTimeout = 30 * time.Second
 )
+
+var commitSHA = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
 
 // Service implements gitfetchersvc.Service.
 type Service struct {
@@ -61,94 +68,77 @@ func New() *Service {
 	}
 }
 
-// ListTags returns available tags from a Git repository using ls-remote (no
-// clone needed).
-func (s *Service) ListTags(ctx context.Context, repositoryURL string) ([]string, error) {
-	if err := s.checkRepoURL(repositoryURL); err != nil {
-		return nil, err
-	}
+// ListRefs returns tags newest first, then branches, with their commits.
+func (s *Service) ListRefs(ctx context.Context, repositoryURL string) ([]entities.ProtoRef, error) {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, s.timeout)
 	defer cancel()
 
-	s.logger.Debug("fetching tags via ls-remote", slog.String("url", maskURL(repositoryURL)))
-
-	// Use ls-remote to get tags without cloning
-	auth := extractAuth(repositoryURL)
-	remote := git.NewRemote(nil, &gitconfig.RemoteConfig{
-		Name: "origin",
-		URLs: []string{repositoryURL},
-	})
-
-	s.logger.Debug("starting ls-remote", slog.Bool("has_auth", auth != nil))
-
-	refs, err := remote.ListContext(ctx, &git.ListOptions{
-		Auth: auth,
-	})
+	refs, err := s.listRemote(ctx, repositoryURL)
 	if err != nil {
-		s.logger.Error("ls-remote failed", slog.String("url", maskURL(repositoryURL)), slogx.Error(err))
-		return nil, fmt.Errorf("list remote refs: %s", classifyGitErr(err))
+		return nil, err
 	}
-	s.logger.Debug("ls-remote completed", slog.Int("refs_count", len(refs)))
-
-	// Extract tags from refs
-	var tags []string
-	for _, ref := range refs {
-		refName := ref.Name().String()
-		if strings.HasPrefix(refName, "refs/tags/") {
-			tagName := strings.TrimPrefix(refName, "refs/tags/")
-			// Skip annotated tag objects (the ^{} ones are handled by git internally)
-			if !strings.HasSuffix(tagName, "^{}") {
-				tags = append(tags, tagName)
-			}
-		}
-	}
-
-	// Sort tags by semantic version in reverse order (newest first)
-	slices.SortFunc(tags, func(a, b string) int {
-		return -compareSemVer(a, b)
-	})
-
-	s.logger.Info("fetched tags", slog.String("url", maskURL(repositoryURL)), slog.Int("count", len(tags)))
-
-	return tags, nil
+	return collectRefs(refs), nil
 }
 
-// FetchVersion fetches proto files and buf configs from a specific tag.
-func (s *Service) FetchVersion(ctx context.Context, repositoryURL, tag string) (*gitfetchersvc.FetchResult, error) {
+// ResolveRef finds a tag, branch or full commit SHA; errs.ErrProtoRefNotFound when none matches.
+func (s *Service) ResolveRef(ctx context.Context, repositoryURL, ref string) (entities.ProtoRef, error) {
+	ref = strings.TrimSpace(ref)
+	refs, err := s.ListRefs(ctx, repositoryURL)
+	if err != nil {
+		return entities.ProtoRef{}, err
+	}
+	name := strings.TrimPrefix(strings.TrimPrefix(ref, "refs/tags/"), "refs/heads/")
+	for _, r := range refs {
+		if r.Name == name {
+			return r, nil
+		}
+	}
+	if commitSHA.MatchString(ref) {
+		sha := strings.ToLower(ref)
+		return entities.ProtoRef{Name: sha, Kind: entities.RefKindCommit, Revision: sha}, nil
+	}
+	return entities.ProtoRef{}, fmt.Errorf("%w: %q is not a tag, branch or full commit SHA", errs.ErrProtoRefNotFound, ref)
+}
+
+// Fetch checks out ref and collects its .proto files and buf configs.
+func (s *Service) Fetch(ctx context.Context, repositoryURL string, ref entities.ProtoRef) (*gitfetchersvc.FetchResult, error) {
 	if err := s.checkRepoURL(repositoryURL); err != nil {
 		return nil, err
 	}
+	opts := &git.CloneOptions{URL: repositoryURL, Auth: extractAuth(repositoryURL), Tags: git.NoTags}
+	switch ref.Kind {
+	case entities.RefKindTag:
+		opts.ReferenceName, opts.Depth, opts.SingleBranch = plumbing.NewTagReferenceName(ref.Name), 1, true
+	case entities.RefKindBranch:
+		opts.ReferenceName, opts.Depth, opts.SingleBranch = plumbing.NewBranchReferenceName(ref.Name), 1, true
+	case entities.RefKindCommit:
+		opts.NoCheckout = true
+	default:
+		return nil, fmt.Errorf("%w: unsupported ref kind %q", errs.ErrInvalidRequest, ref.Kind)
+	}
+
 	ctx, cancel := corecontext.ApplyTimeout(ctx, s.timeout)
 	defer cancel()
 
-	// Create temp directory for cloning
 	tempDir, err := os.MkdirTemp(s.tempDir, TempDirPrefix)
 	if err != nil {
 		return nil, coreerrs.WrapOperation(err, "create temp dir")
 	}
 	defer os.RemoveAll(tempDir)
 
-	s.logger.Debug("cloning repository for version fetch",
-		slog.String("url", maskURL(repositoryURL)),
-		slog.String("tag", tag))
-
-	// Clone at specific tag
-	auth := extractAuth(repositoryURL)
-	_, err = git.PlainCloneContext(ctx, tempDir, false, &git.CloneOptions{
-		URL:           repositoryURL,
-		Auth:          auth,
-		Depth:         1,
-		SingleBranch:  true,
-		ReferenceName: plumbing.NewTagReferenceName(tag),
-		Tags:          git.NoTags,
-	})
+	repo, err := git.PlainCloneContext(ctx, tempDir, false, opts)
 	if err != nil {
 		s.logger.Error("clone failed",
-			slog.String("url", maskURL(repositoryURL)), slog.String("tag", tag), slogx.Error(err))
+			slog.String("url", maskURL(repositoryURL)), slog.String("ref", ref.Name), slogx.Error(err))
 		if errors.Is(err, plumbing.ErrReferenceNotFound) || errors.Is(err, git.NoMatchingRefSpecError{}) {
-			return nil, fmt.Errorf("%w: tag %q", errs.ErrProtoVersionNotFound, tag)
+			return nil, fmt.Errorf("%w: %q", errs.ErrProtoRefNotFound, ref.Name)
 		}
-		return nil, fmt.Errorf("clone repository at tag %q: %s", tag, classifyGitErr(err))
+		return nil, fmt.Errorf("clone repository at %q: %s", ref.Name, classifyGitErr(err))
+	}
+
+	revision, err := checkout(repo, ref)
+	if err != nil {
+		return nil, err
 	}
 
 	walk, err := protoutils.WalkProtoTree(tempDir, protoutils.WalkOptions{CollectConfigs: true, MaxFileSize: MaxFileSize})
@@ -162,48 +152,100 @@ func (s *Service) FetchVersion(ctx context.Context, repositoryURL, tag string) (
 
 	s.logger.Info("fetched proto files",
 		slog.String("url", maskURL(repositoryURL)),
-		slog.String("tag", tag),
+		slog.String("ref", ref.Name),
+		slog.String("revision", revision),
 		slog.Int("files", len(walk.Files)),
 		slog.Int("configs", len(walk.Configs)))
 
 	return &gitfetchersvc.FetchResult{
-		Files:   walk.Files,
-		Configs: walk.Configs,
-		Skipped: walk.Skipped,
+		Revision: revision,
+		Files:    walk.Files,
+		Configs:  walk.Configs,
+		Skipped:  walk.Skipped,
 	}, nil
 }
 
 // ValidateRepository checks if a repository URL is valid and accessible.
 func (s *Service) ValidateRepository(ctx context.Context, repositoryURL string) error {
-	if err := s.checkRepoURL(repositoryURL); err != nil {
-		return err
-	}
-	const validateTimeout = 30 * time.Second
 	ctx, cancel := corecontext.ApplyTimeout(ctx, validateTimeout)
 	defer cancel()
 
-	// Create temp directory
-	tempDir, err := os.MkdirTemp(s.tempDir, TempDirPrefix)
-	if err != nil {
-		return coreerrs.WrapOperation(err, "create temp dir")
-	}
-	defer os.RemoveAll(tempDir)
+	_, err := s.listRemote(ctx, repositoryURL)
+	return err
+}
 
-	// Try to clone with minimal data
-	auth := extractAuth(repositoryURL)
-	_, err = git.PlainCloneContext(ctx, tempDir, false, &git.CloneOptions{
-		URL:        repositoryURL,
-		Auth:       auth,
-		Depth:      1,
-		NoCheckout: true,
-		Tags:       git.NoTags,
+func (s *Service) listRemote(ctx context.Context, repositoryURL string) ([]*plumbing.Reference, error) {
+	if err := s.checkRepoURL(repositoryURL); err != nil {
+		return nil, err
+	}
+	remote := git.NewRemote(nil, &gitconfig.RemoteConfig{Name: "origin", URLs: []string{repositoryURL}})
+	refs, err := remote.ListContext(ctx, &git.ListOptions{Auth: extractAuth(repositoryURL), PeelingOption: git.AppendPeeled})
+	if err != nil {
+		s.logger.Error("ls-remote failed", slog.String("url", maskURL(repositoryURL)), slogx.Error(err))
+		return nil, fmt.Errorf("list remote refs: %s", classifyGitErr(err))
+	}
+	return refs, nil
+}
+
+func collectRefs(refs []*plumbing.Reference) []entities.ProtoRef {
+	peeled := make(map[string]string)
+	for _, r := range refs {
+		if name := r.Name().String(); strings.HasSuffix(name, "^{}") {
+			peeled[strings.TrimSuffix(name, "^{}")] = r.Hash().String()
+		}
+	}
+
+	var tags, branches []entities.ProtoRef
+	for _, r := range refs {
+		name := r.Name()
+		if r.Type() != plumbing.HashReference || strings.HasSuffix(name.String(), "^{}") {
+			continue
+		}
+		revision := cmp.Or(peeled[name.String()], r.Hash().String())
+		switch {
+		case name.IsTag():
+			tags = append(tags, entities.ProtoRef{Name: name.Short(), Kind: entities.RefKindTag, Revision: revision})
+		case name.IsBranch():
+			branches = append(branches, entities.ProtoRef{Name: name.Short(), Kind: entities.RefKindBranch, Revision: revision})
+		}
+	}
+
+	slices.SortFunc(tags, func(a, b entities.ProtoRef) int { return -compareSemVer(a.Name, b.Name) })
+	slices.SortFunc(branches, func(a, b entities.ProtoRef) int {
+		return cmp.Or(cmp.Compare(branchRank(a.Name), branchRank(b.Name)), strings.Compare(a.Name, b.Name))
 	})
-	if err != nil {
-		s.logger.Error("validate repository failed", slog.String("url", maskURL(repositoryURL)), slogx.Error(err))
-		return fmt.Errorf("repository not accessible: %s", classifyGitErr(err))
-	}
+	return append(tags, branches...)
+}
 
-	return nil
+var defaultBranches = []string{"main", "master"}
+
+func branchRank(name string) int {
+	if i := slices.Index(defaultBranches, name); i >= 0 {
+		return i
+	}
+	return len(defaultBranches)
+}
+
+func checkout(repo *git.Repository, ref entities.ProtoRef) (string, error) {
+	if ref.Kind != entities.RefKindCommit {
+		head, err := repo.Head()
+		if err != nil {
+			return "", coreerrs.WrapOperation(err, "read checked out commit")
+		}
+		return head.Hash().String(), nil
+	}
+	hash := plumbing.NewHash(ref.Revision)
+	if _, err := repo.CommitObject(hash); err != nil {
+		return "", fmt.Errorf("%w: commit %s", errs.ErrProtoRefNotFound, ref.Revision)
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		return "", coreerrs.WrapOperation(err, "open worktree")
+	}
+	if err := wt.Checkout(&git.CheckoutOptions{Hash: hash, Force: true}); err != nil {
+		return "", coreerrs.WrapOperation(err, "checkout commit")
+	}
+	return hash.String(), nil
 }
 
 // allowedGitSchemes lists the URL schemes accepted for remote git operations.

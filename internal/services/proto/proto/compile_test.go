@@ -14,7 +14,7 @@ import (
 )
 
 func TestCompileResolved(t *testing.T) {
-	s := newTestService(nil, nil, nil, nil, nil)
+	s := newBareService()
 
 	src := &entities.ProtoSource{Name: "t", SourceType: entities.SourceTypeLocal, Enabled: true}
 

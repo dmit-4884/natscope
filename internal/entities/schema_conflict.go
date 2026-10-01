@@ -31,7 +31,7 @@ const (
 // SchemaRef points to a specific file in a specific snapshot.
 type SchemaRef struct {
 	SourceID string
-	Tag      string
+	Revision string
 	File     string
 }
 

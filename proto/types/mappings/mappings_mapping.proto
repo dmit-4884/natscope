@@ -21,9 +21,8 @@ message SubjectMapping {
   // Required. Identifier of the proto source this mapping is bound to.
   // Decode resolution loads the descriptor only from this source's active selection.
   string source_id = 6 [(google.api.field_behavior) = REQUIRED];
-  // Optional. Pin resolution to a specific tag of the source, overriding the
-  // active selection. Use for decoding old messages produced by an older schema.
-  optional string pinned_tag = 7;
+  reserved 7;
+  reserved "pinned_tag";
   // Optional. Pin resolution to a specific descriptor by content hash (sha256).
   // Survives recompiles. Takes precedence over pinnedTag.
   optional string pinned_fingerprint = 8;

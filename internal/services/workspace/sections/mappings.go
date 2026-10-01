@@ -24,7 +24,6 @@ type mappingItem struct {
 	// import; SourceID is only a same-machine fallback.
 	SourceName        string  `json:"sourceName,omitempty"`
 	SourceID          string  `json:"sourceId,omitempty"`
-	PinnedTag         *string `json:"pinnedTag,omitempty"`
 	PinnedFingerprint *string `json:"pinnedFingerprint,omitempty"`
 }
 
@@ -67,7 +66,6 @@ func (s *MappingsSection) Export(ctx context.Context) (json.RawMessage, error) {
 			MessageType:       m.MessageType,
 			SourceName:        idToName[m.SourceID], // "" when unresolved — falls back to SourceID on import
 			SourceID:          m.SourceID,
-			PinnedTag:         m.PinnedTag,
 			PinnedFingerprint: m.PinnedFingerprint,
 		})
 	}
@@ -133,7 +131,6 @@ func (s *MappingsSection) Import(
 			upd := &entities.SubjectMappingUpdate{
 				Id:                ex.Id,
 				MessageType:       ptr.Wrap(it.MessageType),
-				PinnedTag:         it.PinnedTag,
 				PinnedFingerprint: it.PinnedFingerprint,
 			}
 			// Only overwrite the source id when concrete — an empty value must NOT
@@ -151,7 +148,6 @@ func (s *MappingsSection) Import(
 			Pattern:           it.Pattern,
 			MessageType:       it.MessageType,
 			SourceID:          resolvedSourceID,
-			PinnedTag:         it.PinnedTag,
 			PinnedFingerprint: it.PinnedFingerprint,
 		}); err != nil {
 			return res, err

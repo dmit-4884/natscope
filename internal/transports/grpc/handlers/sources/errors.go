@@ -21,10 +21,8 @@ func (h *Handler) StatusErrorConvert(ctx context.Context, err error) error {
 		return grpchelpers.NewStatus(codes.NotFound, "proto source not found", "PROTO_SOURCE_NOT_FOUND")
 	case errors.Is(err, errs.ErrProtoSourceNameAlreadyInUse):
 		return grpchelpers.NewStatus(codes.AlreadyExists, "proto source name already in use", "PROTO_SOURCE_NAME_ALREADY_IN_USE")
-	case errors.Is(err, errs.ErrProtoVersionNotFound):
-		return grpchelpers.NewStatus(codes.NotFound, "proto version not found", "PROTO_VERSION_NOT_FOUND")
-	case errors.Is(err, errs.ErrProtoVersionAlreadyExists):
-		return grpchelpers.NewStatus(codes.AlreadyExists, "proto version already exists", "PROTO_VERSION_ALREADY_EXISTS")
+	case errors.Is(err, errs.ErrProtoRefNotFound):
+		return grpchelpers.NewStatus(codes.NotFound, "git ref not found", "PROTO_REF_NOT_FOUND")
 	}
 	return grpchelpers.StatusErrorConvert(ctx, err)
 }

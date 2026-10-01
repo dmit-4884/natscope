@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/altessa-s/go-atlas/core/encoding/hash"
+
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 
@@ -18,8 +20,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// stubDescriptors is an in-memory DescriptorsLookup that counts lookups per key
-// so tests can prove cache hits vs rebuilds.
 type stubDescriptors struct {
 	byTag    map[string]*entities.ProtoDescriptor
 	byFP     map[string]*entities.ProtoDescriptor
@@ -35,8 +35,8 @@ func newStub() *stubDescriptors {
 	}
 }
 
-func (s *stubDescriptors) GetBySourceTag(_ context.Context, sourceID, tag string) (*entities.ProtoDescriptor, error) {
-	key := sourceID + "\x00" + tag
+func (s *stubDescriptors) GetBySourceRevision(_ context.Context, sourceID, revision string) (*entities.ProtoDescriptor, error) {
+	key := sourceID + "\x00" + revision
 	s.tagCalls[key]++
 	d, ok := s.byTag[key]
 	if !ok {
@@ -45,17 +45,15 @@ func (s *stubDescriptors) GetBySourceTag(_ context.Context, sourceID, tag string
 	return d, nil
 }
 
-func (s *stubDescriptors) FindByFingerprint(_ context.Context, fp string) (*entities.ProtoDescriptor, error) {
+func (s *stubDescriptors) GetByFingerprint(_ context.Context, sourceID, fp string) (*entities.ProtoDescriptor, error) {
 	s.fpCalls++
 	d, ok := s.byFP[fp]
-	if !ok {
+	if !ok || d.SourceID != sourceID {
 		return nil, errs.ErrProtoDescriptorNotFound
 	}
 	return d, nil
 }
 
-// descriptorSetBytes builds a valid serialized FileDescriptorSet with one
-// message pkg.msg so ParseSchema yields a real descriptor.
 func descriptorSetBytes(t *testing.T, pkg, msg string) []byte {
 	t.Helper()
 	file := &descriptorpb.FileDescriptorProto{
@@ -70,13 +68,20 @@ func descriptorSetBytes(t *testing.T, pkg, msg string) []byte {
 	return data
 }
 
-func (s *stubDescriptors) put(sourceID, tag string, data []byte) *entities.ProtoDescriptor {
-	d := &entities.ProtoDescriptor{SourceID: sourceID, Tag: tag, DescriptorSet: data}
-	s.byTag[sourceID+"\x00"+tag] = d
+func (s *stubDescriptors) put(sourceID, revision string, data []byte) *entities.ProtoDescriptor {
+	d := &entities.ProtoDescriptor{SourceID: sourceID, Revision: revision, DescriptorSet: data, Fingerprint: fingerprint(data)}
+	s.byTag[sourceID+"\x00"+revision] = d
 	if len(data) > 0 {
-		s.byFP[fingerprint(data)] = d
+		s.byFP[d.Fingerprint] = d
 	}
 	return d
+}
+
+func fingerprint(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	return hash.SHA256HexBytes(data)
 }
 
 func TestGetOrBuild_Validation(t *testing.T) {
@@ -118,7 +123,7 @@ func TestGetOrBuild_MissThenHit(t *testing.T) {
 	snap, err := c.GetOrBuild(t.Context(), "src", "v1")
 	require.NoError(t, err)
 	assert.Equal(t, "src", snap.SourceID)
-	assert.Equal(t, "v1", snap.Tag)
+	assert.Equal(t, "v1", snap.Revision)
 	assert.Equal(t, fingerprint(data), snap.Fingerprint)
 	assert.Contains(t, snap.Schema.Messages, "test.pkg.Thing")
 
@@ -203,11 +208,11 @@ func TestGetByFingerprint_StorageLookup(t *testing.T) {
 	stub.put("src", "v1", data)
 	c := NewCache(stub)
 
-	// Cold cache: resolves via FindByFingerprint then builds.
+	// Cold cache: resolves via GetByFingerprint then builds.
 	got, err := c.GetByFingerprint(t.Context(), "src", fingerprint(data))
 	require.NoError(t, err)
 	assert.Equal(t, "src", got.SourceID)
-	assert.Equal(t, "v1", got.Tag)
+	assert.Equal(t, "v1", got.Revision)
 	assert.Equal(t, 1, stub.fpCalls)
 }
 
@@ -231,23 +236,10 @@ func TestGetByFingerprint_NotFound(t *testing.T) {
 	assert.ErrorIs(t, err, errs.ErrMappingDescriptorMissing)
 }
 
-func TestFingerprint(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "", fingerprint(nil))
-	assert.Equal(t, "", fingerprint([]byte{}))
-
-	a := fingerprint([]byte("hello"))
-	assert.NotEmpty(t, a)
-	assert.Equal(t, a, fingerprint([]byte("hello")), "identical input is stable")
-	assert.NotEqual(t, a, fingerprint([]byte("world")), "different input differs")
-}
-
 func TestSnapshotKey(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, "src\x00v1", snapshotKey("src", "v1"))
-	// NUL separator keeps a colon-bearing tag unambiguous.
 	assert.NotEqual(t, snapshotKey("src", "a:b"), snapshotKey("src:a", "b"))
 }
 

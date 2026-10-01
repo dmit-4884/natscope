@@ -25,7 +25,6 @@ import (
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/messages"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/publish"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/registry"
-	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/selections"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/settings"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/sources"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/stats"
@@ -76,7 +75,6 @@ func TransportsModule() fx.Option {
 		fx.Provide(AsConnectHandler(registry.New)),
 		fx.Provide(AsConnectHandler(codec.New)),
 		fx.Provide(AsConnectHandler(sources.New)),
-		fx.Provide(AsConnectHandler(selections.New)),
 		fx.Provide(AsConnectHandler(mappings.New)),
 		fx.Provide(AsConnectHandler(history.New)),
 		fx.Provide(AsConnectHandler(settings.New)),
@@ -118,7 +116,7 @@ func TransportsModule() fx.Option {
 				liveSvc.BroadcastProtoReload()
 			})
 			lc.Append(fx.StartHook(func(ctx context.Context) error {
-				ps.RestoreWatchers(ctx)
+				ps.Start(ctx)
 				return nil
 			}))
 			return nil

@@ -58,8 +58,8 @@ message PublishMessageRequest {
   // Required if messageType is set.
   optional string source_id = 7;
 
-  // Optional. Specific tag of the source snapshot. Empty means active selection.
-  optional string source_tag = 8;
+  // Optional. Schema fingerprint; empty uses the source's active schema.
+  optional string schema_fingerprint = 8;
 }
 
 // Defines the response message for publishing a message to NATS.
@@ -107,8 +107,8 @@ message RequestMessageRequest {
   // Required if messageType is set.
   optional string source_id = 6;
 
-  // Optional. Specific tag of the source snapshot. Empty means active selection.
-  optional string source_tag = 7;
+  // Optional. Schema fingerprint; empty uses the source's active schema.
+  optional string schema_fingerprint = 7;
 
   // Optional. How long to wait for a reply. Defaults to 5 seconds.
   google.protobuf.Duration timeout = 8 [(buf.validate.field).duration = {gt: {}, lte: {seconds: 60}}];
@@ -140,8 +140,8 @@ message EncodeMessageRequest {
   // Required. Identifier of the proto source whose snapshot is used for encoding.
   string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
-  // Optional. Specific tag of the source snapshot. Empty means active selection.
-  optional string source_tag = 4;
+  // Optional. Schema fingerprint; empty uses the source's active schema.
+  optional string schema_fingerprint = 4;
 }
 
 // Defines the response message for encoding a JSON payload to protobuf binary format.
@@ -167,8 +167,8 @@ message ValidateJsonRequest {
   // Required. Identifier of the proto source whose snapshot is used for validation.
   string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
-  // Optional. Specific tag of the source snapshot. Empty means active selection.
-  optional string source_tag = 4;
+  // Optional. Schema fingerprint; empty uses the source's active schema.
+  optional string schema_fingerprint = 4;
 }
 
 // Defines the response message for validating a JSON payload against a protobuf schema.

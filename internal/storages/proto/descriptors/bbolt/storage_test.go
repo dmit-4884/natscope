@@ -4,13 +4,10 @@
 package bbolt_test
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"bytes"
 	"errors"
 	"path/filepath"
 	"testing"
-
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -33,104 +30,94 @@ func newDescStore(t *testing.T) *descbbolt.Storage {
 	return s
 }
 
-func desc(sourceID, tag string, set []byte) *entities.ProtoDescriptor {
+func desc(sourceID, revision, fingerprint string) *entities.ProtoDescriptor {
 	return entities.ProtoDescriptorNew(func(d *entities.ProtoDescriptor) {
 		d.SourceID = sourceID
-		d.Tag = tag
-		d.DescriptorSet = set
-		d.MessageTypes = []string{"pkg.A"}
+		d.Revision = revision
+		d.DescriptorSet = []byte(sourceID + revision)
+		d.Fingerprint = fingerprint
+		d.MessageTypes = []string{"a.B"}
+		d.CompiledAt = 42
 	})
 }
 
-func TestDescriptors_UpsertBySourceTag(t *testing.T) {
+func TestDescriptors_SaveGetRoundTrip(t *testing.T) {
 	s := newDescStore(t)
-	ctx := t.Context()
 
-	if err := s.Save(ctx, desc("s1", "v1", []byte("first"))); err != nil {
-		t.Fatalf("save 1: %v", err)
+	if err := s.Save(t.Context(), desc("s1", "abc", "fp1")); err != nil {
+		t.Fatalf("save: %v", err)
 	}
-	// Second save for the same (source, tag) replaces, not duplicates.
-	if err := s.Save(ctx, desc("s1", "v1", []byte("second"))); err != nil {
-		t.Fatalf("save 2: %v", err)
-	}
-
-	got, err := s.GetBySourceTag(ctx, "s1", "v1")
+	got, err := s.GetBySourceRevision(t.Context(), "s1", "abc")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if string(got.DescriptorSet) != "second" {
-		t.Fatalf("descriptor set = %q, want second", got.DescriptorSet)
+	if !bytes.Equal(got.DescriptorSet, []byte("s1abc")) || got.Fingerprint != "fp1" || got.CompiledAt != 42 {
+		t.Fatalf("round-trip mismatch: %+v", got)
 	}
-
-	all, err := s.GetAll(ctx)
-	if err != nil {
-		t.Fatalf("getall: %v", err)
-	}
-	if len(all) != 1 {
-		t.Fatalf("expected 1 descriptor after upsert, got %d", len(all))
+	if len(got.MessageTypes) != 1 || got.MessageTypes[0] != "a.B" {
+		t.Fatalf("message types mismatch: %+v", got.MessageTypes)
 	}
 }
 
-func TestDescriptors_FindByFingerprint(t *testing.T) {
+func TestDescriptors_SaveReplacesSameRevision(t *testing.T) {
 	s := newDescStore(t)
-	ctx := t.Context()
-	set := []byte("payload-bytes")
-	if err := s.Save(ctx, desc("s1", "v1", set)); err != nil {
+
+	if err := s.Save(t.Context(), desc("s1", "local", "old")); err != nil {
 		t.Fatalf("save: %v", err)
 	}
-
-	sum := sha256.Sum256(set)
-	fp := hex.EncodeToString(sum[:])
-	got, err := s.FindByFingerprint(ctx, fp)
-	if err != nil {
-		t.Fatalf("find by fingerprint: %v", err)
+	if err := s.Save(t.Context(), desc("s1", "local", "new")); err != nil {
+		t.Fatalf("save: %v", err)
 	}
-	if got.SourceID != "s1" || got.Tag != "v1" {
-		t.Fatalf("wrong descriptor: %+v", got)
+	list, err := s.ListBySource(t.Context(), "s1")
+	if err != nil || len(list) != 1 || list[0].Fingerprint != "new" {
+		t.Fatalf("want one replaced schema, got %v %+v", err, list)
 	}
-
-	if _, err := s.FindByFingerprint(ctx, ""); !errors.Is(err, errs.ErrProtoDescriptorNotFound) {
-		t.Fatalf("empty fingerprint: want NotFound, got %v", err)
-	}
-	if _, err := s.FindByFingerprint(ctx, "deadbeef"); !errors.Is(err, errs.ErrProtoDescriptorNotFound) {
-		t.Fatalf("unknown fingerprint: want NotFound, got %v", err)
+	if _, err := s.GetByFingerprint(t.Context(), "s1", "old"); !errors.Is(err, errs.ErrProtoDescriptorNotFound) {
+		t.Fatalf("old fingerprint should be gone, got %v", err)
 	}
 }
 
-func TestDescriptors_ListFilterAndDeleteBySource(t *testing.T) {
+func TestDescriptors_GetByFingerprintIsScopedToSource(t *testing.T) {
 	s := newDescStore(t)
-	ctx := t.Context()
-	_ = s.Save(ctx, desc("s1", "v1", []byte("a")))
-	_ = s.Save(ctx, desc("s1", "v2", []byte("b")))
-	_ = s.Save(ctx, desc("s2", "v1", []byte("c")))
 
-	list, err := s.List(ctx, &entities.ProtoDescriptorsList{
-		SourceID: ptr.Wrap("s1"),
-		ListBase: entities.ListBase{Limit: ptr.Wrap(int64(10)), IncludeTotalCount: true},
-	})
-	if err != nil {
-		t.Fatalf("list: %v", err)
+	if err := s.Save(t.Context(), desc("s1", "a", "same")); err != nil {
+		t.Fatalf("save: %v", err)
 	}
-	if *list.Total != 2 {
-		t.Fatalf("total for s1 = %d, want 2", *list.Total)
+	if err := s.Save(t.Context(), desc("s2", "b", "same")); err != nil {
+		t.Fatalf("save: %v", err)
 	}
-
-	n, err := s.DeleteBySource(ctx, "s1")
-	if err != nil {
-		t.Fatalf("delete by source: %v", err)
+	got, err := s.GetByFingerprint(t.Context(), "s2", "same")
+	if err != nil || got.SourceID != "s2" || got.Revision != "b" {
+		t.Fatalf("want s2/b, got %v %+v", err, got)
 	}
-	if n != 2 {
-		t.Fatalf("deleted %d, want 2", n)
+	if _, err := s.GetByFingerprint(t.Context(), "s3", "same"); !errors.Is(err, errs.ErrProtoDescriptorNotFound) {
+		t.Fatalf("other source must not match, got %v", err)
 	}
-	remaining, _ := s.GetAll(ctx)
-	if len(remaining) != 1 || remaining[0].SourceID != "s2" {
-		t.Fatalf("remaining = %+v", remaining)
+	if _, err := s.GetByFingerprint(t.Context(), "s1", ""); !errors.Is(err, errs.ErrProtoDescriptorNotFound) {
+		t.Fatalf("empty fingerprint must not match, got %v", err)
 	}
 }
 
-func TestDescriptors_GetByIDNotFound(t *testing.T) {
+func TestDescriptors_ListAndDeleteBySource(t *testing.T) {
 	s := newDescStore(t)
-	if _, err := s.GetById(t.Context(), "nope"); !errors.Is(err, errs.ErrProtoDescriptorNotFound) {
-		t.Fatalf("want NotFound, got %v", err)
+
+	for _, d := range []*entities.ProtoDescriptor{desc("s1", "a", "1"), desc("s1", "b", "2"), desc("s2", "a", "3")} {
+		if err := s.Save(t.Context(), d); err != nil {
+			t.Fatalf("save: %v", err)
+		}
+	}
+	list, err := s.ListBySource(t.Context(), "s1")
+	if err != nil || len(list) != 2 {
+		t.Fatalf("list s1: %v %d", err, len(list))
+	}
+	n, err := s.DeleteBySource(t.Context(), "s1")
+	if err != nil || n != 2 {
+		t.Fatalf("delete: n=%d err=%v", n, err)
+	}
+	if _, err := s.GetBySourceRevision(t.Context(), "s1", "a"); !errors.Is(err, errs.ErrProtoDescriptorNotFound) {
+		t.Fatalf("s1 should be gone, got %v", err)
+	}
+	if _, err := s.GetBySourceRevision(t.Context(), "s2", "a"); err != nil {
+		t.Fatalf("s2 should survive: %v", err)
 	}
 }

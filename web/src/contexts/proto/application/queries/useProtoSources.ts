@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import {
   getProtoSources,
   getProtoSource,
@@ -7,15 +7,12 @@ import {
   deleteProtoSource,
   setSourceEnabled,
   setWatcher,
-  compileLocal,
   validateLocalPath,
   validateRepository,
-  compileFiles,
-  getProtoSourceTags,
-  getProtoSelections,
-  selectProtoVersion,
-  deleteProtoSelection,
-  loadProtoFiles,
+  refreshSource,
+  listSourceRefs,
+  selectSourceRef,
+  listSourceRevisions,
   type CreateProtoSourceRequest,
   type UpdateProtoSourceRequest,
 } from '@/api/protoSources'
@@ -25,8 +22,14 @@ const protoSourcesKeys = {
   all: ['protoSources'] as const,
   sources: () => [...protoSourcesKeys.all, 'sources'] as const,
   source: (id: string) => [...protoSourcesKeys.all, 'source', id] as const,
-  tags: (sourceId: string) => [...protoSourcesKeys.all, 'tags', sourceId] as const,
-  selections: () => [...protoSourcesKeys.all, 'selections'] as const,
+  refs: (sourceId: string) => [...protoSourcesKeys.all, 'refs', sourceId] as const,
+  revisions: (sourceId: string) => [...protoSourcesKeys.all, 'revisions', sourceId] as const,
+}
+
+function invalidateSchemas(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: protoSourcesKeys.all })
+  queryClient.invalidateQueries({ queryKey: protoKeys.messages() })
+  queryClient.invalidateQueries({ queryKey: ['mappings'] })
 }
 
 export function useProtoSources() {
@@ -84,14 +87,7 @@ export function useSetSourceEnabled() {
   return useMutation({
     mutationFn: ({ sourceId, enabled }: { sourceId: string; enabled: boolean }) =>
       setSourceEnabled(sourceId, enabled),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: protoSourcesKeys.sources() })
-      queryClient.invalidateQueries({ queryKey: protoSourcesKeys.selections() })
-      queryClient.invalidateQueries({ queryKey: protoKeys.messages() })
-      // Toggling a source changes active schema-conflicts, flipping mapping
-      // health badges; without this they stay stale until next reload.
-      queryClient.invalidateQueries({ queryKey: ['mappings'] })
-    },
+    onSuccess: () => invalidateSchemas(queryClient),
   })
 }
 
@@ -106,16 +102,11 @@ export function useSetWatcher() {
   })
 }
 
-export function useCompileLocal() {
+export function useRefreshSource() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ sourceId }: { sourceId: string }) => compileLocal(sourceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: protoSourcesKeys.sources() })
-      queryClient.invalidateQueries({ queryKey: protoSourcesKeys.selections() })
-      queryClient.invalidateQueries({ queryKey: protoKeys.messages() })
-      queryClient.invalidateQueries({ queryKey: ['mappings'] })
-    },
+    mutationFn: ({ sourceId }: { sourceId: string }) => refreshSource(sourceId),
+    onSuccess: () => invalidateSchemas(queryClient),
   })
 }
 
@@ -132,56 +123,26 @@ export function useValidateRepository() {
   })
 }
 
-export function useCompileFiles() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ sourceId }: { sourceId: string }) => compileFiles(sourceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: protoSourcesKeys.sources() })
-      queryClient.invalidateQueries({ queryKey: protoKeys.messages() })
-      queryClient.invalidateQueries({ queryKey: ['mappings'] })
-    },
-  })
-}
-
-export function useProtoSourceTags(sourceId: string | null) {
+export function useSourceRefs(sourceId: string | null) {
   return useQuery({
-    queryKey: protoSourcesKeys.tags(sourceId || ''),
-    queryFn: () => getProtoSourceTags(sourceId!),
+    queryKey: protoSourcesKeys.refs(sourceId || ''),
+    queryFn: () => listSourceRefs(sourceId!),
     enabled: !!sourceId,
   })
 }
 
-export function useProtoSelections() {
+export function useSelectSourceRef() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sourceId, ref }: { sourceId: string; ref: string }) => selectSourceRef(sourceId, ref),
+    onSuccess: () => invalidateSchemas(queryClient),
+  })
+}
+
+export function useSourceRevisions(sourceId: string | null) {
   return useQuery({
-    queryKey: protoSourcesKeys.selections(),
-    queryFn: getProtoSelections,
+    queryKey: protoSourcesKeys.revisions(sourceId || ''),
+    queryFn: () => listSourceRevisions(sourceId!),
+    enabled: !!sourceId,
   })
 }
-
-export function useSelectProtoVersion() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ sourceId, tag }: { sourceId: string; tag: string }) => {
-      const selection = await selectProtoVersion(sourceId, tag)
-      await loadProtoFiles()
-      return selection
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: protoSourcesKeys.selections() })
-      queryClient.invalidateQueries({ queryKey: protoKeys.messages() })
-      queryClient.invalidateQueries({ queryKey: protoSourcesKeys.all })
-    },
-  })
-}
-
-export function useDeleteProtoSelection() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: deleteProtoSelection,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: protoSourcesKeys.selections() })
-    },
-  })
-}
-

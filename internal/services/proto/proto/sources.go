@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/altessa-s/go-atlas/core/errors"
 	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 	"github.com/altessa-s/go-atlas/domain/normalizer"
@@ -136,6 +135,12 @@ func (s *Service) DeleteSource(ctx context.Context, id string) error {
 	if s.fileWatcher != nil {
 		s.fileWatcher.Unwatch(id)
 	}
+	if _, err := s.descriptorsStorage.DeleteBySource(ctx, id); err != nil {
+		s.logger.WarnContext(ctx, "delete source schemas failed", slog.String("id", id), slogx.Error(err))
+	}
+	if _, err := s.fileSetsStorage.DeleteBySource(ctx, id); err != nil {
+		s.logger.WarnContext(ctx, "delete source files failed", slog.String("id", id), slogx.Error(err))
+	}
 	s.registryCache.InvalidateSource(id)
 	s.notifyReload(ctx)
 
@@ -224,157 +229,4 @@ func (s *Service) ValidateRepository(
 		return &entities.RepositoryValidation{Valid: false, Error: &msg}, nil
 	}
 	return &entities.RepositoryValidation{Valid: true}, nil
-}
-
-// ListTags returns available tags from a source's Git repository.
-func (s *Service) ListTags(ctx context.Context, sourceID string) ([]string, error) {
-	source, err := s.GetSource(ctx, sourceID)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.gitFetcher.ListTags(ctx, source.AuthenticatedURL())
-}
-
-// FetchVersion returns proto files for a tag: cached version if present, else
-// fetches from Git and saves.
-func (s *Service) FetchVersion(ctx context.Context, sourceID, tag string) (*entities.ProtoVersion, error) {
-	existing, err := s.versionsStorage.GetBySourceAndTag(ctx, sourceID, tag)
-	if err == nil {
-		return existing, nil
-	}
-
-	version, err := s.fetchFromGit(ctx, sourceID, tag)
-	if err != nil {
-		return nil, err
-	}
-
-	// Save immediately (standalone fetch, not part of compile pipeline).
-	if err := s.versionsStorage.Save(ctx, version); err != nil {
-		return nil, err
-	}
-
-	return version, nil
-}
-
-// fetchFromGit fetches proto files from Git without saving to storage.
-func (s *Service) fetchFromGit(ctx context.Context, sourceID, tag string) (*entities.ProtoVersion, error) {
-	source, err := s.GetSource(ctx, sourceID)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := s.gitFetcher.FetchVersion(ctx, source.AuthenticatedURL(), tag)
-	if err != nil {
-		return nil, err
-	}
-
-	s.logger.InfoContext(ctx, "fetched proto version",
-		slog.String("source_id", sourceID),
-		slog.String("tag", tag),
-		slog.Int("files", len(res.Files)),
-		slog.Int("configs", len(res.Configs)))
-
-	return entities.ProtoVersionNew(func(v *entities.ProtoVersion) {
-		v.SourceID = sourceID
-		v.Tag = tag
-		v.Files = res.Files
-		v.Configs = res.Configs
-		v.FetchedAt = time.Now().UTC()
-	}), nil
-}
-
-// GetVersion retrieves a stored version by source Id and tag.
-func (s *Service) GetVersion(ctx context.Context, sourceID, tag string) (*entities.ProtoVersion, error) {
-	return s.versionsStorage.GetBySourceAndTag(ctx, sourceID, tag)
-}
-
-// FetchAndCompile fetches, compiles, and stores descriptors; nothing is
-// persisted until compilation succeeds, so no stale versions on error.
-func (s *Service) FetchAndCompile(ctx context.Context, sourceID, tag string) (*entities.ProtoDescriptor, error) {
-	unlock := s.compileLocks.lock(sourceID)
-	defer unlock()
-
-	existing, err := s.descriptorsStorage.GetBySourceTag(ctx, sourceID, tag)
-	if err == nil {
-		return existing, nil
-	}
-
-	// 1. Fetch proto files (from cache or Git) — NOT saved yet if fetched from
-	// Git.
-	version, cached, err := s.getOrFetchVersion(ctx, sourceID, tag)
-	if err != nil {
-		return nil, errors.WrapOperation(err, "fetch version")
-	}
-
-	// 2. Compile — if this fails, nothing is saved.
-	source, err := s.GetSource(ctx, sourceID)
-	if err != nil {
-		return nil, err
-	}
-	out, err := s.compile(ctx, source, version.Files, version.Configs, "")
-	if err != nil {
-		s.recordCompile(ctx, sourceID, false, err.Error(), 0, len(version.Files), nil, nil, "")
-		return nil, errors.WrapOperation(err, "compile proto files")
-	}
-	if out.HasErrors() {
-		summary := summarizeDiagnostics(out.Diags)
-		s.recordCompile(ctx, sourceID, false, summary, 0, len(version.Files), out.Diags, out.Roots, string(out.Origin))
-		return nil, fmt.Errorf("%w: %s", errs.ErrInvalidRequest, summary)
-	}
-	fds := out.FDS
-
-	descSet, err := s.serialize(fds)
-	if err != nil {
-		s.recordCompile(ctx, sourceID, false, err.Error(), 0, len(fds), out.Diags, out.Roots, string(out.Origin))
-		return nil, errors.WrapOperation(err, "serialize descriptors")
-	}
-
-	messageTypes := s.extractTypes(fds)
-	s.recordCompile(ctx, sourceID, true, "", len(messageTypes), len(fds), out.Diags, out.Roots, string(out.Origin))
-
-	// 3. Save the version if it was freshly fetched from Git (not already stored).
-	if !cached {
-		if saveErr := s.versionsStorage.Save(ctx, version); saveErr != nil {
-			return nil, errors.WrapOperation(saveErr, "save version")
-		}
-	}
-
-	// 4. Save descriptor.
-	descriptor := entities.ProtoDescriptorNew(func(d *entities.ProtoDescriptor) {
-		d.SourceID = sourceID
-		d.Tag = tag
-		d.DescriptorSet = descSet
-		d.MessageTypes = messageTypes
-		d.CompiledAt = time.Now().UnixMilli()
-	})
-
-	if err := s.descriptorsStorage.Save(ctx, descriptor); err != nil {
-		return nil, errors.WrapOperation(err, "save descriptor")
-	}
-
-	s.registryCache.Invalidate(sourceID, tag)
-
-	s.logger.InfoContext(ctx, "compiled and saved proto descriptors",
-		slog.String("source", sourceID),
-		slog.String("tag", tag),
-		slog.Int("message_types", len(messageTypes)),
-		slog.Int("descriptor_size", len(descSet)))
-
-	s.notifyReload(ctx)
-	return descriptor, nil
-}
-
-// getOrFetchVersion returns the stored version (cached=true), else fetches
-// from Git without saving (cached=false); caller saves only after compile.
-func (s *Service) getOrFetchVersion(ctx context.Context, sourceID, tag string) (version *entities.ProtoVersion, cached bool, err error) {
-	existing, err := s.versionsStorage.GetBySourceAndTag(ctx, sourceID, tag)
-	if err == nil {
-		return existing, true, nil
-	}
-	fetched, err := s.fetchFromGit(ctx, sourceID, tag)
-	if err != nil {
-		return nil, false, err
-	}
-	return fetched, false, nil
 }

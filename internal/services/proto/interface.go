@@ -29,7 +29,7 @@ type LiveDecoder interface {
 // examples, stats, and schema conflicts.
 type Registry interface {
 	// ListMessages lists all messages from active snapshots; each entry carries
-	// SourceID + SourceTag.
+	// SourceID + SourceRevision.
 	ListMessages(ctx context.Context) []entities.ProtoMessageInfo
 
 	// GetMessage returns message-type detail within a source;
@@ -56,8 +56,7 @@ type Registry interface {
 // Codec encodes, decodes, and validates protobuf payloads against pinned
 // snapshots.
 type Codec interface {
-	// Decode decodes via the snapshot from req.SourceID+req.Tag; SourceID
-	// required, empty Tag uses active selection.
+	// Decode decodes via the schema picked by req.SourceID and req.Fingerprint.
 	Decode(ctx context.Context, req entities.CodecRequest) (*entities.DecodeResult, error)
 
 	// DecodeForMapping decodes against the mapping's bound source — safest path,
@@ -121,18 +120,17 @@ type SourceManager interface {
 	// ValidateRepository.
 	ValidateLocalPath(ctx context.Context, dirPath string) (*entities.LocalPathValidation, error)
 
-	// ListTags returns available tags from a source's Git repository.
-	ListTags(ctx context.Context, sourceID string) ([]string, error)
+	// ListRefs returns the tags and branches of a git source.
+	ListRefs(ctx context.Context, sourceID string) ([]entities.ProtoRef, error)
 
-	// FetchVersion fetches proto files for a specific tag and stores them.
-	FetchVersion(ctx context.Context, sourceID, tag string) (*entities.ProtoVersion, error)
+	// SelectRef points a git source at a tag, branch or commit; compile errors come back in the outcome.
+	SelectRef(ctx context.Context, sourceID, ref string) (*entities.ProtoSource, *entities.CompileOutcome, error)
 
-	// GetVersion retrieves a stored version by source Id and tag.
-	GetVersion(ctx context.Context, sourceID, tag string) (*entities.ProtoVersion, error)
+	// RefreshSource rebuilds the active schema: re-resolves the git ref or recompiles local files.
+	RefreshSource(ctx context.Context, sourceID string) (*entities.ProtoSource, *entities.CompileOutcome, error)
 
-	// FetchAndCompile fetches proto files, compiles them to descriptors, and
-	// stores them.
-	FetchAndCompile(ctx context.Context, sourceID, tag string) (*entities.ProtoDescriptor, error)
+	// ListRevisions returns the stored schemas of a source, newest first.
+	ListRevisions(ctx context.Context, sourceID string) ([]entities.SchemaRevision, error)
 
 	// SetEnabled enables or disables a source.
 	SetEnabled(ctx context.Context, sourceID string, enabled bool) (*entities.ProtoSource, error)
@@ -140,36 +138,7 @@ type SourceManager interface {
 	// SetWatcher enables or disables file watcher for a local directory source.
 	SetWatcher(ctx context.Context, sourceID string, enabled bool) (*entities.ProtoSource, error)
 
-	// CompileLocal compiles a local dir source; compile errors come back as
-	// diagnostics with nil error.
-	CompileLocal(ctx context.Context, sourceID string) (*entities.CompileResult, []entities.CompileDiagnostic, error)
-
 	// ValidateFiles compiles a Files-type source (or inline files/includeDirs when
 	// sourceID empty) without persisting.
-	ValidateFiles(
-		ctx context.Context,
-		sourceID *string,
-		files []string,
-		includeDirs []string,
-	) (*entities.CompileResult, []entities.CompileDiagnostic, error)
-
-	// CompileFiles compiles a Files-type source and persists; on error nothing is
-	// persisted, prior descriptor stays.
-	CompileFiles(ctx context.Context, sourceID string) (*entities.CompileResult, []entities.CompileDiagnostic, error)
-}
-
-// SelectionManager manages the per-user selection of proto versions.
-type SelectionManager interface {
-	// Select selects a proto version for a user (creates or updates).
-	Select(ctx context.Context, in *entities.ProtoSelectionCreate) (*entities.ProtoSelection, error)
-
-	// ListSelections returns selections with pagination.
-	ListSelections(ctx context.Context, in *entities.ProtoSelectionsList) (*entities.List[entities.ProtoSelections], error)
-
-	// LoadAllSelections fetch+compiles every stored selection; per-selection
-	// failures are logged, never abort.
-	LoadAllSelections(ctx context.Context) (*entities.ProtoLoadResult, error)
-
-	// DeleteSelection removes a selection.
-	DeleteSelection(ctx context.Context, selectionID string) error
+	ValidateFiles(ctx context.Context, sourceID *string, files []string, includeDirs []string) (*entities.CompileOutcome, error)
 }

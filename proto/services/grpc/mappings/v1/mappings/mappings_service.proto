@@ -39,8 +39,8 @@ message CreateMappingRequest {
   // Required. Identifier of the proto source this mapping is bound to.
   string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
-  // Optional. Pin resolution to a specific tag.
-  optional string pinned_tag = 4;
+  reserved 4;
+  reserved "pinned_tag";
 
   // Optional. Pin resolution to a specific descriptor by content hash.
   optional string pinned_fingerprint = 5;
@@ -120,9 +120,8 @@ message MappingBulkItem {
   // Required. Identifier of the proto source this mapping is bound to.
   string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
-  // Optional. Pin resolution to a specific tag of the source, overriding the
-  // active selection; unset keeps an existing mapping's pin.
-  optional string pinned_tag = 4;
+  reserved 4;
+  reserved "pinned_tag";
 
   // Optional. Pin resolution to a specific descriptor by content hash; unset keeps an existing pin.
   optional string pinned_fingerprint = 5;

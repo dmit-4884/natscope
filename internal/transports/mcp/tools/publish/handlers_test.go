@@ -33,12 +33,12 @@ type fakeRegistry struct {
 func (f fakeRegistry) ListMessages(context.Context) []entities.ProtoMessageInfo { return f.types }
 
 func newToolset() *Toolset {
-	pinned := "v2"
+	pinned := "fp-2"
 	return New(
 		&appconfig.Config{MCP: &appconfig.MCPConfig{AllowWrites: true}},
 		nil, nil,
 		fakeMappings{resolver: natsutil.NewMappingResolver(entities.SubjectMappings{
-			{BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "src", PinnedTag: &pinned},
+			{BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "src", PinnedFingerprint: &pinned},
 		})},
 		fakeRegistry{types: []entities.ProtoMessageInfo{{FullName: "o.v1.Refund", SourceID: "src"}}},
 	)
@@ -54,7 +54,7 @@ func TestRequest(t *testing.T) {
 	assert.Equal(t, `{"id":"42"}`, req.Data)
 	assert.Equal(t, "o.v1.Order", *req.MessageType)
 	assert.Equal(t, "src", *req.SourceID)
-	assert.Equal(t, "v2", *req.SourceTag)
+	assert.Equal(t, "fp-2", *req.SchemaFingerprint)
 	assert.Equal(t, publishOutput{Encoding: encodingProtobuf, MessageType: "o.v1.Order"}, out)
 
 	req, out, err = ts.request(t.Context(), publishInput{Subject: "orders.created", JSON: payload, Raw: true})
@@ -65,7 +65,7 @@ func TestRequest(t *testing.T) {
 	req, out, err = ts.request(t.Context(), publishInput{Subject: "refunds.new", JSON: payload, Type: "o.v1.Refund"})
 	require.NoError(t, err)
 	assert.Equal(t, "o.v1.Refund", *req.MessageType)
-	assert.Nil(t, req.SourceTag)
+	assert.Nil(t, req.SchemaFingerprint)
 	assert.Equal(t, encodingProtobuf, out.Encoding)
 
 	req, out, err = ts.request(t.Context(), publishInput{Subject: "logs.app", Text: "plain line", Headers: map[string]string{"k": "v"}})

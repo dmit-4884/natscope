@@ -3,7 +3,7 @@
 
 package entities
 
-// PublishRequest is the publish service input; MessageType/SourceID/SourceTag
+// PublishRequest is the publish service input; MessageType/SourceID/SchemaFingerprint
 // drive JSON→proto encoding, else Data is sent verbatim.
 type PublishRequest struct {
 	// ConnectionID identifies which saved NATS connection to publish through.
@@ -16,13 +16,13 @@ type PublishRequest struct {
 	// Headers carries optional NATS message headers.
 	Headers map[string]string
 	// MessageType, when set, triggers proto encoding of Data via
-	// SourceID/SourceTag.
+	// SourceID/SchemaFingerprint.
 	MessageType *string `normalize:"trim,nil_on_empty"`
 	// SourceID is the proto source to encode against; required when MessageType is
 	// set.
 	SourceID *string `normalize:"trim,nil_on_empty"`
-	// SourceTag pins a source version; empty falls back to the active selection.
-	SourceTag *string `normalize:"trim,nil_on_empty"`
+	// SchemaFingerprint picks a stored schema; empty uses the active one.
+	SchemaFingerprint *string `normalize:"trim,nil_on_empty"`
 	// SubjectPattern is the UI subject template, for history bookkeeping; not used
 	// during publish.
 	SubjectPattern *string `normalize:"trim,nil_on_empty"`

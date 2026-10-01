@@ -22,8 +22,8 @@ import (
 // DescriptorsLookup is the minimal storage contract the cache needs, defined
 // locally to keep this package free of storage-layer imports.
 type DescriptorsLookup interface {
-	GetBySourceTag(ctx context.Context, sourceID, tag string) (*entities.ProtoDescriptor, error)
-	FindByFingerprint(ctx context.Context, fingerprint string) (*entities.ProtoDescriptor, error)
+	GetBySourceRevision(ctx context.Context, sourceID, revision string) (*entities.ProtoDescriptor, error)
+	GetByFingerprint(ctx context.Context, sourceID, fingerprint string) (*entities.ProtoDescriptor, error)
 }
 
 // maxCachedSnapshots bounds the cache. Snapshots hold parsed descriptor sets,
@@ -50,17 +50,17 @@ func NewCache(descriptors DescriptorsLookup) *Cache {
 	}
 }
 
-// GetOrBuild returns the cached snapshot for (sourceID, tag), parsing from
+// GetOrBuild returns the cached snapshot for (sourceID, revision), parsing from
 // storage on miss; concurrent calls share one parse via singleflight.
-func (c *Cache) GetOrBuild(ctx context.Context, sourceID, tag string) (*Snapshot, error) {
+func (c *Cache) GetOrBuild(ctx context.Context, sourceID, revision string) (*Snapshot, error) {
 	if sourceID == "" {
 		return nil, errs.ErrMappingSourceNotFound
 	}
-	if tag == "" {
+	if revision == "" {
 		return nil, errs.ErrMappingDescriptorMissing
 	}
 
-	key := snapshotKey(sourceID, tag)
+	key := snapshotKey(sourceID, revision)
 
 	c.mu.RLock()
 	snap := c.entries[key]
@@ -78,7 +78,7 @@ func (c *Cache) GetOrBuild(ctx context.Context, sourceID, tag string) (*Snapshot
 			return cached, nil
 		}
 
-		d, err := c.descriptors.GetBySourceTag(ctx, sourceID, tag)
+		d, err := c.descriptors.GetBySourceRevision(ctx, sourceID, revision)
 		if err != nil {
 			if errors.Is(err, errs.ErrProtoDescriptorNotFound) {
 				return nil, errs.ErrMappingDescriptorMissing
@@ -96,11 +96,11 @@ func (c *Cache) GetOrBuild(ctx context.Context, sourceID, tag string) (*Snapshot
 
 		built := &Snapshot{
 			SourceID:    sourceID,
-			Tag:         tag,
+			Revision:    revision,
 			Descriptor:  d,
 			Schema:      schema,
 			ParsedAt:    time.Now(),
-			Fingerprint: fingerprint(d.DescriptorSet),
+			Fingerprint: d.Fingerprint,
 		}
 
 		c.mu.Lock()
@@ -139,24 +139,19 @@ func (c *Cache) GetByFingerprint(ctx context.Context, sourceID, fingerprint stri
 	}
 	c.mu.RUnlock()
 
-	d, err := c.descriptors.FindByFingerprint(ctx, fingerprint)
+	d, err := c.descriptors.GetByFingerprint(ctx, sourceID, fingerprint)
 	if err != nil {
 		if errors.Is(err, errs.ErrProtoDescriptorNotFound) {
 			return nil, errs.ErrMappingDescriptorMissing
 		}
 		return nil, coreerrs.Wrap(err, "registry: lookup by fingerprint")
 	}
-	if d.SourceID != sourceID {
-		// Fingerprint matched a different source; refuse — never substitute across
-		// sources even on coinciding content hash.
-		return nil, errs.ErrMappingDescriptorMissing
-	}
-	return c.GetOrBuild(ctx, d.SourceID, d.Tag)
+	return c.GetOrBuild(ctx, d.SourceID, d.Revision)
 }
 
-// Invalidate drops the cached snapshot for (sourceID, tag) if present.
-func (c *Cache) Invalidate(sourceID, tag string) {
-	key := snapshotKey(sourceID, tag)
+// Invalidate drops the cached snapshot for (sourceID, revision) if present.
+func (c *Cache) Invalidate(sourceID, revision string) {
+	key := snapshotKey(sourceID, revision)
 	c.mu.Lock()
 	delete(c.entries, key)
 	c.mu.Unlock()
@@ -195,8 +190,6 @@ func (c *Cache) evictLocked() {
 	}
 }
 
-// snapshotKey produces the cache key for (sourceID, tag); NUL separator keeps
-// it unambiguous if a tag contains ':'.
-func snapshotKey(sourceID, tag string) string {
-	return sourceID + "\x00" + tag
+func snapshotKey(sourceID, revision string) string {
+	return sourceID + "\x00" + revision
 }

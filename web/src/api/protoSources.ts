@@ -1,8 +1,13 @@
 import { tsToMillis } from '@/utils/timestamp'
-import type { ProtoSource as ProtoSourceProto , CompileDiagnostic as PbDiagnostic } from '../gen/types/proto/proto_source_pb'
-import { SourceType } from '../gen/types/proto/proto_source_pb'
-import type { ProtoSelection as ProtoSelectionProto } from '../gen/types/proto/proto_selection_pb'
-import { sourcesClient, selectionsClient } from './grpc/clients'
+import type {
+  ProtoSource as ProtoSourceProto,
+  CompileDiagnostic as PbDiagnostic,
+  ProtoRef as PbRef,
+  SchemaRevision as PbRevision,
+} from '../gen/types/proto/proto_source_pb'
+import { SourceType, RefKind } from '../gen/types/proto/proto_source_pb'
+import type { CompileOutcome as PbOutcome } from '../gen/services/grpc/proto/v1/sources/proto_sources_service_pb'
+import { sourcesClient } from './grpc/clients'
 
 export type ProtoSourceType = 'git' | 'local' | 'files'
 
@@ -33,8 +38,26 @@ export interface ProtoSource {
   // Slash-relative prefixes excluded from compilation (e.g. "pb", "gen").
   excludePrefixes?: string[]
   lastCompile?: ProtoCompileResult
+  selectedRef?: ProtoRef
+  activeSchema?: SchemaRevision
   created_at: number
   updated_at?: number
+}
+
+export type RefKindName = 'tag' | 'branch' | 'commit'
+
+export interface ProtoRef {
+  name: string
+  kind: RefKindName
+  revision: string
+}
+
+export interface SchemaRevision {
+  revision: string
+  fingerprint: string
+  compiledAt: number
+  messageCount: number
+  active: boolean
 }
 
 export interface CompileDiagnostic {
@@ -47,11 +70,16 @@ export interface CompileDiagnostic {
   hint?: string
 }
 
-export interface CompileFilesResult {
+export interface CompileOutcome {
   valid: boolean
   messageTypes: number
   fileDescriptors: number
   diagnostics: CompileDiagnostic[]
+}
+
+export interface SourceUpdateResult {
+  source: ProtoSource
+  outcome: CompileOutcome
 }
 
 export interface ProtoSourcesList {
@@ -82,14 +110,6 @@ export interface UpdateProtoSourceRequest {
   includeDirs?: string[]
   importRoots?: string[]
   excludePrefixes?: string[]
-}
-
-export interface ProtoSelection {
-  id: string
-  source_id: string
-  tag: string
-  created_at: number
-  updated_at?: number
 }
 
 function sourceTypeFromProto(st: SourceType): ProtoSourceType {
@@ -142,8 +162,34 @@ function toProtoSource(p: ProtoSourceProto): ProtoSource {
           rootsOrigin: (p.lastCompile.rootsOrigin ?? '') as ProtoCompileResult['rootsOrigin'],
         }
       : undefined,
+    selectedRef: p.selectedRef ? fromPbRef(p.selectedRef) : undefined,
+    activeSchema: p.activeSchema ? fromPbRevision(p.activeSchema) : undefined,
     created_at: tsToMillis(p.createdAt),
     updated_at: tsToMillis(p.updatedAt) || undefined,
+  }
+}
+
+function fromPbRef(r: PbRef): ProtoRef {
+  const kind: RefKindName = r.kind === RefKind.BRANCH ? 'branch' : r.kind === RefKind.COMMIT ? 'commit' : 'tag'
+  return { name: r.name, kind, revision: r.revision }
+}
+
+function fromPbRevision(r: PbRevision): SchemaRevision {
+  return {
+    revision: r.revision,
+    fingerprint: r.fingerprint,
+    compiledAt: Number(r.compiledAt),
+    messageCount: r.messageCount,
+    active: r.active,
+  }
+}
+
+function fromPbOutcome(o: PbOutcome | undefined): CompileOutcome {
+  return {
+    valid: o?.valid ?? false,
+    messageTypes: o?.messageTypes ?? 0,
+    fileDescriptors: o?.fileDescriptors ?? 0,
+    diagnostics: (o?.diagnostics ?? []).map(fromPbDiagnostic),
   }
 }
 
@@ -157,16 +203,6 @@ function fromPbDiagnostic(d: PbDiagnostic): CompileDiagnostic {
     message: d.message,
     missingImport: d.missingImport || undefined,
     hint: d.hint || undefined,
-  }
-}
-
-function toProtoSelection(s: ProtoSelectionProto): ProtoSelection {
-  return {
-    id: s.id,
-    source_id: s.sourceId,
-    tag: s.tag,
-    created_at: tsToMillis(s.createdAt),
-    updated_at: tsToMillis(s.updatedAt) || undefined,
   }
 }
 
@@ -246,33 +282,9 @@ export async function setWatcher(sourceId: string, enabled: boolean): Promise<Pr
   return toProtoSource(response.source!)
 }
 
-// Local compile
-
-export async function compileLocal(sourceId: string): Promise<{
-  messageTypes: number
-  fileDescriptors: number
-  valid: boolean
-  diagnostics: CompileDiagnostic[]
-}> {
-  const response = await sourcesClient.compileLocal({ sourceId })
-  return {
-    messageTypes: response.messageTypes,
-    fileDescriptors: response.fileDescriptors,
-    valid: response.valid,
-    diagnostics: (response.diagnostics ?? []).map(fromPbDiagnostic),
-  }
-}
-
-// Files validate / compile
-
-export async function compileFiles(sourceId: string): Promise<CompileFilesResult> {
-  const response = await sourcesClient.compileFiles({ sourceId })
-  return {
-    valid: response.valid,
-    messageTypes: response.messageTypes,
-    fileDescriptors: response.fileDescriptors,
-    diagnostics: (response.diagnostics ?? []).map(fromPbDiagnostic),
-  }
+export async function refreshSource(sourceId: string): Promise<SourceUpdateResult> {
+  const response = await sourcesClient.refreshSource({ sourceId })
+  return { source: toProtoSource(response.source!), outcome: fromPbOutcome(response.outcome) }
 }
 
 // Validate local path
@@ -299,42 +311,17 @@ export async function validateRepository(
   }
 }
 
-// Tags and Versions
-
-export async function getProtoSourceTags(sourceId: string): Promise<string[]> {
-  const response = await sourcesClient.listTags({ sourceId })
-  return response.tags || []
+export async function listSourceRefs(sourceId: string): Promise<ProtoRef[]> {
+  const response = await sourcesClient.listRefs({ sourceId })
+  return response.refs.map(fromPbRef)
 }
 
-// Selections
-
-export async function getProtoSelections(): Promise<ProtoSelection[]> {
-  const response = await selectionsClient.listSelections({ pageSize: 0, pageToken: '' })
-  return (response.selections || []).map(toProtoSelection)
+export async function selectSourceRef(sourceId: string, ref: string): Promise<SourceUpdateResult> {
+  const response = await sourcesClient.selectRef({ sourceId, ref })
+  return { source: toProtoSource(response.source!), outcome: fromPbOutcome(response.outcome) }
 }
 
-export async function selectProtoVersion(sourceId: string, tag: string): Promise<ProtoSelection> {
-  const response = await selectionsClient.selectVersion({ sourceId, tag })
-  return toProtoSelection(response.selection!)
-}
-
-export async function deleteProtoSelection(selectionId: string): Promise<void> {
-  await selectionsClient.deleteSelection({ id: selectionId })
-}
-
-// Proto Loading (Lazy Loading V1)
-
-export interface LoadProtoResponse {
-  loaded: boolean
-  selections: number
-  messages_count: number
-}
-
-export async function loadProtoFiles(): Promise<LoadProtoResponse> {
-  const response = await selectionsClient.loadSelections({})
-  return {
-    loaded: response.messageCount > 0,
-    selections: response.fileCount,
-    messages_count: response.messageCount,
-  }
+export async function listSourceRevisions(sourceId: string): Promise<SchemaRevision[]> {
+  const response = await sourcesClient.listRevisions({ sourceId })
+  return response.revisions.map(fromPbRevision)
 }

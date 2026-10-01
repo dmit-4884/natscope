@@ -7,7 +7,7 @@ describe('ProtoMessage', () => {
     proto_file: 'order/order_event.proto',
     package: 'my.package',
     source_id: 'src-A',
-    source_tag: 'v1.0.0',
+    source_revision: 'v1.0.0',
     fields: [
       { name: 'order_id', type: 'string', number: 1, label: 'optional', is_message: false },
       { name: 'amount', type: 'double', number: 2 },
@@ -24,7 +24,7 @@ describe('ProtoMessage', () => {
       expect(msg.protoFile).toBe('order/order_event.proto')
       expect(msg.packageName).toBe('my.package')
       expect(msg.sourceId).toBe('src-A')
-      expect(msg.sourceTag).toBe('v1.0.0')
+      expect(msg.sourceRevision).toBe('v1.0.0')
       expect(msg.fields).toHaveLength(3)
     })
 

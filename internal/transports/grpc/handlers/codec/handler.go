@@ -52,7 +52,7 @@ func (h *Handler) DecodeMessage(
 	result, err := h.protoService.Decode(ctx, entities.CodecRequest{
 		Data:        in.Data,
 		SourceID:    in.SourceId,
-		Tag:         ptr.Unwrap(in.Tag, ""),
+		Fingerprint: ptr.Unwrap(in.Fingerprint, ""),
 		MessageType: in.MessageType,
 	})
 	if err != nil {
@@ -79,7 +79,7 @@ func (h *Handler) EncodeMessage(
 	result, err := h.protoService.Encode(ctx, entities.CodecRequest{
 		JSON:        []byte(in.Data),
 		SourceID:    in.SourceId,
-		Tag:         ptr.Unwrap(in.Tag, ""),
+		Fingerprint: ptr.Unwrap(in.Fingerprint, ""),
 		MessageType: in.MessageType,
 	})
 	if err != nil {
@@ -109,7 +109,7 @@ func (h *Handler) ValidateMessage(
 	dataBase64 := base64.StdEncoding.EncodeToString(in.Data)
 	result, err := h.protoService.Validate(ctx, dataBase64, entities.CodecRequest{
 		SourceID:    in.SourceId,
-		Tag:         ptr.Unwrap(in.Tag, ""),
+		Fingerprint: ptr.Unwrap(in.Fingerprint, ""),
 		MessageType: in.MessageType,
 	})
 	if err != nil {

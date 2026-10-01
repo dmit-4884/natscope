@@ -33,9 +33,8 @@ message DecodeMessageRequest {
   // Required. Identifier of the proto source whose snapshot the decoder uses.
   string source_id = 3 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
 
-  // Optional. Specific tag of the source snapshot. When omitted, the active selection of the source is used.
-  // Local sources always resolve to "local" regardless of this field.
-  optional string tag = 4;
+  // Optional. Schema fingerprint; empty uses the source's active schema.
+  optional string fingerprint = 4;
 }
 
 // Defines the response message for decoding binary protobuf data.
@@ -56,8 +55,8 @@ message EncodeMessageRequest {
   // Required. Identifier of the proto source whose snapshot the encoder uses.
   string source_id = 3 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
 
-  // Optional. Specific tag of the source snapshot. When omitted, the active selection of the source is used.
-  optional string tag = 4;
+  // Optional. Schema fingerprint; empty uses the source's active schema.
+  optional string fingerprint = 4;
 }
 
 // Defines the response message for encoding a protobuf message.
@@ -78,8 +77,8 @@ message ValidateMessageRequest {
   // Required. Identifier of the proto source whose snapshot the validator uses.
   string source_id = 3 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
 
-  // Optional. Specific tag of the source snapshot. When omitted, the active selection of the source is used.
-  optional string tag = 4;
+  // Optional. Schema fingerprint; empty uses the source's active schema.
+  optional string fingerprint = 4;
 }
 
 // Defines the response message for validating binary protobuf data.

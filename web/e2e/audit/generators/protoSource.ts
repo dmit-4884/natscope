@@ -1,7 +1,7 @@
 /**
- * Fixture generator: a genuinely non-trivial proto file compiled into a FILES
- * source (nested message, enum, repeated, map). Backend shares the filesystem,
- * so we write the .proto to a temp dir and point a source at it.
+ * Fixture generator: a genuinely non-trivial proto file compiled into a local
+ * directory source (nested message, enum, repeated, map). Backend shares the
+ * filesystem, so we write the .proto to a temp dir and point a source at it.
  */
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -41,12 +41,11 @@ export async function ensureAuditProtoSource(name = 'AUDIT_CODEC_SRC'): Promise<
     if (s.name === name) await A.deleteSource(s.id).catch(() => {})
   }
   const dir = mkdtempSync(join(tmpdir(), 'audit-proto-'))
-  const path = join(dir, 'audit.proto')
-  writeFileSync(path, AUDIT_PROTO)
-  const created = await A.createSource({ name, sourceType: 'SOURCE_TYPE_FILES', files: [path], includeDirs: [] })
+  writeFileSync(join(dir, 'audit.proto'), AUDIT_PROTO)
+  const created = await A.createSource({ name, sourceType: 'SOURCE_TYPE_LOCAL', localPath: dir, watcherEnabled: false })
   const sourceId = created.source?.id
   if (!sourceId) throw new Error('CreateSource returned no id')
-  await A.compileFiles(sourceId)
+  await A.refreshSource(sourceId)
   return sourceId
 }
 

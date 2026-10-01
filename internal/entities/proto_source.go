@@ -84,6 +84,12 @@ type ProtoSource struct {
 	// LastCompile is the most recent compile pass result; server-side telemetry,
 	// never accepted from clients.
 	LastCompile *ProtoCompileResult
+
+	// SelectedRef is the git ref a git source tracks.
+	SelectedRef *ProtoRef
+
+	// ActiveSchema is computed on read, never stored.
+	ActiveSchema *SchemaRevision
 }
 
 // ProtoSourceNew creates a new ProtoSource with generated Id and timestamps.

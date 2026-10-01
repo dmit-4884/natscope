@@ -45,8 +45,8 @@ func TestMergeWithReport_SameSymbolDifferentFile_Error(t *testing.T) {
 	}
 
 	report, err := MergeWithReport([]SchemaInput{
-		{SourceID: "src-A", Tag: "v1", Bytes: mustMarshalSet(t, file1)},
-		{SourceID: "src-B", Tag: "v3", Bytes: mustMarshalSet(t, file2)},
+		{SourceID: "src-A", Revision: "v1", Bytes: mustMarshalSet(t, file1)},
+		{SourceID: "src-B", Revision: "v3", Bytes: mustMarshalSet(t, file2)},
 	})
 	if err != nil {
 		t.Fatalf("MergeWithReport: %v", err)

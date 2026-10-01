@@ -21,6 +21,6 @@ type conflictDoc struct {
 
 type schemaRefDoc struct {
 	SourceID string `json:"sourceId,omitempty"`
-	Tag      string `json:"tag,omitempty"`
+	Revision string `json:"revision,omitempty"`
 	File     string `json:"file,omitempty"`
 }

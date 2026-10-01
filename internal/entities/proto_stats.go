@@ -13,16 +13,3 @@ type ProtoStats struct {
 func (p *ProtoStats) IsLoaded() bool {
 	return p != nil && p.MessagesCount > 0
 }
-
-// ProtoLoadResult is the outcome of fetch+compile across all active proto
-// selections.
-type ProtoLoadResult struct {
-	// MessageCount is the total message types available across all active
-	// snapshots.
-	MessageCount int
-	// CompiledCount is the number of selections that compiled successfully.
-	CompiledCount int
-	// FailedCount is the number of selections that failed to compile (per-source
-	// errors logged at WARN).
-	FailedCount int
-}

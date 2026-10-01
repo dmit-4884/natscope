@@ -39,19 +39,18 @@ type mockProtoService struct {
 	repoErr        error
 	localResult    *entities.LocalPathValidation
 	localErr       error
-	tagsResult     []string
-	tagsErr        error
-	versionResult  *entities.ProtoVersion
-	versionErr     error
+	refsResult     []entities.ProtoRef
+	refsErr        error
+	refSource      *entities.ProtoSource
+	refOutcome     *entities.CompileOutcome
+	refErr         error
+	revisions      []entities.SchemaRevision
+	revisionsErr   error
 	enabledResult  *entities.ProtoSource
 	enabledErr     error
 	watcherResult  *entities.ProtoSource
 	watcherErr     error
-	compileResult  *entities.CompileResult
-	compileDiags   []entities.CompileDiagnostic
-	compileErr     error
-	validateResult *entities.CompileResult
-	validateDiags  []entities.CompileDiagnostic
+	validateResult *entities.CompileOutcome
 	validateErr    error
 }
 
@@ -83,12 +82,20 @@ func (m *mockProtoService) ValidateLocalPath(_ context.Context, _ string) (*enti
 	return m.localResult, m.localErr
 }
 
-func (m *mockProtoService) ListTags(_ context.Context, _ string) ([]string, error) {
-	return m.tagsResult, m.tagsErr
+func (m *mockProtoService) ListRefs(_ context.Context, _ string) ([]entities.ProtoRef, error) {
+	return m.refsResult, m.refsErr
 }
 
-func (m *mockProtoService) FetchVersion(_ context.Context, _, _ string) (*entities.ProtoVersion, error) {
-	return m.versionResult, m.versionErr
+func (m *mockProtoService) SelectRef(_ context.Context, _, _ string) (*entities.ProtoSource, *entities.CompileOutcome, error) {
+	return m.refSource, m.refOutcome, m.refErr
+}
+
+func (m *mockProtoService) RefreshSource(_ context.Context, _ string) (*entities.ProtoSource, *entities.CompileOutcome, error) {
+	return m.refSource, m.refOutcome, m.refErr
+}
+
+func (m *mockProtoService) ListRevisions(_ context.Context, _ string) ([]entities.SchemaRevision, error) {
+	return m.revisions, m.revisionsErr
 }
 
 func (m *mockProtoService) SetEnabled(_ context.Context, _ string, _ bool) (*entities.ProtoSource, error) {
@@ -99,16 +106,8 @@ func (m *mockProtoService) SetWatcher(_ context.Context, _ string, _ bool) (*ent
 	return m.watcherResult, m.watcherErr
 }
 
-func (m *mockProtoService) CompileLocal(_ context.Context, _ string) (*entities.CompileResult, []entities.CompileDiagnostic, error) {
-	return m.compileResult, m.compileDiags, m.compileErr
-}
-
-func (m *mockProtoService) ValidateFiles(_ context.Context, _ *string, _, _ []string) (*entities.CompileResult, []entities.CompileDiagnostic, error) {
-	return m.validateResult, m.validateDiags, m.validateErr
-}
-
-func (m *mockProtoService) CompileFiles(_ context.Context, _ string) (*entities.CompileResult, []entities.CompileDiagnostic, error) {
-	return m.compileResult, m.compileDiags, m.compileErr
+func (m *mockProtoService) ValidateFiles(_ context.Context, _ *string, _, _ []string) (*entities.CompileOutcome, error) {
+	return m.validateResult, m.validateErr
 }
 
 // --- Tests ---
@@ -318,56 +317,94 @@ func TestHandler_ValidateLocalPath(t *testing.T) {
 	})
 }
 
-func TestHandler_ListTags(t *testing.T) {
+func TestHandler_ListRefs(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoService{tagsResult: []string{"v1.0.0", "v1.1.0"}}
-		handler := New(svc)
-
-		resp, err := handler.ListTags(t.Context(), connect.NewRequest(&sourcespb.ListTagsRequest{SourceId: "src-1"}))
+		svc := &mockProtoService{refsResult: []entities.ProtoRef{
+			{Name: "v1.0.0", Kind: entities.RefKindTag, Revision: "aaa"},
+			{Name: "main", Kind: entities.RefKindBranch, Revision: "bbb"},
+		}}
+		resp, err := New(svc).ListRefs(t.Context(), connect.NewRequest(&sourcespb.ListRefsRequest{SourceId: "src-1"}))
 		require.NoError(t, err)
-		assert.Equal(t, []string{"v1.0.0", "v1.1.0"}, resp.Msg.Tags)
+		require.Len(t, resp.Msg.Refs, 2)
+		assert.Equal(t, protopb.RefKind_REF_KIND_TAG, resp.Msg.Refs[0].Kind)
+		assert.Equal(t, protopb.RefKind_REF_KIND_BRANCH, resp.Msg.Refs[1].Kind)
+		assert.Equal(t, "bbb", resp.Msg.Refs[1].Revision)
 	})
 
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoService{tagsErr: errs.ErrProtoSourceNotFound}
-		handler := New(svc)
-
-		_, err := handler.ListTags(t.Context(), connect.NewRequest(&sourcespb.ListTagsRequest{SourceId: "x"}))
+		svc := &mockProtoService{refsErr: errs.ErrProtoSourceNotFound}
+		_, err := New(svc).ListRefs(t.Context(), connect.NewRequest(&sourcespb.ListRefsRequest{SourceId: "x"}))
 		assert.ErrorIs(t, err, errs.ErrProtoSourceNotFound)
 	})
 }
 
-func TestHandler_FetchVersion(t *testing.T) {
+func TestHandler_SelectRef(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoService{versionResult: entities.ProtoVersionNew()}
-		handler := New(svc)
-
-		resp, err := handler.FetchVersion(t.Context(), connect.NewRequest(&sourcespb.FetchVersionRequest{
-			SourceId: "src-1",
-			Tag:      "v1.0.0",
-		}))
+		src := entities.ProtoSourceNew(func(s *entities.ProtoSource) {
+			s.SelectedRef = &entities.ProtoRef{Name: "main", Kind: entities.RefKindBranch, Revision: "abc"}
+			s.ActiveSchema = &entities.SchemaRevision{Revision: "abc", Fingerprint: "fp", MessageCount: 3, Active: true}
+		})
+		svc := &mockProtoService{refSource: src, refOutcome: &entities.CompileOutcome{Valid: true, MessageTypes: 3, FileDescriptors: 2}}
+		resp, err := New(svc).SelectRef(t.Context(), connect.NewRequest(&sourcespb.SelectRefRequest{SourceId: "src-1", Ref: "main"}))
 		require.NoError(t, err)
-		require.NotNil(t, resp.Msg.Version)
+		assert.Equal(t, protopb.RefKind_REF_KIND_BRANCH, resp.Msg.Source.SelectedRef.Kind)
+		assert.Equal(t, "fp", resp.Msg.Source.ActiveSchema.Fingerprint)
+		assert.True(t, resp.Msg.Outcome.Valid)
+		assert.Equal(t, int32(2), resp.Msg.Outcome.FileDescriptors)
 	})
 
-	t.Run("NotFound", func(t *testing.T) {
+	t.Run("CompileErrorsComeBackAsOutcome", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoService{versionErr: errs.ErrProtoVersionNotFound}
-		handler := New(svc)
-
-		_, err := handler.FetchVersion(t.Context(), connect.NewRequest(&sourcespb.FetchVersionRequest{
-			SourceId: "src-1",
-			Tag:      "missing",
-		}))
-		assert.ErrorIs(t, err, errs.ErrProtoVersionNotFound)
+		svc := &mockProtoService{
+			refSource:  entities.ProtoSourceNew(),
+			refOutcome: &entities.CompileOutcome{Diagnostics: []entities.CompileDiagnostic{{Severity: entities.DiagnosticError, Message: "boom"}}},
+		}
+		resp, err := New(svc).SelectRef(t.Context(), connect.NewRequest(&sourcespb.SelectRefRequest{SourceId: "src-1", Ref: "v1"}))
+		require.NoError(t, err)
+		assert.False(t, resp.Msg.Outcome.Valid)
+		require.Len(t, resp.Msg.Outcome.Diagnostics, 1)
+		assert.Equal(t, "boom", resp.Msg.Outcome.Diagnostics[0].Message)
 	})
+
+	t.Run("RefNotFound", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockProtoService{refErr: errs.ErrProtoRefNotFound}
+		_, err := New(svc).SelectRef(t.Context(), connect.NewRequest(&sourcespb.SelectRefRequest{SourceId: "src-1", Ref: "nope"}))
+		assert.ErrorIs(t, err, errs.ErrProtoRefNotFound)
+	})
+}
+
+func TestHandler_RefreshSource(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockProtoService{refSource: entities.ProtoSourceNew(), refOutcome: &entities.CompileOutcome{Valid: true, MessageTypes: 6}}
+	resp, err := New(svc).RefreshSource(t.Context(), connect.NewRequest(&sourcespb.RefreshSourceRequest{SourceId: "src-1"}))
+	require.NoError(t, err)
+	assert.True(t, resp.Msg.Outcome.Valid)
+	assert.Equal(t, int32(6), resp.Msg.Outcome.MessageTypes)
+}
+
+func TestHandler_ListRevisions(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockProtoService{revisions: []entities.SchemaRevision{
+		{Revision: "b", Fingerprint: "fp-b", CompiledAt: 2, MessageCount: 4, Active: true},
+		{Revision: "a", Fingerprint: "fp-a", CompiledAt: 1, MessageCount: 3},
+	}}
+	resp, err := New(svc).ListRevisions(t.Context(), connect.NewRequest(&sourcespb.ListRevisionsRequest{SourceId: "src-1"}))
+	require.NoError(t, err)
+	require.Len(t, resp.Msg.Revisions, 2)
+	assert.Equal(t, "fp-b", resp.Msg.Revisions[0].Fingerprint)
+	assert.True(t, resp.Msg.Revisions[0].Active)
+	assert.Equal(t, int64(1), resp.Msg.Revisions[1].CompiledAt)
+	assert.Equal(t, int32(3), resp.Msg.Revisions[1].MessageCount)
 }
 
 func TestHandler_SetEnabled(t *testing.T) {
@@ -422,36 +459,12 @@ func TestHandler_SetWatcher(t *testing.T) {
 	})
 }
 
-func TestHandler_CompileLocal(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Success", func(t *testing.T) {
-		t.Parallel()
-		svc := &mockProtoService{compileResult: &entities.CompileResult{MessageTypes: 5, FileDescriptors: 2}}
-		handler := New(svc)
-
-		resp, err := handler.CompileLocal(t.Context(), connect.NewRequest(&sourcespb.CompileLocalRequest{SourceId: "src-1"}))
-		require.NoError(t, err)
-		assert.True(t, resp.Msg.Valid)
-		assert.Equal(t, int32(5), resp.Msg.MessageTypes)
-	})
-
-	t.Run("ServiceError", func(t *testing.T) {
-		t.Parallel()
-		svc := &mockProtoService{compileErr: errs.ErrProtoSourceNotFound}
-		handler := New(svc)
-
-		_, err := handler.CompileLocal(t.Context(), connect.NewRequest(&sourcespb.CompileLocalRequest{SourceId: "x"}))
-		assert.ErrorIs(t, err, errs.ErrProtoSourceNotFound)
-	})
-}
-
 func TestHandler_ValidateFiles(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoService{validateResult: &entities.CompileResult{MessageTypes: 4, FileDescriptors: 1}}
+		svc := &mockProtoService{validateResult: &entities.CompileOutcome{Valid: true, MessageTypes: 4, FileDescriptors: 1}}
 		handler := New(svc)
 
 		resp, err := handler.ValidateFiles(t.Context(), connect.NewRequest(&sourcespb.ValidateFilesRequest{
@@ -469,29 +482,5 @@ func TestHandler_ValidateFiles(t *testing.T) {
 
 		_, err := handler.ValidateFiles(t.Context(), connect.NewRequest(&sourcespb.ValidateFilesRequest{}))
 		assert.Error(t, err)
-	})
-}
-
-func TestHandler_CompileFiles(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Success", func(t *testing.T) {
-		t.Parallel()
-		svc := &mockProtoService{compileResult: &entities.CompileResult{MessageTypes: 6, FileDescriptors: 3}}
-		handler := New(svc)
-
-		resp, err := handler.CompileFiles(t.Context(), connect.NewRequest(&sourcespb.CompileFilesRequest{SourceId: "src-1"}))
-		require.NoError(t, err)
-		assert.True(t, resp.Msg.Valid)
-		assert.Equal(t, int32(6), resp.Msg.MessageTypes)
-	})
-
-	t.Run("ServiceError", func(t *testing.T) {
-		t.Parallel()
-		svc := &mockProtoService{compileErr: errs.ErrProtoSourceNotFound}
-		handler := New(svc)
-
-		_, err := handler.CompileFiles(t.Context(), connect.NewRequest(&sourcespb.CompileFilesRequest{SourceId: "x"}))
-		assert.ErrorIs(t, err, errs.ErrProtoSourceNotFound)
 	})
 }

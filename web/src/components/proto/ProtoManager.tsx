@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   useProtoSources,
-  useProtoSelections,
-  useDeleteProtoSelection,
   useProtoMessageEntities,
   groupMessagesByPackage,
 } from '@/contexts/proto'
@@ -46,27 +44,11 @@ export default function ProtoManager() {
   const [messagesExpanded, setMessagesExpanded] = useState(false)
 
   const { data: sources = [], isLoading: isLoadingSources, error: sourcesError, refetch: refetchSources } = useProtoSources()
-  const { data: selections = [], isLoading: isLoadingSelections } = useProtoSelections()
   const { messages, packages, isLoading: isLoadingMessages } = useProtoMessageEntities()
-
-  const deleteMutation = useDeleteProtoSelection()
 
   const messageCount = messages.length
   const packageCount = packages.length
   const groupedByPackage = groupMessagesByPackage(messages)
-
-  // Map source_id to selection for easy lookup
-  const selectionBySourceId = new Map(
-    selections.map((sel) => [sel.source_id, sel])
-  )
-
-  const handleRemoveSelection = async (selectionId: string) => {
-    try {
-      await deleteMutation.mutateAsync(selectionId)
-    } catch {
-      /* toasted by the global mutation error handler */
-    }
-  }
 
   // ProtoManager is only rendered inside the dedicated Settings page
   // (/settings/proto), so create/edit always route to full-width pages.
@@ -92,7 +74,7 @@ export default function ProtoManager() {
     })
   }
 
-  const hasSelections = selections.length > 0
+  const hasSchemas = sources.some((source) => source.activeSchema)
   const hasMessages = messageCount > 0
 
   return (
@@ -118,13 +100,7 @@ export default function ProtoManager() {
         ) : sources.length > 0 ? (
           <div className="space-y-3">
             {sources.map((source) => (
-              <ProtoSourceCard
-                key={source.id}
-                source={source}
-                selection={selectionBySourceId.get(source.id)}
-                onEdit={handleEditSource}
-                onRemoveSelection={handleRemoveSelection}
-              />
+              <ProtoSourceCard key={source.id} source={source} onEdit={handleEditSource} />
             ))}
           </div>
         ) : (
@@ -141,7 +117,7 @@ export default function ProtoManager() {
         )}
       </SettingsSection>
 
-      {(hasSelections || isLoadingSelections) && (
+      {hasSchemas && (
         <SettingsSection
           title="Available messages"
           description="Message types compiled from the active source versions"
@@ -151,7 +127,7 @@ export default function ProtoManager() {
           isOpen={messagesExpanded}
           onToggle={() => setMessagesExpanded((prev) => !prev)}
         >
-          {isLoadingMessages || isLoadingSelections ? (
+          {isLoadingMessages ? (
             <div className="flex items-center justify-center gap-2 text-sm text-content-tertiary py-6">
               <Spinner size="sm" />
               <span>Loading proto files...</span>
@@ -193,7 +169,7 @@ export default function ProtoManager() {
               size="sm"
               icon={<PackageIcon />}
               title="No messages loaded"
-              description="Select a version in a proto source above to load message types."
+              description="Compile a proto source above to load message types."
             />
           )}
         </SettingsSection>

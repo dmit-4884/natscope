@@ -18,7 +18,7 @@ import (
 // source snapshot so conflict reports can name winners and losers.
 type SchemaInput struct {
 	SourceID string
-	Tag      string
+	Revision string
 	Bytes    []byte
 }
 
@@ -76,7 +76,7 @@ func MergeWithReport(inputs []SchemaInput) (*MergeReport, error) {
 					c.Severity = entities.SeverityError
 					c.Symbol = name
 					c.Winner = existing.ref
-					c.Loser = entities.SchemaRef{SourceID: in.SourceID, Tag: in.Tag, File: name}
+					c.Loser = entities.SchemaRef{SourceID: in.SourceID, Revision: in.Revision, File: name}
 					c.Reason = fmt.Sprintf("file %q has different content in two snapshots", name)
 					c.Policy = "first-wins; reject by strict policy"
 				}))
@@ -101,7 +101,7 @@ func MergeWithReport(inputs []SchemaInput) (*MergeReport, error) {
 					c.Severity = severity
 					c.Symbol = first
 					c.Winner = prev.ref
-					c.Loser = entities.SchemaRef{SourceID: in.SourceID, Tag: in.Tag, File: name}
+					c.Loser = entities.SchemaRef{SourceID: in.SourceID, Revision: in.Revision, File: name}
 					if kind == entities.SameSymbolSameShape {
 						c.Reason = fmt.Sprintf("symbol %q duplicated with identical shape", first)
 						c.Policy = "first-wins; allowed (info only)"
@@ -113,7 +113,7 @@ func MergeWithReport(inputs []SchemaInput) (*MergeReport, error) {
 				continue
 			}
 
-			ref := entities.SchemaRef{SourceID: in.SourceID, Tag: in.Tag, File: name}
+			ref := entities.SchemaRef{SourceID: in.SourceID, Revision: in.Revision, File: name}
 			registerFileSymbols(file, typeOwner, ref, fileBytes)
 
 			seen[name] = seenFile{ref: ref, content: fileBytes}

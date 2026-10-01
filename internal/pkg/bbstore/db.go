@@ -98,6 +98,18 @@ func (db *DB) update(ctx context.Context, fn func(tx *bbolt.Tx) error) error {
 	return db.b.Update(fn)
 }
 
+// DropBuckets deletes the named buckets; missing ones are skipped.
+func (db *DB) DropBuckets(ctx context.Context, names ...string) error {
+	return db.update(ctx, func(tx *bbolt.Tx) error {
+		for _, name := range names {
+			if err := tx.DeleteBucket([]byte(name)); err != nil && !errors.Is(err, berrors.ErrBucketNotFound) {
+				return fmt.Errorf("drop bucket %s: %w", name, err)
+			}
+		}
+		return nil
+	})
+}
+
 // GetRaw returns a copy of the bytes stored for key in bucket, or nil if
 // either is absent; for migration tooling/diagnostics, stores never use it.
 func (db *DB) GetRaw(ctx context.Context, bucket, key string) ([]byte, error) {

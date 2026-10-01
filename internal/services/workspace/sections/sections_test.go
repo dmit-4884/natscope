@@ -4,6 +4,7 @@
 package sections
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -14,10 +15,12 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore/bbstoretest"
 
 	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	mappingssvc "github.com/dmit-4884/natscope/internal/services/mappings"
+	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	mappingsService "github.com/dmit-4884/natscope/internal/services/mappings/mappings"
 	settingsService "github.com/dmit-4884/natscope/internal/services/settings/settings"
 	templatesService "github.com/dmit-4884/natscope/internal/services/templates/templates"
@@ -87,6 +90,59 @@ func TestProtoSourcesExport_HasNoToken(t *testing.T) {
 	assertNoSecrets(t, payload, "ghp_supersecret")
 	assert.Contains(t, string(payload), "git-src")
 	assert.Contains(t, string(payload), "acme/proto.git")
+}
+
+type fakeSources struct {
+	protosvc.SourceManager
+	created  []*entities.ProtoSourceCreate
+	selected map[string]string
+	failRef  string
+}
+
+func (f *fakeSources) ListSources(context.Context, *entities.ProtoSourcesList) (*entities.List[entities.ProtoSources], error) {
+	return &entities.List[entities.ProtoSources]{}, nil
+}
+
+func (f *fakeSources) CreateSource(_ context.Context, in *entities.ProtoSourceCreate) (*entities.ProtoSource, error) {
+	f.created = append(f.created, in)
+	return entities.ProtoSourceNew(func(s *entities.ProtoSource) { s.Name = in.Name }), nil
+}
+
+func (f *fakeSources) SelectRef(_ context.Context, sourceID, ref string) (*entities.ProtoSource, *entities.CompileOutcome, error) {
+	if ref == f.failRef {
+		return nil, nil, errs.ErrProtoRefNotFound
+	}
+	f.selected[sourceID] = ref
+	return nil, &entities.CompileOutcome{Valid: true}, nil
+}
+
+func TestProtoSourcesSection_RoundTripsSelectedRef(t *testing.T) {
+	t.Parallel()
+	src := &entities.ProtoSource{
+		Name: "git-src", SourceType: entities.SourceTypeGit, Repository: "https://github.com/acme/proto.git",
+		SelectedRef: &entities.ProtoRef{Name: "main", Kind: entities.RefKindBranch, Revision: "abc"},
+	}
+	broken := &entities.ProtoSource{
+		Name: "broken", SourceType: entities.SourceTypeGit, Repository: "https://github.com/acme/other.git",
+		SelectedRef: &entities.ProtoRef{Name: "gone", Kind: entities.RefKindTag, Revision: "def"},
+	}
+	payload, err := json.Marshal(newItemsPayload([]protoSourceItem{redactProtoSource(src), redactProtoSource(broken)}))
+	require.NoError(t, err)
+	assert.Contains(t, string(payload), `"ref":"main"`)
+	assert.NotContains(t, string(payload), "abc", "revisions are not exported")
+
+	fake := &fakeSources{selected: map[string]string{}, failRef: "gone"}
+	res, err := NewProtoSourcesSection(fake).Import(t.Context(), payload, entities.WorkspaceStrategyMerge)
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), res.Created)
+	require.Len(t, fake.created, 2)
+	var picked []string
+	for _, ref := range fake.selected {
+		picked = append(picked, ref)
+	}
+	assert.Equal(t, []string{"main"}, picked)
+	require.NotEmpty(t, res.Warnings)
+	assert.Contains(t, strings.Join(res.Warnings, "\n"), `source "broken": ref "gone" not selected`)
 }
 
 // --- mappings section roundtrip (real SQLite-backed service) ---

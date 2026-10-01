@@ -7,8 +7,8 @@ export interface DecodeRequest {
   data_base64: string
   message_type: string
   source_id: string
-  /** Optional. Empty / absent means "use active selection of the source". */
-  source_tag?: string
+  /** Empty uses the source's active schema. */
+  schema_fingerprint?: string
 }
 
 export interface DecodeResponse {
@@ -28,7 +28,7 @@ export async function decodeMessage(request: DecodeRequest): Promise<DecodeRespo
       data: bytes,
       messageType: request.message_type,
       sourceId: request.source_id,
-      tag: request.source_tag || undefined,
+      fingerprint: request.schema_fingerprint || undefined,
     })
 
     const result = response.result

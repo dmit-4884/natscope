@@ -121,9 +121,6 @@ func (s *Storage) BulkSave(
 			if prev, ok := byKey[key]; ok {
 				d.ID = prev.ID
 				d.CreatedAt = prev.CreatedAt
-				if d.PinnedTag == nil {
-					d.PinnedTag = prev.PinnedTag
-				}
 				if d.PinnedFingerprint == nil {
 					d.PinnedFingerprint = prev.PinnedFingerprint
 				}

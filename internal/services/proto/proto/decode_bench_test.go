@@ -82,7 +82,7 @@ func BenchmarkProtoUnmarshalOnly_1_6MB(b *testing.B) {
 
 	b.SetBytes(int64(len(data)))
 	for b.Loop() {
-		_ = schema.UnmarshalBinary(data, dynamicpb.NewMessage(md))
+		_ = schema.ParseBinary(data, dynamicpb.NewMessage(md))
 	}
 }
 
@@ -90,12 +90,12 @@ func BenchmarkProtoJSONMarshalOnly_1_6MB(b *testing.B) {
 	schema, md := loadBenchSchema(b)
 	data := buildPayloadBytes(b, md, 1600*1024)
 	msg := dynamicpb.NewMessage(md)
-	if err := schema.UnmarshalBinary(data, msg); err != nil {
+	if err := schema.ParseBinary(data, msg); err != nil {
 		b.Fatal(err)
 	}
 
 	b.SetBytes(int64(len(data)))
 	for b.Loop() {
-		_, _ = schema.MarshalJSON(msg)
+		_, _ = schema.RenderJSON(msg)
 	}
 }

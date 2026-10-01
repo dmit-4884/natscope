@@ -64,7 +64,7 @@ func (s *Service) computeOneHealth(ctx context.Context, id string) (entities.Sub
 		switch {
 		case errors.Is(err, errs.ErrMappingSelectionMissing):
 			res.Health = entities.MappingHealthSelectionMissing
-			res.Detail = fmt.Sprintf("source %q has no selected version", src.Name)
+			res.Detail = fmt.Sprintf("source %q has no selected git ref", src.Name)
 		case errors.Is(err, errs.ErrMappingSourceDisabled):
 			res.Health = entities.MappingHealthSourceDisabled
 			res.Detail = fmt.Sprintf("source %q is disabled", src.Name)
@@ -90,8 +90,6 @@ func mappingVersionLabel(m *entities.SubjectMapping) string {
 	switch {
 	case m.PinnedFingerprint != nil && *m.PinnedFingerprint != "":
 		return fmt.Sprintf("pinned fingerprint %q", *m.PinnedFingerprint)
-	case m.PinnedTag != nil && *m.PinnedTag != "":
-		return fmt.Sprintf("pinned tag %q", *m.PinnedTag)
 	default:
 		return "the active version"
 	}

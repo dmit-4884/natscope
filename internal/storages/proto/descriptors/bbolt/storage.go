@@ -1,15 +1,13 @@
 // Copyright 2026 The Natscope Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package bbolt is the bbolt (doc-model) implementation of proto-descriptor
-// storage. The FileDescriptorSet and message types are nested JSON; a
-// fingerprint (sha256 of the set) enables pinned-snapshot lookup.
+// Package bbolt is the bbolt implementation of compiled proto schema storage.
 package bbolt
 
 import (
 	"context"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
+	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -18,16 +16,15 @@ import (
 	storage "github.com/dmit-4884/natscope/internal/storages/proto/descriptors"
 )
 
-// Storage is the doc-model bbolt proto-descriptor store.
+// Storage is the bbolt proto schema store.
 type Storage struct {
 	store *bbstore.Store[descriptorDoc, *descriptorDoc]
 }
 
-// New opens the proto_descriptors bucket (creating it if needed) and returns the
-// store.
+// New opens the proto_schemas bucket.
 func New(ctx context.Context, db *bbstore.DB) (*Storage, error) {
 	store, err := bbstore.Open[descriptorDoc, *descriptorDoc](ctx, db, bbstore.Spec{
-		Bucket:   "proto_descriptors",
+		Bucket:   "proto_schemas",
 		NotFound: errs.ErrProtoDescriptorNotFound,
 		Indexes: []bbstore.Index{
 			{Path: "sourceId"},
@@ -40,11 +37,10 @@ func New(ctx context.Context, db *bbstore.DB) (*Storage, error) {
 	return &Storage{store: store}, nil
 }
 
-// Save replaces any descriptor for the same (source, tag), so the new id and
-// message types fully supersede the prior snapshot.
+// Save stores a schema, replacing the one for the same source and revision.
 func (s *Storage) Save(ctx context.Context, in *entities.ProtoDescriptor) error {
 	return s.store.WithTransaction(ctx, func(ctx context.Context) error {
-		existing, err := s.docBySourceTag(ctx, in.SourceID, in.Tag)
+		existing, err := s.find(ctx, in.SourceID, func(d *descriptorDoc) bool { return d.Revision == in.Revision })
 		if err != nil {
 			return err
 		}
@@ -53,20 +49,39 @@ func (s *Storage) Save(ctx context.Context, in *entities.ProtoDescriptor) error 
 				return err
 			}
 		}
-		return s.store.Save(ctx, toDoc(in))
+		return s.store.Save(ctx, converter.Convert(in, &descriptorDoc{}, bbstore.Opts()...))
 	})
 }
 
-func (s *Storage) GetById(ctx context.Context, id string) (*entities.ProtoDescriptor, error) {
-	d, err := s.store.Get(ctx, id)
+// GetBySourceRevision returns errs.ErrProtoDescriptorNotFound when absent.
+func (s *Storage) GetBySourceRevision(ctx context.Context, sourceID, revision string) (*entities.ProtoDescriptor, error) {
+	return s.get(ctx, sourceID, func(d *descriptorDoc) bool { return d.Revision == revision })
+}
+
+// GetByFingerprint returns errs.ErrProtoDescriptorNotFound when absent.
+func (s *Storage) GetByFingerprint(ctx context.Context, sourceID, fingerprint string) (*entities.ProtoDescriptor, error) {
+	if fingerprint == "" {
+		return nil, errs.ErrProtoDescriptorNotFound
+	}
+	return s.get(ctx, sourceID, func(d *descriptorDoc) bool { return d.Fingerprint == fingerprint })
+}
+
+// ListBySource returns every stored schema of a source.
+func (s *Storage) ListBySource(ctx context.Context, sourceID string) (entities.ProtoDescriptors, error) {
+	docs, err := s.store.ListBy(ctx, "$.sourceId", sourceID)
 	if err != nil {
 		return nil, err
 	}
-	return bbstore.ToEntity[entities.ProtoDescriptor](d), nil
+	return bbstore.ToEntities[entities.ProtoDescriptor](docs), nil
 }
 
-func (s *Storage) GetBySourceTag(ctx context.Context, sourceID, tag string) (*entities.ProtoDescriptor, error) {
-	d, err := s.docBySourceTag(ctx, sourceID, tag)
+// DeleteBySource deletes every stored schema of a source.
+func (s *Storage) DeleteBySource(ctx context.Context, sourceID string) (int64, error) {
+	return s.store.DeleteBy(ctx, "$.sourceId", sourceID)
+}
+
+func (s *Storage) get(ctx context.Context, sourceID string, match func(*descriptorDoc) bool) (*entities.ProtoDescriptor, error) {
+	d, err := s.find(ctx, sourceID, match)
 	if err != nil {
 		return nil, err
 	}
@@ -76,75 +91,17 @@ func (s *Storage) GetBySourceTag(ctx context.Context, sourceID, tag string) (*en
 	return bbstore.ToEntity[entities.ProtoDescriptor](d), nil
 }
 
-func (s *Storage) FindByFingerprint(ctx context.Context, fingerprint string) (*entities.ProtoDescriptor, error) {
-	if fingerprint == "" {
-		return nil, errs.ErrProtoDescriptorNotFound
-	}
-	d, err := s.store.GetBy(ctx, "$.fingerprint", fingerprint)
-	if err != nil {
-		return nil, err
-	}
-	return bbstore.ToEntity[entities.ProtoDescriptor](d), nil
-}
-
-func (s *Storage) GetAll(ctx context.Context) (entities.ProtoDescriptors, error) {
-	docs, err := s.store.ListAll(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return bbstore.ToEntities[entities.ProtoDescriptor](docs), nil
-}
-
-func (s *Storage) List(
-	ctx context.Context,
-	in *entities.ProtoDescriptorsList,
-) (*entities.List[entities.ProtoDescriptors], error) {
-	var filters []bbstore.Filter
-	if in.SourceID != nil {
-		filters = append(filters, bbstore.Filter{Path: "$.sourceId", Val: *in.SourceID})
-	}
-	if in.Tag != nil {
-		filters = append(filters, bbstore.Filter{Path: "$.tag", Val: *in.Tag})
-	}
-	docs, next, total, err := s.store.ListFiltered(ctx, filters, in.Cursor, in.GetLimit(), in.IncludeTotalCount)
-	if err != nil {
-		return nil, err
-	}
-	out := &entities.List[entities.ProtoDescriptors]{Items: bbstore.ToEntities[entities.ProtoDescriptor](docs), Total: total}
-	if next != "" {
-		out.NextCursor = ptr.Wrap(next)
-	}
-	return out, nil
-}
-
-func (s *Storage) Update(ctx context.Context, in *entities.ProtoDescriptor) error {
-	return s.store.Update(ctx, toDoc(in))
-}
-
-func (s *Storage) Delete(ctx context.Context, id string) error {
-	return s.store.Delete(ctx, id)
-}
-
-func (s *Storage) DeleteBySource(ctx context.Context, sourceID string) (int64, error) {
-	return s.store.DeleteBy(ctx, "$.sourceId", sourceID)
-}
-
-func (s *Storage) Exists(ctx context.Context, id string) (bool, error) {
-	return s.store.Exists(ctx, id)
-}
-
-// docBySourceTag finds the descriptor for (sourceId, tag), or nil.
-func (s *Storage) docBySourceTag(ctx context.Context, sourceID, tag string) (*descriptorDoc, error) {
+func (s *Storage) find(ctx context.Context, sourceID string, match func(*descriptorDoc) bool) (*descriptorDoc, error) {
 	docs, err := s.store.ListBy(ctx, "$.sourceId", sourceID)
 	if err != nil {
 		return nil, err
 	}
 	for _, d := range docs {
-		if d.Tag == tag {
+		if match(d) {
 			return d, nil
 		}
 	}
-	return nil, nil //nolint:nilnil // (nil, nil) is the documented "not found" result
+	return nil, nil //nolint:nilnil // nil, nil means not found
 }
 
 var _ storage.Storage = (*Storage)(nil)

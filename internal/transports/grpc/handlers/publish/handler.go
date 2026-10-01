@@ -96,8 +96,8 @@ func (h *Handler) EncodeMessage(
 		SourceID:    in.SourceId,
 		MessageType: in.MessageType,
 	}
-	if in.SourceTag != nil {
-		cr.Tag = *in.SourceTag
+	if in.SchemaFingerprint != nil {
+		cr.Fingerprint = *in.SchemaFingerprint
 	}
 	result, err := h.protoService.Encode(ctx, cr)
 	if err != nil {
@@ -130,8 +130,8 @@ func (h *Handler) ValidateJson(
 		SourceID:    in.SourceId,
 		MessageType: in.MessageType,
 	}
-	if in.SourceTag != nil {
-		cr.Tag = *in.SourceTag
+	if in.SchemaFingerprint != nil {
+		cr.Fingerprint = *in.SchemaFingerprint
 	}
 	result, err := h.protoService.ValidateJSON(ctx, cr)
 	if err != nil {

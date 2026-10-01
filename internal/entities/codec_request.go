@@ -11,9 +11,8 @@ type CodecRequest struct {
 	JSON []byte
 	// SourceID identifies the proto source whose snapshot to use. Required.
 	SourceID string
-	// Tag selects a version; empty falls back to the source's active selection (or
-	// LocalTag for local sources).
-	Tag string
+	// Fingerprint picks a stored schema; empty uses the source's active schema.
+	Fingerprint string
 	// MessageType is the fully-qualified name of the protobuf message type.
 	MessageType string
 }

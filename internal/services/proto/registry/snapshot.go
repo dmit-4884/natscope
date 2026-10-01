@@ -9,28 +9,16 @@ package registry
 import (
 	"time"
 
-	"github.com/altessa-s/go-atlas/core/encoding/hash"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 )
 
-// Snapshot is an immutable parsed view of a single ProtoDescriptor. Equal
-// Fingerprint means interchangeable schemas, surviving no-op recompiles.
+// Snapshot is an immutable parsed view of one stored schema.
 type Snapshot struct {
 	SourceID    string
-	Tag         string
+	Revision    string
 	Descriptor  *entities.ProtoDescriptor
 	Schema      *protoutils.Schema
 	ParsedAt    time.Time
 	Fingerprint string
-}
-
-// fingerprint computes a content hash for a serialized FileDescriptorSet; empty
-// input yields "".
-func fingerprint(data []byte) string {
-	if len(data) == 0 {
-		return ""
-	}
-	return hash.SHA256HexBytes(data)
 }

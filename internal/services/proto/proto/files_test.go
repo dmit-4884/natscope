@@ -39,7 +39,7 @@ message Hello { string name = 1; }
 	require.Empty(t, diags)
 	require.Len(t, entries, 1)
 
-	fds, compileDiags, err := compileFiles(t.Context(), entries, nil)
+	fds, compileDiags, err := compileFileEntries(t.Context(), entries, nil)
 	require.NoError(t, err)
 	assert.Empty(t, compileDiags)
 	require.Len(t, fds, 1)
@@ -58,7 +58,7 @@ message Broken {
 
 	entries, diags := protoutils.ReadFilesFromPaths([]string{p})
 	require.Empty(t, diags)
-	fds, compileDiags, err := compileFiles(t.Context(), entries, nil)
+	fds, compileDiags, err := compileFileEntries(t.Context(), entries, nil)
 	require.NoError(t, err)
 	assert.Empty(t, fds)
 	require.NotEmpty(t, compileDiags, "syntax error must surface as diagnostic")
@@ -79,7 +79,7 @@ import "google/protobuf/timestamp.proto";
 message WithTs { google.protobuf.Timestamp ts = 1; }
 `)
 	entries, _ := protoutils.ReadFilesFromPaths([]string{p})
-	fds, diags, err := compileFiles(t.Context(), entries, nil)
+	fds, diags, err := compileFileEntries(t.Context(), entries, nil)
 	require.NoError(t, err)
 	assert.Empty(t, fds, "must not compile without explicit timestamp.proto")
 
@@ -108,7 +108,7 @@ message NeedsFake { string x = 1; }
 	entries, preDiags := protoutils.ReadFilesFromPaths([]string{p})
 	require.Empty(t, preDiags)
 
-	fds, compileDiags, err := compileFiles(t.Context(), entries, nil)
+	fds, compileDiags, err := compileFileEntries(t.Context(), entries, nil)
 	require.NoError(t, err)
 	assert.Empty(t, fds)
 
@@ -146,12 +146,12 @@ message Common { string s = 1; }
 	require.Empty(t, diags)
 
 	// Without include dirs → fails.
-	_, withoutDiags, err := compileFiles(t.Context(), entries, nil)
+	_, withoutDiags, err := compileFileEntries(t.Context(), entries, nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, withoutDiags, "should fail without include dirs")
 
 	// With the right include dir → succeeds.
-	fds, withDiags, err := compileFiles(t.Context(), entries, []string{filepath.Join(tmp, "deps")})
+	fds, withDiags, err := compileFileEntries(t.Context(), entries, []string{filepath.Join(tmp, "deps")})
 	require.NoError(t, err)
 	assert.Empty(t, withDiags)
 	assert.NotEmpty(t, fds, "should compile with include dirs satisfying the import")
@@ -172,7 +172,7 @@ message M {}
 	entries, diags := protoutils.ReadFilesFromPaths([]string{p})
 	require.Empty(t, diags)
 
-	fds, compileDiags, err := compileFiles(t.Context(), entries, []string{dir})
+	fds, compileDiags, err := compileFileEntries(t.Context(), entries, []string{dir})
 	require.NoError(t, err)
 	assert.Empty(t, fds)
 	require.NotEmpty(t, compileDiags)
@@ -197,7 +197,7 @@ message M {}
 	entries, diags := protoutils.ReadFilesFromPaths([]string{p})
 	require.Empty(t, diags)
 
-	fds, compileDiags, err := compileFiles(t.Context(), entries, nil)
+	fds, compileDiags, err := compileFileEntries(t.Context(), entries, nil)
 	require.NoError(t, err)
 	assert.Empty(t, fds)
 	require.NotEmpty(t, compileDiags)
@@ -226,7 +226,7 @@ message M {}
 	entries, diags := protoutils.ReadFilesFromPaths([]string{p})
 	require.Empty(t, diags)
 
-	fds, compileDiags, err := compileFiles(t.Context(), entries, []string{dir})
+	fds, compileDiags, err := compileFileEntries(t.Context(), entries, []string{dir})
 	require.NoError(t, err)
 	assert.Empty(t, fds)
 	for _, d := range compileDiags {
@@ -245,21 +245,21 @@ message M { int32 x = 1; }
 `)
 
 	s := &Service{}
-	result, diags, err := s.ValidateFiles(t.Context(), nil, []string{p}, nil)
+	result, err := s.ValidateFiles(t.Context(), nil, []string{p}, nil)
 	require.NoError(t, err)
-	assert.Empty(t, diags)
-	require.NotNil(t, result)
+	assert.Empty(t, result.Diagnostics)
+	assert.True(t, result.Valid)
 	assert.Equal(t, 1, result.FileDescriptors)
 	assert.Equal(t, 1, result.MessageTypes)
 }
 
 func TestService_ValidateFiles_Inline_PreCompileError(t *testing.T) {
 	s := &Service{}
-	result, diags, err := s.ValidateFiles(t.Context(), nil, []string{"/nonexistent/foo.proto"}, nil)
+	result, err := s.ValidateFiles(t.Context(), nil, []string{"/nonexistent/foo.proto"}, nil)
 	require.NoError(t, err)
-	assert.Nil(t, result)
-	require.NotEmpty(t, diags)
-	assert.Equal(t, entities.DiagnosticError, diags[0].Severity)
+	assert.False(t, result.Valid)
+	require.NotEmpty(t, result.Diagnostics)
+	assert.Equal(t, entities.DiagnosticError, result.Diagnostics[0].Severity)
 }
 
 // --- Integration with the user's real proto repo. Skipped if not present. ---
@@ -277,12 +277,12 @@ func TestService_ValidateFiles_RealRepo(t *testing.T) {
 	s := &Service{}
 	// Either outcome (with or without include dirs) is acceptable; this just
 	// confirms the diagnostics path returns useful information.
-	_, diagsNoDeps, err := s.ValidateFiles(t.Context(), nil, []string{candidate}, nil)
+	noDeps, err := s.ValidateFiles(t.Context(), nil, []string{candidate}, nil)
 	require.NoError(t, err)
-	t.Logf("without include dirs: %d diagnostics", len(diagsNoDeps))
+	t.Logf("without include dirs: %d diagnostics", len(noDeps.Diagnostics))
 
 	includeDirs := []string{repo, filepath.Join(repo, "third_party")}
-	res, diagsWithDeps, err := s.ValidateFiles(t.Context(), nil, []string{candidate}, includeDirs)
+	withDeps, err := s.ValidateFiles(t.Context(), nil, []string{candidate}, includeDirs)
 	require.NoError(t, err)
-	t.Logf("with include dirs: %d diagnostics, result=%v", len(diagsWithDeps), res)
+	t.Logf("with include dirs: %d diagnostics, valid=%v", len(withDeps.Diagnostics), withDeps.Valid)
 }

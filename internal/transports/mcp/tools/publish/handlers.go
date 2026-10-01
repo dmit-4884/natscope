@@ -118,7 +118,7 @@ func (t *Toolset) request(ctx context.Context, in publishInput) (*entities.Publi
 		req.MessageType, req.SourceID = &info.FullName, &info.SourceID
 	case !in.Raw:
 		if m := t.mappings.Resolver(ctx).Resolve(subject); m != nil {
-			req.MessageType, req.SourceID, req.SourceTag = &m.MessageType, &m.SourceID, m.PinnedTag
+			req.MessageType, req.SourceID, req.SchemaFingerprint = &m.MessageType, &m.SourceID, m.PinnedFingerprint
 		}
 	}
 	if req.MessageType != nil {

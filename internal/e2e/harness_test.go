@@ -41,7 +41,6 @@ import (
 	streamsconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/streams/grpc_nats_streamsconnect"
 	codecconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/codec/grpc_proto_codecconnect"
 	registryconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/registry/grpc_proto_registryconnect"
-	selectionsconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/selections/grpc_proto_selectionsconnect"
 	sourcesconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/sources/grpc_proto_sourcesconnect"
 	settingsconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/settings/v1/settings/grpc_settingsconnect"
 	templatesconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/templates/v1/templates/grpc_templatesconnect"
@@ -71,7 +70,6 @@ type e2eEnv struct {
 	registry    registryconnect.RegistryServiceClient
 	codec       codecconnect.CodecServiceClient
 	sources     sourcesconnect.SourcesServiceClient
-	selections  selectionsconnect.SelectionsServiceClient
 	workspace   workspaceconnect.WorkspaceServiceClient
 }
 
@@ -165,7 +163,6 @@ func setupE2EWith(t *testing.T, configure func(*appconfig.Config)) *e2eEnv {
 		registry:    registryconnect.NewRegistryServiceClient(hc, baseURL),
 		codec:       codecconnect.NewCodecServiceClient(hc, baseURL),
 		sources:     sourcesconnect.NewSourcesServiceClient(hc, baseURL),
-		selections:  selectionsconnect.NewSelectionsServiceClient(hc, baseURL),
 		workspace:   workspaceconnect.NewWorkspaceServiceClient(hc, baseURL),
 	}
 }

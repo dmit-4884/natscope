@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/bufbuild/protocompile"
 	"github.com/bufbuild/protocompile/linker"
@@ -26,17 +25,11 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
-
-	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
-// FilesTag is the synthetic descriptor tag for Files-type sources (one
-// persisted descriptor per source).
-const FilesTag = "manual"
-
-// compileFiles runs protocompile against the file map plus include dirs.
+// compileFileEntries runs protocompile against the file map plus include dirs.
 // Compile errors return nil descriptors; third return is for real failures.
-func compileFiles(
+func compileFileEntries(
 	ctx context.Context,
 	files []entities.ProtoFileEntry,
 	includeDirs []string,
@@ -121,124 +114,87 @@ func (s *Service) ValidateFiles(
 	sourceID *string,
 	files []string,
 	includeDirs []string,
-) (*entities.CompileResult, []entities.CompileDiagnostic, error) {
+) (*entities.CompileOutcome, error) {
 	if sourceID != nil && *sourceID != "" {
 		src, err := s.sourcesStorage.Get(ctx, *sourceID, false)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if src.SourceType != entities.SourceTypeFiles {
-			return nil, nil, fmt.Errorf("%w: validate files is only available for files-type sources", errs.ErrInvalidRequest)
+			return nil, fmt.Errorf("%w: validate files is only available for files-type sources", errs.ErrInvalidRequest)
 		}
 		files = src.Files
 		includeDirs = src.IncludeDirs
 	}
 
-	entries, preDiag := protoutils.ReadFilesFromPaths(files)
-	dirDiag := protoutils.ValidateIncludeDirs(includeDirs)
-
-	allDiag := append([]entities.CompileDiagnostic{}, preDiag...)
-	allDiag = append(allDiag, dirDiag...)
-
-	// Skip the compiler if pre-compile diagnostics already disqualify the input.
-	if len(entries) == 0 || slices.Any(allDiag, func(d entities.CompileDiagnostic) bool {
-		return d.Severity == entities.DiagnosticError
-	}) {
-		return nil, allDiag, nil
-	}
-
-	fds, compileDiag, err := compileFiles(ctx, entries, includeDirs)
+	fds, diags, err := readAndCompileFiles(ctx, files, includeDirs)
 	if err != nil {
-		return nil, allDiag, err
+		return nil, err
 	}
-	allDiag = append(allDiag, compileDiag...)
-
 	if len(fds) == 0 {
-		return nil, allDiag, nil
+		return &entities.CompileOutcome{Diagnostics: diags}, nil
 	}
-
-	return &entities.CompileResult{
+	return &entities.CompileOutcome{
+		Valid:           true,
 		MessageTypes:    len(s.extractTypes(fds)),
 		FileDescriptors: len(fds),
-	}, allDiag, nil
+		Diagnostics:     diags,
+	}, nil
 }
 
-// CompileFiles compiles a stored Files-type source and persists the descriptor
-// under FilesTag. On error nothing persists; success still returns warnings.
-func (s *Service) CompileFiles(
-	ctx context.Context,
-	sourceID string,
-) (*entities.CompileResult, []entities.CompileDiagnostic, error) {
-	unlock := s.compileLocks.lock(sourceID)
+func (s *Service) compileFiles(ctx context.Context, src *entities.ProtoSource) (*entities.CompileOutcome, error) {
+	unlock := s.compileLocks.lock(src.Id)
 	defer unlock()
 
-	src, err := s.sourcesStorage.Get(ctx, sourceID, false)
+	fds, diags, err := readAndCompileFiles(ctx, src.Files, src.IncludeDirs)
 	if err != nil {
-		return nil, nil, err
+		s.recordCompile(ctx, src.Id, false, err.Error(), 0, len(src.Files), diags, nil, "", nil)
+		return nil, err
 	}
-	if src.SourceType != entities.SourceTypeFiles {
-		return nil, nil, fmt.Errorf("%w: compile files is only available for files-type sources", errs.ErrInvalidRequest)
-	}
-
-	entries, preDiag := protoutils.ReadFilesFromPaths(src.Files)
-	dirDiag := protoutils.ValidateIncludeDirs(src.IncludeDirs)
-	allDiag := append([]entities.CompileDiagnostic{}, preDiag...)
-	allDiag = append(allDiag, dirDiag...)
-
-	if len(entries) == 0 || slices.Any(allDiag, func(d entities.CompileDiagnostic) bool {
-		return d.Severity == entities.DiagnosticError
-	}) {
-		s.recordCompile(ctx, sourceID, false, summarizeDiagnostics(allDiag), 0, len(entries), allDiag, nil, "")
-		return nil, allDiag, nil
-	}
-
-	fds, compileDiag, err := compileFiles(ctx, entries, src.IncludeDirs)
-	if err != nil {
-		s.recordCompile(ctx, sourceID, false, err.Error(), 0, len(entries), allDiag, nil, "")
-		return nil, allDiag, err
-	}
-	allDiag = append(allDiag, compileDiag...)
-
 	if len(fds) == 0 {
-		s.recordCompile(ctx, sourceID, false, summarizeDiagnostics(allDiag), 0, len(entries), allDiag, nil, "")
-		return nil, allDiag, nil
+		s.recordCompile(ctx, src.Id, false, summarizeDiagnostics(diags), 0, len(src.Files), diags, nil, "", nil)
+		return &entities.CompileOutcome{Diagnostics: diags}, nil
 	}
 
-	descSet, err := s.serialize(fds)
+	d, err := s.storeSchema(ctx, src.Id, FilesRevision, fds)
 	if err != nil {
-		s.recordCompile(ctx, sourceID, false, err.Error(), 0, len(fds), allDiag, nil, "")
-		return nil, allDiag, coreerrs.WrapOperation(err, "serialize descriptors")
+		s.recordCompile(ctx, src.Id, false, err.Error(), 0, len(fds), diags, nil, "", nil)
+		return nil, err
 	}
-
-	messageTypes := s.extractTypes(fds)
-	s.recordCompile(ctx, sourceID, true, "", len(messageTypes), len(fds), allDiag, nil, "")
-
-	descriptor := entities.ProtoDescriptorNew(func(d *entities.ProtoDescriptor) {
-		d.SourceID = sourceID
-		d.Tag = FilesTag
-		d.DescriptorSet = descSet
-		d.MessageTypes = messageTypes
-		d.CompiledAt = time.Now().UnixMilli()
-	})
-	if err := s.descriptorsStorage.Save(ctx, descriptor); err != nil {
-		return nil, allDiag, coreerrs.WrapOperation(err, "save descriptor")
-	}
-
-	s.registryCache.Invalidate(sourceID, FilesTag)
+	s.recordCompile(ctx, src.Id, true, "", len(d.MessageTypes), len(fds), diags, nil, "", schemaRevision(d, true))
 
 	s.logger.InfoContext(ctx, "compiled files proto source",
-		slog.String("source_id", sourceID),
-		slog.Int("files", len(entries)),
+		slog.String("source_id", src.Id),
+		slog.Int("files", len(src.Files)),
 		slog.Int("include_dirs", len(src.IncludeDirs)),
-		slog.Int("message_types", len(messageTypes)),
+		slog.Int("message_types", len(d.MessageTypes)),
 		slog.Int("file_descriptors", len(fds)))
 
 	s.notifyReload(ctx)
 
-	return &entities.CompileResult{
-		MessageTypes:    len(messageTypes),
+	return &entities.CompileOutcome{
+		Valid:           true,
+		MessageTypes:    len(d.MessageTypes),
 		FileDescriptors: len(fds),
-	}, allDiag, nil
+		Diagnostics:     diags,
+	}, nil
+}
+
+func readAndCompileFiles(
+	ctx context.Context,
+	files, includeDirs []string,
+) ([]protoreflect.FileDescriptor, []entities.CompileDiagnostic, error) {
+	entries, diags := protoutils.ReadFilesFromPaths(files)
+	diags = append(diags, protoutils.ValidateIncludeDirs(includeDirs)...)
+	if len(entries) == 0 || slices.Any(diags, func(d entities.CompileDiagnostic) bool {
+		return d.Severity == entities.DiagnosticError
+	}) {
+		return nil, diags, nil
+	}
+
+	fds, compileDiag, err := compileFileEntries(ctx, entries, includeDirs)
+	diags = append(diags, compileDiag...)
+	return fds, diags, err
 }
 
 // safeDiskResolver confines Include Directories imports to relative ".proto" paths under the configured

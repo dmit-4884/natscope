@@ -98,12 +98,9 @@ func (d *liveDecoder) snapshotFor(ctx context.Context, m *entities.SubjectMappin
 // mappingSnapshotKey keys the snapshot cache by source plus pin, so differently
 // pinned mappings on one source don't collide.
 func mappingSnapshotKey(m *entities.SubjectMapping) string {
-	var pinTag, pinFP string
-	if m.PinnedTag != nil {
-		pinTag = *m.PinnedTag
-	}
+	var pinFP string
 	if m.PinnedFingerprint != nil {
 		pinFP = *m.PinnedFingerprint
 	}
-	return m.SourceID + "\x00" + pinTag + "\x00" + pinFP
+	return m.SourceID + "\x00" + pinFP
 }

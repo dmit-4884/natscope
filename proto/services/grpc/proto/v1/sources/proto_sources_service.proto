@@ -5,7 +5,6 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "types/proto/proto_source.proto";
-import "types/proto/proto_version.proto";
 
 // Provides operations for managing protobuf file sources (Git repos, local dirs).
 service SourcesService {
@@ -30,11 +29,17 @@ service SourcesService {
   // Validates that a local directory path exists and contains .proto files.
   rpc ValidateLocalPath(ValidateLocalPathRequest) returns (ValidateLocalPathResponse) {}
 
-  // Lists all available Git tags for the specified protobuf source repository.
-  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {}
+  // Lists tags and branches of a Git source.
+  rpc ListRefs(ListRefsRequest) returns (ListRefsResponse) {}
 
-  // Fetches protobuf files from a specific Git tag and creates a version snapshot.
-  rpc FetchVersion(FetchVersionRequest) returns (FetchVersionResponse) {}
+  // Points a Git source at a tag, branch or commit and compiles it.
+  rpc SelectRef(SelectRefRequest) returns (SelectRefResponse) {}
+
+  // Rebuilds the active schema: re-resolves a Git ref, recompiles local files.
+  rpc RefreshSource(RefreshSourceRequest) returns (RefreshSourceResponse) {}
+
+  // Lists the stored compiled schemas of a source.
+  rpc ListRevisions(ListRevisionsRequest) returns (ListRevisionsResponse) {}
 
   // Enables or disables a source (controls whether it participates in compilation).
   rpc SetEnabled(SetEnabledRequest) returns (SetEnabledResponse) {}
@@ -42,18 +47,9 @@ service SourcesService {
   // Enables or disables the file watcher for a local directory source.
   rpc SetWatcher(SetWatcherRequest) returns (SetWatcherResponse) {}
 
-  // Triggers manual compilation of a local directory source.
-  rpc CompileLocal(CompileLocalRequest) returns (CompileLocalResponse) {}
-
   // Validates a Files-type source by attempting compilation without persisting.
   // Returns the full list of diagnostics, even on success (warnings).
   rpc ValidateFiles(ValidateFilesRequest) returns (ValidateFilesResponse) {}
-
-  // Triggers manual compilation of a Files-type source. On compile error,
-  // returns INVALID_ARGUMENT with diagnostics in the response (not as gRPC
-  // status details — the trailers are reserved for transport-level errors).
-  rpc CompileFiles(CompileFilesRequest) returns (CompileFilesResponse) {}
-
 }
 
 // --- Create ---
@@ -199,25 +195,56 @@ message ValidateLocalPathResponse {
   optional string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// --- List Tags ---
+// --- Refs ---
 
-message ListTagsRequest {
+message ListRefsRequest {
   string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
 }
 
-message ListTagsResponse {
-  repeated string tags = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+message ListRefsResponse {
+  // Tags newest first, then branches.
+  repeated .natscope.types.proto.ProtoRef refs = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// --- Fetch Version ---
-
-message FetchVersionRequest {
+message SelectRefRequest {
   string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
-  string tag = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+  // Tag, branch or commit SHA.
+  string ref = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (buf.validate.field).string.max_len = 255, (google.api.field_behavior) = REQUIRED];
 }
 
-message FetchVersionResponse {
-  .natscope.types.proto.ProtoVersion version = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+message SelectRefResponse {
+  .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CompileOutcome outcome = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Refresh ---
+
+message RefreshSourceRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+}
+
+message RefreshSourceResponse {
+  .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CompileOutcome outcome = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Result of a compile pass.
+message CompileOutcome {
+  bool valid = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 message_types = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 file_descriptors = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated .natscope.types.proto.CompileDiagnostic diagnostics = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// --- Revisions ---
+
+message ListRevisionsRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+}
+
+message ListRevisionsResponse {
+  // Newest first.
+  repeated .natscope.types.proto.SchemaRevision revisions = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // --- Set Enabled ---
@@ -242,22 +269,6 @@ message SetWatcherResponse {
   .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// --- Compile Local ---
-
-message CompileLocalRequest {
-  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
-}
-
-message CompileLocalResponse {
-  int32 message_types = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 file_descriptors = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // True when compilation succeeded (warnings allowed). False -> diagnostics
-  // explain why; message_types/file_descriptors are zero.
-  bool valid = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // Full diagnostic list, same contract as CompileFilesResponse.
-  repeated .natscope.types.proto.CompileDiagnostic diagnostics = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
 // --- Validate Files (dry run) ---
 
 message ValidateFilesRequest {
@@ -278,17 +289,3 @@ message ValidateFilesResponse {
   // Full list of diagnostics. Empty when valid=true and no warnings.
   repeated .natscope.types.proto.CompileDiagnostic diagnostics = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
-
-// --- Compile Files (persist) ---
-
-message CompileFilesRequest {
-  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
-}
-
-message CompileFilesResponse {
-  bool valid = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 message_types = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 file_descriptors = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  repeated .natscope.types.proto.CompileDiagnostic diagnostics = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-

@@ -44,8 +44,7 @@ func optimalDecodeConcurrency() int {
 	return n
 }
 
-// Decode decodes protobuf data using the snapshot resolved from req.SourceID +
-// req.Tag.
+// Decode decodes protobuf data with the schema picked by req.SourceID and req.Fingerprint.
 func (s *Service) Decode(ctx context.Context, req entities.CodecRequest) (*entities.DecodeResult, error) {
 	snap, err := s.snapshotForRequest(ctx, req)
 	if err != nil {
@@ -90,7 +89,7 @@ func decodeWithSnapshot(snap *registry.Snapshot, data []byte, messageType string
 	if !ok {
 		return &entities.DecodeResult{
 			Success: false,
-			Error:   fmt.Sprintf("Proto type '%s' not found in source '%s' (tag '%s').", messageType, snap.SourceID, snap.Tag),
+			Error:   fmt.Sprintf("Proto type '%s' not found in source '%s' (revision '%s').", messageType, snap.SourceID, snap.Revision),
 		}
 	}
 	return decodeWithDescriptor(snap.Schema, md, data, messageType)
@@ -105,7 +104,7 @@ func decodeWithDescriptor(
 	messageType string,
 ) *entities.DecodeResult {
 	msg := dynamicpb.NewMessage(md)
-	if unmarshalErr := schema.UnmarshalBinary(data, msg); unmarshalErr != nil {
+	if unmarshalErr := schema.ParseBinary(data, msg); unmarshalErr != nil {
 		return &entities.DecodeResult{
 			Success: false,
 			Error: fmt.Sprintf(
@@ -115,7 +114,7 @@ func decodeWithDescriptor(
 		}
 	}
 
-	rawJSON, err := schema.MarshalJSON(msg)
+	rawJSON, err := schema.RenderJSON(msg)
 	if err != nil {
 		return &entities.DecodeResult{
 			Success: false,
@@ -161,7 +160,7 @@ func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Messa
 			messages[i].DecodeError = err.Error()
 			continue
 		}
-		key := snap.SourceID + "\x00" + snap.Tag
+		key := snap.SourceID + "\x00" + snap.Revision
 		g := groups[key]
 		if g == nil {
 			g = &group{snap: snap}

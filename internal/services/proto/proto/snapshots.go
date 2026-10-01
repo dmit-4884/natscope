@@ -15,60 +15,36 @@ import (
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 )
 
-// activeTagFor returns the active tag: LocalTag for local, FilesTag for files,
-// the ProtoSelection tag for git (ErrMappingSelectionMissing if absent).
-func (s *Service) activeTagFor(ctx context.Context, sourceID string) (string, error) {
+func (s *Service) mappingSource(ctx context.Context, sourceID string) (*entities.ProtoSource, error) {
 	src, err := s.sourcesStorage.Get(ctx, sourceID, false)
-	if err != nil {
-		if errors.Is(err, errs.ErrProtoSourceNotFound) {
-			return "", errs.ErrMappingSourceNotFound
-		}
-		return "", err
+	if errors.Is(err, errs.ErrProtoSourceNotFound) {
+		return nil, errs.ErrMappingSourceNotFound
 	}
-	if !src.Enabled {
-		return "", errs.ErrMappingSourceDisabled
-	}
-
-	if src.SourceType == entities.SourceTypeLocal {
-		return LocalTag, nil
-	}
-	if src.SourceType == entities.SourceTypeFiles {
-		return FilesTag, nil
-	}
-
-	sel, err := s.selectionsStorage.GetBySource(ctx, sourceID)
-	if err != nil {
-		if errors.Is(err, errs.ErrProtoSelectionNotFound) {
-			return "", errs.ErrMappingSelectionMissing
-		}
-		return "", err
-	}
-	return sel.Tag, nil
+	return src, err
 }
 
-// snapshotForSource returns the cached snapshot for the active tag of a source.
 func (s *Service) snapshotForSource(ctx context.Context, sourceID string) (*registry.Snapshot, error) {
-	tag, err := s.activeTagFor(ctx, sourceID)
+	src, err := s.mappingSource(ctx, sourceID)
 	if err != nil {
 		return nil, err
 	}
-	return s.registryCache.GetOrBuild(ctx, sourceID, tag)
+	revision, err := activeRevision(src)
+	if err != nil {
+		return nil, err
+	}
+	return s.registryCache.GetOrBuild(ctx, sourceID, revision)
 }
 
-// snapshotForRequest resolves a snapshot for a CodecRequest; empty Tag falls
-// back to the active selection.
 func (s *Service) snapshotForRequest(ctx context.Context, req entities.CodecRequest) (*registry.Snapshot, error) {
 	if req.SourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
-	if req.Tag != "" {
-		return s.registryCache.GetOrBuild(ctx, req.SourceID, req.Tag)
+	if req.Fingerprint != "" {
+		return s.registryCache.GetByFingerprint(ctx, req.SourceID, req.Fingerprint)
 	}
 	return s.snapshotForSource(ctx, req.SourceID)
 }
 
-// resolveDescriptorForMapping resolves a snapshot bound to the mapping's
-// source: PinnedFingerprint -> PinnedTag -> active selection, in that order.
 func (s *Service) resolveDescriptorForMapping(
 	ctx context.Context,
 	m *entities.SubjectMapping,
@@ -80,18 +56,11 @@ func (s *Service) resolveDescriptorForMapping(
 		return nil, errs.ErrMappingSourceIDRequired
 	}
 	if m.PinnedFingerprint != nil && *m.PinnedFingerprint != "" {
-		// Always scope by mapping.SourceID — never resolve a fingerprint match from
-		// another source (see cache.go GetByFingerprint).
 		return s.registryCache.GetByFingerprint(ctx, m.SourceID, *m.PinnedFingerprint)
-	}
-	if m.PinnedTag != nil && *m.PinnedTag != "" {
-		return s.registryCache.GetOrBuild(ctx, m.SourceID, *m.PinnedTag)
 	}
 	return s.snapshotForSource(ctx, m.SourceID)
 }
 
-// activeSnapshots returns one cached snapshot per enabled source; per-source
-// errors are logged, never abort the aggregate.
 func (s *Service) activeSnapshots(ctx context.Context) []*registry.Snapshot {
 	sources, err := s.allSources(ctx)
 	if err != nil {

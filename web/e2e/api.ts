@@ -112,13 +112,13 @@ export async function ensureStream(
 }
 
 /**
- * Ensure a compiled "files" proto source + subject mapping exist, so the
+ * Ensure a compiled local proto source + subject mapping exist, so the
  * publish tab resolves the given pattern to a proto message type.
  * Returns the source id.
  */
 export async function ensureProtoMapping(
   sourceName: string,
-  protoFilePath: string,
+  protoDir: string,
   pattern: string,
   messageType: string,
 ): Promise<string> {
@@ -133,13 +133,13 @@ export async function ensureProtoMapping(
     const created = await call<{ source?: { id: string } }>(
       'natscope.proto.sources.v1.SourcesService',
       'CreateSource',
-      { name: sourceName, sourceType: 'SOURCE_TYPE_FILES', files: [protoFilePath], includeDirs: [] },
+      { name: sourceName, sourceType: 'SOURCE_TYPE_LOCAL', localPath: protoDir, watcherEnabled: false },
     )
     sourceId = created.source?.id
     if (!sourceId) throw new Error('CreateSource returned no source id')
   }
   // Recompile every run: cheap, and revalidates after backend restarts.
-  await call('natscope.proto.sources.v1.SourcesService', 'CompileFiles', { sourceId })
+  await call('natscope.proto.sources.v1.SourcesService', 'RefreshSource', { sourceId })
 
   const mappings = await call<{ mappings?: Array<{ id: string; pattern: string; sourceId?: string }> }>(
     'natscope.mappings.v1.MappingsService',
@@ -147,16 +147,11 @@ export async function ensureProtoMapping(
     { pageSize: 500 },
   )
   const existing = (mappings.mappings ?? []).find((m) => m.pattern === pattern)
-  if (!existing) {
+  if (existing && existing.sourceId !== sourceId) {
+    await call('natscope.mappings.v1.MappingsService', 'DeleteMapping', { id: existing.id })
+  }
+  if (!existing || existing.sourceId !== sourceId) {
     await call('natscope.mappings.v1.MappingsService', 'CreateMapping', {
-      pattern,
-      messageType,
-      sourceId,
-    })
-  } else if (existing.sourceId && existing.sourceId !== sourceId) {
-    // The source was recreated with a new id — repair the stale mapping.
-    await call('natscope.mappings.v1.MappingsService', 'UpdateMapping', {
-      id: existing.id,
       pattern,
       messageType,
       sourceId,

@@ -19,10 +19,10 @@ import (
 
 func jsonToBinary(schema *protoutils.Schema, md protoreflect.MessageDescriptor, messageType string, data []byte) ([]byte, error) {
 	msg := dynamicpb.NewMessage(md)
-	if err := schema.UnmarshalJSON(data, msg); err != nil {
+	if err := schema.ParseJSON(data, msg); err != nil {
 		return nil, jsonConvertError(messageType, err)
 	}
-	out, err := protoutils.MarshalBinary(msg)
+	out, err := protoutils.EncodeBinary(msg)
 	if err != nil {
 		return nil, &codecError{msg: fmt.Sprintf("Failed to encode '%s': %v", messageType, err), cause: err}
 	}
@@ -49,7 +49,7 @@ func snapshotError(sourceID string, err error) error {
 	case errors.Is(err, errs.ErrMappingSourceDisabled):
 		msg = fmt.Sprintf("Proto source '%s' is disabled.", sourceID)
 	case errors.Is(err, errs.ErrMappingSelectionMissing):
-		msg = fmt.Sprintf("Proto source '%s' has no selected version.", sourceID)
+		msg = fmt.Sprintf("Proto source '%s' has no selected git ref.", sourceID)
 	default:
 		msg = fmt.Sprintf("Failed to resolve proto source '%s': %v", sourceID, err)
 	}

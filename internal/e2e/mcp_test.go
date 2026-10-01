@@ -9,8 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -33,9 +31,7 @@ import (
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
 	publishpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/publish"
 	codecpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/codec"
-	sourcespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/sources"
 	natstypes "github.com/dmit-4884/natscope/proto/gen/types/nats"
-	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
 )
 
 func mcpSession(t *testing.T, env *e2eEnv) *mcp.ClientSession {
@@ -354,16 +350,7 @@ func TestMCPProtoPublishAndDecode(t *testing.T) {
 	ctx := t.Context()
 	cs := mcpSession(t, env)
 
-	protoPath := filepath.Join(t.TempDir(), "flow.proto")
-	require.NoError(t, os.WriteFile(protoPath, []byte(testProtoContent), 0o600))
-	srcResp, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
-		Name: "mcp-flow", SourceType: protopb.SourceType_SOURCE_TYPE_FILES, Files: []string{protoPath},
-	}))
-	require.NoError(t, err)
-	sourceID := srcResp.Msg.GetSource().GetId()
-	compileResp, err := env.sources.CompileFiles(ctx, connect.NewRequest(&sourcespb.CompileFilesRequest{SourceId: sourceID}))
-	require.NoError(t, err)
-	require.True(t, compileResp.Msg.GetValid(), "diagnostics: %v", compileResp.Msg.GetDiagnostics())
+	sourceID := createLocalSource(t, env, "mcp-flow", map[string]string{"flow.proto": testProtoContent})
 
 	connResp, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
 		Name: "mcp-proto", Urls: []string{env.natsURL},

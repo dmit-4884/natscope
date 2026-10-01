@@ -31,7 +31,6 @@ export const SVC = {
   settings: 'natscope.settings.settings.v1.SettingsService',
   sources: 'natscope.proto.sources.v1.SourcesService',
   registry: 'natscope.proto.registry.v1.RegistryService',
-  selections: 'natscope.proto.selections.v1.SelectionsService',
   codec: 'natscope.proto.codec.v1.CodecService',
   workspace: 'natscope.workspace.v1.WorkspaceService',
 } as const
@@ -306,15 +305,14 @@ export const createTemplate = (body: Record<string, unknown>) =>
 export const deleteTemplate = (id: string) => call(SVC.templates, 'DeleteTemplate', { id })
 
 // ============================================================================
-// Proto sources / registry / codec / selections
+// Proto sources / registry / codec
 // ============================================================================
 export const listSources = (pageSize = 500) =>
   call<{ sources?: Array<{ id: string; name: string; sourceType?: string }> }>(SVC.sources, 'ListSources', { pageSize })
 export const createSource = (body: Record<string, unknown>) =>
   call<{ source?: { id: string } }>(SVC.sources, 'CreateSource', body)
-export const compileFiles = (sourceId: string) => call(SVC.sources, 'CompileFiles', { sourceId })
+export const refreshSource = (sourceId: string) => call(SVC.sources, 'RefreshSource', { sourceId })
 export const deleteSource = (id: string) => call(SVC.sources, 'DeleteSource', { id })
-export const validateFiles = (body: Record<string, unknown>) => call<Record<string, unknown>>(SVC.sources, 'ValidateFiles', body)
 export const listProtoMessages = (body: Record<string, unknown>) =>
   call<{ messages?: Array<{ fullName?: string }> }>(SVC.registry, 'ListProtoMessages', body)
 export const generateExample = (body: Record<string, unknown>) => call<Record<string, unknown>>(SVC.registry, 'GenerateExample', body)

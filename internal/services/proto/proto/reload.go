@@ -7,10 +7,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/altessa-s/go-atlas/core/collections/slices"
 	"github.com/altessa-s/go-atlas/core/runtime/panics"
-
-	"github.com/dmit-4884/natscope/internal/entities"
 
 	corecontext "github.com/altessa-s/go-atlas/core/context"
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
@@ -36,12 +33,10 @@ func (s *Service) onFileWatcherChange(ctx context.Context, sourceID string) {
 		return
 	}
 
-	if _, diags, err := s.compileLocalLocked(ctx, source); err != nil {
+	if outcome, err := s.compileLocal(ctx, source); err != nil {
 		s.logger.Error("filewatcher: recompile failed",
 			slog.String("source_id", sourceID), slogx.Error(err))
-	} else if slices.Any(diags, func(d entities.CompileDiagnostic) bool {
-		return d.Severity == entities.DiagnosticError
-	}) {
+	} else if !outcome.Valid {
 		s.logger.Warn("filewatcher: recompile produced diagnostics",
 			slog.String("source_id", sourceID))
 	}

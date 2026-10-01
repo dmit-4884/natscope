@@ -15,7 +15,6 @@ import (
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
 	messagespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/messages"
 	streamspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/streams"
-	selectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/selections"
 	sourcespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/sources"
 	templatespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/templates/v1/templates"
 )
@@ -78,8 +77,16 @@ func TestNotFound(t *testing.T) {
 			_, err := env.sources.DeleteSource(ctx, connect.NewRequest(&sourcespb.DeleteSourceRequest{Id: unknownUUID}))
 			return err
 		}},
-		{"selections.DeleteSelection unknown id", func() error {
-			_, err := env.selections.DeleteSelection(ctx, connect.NewRequest(&selectionspb.DeleteSelectionRequest{Id: unknownUUID}))
+		{"sources.SelectRef unknown id", func() error {
+			_, err := env.sources.SelectRef(ctx, connect.NewRequest(&sourcespb.SelectRefRequest{SourceId: unknownUUID, Ref: "main"}))
+			return err
+		}},
+		{"sources.RefreshSource unknown id", func() error {
+			_, err := env.sources.RefreshSource(ctx, connect.NewRequest(&sourcespb.RefreshSourceRequest{SourceId: unknownUUID}))
+			return err
+		}},
+		{"sources.ListRevisions unknown id", func() error {
+			_, err := env.sources.ListRevisions(ctx, connect.NewRequest(&sourcespb.ListRevisionsRequest{SourceId: unknownUUID}))
 			return err
 		}},
 		{"streams.GetStream unknown stream on real connection", func() error {

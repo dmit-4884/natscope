@@ -6,6 +6,7 @@ package sections
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
 	"github.com/altessa-s/go-atlas/core/collections/slices"
@@ -28,6 +29,7 @@ type protoSourceItem struct {
 	IncludeDirs     []string `json:"includeDirs,omitempty"`
 	ImportRoots     []string `json:"importRoots,omitempty"`
 	ExcludePrefixes []string `json:"excludePrefixes,omitempty"`
+	Ref             string   `json:"ref,omitempty"`
 }
 
 // ProtoSourcesSection exports/imports proto sources WITHOUT git tokens; merge
@@ -113,10 +115,9 @@ func (s *ProtoSourcesSection) Import(
 			res.Deleted++
 		}
 		for _, it := range items {
-			if _, cErr := s.svc.CreateSource(ctx, toProtoSourceCreate(it)); cErr != nil {
+			if cErr := s.create(ctx, it, &res); cErr != nil {
 				return res, cErr
 			}
-			res.Created++
 		}
 		if hasGitSource(items) {
 			res.Warnings = append(res.Warnings, "git sources imported without tokens — set them before fetching")
@@ -131,10 +132,9 @@ func (s *ProtoSourcesSection) Import(
 		if _, ok := existing[it.Name]; ok {
 			continue
 		}
-		if _, cErr := s.svc.CreateSource(ctx, toProtoSourceCreate(it)); cErr != nil {
+		if cErr := s.create(ctx, it, &res); cErr != nil {
 			return res, cErr
 		}
-		res.Created++
 	}
 	if hasGitSource(items) {
 		res.Warnings = append(res.Warnings, "git sources imported without tokens — set them before fetching")
@@ -142,8 +142,32 @@ func (s *ProtoSourcesSection) Import(
 	return res, nil
 }
 
+func (s *ProtoSourcesSection) create(ctx context.Context, it protoSourceItem, res *entities.WorkspaceSectionResult) error {
+	src, err := s.svc.CreateSource(ctx, toProtoSourceCreate(it))
+	if err != nil {
+		return err
+	}
+	res.Created++
+	if it.Ref == "" {
+		return nil
+	}
+	_, outcome, err := s.svc.SelectRef(ctx, src.Id, it.Ref)
+	switch {
+	case err != nil:
+		res.Warnings = append(res.Warnings, fmt.Sprintf("source %q: ref %q not selected: %v", it.Name, it.Ref, err))
+	case !outcome.Valid:
+		res.Warnings = append(res.Warnings, fmt.Sprintf("source %q: ref %q does not compile", it.Name, it.Ref))
+	}
+	return nil
+}
+
 func redactProtoSource(src *entities.ProtoSource) protoSourceItem {
+	var ref string
+	if src.SelectedRef != nil {
+		ref = src.SelectedRef.Name
+	}
 	return protoSourceItem{
+		Ref:             ref,
 		Name:            src.Name,
 		SourceType:      string(src.SourceType),
 		Repository:      src.Repository,

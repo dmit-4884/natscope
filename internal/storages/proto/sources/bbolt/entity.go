@@ -23,6 +23,22 @@ type sourceDoc struct {
 	ImportRoots     []string          `json:"importRoots,omitempty"`
 	ExcludePrefixes []string          `json:"excludePrefixes,omitempty"`
 	LastCompile     *compileResultDoc `json:"lastCompile,omitempty"`
+	SelectedRef     *refDoc           `json:"selectedRef,omitempty"`
+	ActiveSchema    *revisionDoc      `json:"activeSchema,omitempty"`
+}
+
+type revisionDoc struct {
+	Revision     string `json:"revision"`
+	Fingerprint  string `json:"fingerprint,omitempty"`
+	CompiledAt   int64  `json:"compiledAt,omitempty"`
+	MessageCount int32  `json:"messageCount,omitempty"`
+	Active       bool   `json:"active,omitempty"`
+}
+
+type refDoc struct {
+	Name     string `json:"name"`
+	Kind     string `json:"kind,omitempty"`
+	Revision string `json:"revision,omitempty"`
 }
 
 type compileResultDoc struct {

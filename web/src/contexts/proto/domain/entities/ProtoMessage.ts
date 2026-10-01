@@ -9,8 +9,8 @@ interface ProtoMessageProps {
   fields: ProtoField[]
   /** ProtoSource the message lives in. Required after the registry redesign. */
   sourceId: string
-  /** Active tag of the source snapshot ("local" / "v1.0.0" / etc.). */
-  sourceTag: string
+  /** Revision of the schema the type comes from. */
+  sourceRevision: string
 }
 
 /**
@@ -27,7 +27,7 @@ export class ProtoMessage extends Entity<ProtoMessageProps> {
     proto_file: string
     package: string
     source_id: string
-    source_tag: string
+    source_revision: string
     fields: Array<{
       name: string
       type: string
@@ -42,7 +42,7 @@ export class ProtoMessage extends Entity<ProtoMessageProps> {
       protoFile: data.proto_file,
       packageName: data.package,
       sourceId: data.source_id,
-      sourceTag: data.source_tag,
+      sourceRevision: data.source_revision,
       fields: data.fields.map((f) => ProtoField.fromApi(f)),
     })
   }
@@ -63,8 +63,8 @@ export class ProtoMessage extends Entity<ProtoMessageProps> {
     return this.props.sourceId
   }
 
-  get sourceTag(): string {
-    return this.props.sourceTag
+  get sourceRevision(): string {
+    return this.props.sourceRevision
   }
 
   get fields(): ReadonlyArray<ProtoField> {

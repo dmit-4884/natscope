@@ -44,9 +44,38 @@ func (h *Handler) HTTPHandler(opts ...connect.HandlerOption) (string, http.Handl
 }
 
 func (h *Handler) sourceToProto(s *entities.ProtoSource) *protopb.ProtoSource {
-	pb := converter.Convert(s, &protopb.ProtoSource{}, converter.WithHandleEmbeddedStructs(true), grpchelpers.ProtoCodecs)
+	pb := converter.Convert(s, &protopb.ProtoSource{},
+		converter.WithHandleEmbeddedStructs(true), grpchelpers.ProtoCodecs, converter.WithIgnoreFields("SelectedRef"))
 	pb.SourceType = sourceTypeToProto(s.SourceType)
+	if s.SelectedRef != nil {
+		pb.SelectedRef = refToProto(*s.SelectedRef)
+	}
 	return pb
+}
+
+func refToProto(r entities.ProtoRef) *protopb.ProtoRef {
+	pb := &protopb.ProtoRef{Name: r.Name, Revision: r.Revision}
+	switch r.Kind {
+	case entities.RefKindTag:
+		pb.Kind = protopb.RefKind_REF_KIND_TAG
+	case entities.RefKindBranch:
+		pb.Kind = protopb.RefKind_REF_KIND_BRANCH
+	case entities.RefKindCommit:
+		pb.Kind = protopb.RefKind_REF_KIND_COMMIT
+	}
+	return pb
+}
+
+func outcomeToProto(o *entities.CompileOutcome) *sourcespb.CompileOutcome {
+	if o == nil {
+		return nil
+	}
+	return &sourcespb.CompileOutcome{
+		Valid:           o.Valid,
+		MessageTypes:    int32(o.MessageTypes),    //nolint:gosec // bounded by descriptor size
+		FileDescriptors: int32(o.FileDescriptors), //nolint:gosec // bounded by descriptor size
+		Diagnostics:     diagnosticsToProto(o.Diagnostics),
+	}
 }
 
 func sourceTypeToProto(st entities.SourceType) protopb.SourceType {
@@ -198,35 +227,61 @@ func (h *Handler) ValidateLocalPath(
 	}), nil
 }
 
-// ListTags returns available tags from a source's Git repository.
-func (h *Handler) ListTags(
+// ListRefs returns the tags and branches of a git source.
+func (h *Handler) ListRefs(
 	ctx context.Context,
-	req *connect.Request[sourcespb.ListTagsRequest],
-) (*connect.Response[sourcespb.ListTagsResponse], error) {
-	tags, err := h.protoService.ListTags(ctx, req.Msg.SourceId)
+	req *connect.Request[sourcespb.ListRefsRequest],
+) (*connect.Response[sourcespb.ListRefsResponse], error) {
+	refs, err := h.protoService.ListRefs(ctx, req.Msg.SourceId)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&sourcespb.ListTagsResponse{Tags: tags}), nil
+	return connect.NewResponse(&sourcespb.ListRefsResponse{Refs: slices.To(refs, refToProto)}), nil
 }
 
-// FetchVersion fetches proto files for a specific tag.
-func (h *Handler) FetchVersion(
+// SelectRef points a git source at a tag, branch or commit.
+func (h *Handler) SelectRef(
 	ctx context.Context,
-	req *connect.Request[sourcespb.FetchVersionRequest],
-) (*connect.Response[sourcespb.FetchVersionResponse], error) {
-	in := req.Msg
-	version, err := h.protoService.FetchVersion(ctx, in.SourceId, in.Tag)
+	req *connect.Request[sourcespb.SelectRefRequest],
+) (*connect.Response[sourcespb.SelectRefResponse], error) {
+	source, outcome, err := h.protoService.SelectRef(ctx, req.Msg.SourceId, req.Msg.Ref)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&sourcespb.FetchVersionResponse{
-		Version: converter.Convert(
-			version,
-			&protopb.ProtoVersion{},
-			converter.WithHandleEmbeddedStructs(true),
-			grpchelpers.ProtoCodecs,
-		),
+	return connect.NewResponse(&sourcespb.SelectRefResponse{
+		Source:  h.sourceToProto(source),
+		Outcome: outcomeToProto(outcome),
+	}), nil
+}
+
+// RefreshSource rebuilds the active schema of a source.
+func (h *Handler) RefreshSource(
+	ctx context.Context,
+	req *connect.Request[sourcespb.RefreshSourceRequest],
+) (*connect.Response[sourcespb.RefreshSourceResponse], error) {
+	source, outcome, err := h.protoService.RefreshSource(ctx, req.Msg.SourceId)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&sourcespb.RefreshSourceResponse{
+		Source:  h.sourceToProto(source),
+		Outcome: outcomeToProto(outcome),
+	}), nil
+}
+
+// ListRevisions returns the stored schemas of a source.
+func (h *Handler) ListRevisions(
+	ctx context.Context,
+	req *connect.Request[sourcespb.ListRevisionsRequest],
+) (*connect.Response[sourcespb.ListRevisionsResponse], error) {
+	revisions, err := h.protoService.ListRevisions(ctx, req.Msg.SourceId)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&sourcespb.ListRevisionsResponse{
+		Revisions: slices.To(revisions, func(r entities.SchemaRevision) *protopb.SchemaRevision {
+			return converter.Convert(r, &protopb.SchemaRevision{})
+		}),
 	}), nil
 }
 
@@ -254,63 +309,20 @@ func (h *Handler) SetWatcher(
 	return connect.NewResponse(&sourcespb.SetWatcherResponse{Source: h.sourceToProto(source)}), nil
 }
 
-// CompileLocal triggers manual compilation of a local directory source.
-func (h *Handler) CompileLocal(
-	ctx context.Context,
-	req *connect.Request[sourcespb.CompileLocalRequest],
-) (*connect.Response[sourcespb.CompileLocalResponse], error) {
-	result, diags, err := h.protoService.CompileLocal(ctx, req.Msg.SourceId)
-	if err != nil {
-		return nil, err
-	}
-	resp := &sourcespb.CompileLocalResponse{
-		Diagnostics: diagnosticsToProto(diags),
-	}
-	if result != nil {
-		resp.Valid = true
-		resp.MessageTypes = int32(result.MessageTypes)
-		resp.FileDescriptors = int32(result.FileDescriptors)
-	}
-	return connect.NewResponse(resp), nil
-}
-
 // ValidateFiles validates a Files-type source without persisting anything.
 func (h *Handler) ValidateFiles(
 	ctx context.Context,
 	req *connect.Request[sourcespb.ValidateFilesRequest],
 ) (*connect.Response[sourcespb.ValidateFilesResponse], error) {
 	in := req.Msg
-	result, diags, err := h.protoService.ValidateFiles(ctx, in.SourceId, in.Files, in.IncludeDirs)
+	outcome, err := h.protoService.ValidateFiles(ctx, in.SourceId, in.Files, in.IncludeDirs)
 	if err != nil {
 		return nil, err
 	}
-	resp := &sourcespb.ValidateFilesResponse{
-		Diagnostics: diagnosticsToProto(diags),
-	}
-	if result != nil {
-		resp.Valid = true
-		resp.MessageTypes = int32(result.MessageTypes)
-		resp.FileDescriptors = int32(result.FileDescriptors)
-	}
-	return connect.NewResponse(resp), nil
-}
-
-// CompileFiles compiles a Files-type source and persists its descriptor.
-func (h *Handler) CompileFiles(
-	ctx context.Context,
-	req *connect.Request[sourcespb.CompileFilesRequest],
-) (*connect.Response[sourcespb.CompileFilesResponse], error) {
-	result, diags, err := h.protoService.CompileFiles(ctx, req.Msg.SourceId)
-	if err != nil {
-		return nil, err
-	}
-	resp := &sourcespb.CompileFilesResponse{
-		Diagnostics: diagnosticsToProto(diags),
-	}
-	if result != nil {
-		resp.Valid = true
-		resp.MessageTypes = int32(result.MessageTypes)
-		resp.FileDescriptors = int32(result.FileDescriptors)
-	}
-	return connect.NewResponse(resp), nil
+	return connect.NewResponse(&sourcespb.ValidateFilesResponse{
+		Valid:           outcome.Valid,
+		MessageTypes:    int32(outcome.MessageTypes),    //nolint:gosec // bounded by descriptor size
+		FileDescriptors: int32(outcome.FileDescriptors), //nolint:gosec // bounded by descriptor size
+		Diagnostics:     diagnosticsToProto(outcome.Diagnostics),
+	}), nil
 }

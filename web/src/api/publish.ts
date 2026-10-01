@@ -9,7 +9,7 @@ export interface PublishRequest {
   subject_pattern?: string
   message_type?: string
   source_id?: string
-  source_tag?: string
+  schema_fingerprint?: string
   /** null publishes without a body (counter increments). */
   data: Record<string, unknown> | null
   headers?: Record<string, string>
@@ -37,7 +37,7 @@ interface ValidationViolation {
 export interface ValidateJSONRequest {
   message_type: string
   source_id: string
-  source_tag?: string
+  schema_fingerprint?: string
   data: Record<string, unknown>
 }
 
@@ -47,7 +47,7 @@ export async function publishMessage(request: PublishRequest): Promise<PublishRe
     subject: request.subject,
     messageType: request.message_type || undefined,
     sourceId: request.source_id || undefined,
-    sourceTag: request.source_tag || undefined,
+    schemaFingerprint: request.schema_fingerprint || undefined,
     data: request.data === null ? '' : JSON.stringify(request.data),
     headers: request.headers ?? {},
     subjectPattern: request.subject_pattern || undefined,
@@ -70,7 +70,7 @@ export interface RequestMessageRequest {
   headers?: Record<string, string>
   message_type?: string
   source_id?: string
-  source_tag?: string
+  schema_fingerprint?: string
   timeout_ms?: number
 }
 
@@ -90,7 +90,7 @@ export async function requestMessage(request: RequestMessageRequest): Promise<Re
     headers: request.headers ?? {},
     messageType: request.message_type || undefined,
     sourceId: request.source_id || undefined,
-    sourceTag: request.source_tag || undefined,
+    schemaFingerprint: request.schema_fingerprint || undefined,
     timeout: millisToDur(request.timeout_ms),
   })
   return {
@@ -106,7 +106,7 @@ export async function validateJSON(request: ValidateJSONRequest): Promise<Valida
   const response = await publishClient.validateJson({
     messageType: request.message_type,
     sourceId: request.source_id,
-    sourceTag: request.source_tag || undefined,
+    schemaFingerprint: request.schema_fingerprint || undefined,
     data: JSON.stringify(request.data),
   })
   const result = response.result

@@ -5,7 +5,7 @@ import { test as base } from '@playwright/test'
 import { findConnectionByName, ensureStream, ensureProtoMapping } from './api'
 
 // Worker setup: local connection, E2E stream (max_msg_size small on purpose
-// for oversize tests), proto source from a temp file (backend shares the FS).
+// for oversize tests), proto source from a temp dir (backend shares the FS).
 export const CONNECTION_NAME = 'local'
 export const STREAM = 'E2E_PUBLISH'
 export const PATTERN = 'e2e.publish.*.*'
@@ -14,7 +14,7 @@ export const PROTO_PATTERN = 'e2e.proto.*'
 export const PROTO_MESSAGE_TYPE = 'e2e.E2EMessage'
 export const MAX_MSG_SIZE = 1024
 
-const PROTO_SOURCE_NAME = 'e2e-proto-files'
+const PROTO_SOURCE_NAME = 'e2e-proto-local'
 const PROTO_FILE_CONTENT = `syntax = "proto3";
 
 package e2e;
@@ -26,12 +26,11 @@ message E2EMessage {
 }
 `
 
-function writeProtoFile(): string {
+function writeProtoDir(): string {
   const dir = join(tmpdir(), 'natscope-e2e-proto')
   mkdirSync(dir, { recursive: true })
-  const path = join(dir, 'e2e.proto')
-  writeFileSync(path, PROTO_FILE_CONTENT)
-  return path
+  writeFileSync(join(dir, 'e2e.proto'), PROTO_FILE_CONTENT)
+  return dir
 }
 
 interface Env {
@@ -41,7 +40,7 @@ interface Env {
 }
 
 // WorkerEnv is resolved once per worker so expensive backend setup
-// (CompileFiles etc.) doesn't repeat for every test.
+// (source compile etc.) doesn't repeat for every test.
 interface WorkerEnv {
   connectionId: string
   connectionUrl: string
@@ -59,7 +58,7 @@ export const test = base.extend<{ env: Env }, { _workerEnv: WorkerEnv }>({
       await ensureStream(conn.id, STREAM, [PATTERN, PLAIN_SUBJECT, PROTO_PATTERN], MAX_MSG_SIZE)
       const protoSourceId = await ensureProtoMapping(
         PROTO_SOURCE_NAME,
-        writeProtoFile(),
+        writeProtoDir(),
         PROTO_PATTERN,
         PROTO_MESSAGE_TYPE,
       )

@@ -8,13 +8,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// UnmarshalBinary parses wire bytes into m.
-func (s *Schema) UnmarshalBinary(data []byte, m proto.Message) error {
+// ParseBinary parses wire bytes into m.
+func (s *Schema) ParseBinary(data []byte, m proto.Message) error {
 	return proto.UnmarshalOptions{Resolver: s.Types}.Unmarshal(data, m)
 }
 
-// MarshalJSON renders m with proto field names and zero values included.
-func (s *Schema) MarshalJSON(m proto.Message) ([]byte, error) {
+// RenderJSON renders m with proto field names and zero values included.
+func (s *Schema) RenderJSON(m proto.Message) ([]byte, error) {
 	return protojson.MarshalOptions{
 		UseProtoNames:   true,
 		EmitUnpopulated: true,
@@ -22,12 +22,12 @@ func (s *Schema) MarshalJSON(m proto.Message) ([]byte, error) {
 	}.Marshal(m)
 }
 
-// UnmarshalJSON parses JSON into m; unknown fields and enum names are errors.
-func (s *Schema) UnmarshalJSON(data []byte, m proto.Message) error {
+// ParseJSON parses JSON into m; unknown fields and enum names are errors.
+func (s *Schema) ParseJSON(data []byte, m proto.Message) error {
 	return protojson.UnmarshalOptions{Resolver: s.Types}.Unmarshal(data, m)
 }
 
-// MarshalBinary encodes m deterministically.
-func MarshalBinary(m proto.Message) ([]byte, error) {
+// EncodeBinary encodes m deterministically.
+func EncodeBinary(m proto.Message) ([]byte, error) {
 	return proto.MarshalOptions{Deterministic: true}.Marshal(m)
 }

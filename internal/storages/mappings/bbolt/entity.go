@@ -12,6 +12,5 @@ type mappingDoc struct {
 	Pattern           string  `json:"pattern"`
 	MessageType       string  `json:"messageType,omitempty"`
 	SourceID          string  `json:"sourceId"`
-	PinnedTag         *string `json:"pinnedTag,omitempty"`
 	PinnedFingerprint *string `json:"pinnedFingerprint,omitempty"`
 }

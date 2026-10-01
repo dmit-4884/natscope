@@ -73,15 +73,15 @@ func TestSchema_AnyRoundTripsThroughJSONAndBinary(t *testing.T) {
 	require.True(t, ok)
 
 	in := dynamicpb.NewMessage(md)
-	require.NoError(t, schema.UnmarshalJSON([]byte(
+	require.NoError(t, schema.ParseJSON([]byte(
 		`{"payload":{"@type":"type.googleapis.com/demo.Inner","x":42},"items":[{"@type":"type.googleapis.com/demo.Inner","x":7}]}`,
 	), in))
-	wire, err := protoutils.MarshalBinary(in)
+	wire, err := protoutils.EncodeBinary(in)
 	require.NoError(t, err)
 
 	out := dynamicpb.NewMessage(md)
-	require.NoError(t, schema.UnmarshalBinary(wire, out))
-	rendered, err := schema.MarshalJSON(out)
+	require.NoError(t, schema.ParseBinary(wire, out))
+	rendered, err := schema.RenderJSON(out)
 	require.NoError(t, err)
 	assert.JSONEq(t,
 		`{"payload":{"@type":"type.googleapis.com/demo.Inner","x":42},"items":[{"@type":"type.googleapis.com/demo.Inner","x":7}]}`,
@@ -99,8 +99,8 @@ func TestSchema_AnyWithTypeOutsideSchemaKeepsTypeURL(t *testing.T) {
 	wire := append([]byte{0x0a, byte(len(payload))}, payload...)
 
 	msg := dynamicpb.NewMessage(md)
-	require.NoError(t, schema.UnmarshalBinary(wire, msg))
-	rendered, err := schema.MarshalJSON(msg)
+	require.NoError(t, schema.ParseBinary(wire, msg))
+	rendered, err := schema.RenderJSON(msg)
 	require.NoError(t, err, "an Any of an unknown type must not fail the whole message")
 	assert.JSONEq(t, `{"payload":{"@type":"type.googleapis.com/elsewhere.Missing"},"items":[]}`, string(rendered))
 }
@@ -142,7 +142,7 @@ message Order {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := schema.UnmarshalJSON([]byte(tt.json), dynamicpb.NewMessage(md))
+			err := schema.ParseJSON([]byte(tt.json), dynamicpb.NewMessage(md))
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -152,7 +152,7 @@ message Order {
 	}
 }
 
-func TestMarshalBinary_IsDeterministic(t *testing.T) {
+func TestEncodeBinary_IsDeterministic(t *testing.T) {
 	t.Parallel()
 	schema := prototest.Schema(t, map[string]string{"m.proto": `
 syntax = "proto3";
@@ -168,8 +168,8 @@ message M {
 	var first []byte
 	for i := range 20 {
 		msg := dynamicpb.NewMessage(md)
-		require.NoError(t, schema.UnmarshalJSON([]byte(`{"counts":{"a":1,"b":2,"c":3,"d":4},"tags":["t"]}`), msg))
-		data, err := protoutils.MarshalBinary(msg)
+		require.NoError(t, schema.ParseJSON([]byte(`{"counts":{"a":1,"b":2,"c":3,"d":4},"tags":["t"]}`), msg))
+		data, err := protoutils.EncodeBinary(msg)
 		require.NoError(t, err)
 		if i == 0 {
 			first = data

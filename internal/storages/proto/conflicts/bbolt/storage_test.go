@@ -31,8 +31,8 @@ func TestConflicts_WinnerLoserRoundTrip(t *testing.T) {
 			c.Kind = entities.SameSymbolDifferentShape
 			c.Severity = entities.SeverityError
 			c.Symbol = "api.v1.Order"
-			c.Winner = entities.SchemaRef{SourceID: "src-w", Tag: "v2", File: "order.proto"}
-			c.Loser = entities.SchemaRef{SourceID: "src-l", Tag: "v1", File: "old/order.proto"}
+			c.Winner = entities.SchemaRef{SourceID: "src-w", Revision: "v2", File: "order.proto"}
+			c.Loser = entities.SchemaRef{SourceID: "src-l", Revision: "v1", File: "old/order.proto"}
 			c.Reason = "shape differs"
 			c.Policy = "first-wins"
 		}),
@@ -52,10 +52,10 @@ func TestConflicts_WinnerLoserRoundTrip(t *testing.T) {
 		c.Reason != "shape differs" || c.Policy != "first-wins" {
 		t.Fatalf("scalar mismatch: %+v", c)
 	}
-	if c.Winner != (entities.SchemaRef{SourceID: "src-w", Tag: "v2", File: "order.proto"}) {
+	if c.Winner != (entities.SchemaRef{SourceID: "src-w", Revision: "v2", File: "order.proto"}) {
 		t.Fatalf("winner mismatch: %+v", c.Winner)
 	}
-	if c.Loser != (entities.SchemaRef{SourceID: "src-l", Tag: "v1", File: "old/order.proto"}) {
+	if c.Loser != (entities.SchemaRef{SourceID: "src-l", Revision: "v1", File: "old/order.proto"}) {
 		t.Fatalf("loser mismatch: %+v", c.Loser)
 	}
 }

@@ -25,7 +25,6 @@ import (
 	streamspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/streams"
 	codecpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/codec"
 	registrypb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/registry"
-	selectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/selections"
 	sourcespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/sources"
 	settingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/settings/v1/settings"
 	templatespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/templates/v1/templates"
@@ -308,9 +307,9 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			"selections.SelectVersion missing source_id/tag",
+			"sources.SelectRef missing source_id/ref",
 			func() error {
-				_, err := env.selections.SelectVersion(ctx, connect.NewRequest(&selectionspb.SelectVersionRequest{}))
+				_, err := env.sources.SelectRef(ctx, connect.NewRequest(&sourcespb.SelectRefRequest{}))
 				return err
 			},
 			connect.CodeInvalidArgument,

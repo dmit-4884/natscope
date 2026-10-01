@@ -9,23 +9,15 @@ import {
   useValidateLocalPath,
   useValidateRepository,
   useProtoSource,
-  useCompileLocal,
-  useCompileFiles,
+  useRefreshSource,
 } from '@/contexts/proto'
 import type {
-  CompileDiagnostic,
+  CompileOutcome,
   CreateProtoSourceRequest,
   ProtoSourceType,
   UpdateProtoSourceRequest,
 } from '@/api/protoSources'
 import { CompileDiagnosticsList } from '@/components/proto/CompileDiagnosticsList'
-
-interface CompileOutcome {
-  messageTypes: number
-  fileDescriptors: number
-  valid: boolean
-  diagnostics: CompileDiagnostic[]
-}
 
 // Splits a textarea value into a clean list of paths. Accepts both newlines
 // and commas as separators (often pasted from CLI args, JSON arrays, etc.).
@@ -95,9 +87,8 @@ export default function ProtoSourceEditPage({ mode }: Props) {
   const updateMutation = useUpdateProtoSource()
   const validateLocal = useValidateLocalPath()
   const validateRepo = useValidateRepository()
-  const compileLocalMutation = useCompileLocal()
-  const compileFilesMutation = useCompileFiles()
-  const isCompiling = compileLocalMutation.isPending || compileFilesMutation.isPending
+  const refreshMutation = useRefreshSource()
+  const isCompiling = refreshMutation.isPending
   const isValidating = validateLocal.isPending || validateRepo.isPending
 
   const lastHydratedFor = useRef<string | null>(null)
@@ -274,10 +265,8 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     try {
       const sourceId = await persist()
       if (!sourceId) return
-      if (sourceType === 'local') {
-        setCompileOut(await compileLocalMutation.mutateAsync({ sourceId }))
-      } else if (sourceType === 'files') {
-        setCompileOut(await compileFilesMutation.mutateAsync({ sourceId }))
+      if (sourceType !== 'git') {
+        setCompileOut((await refreshMutation.mutateAsync({ sourceId })).outcome)
       }
     } catch (err) {
       setCompileErr(getErrorMessage(err) || 'Failed to compile')

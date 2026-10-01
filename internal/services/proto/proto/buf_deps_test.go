@@ -185,7 +185,7 @@ message User {
 		src := t.TempDir()
 		writeBufLock(t, src, bufLockV2Single(fixtureCommitProtovalidate, fixtureDigestB5))
 
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 
 		files := []entities.ProtoFileEntry{
 			{Path: "blitz/types/user.proto", Content: userProtoImportingProtovalidate},
@@ -203,7 +203,7 @@ message User {
 		setIsolatedCache(t, c.root)
 
 		src := t.TempDir() // no buf.lock
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 
 		out, err := svc.compile(t.Context(), localSrc, []entities.ProtoFileEntry{
 			{Path: "blitz/types/user.proto", Content: userProtoImportingProtovalidate},
@@ -221,7 +221,7 @@ message User {
 		src := t.TempDir()
 		writeBufLock(t, src, bufLockV2Single(strings.Repeat("0", 32), fixtureDigestB5))
 
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 		out, err := svc.compile(t.Context(), localSrc, []entities.ProtoFileEntry{
 			{Path: "blitz/types/user.proto", Content: userProtoImportingProtovalidate},
 		}, nil, src)
@@ -239,7 +239,7 @@ message User {
 		src := t.TempDir()
 		writeBufLock(t, src, bufLockV2Single(fixtureCommitProtovalidate, fixtureDigestB5))
 
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 		out, err := svc.compile(t.Context(), localSrc, []entities.ProtoFileEntry{
 			{Path: "blitz/types/user.proto", Content: userProtoImportingProtovalidate},
 		}, nil, src)
@@ -256,7 +256,7 @@ message User {
 
 		src := t.TempDir()
 		writeBufLock(t, src, bufLockV2Single(fixtureCommitProtovalidate, fixtureDigestB5))
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 
 		out, err := svc.compile(t.Context(), localSrc, []entities.ProtoFileEntry{
 			{Path: "blitz/types/user.proto", Content: userProtoImportingProtovalidate},
@@ -283,7 +283,7 @@ import "google/api/annotations.proto";
 
 message Ping { string id = 1; }
 `
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 		out, err := svc.compile(t.Context(), localSrc, []entities.ProtoFileEntry{
 			{Path: "blitz/api/ping.proto", Content: userProto},
 		}, nil, src)
@@ -300,7 +300,7 @@ message Ping { string id = 1; }
 		src := t.TempDir()
 		writeBufLock(t, src, bufLockV2Single(fixtureCommitProtovalidate, fixtureDigestB4))
 
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 		out, err := svc.compile(t.Context(), localSrc, []entities.ProtoFileEntry{
 			{Path: "blitz/types/user.proto", Content: userProtoImportingProtovalidate},
 		}, nil, src)
@@ -335,7 +335,7 @@ message WithId {
   acme.shared.Id id = 1;
 }
 `
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 		out, err := svc.compile(t.Context(), localSrc, []entities.ProtoFileEntry{
 			{Path: "blitz/api/with_id.proto", Content: userProto},
 		}, nil, src)
@@ -359,7 +359,7 @@ message WithId {
 
 		src := t.TempDir()
 		writeBufLock(t, src, bufLockV2Single(fixtureCommitProtovalidate, fixtureDigestB5))
-		svc := newTestService(nil, nil, nil, nil, nil)
+		svc := newBareService()
 
 		out, err := svc.compile(t.Context(), localSrc, []entities.ProtoFileEntry{
 			{Path: "blitz/types/user.proto", Content: userProtoImportingProtovalidate},

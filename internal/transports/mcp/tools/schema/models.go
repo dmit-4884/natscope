@@ -8,10 +8,10 @@ import (
 )
 
 type typeView struct {
-	FullName  string `json:"fullName"`
-	ProtoFile string `json:"file"`
-	SourceID  string `json:"sourceId"`
-	SourceTag string `json:"sourceTag,omitempty"`
+	FullName       string `json:"fullName"`
+	ProtoFile      string `json:"file"`
+	SourceID       string `json:"sourceId"`
+	SourceRevision string `json:"sourceRevision,omitempty"`
 }
 
 type listTypesInput struct {
@@ -48,7 +48,6 @@ type mappingView struct {
 	Pattern           string  `json:"pattern"`
 	MessageType       string  `json:"messageType"`
 	SourceID          string  `json:"sourceId"`
-	PinnedTag         *string `json:"pinnedTag,omitempty"`
 	PinnedFingerprint *string `json:"pinnedFingerprint,omitempty"`
 }
 
@@ -116,6 +115,6 @@ type conflictView struct {
 
 type schemaRefView struct {
 	SourceID string `json:"sourceId"`
-	Tag      string `json:"tag,omitempty"`
+	Revision string `json:"revision,omitempty"`
 	File     string `json:"file"`
 }

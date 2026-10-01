@@ -3,24 +3,17 @@
 
 package entities
 
-// ProtoDescriptor holds the compiled, serialized FileDescriptorSet for a
-// source+tag (lazy-loading entity).
+// ProtoDescriptor is the compiled FileDescriptorSet of a source at one revision.
 type ProtoDescriptor struct {
 	BaseEntity
 
-	SourceID string
-
-	// Tag is the Git tag (e.g., "v0.72.0").
-	Tag string
-
-	// DescriptorSet is the serialized FileDescriptorSet (protobuf binary).
+	SourceID      string
+	Revision      string
 	DescriptorSet []byte
-
-	// MessageTypes lists fully qualified message names for quick lookup.
+	// Fingerprint is the SHA-256 of DescriptorSet.
+	Fingerprint  string
 	MessageTypes []string
-
-	// CompiledAt is the Unix timestamp when descriptors were compiled.
-	CompiledAt int64
+	CompiledAt   int64
 }
 
 // ProtoDescriptorNew creates a new ProtoDescriptor with generated Id and
@@ -39,10 +32,3 @@ func ProtoDescriptorNew(init ...func(*ProtoDescriptor)) *ProtoDescriptor {
 
 // ProtoDescriptors is a slice of ProtoDescriptor pointers.
 type ProtoDescriptors []*ProtoDescriptor
-
-// ProtoDescriptorsList is the listing criteria for descriptors.
-type ProtoDescriptorsList struct {
-	ListBase
-	SourceID *string
-	Tag      *string
-}

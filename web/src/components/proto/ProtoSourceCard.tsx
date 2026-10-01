@@ -2,14 +2,13 @@ import { useState } from 'react'
 import { Button, RowActionButton, Toggle } from '@/components/ui'
 import {
   useDeleteProtoSource,
-  useProtoSourceTags,
-  useSelectProtoVersion,
+  useSourceRefs,
+  useSelectSourceRef,
   useSetSourceEnabled,
   useSetWatcher,
-  useCompileLocal,
-  useCompileFiles,
+  useRefreshSource,
 } from '@/contexts/proto'
-import type { ProtoSource, ProtoSourceType, ProtoSelection, CompileDiagnostic } from '@/api/protoSources'
+import type { ProtoSource, ProtoSourceType, CompileOutcome } from '@/api/protoSources'
 import { ProtoSourceGitFooter } from './ProtoSourceGitFooter'
 import { ProtoSourceLocalFooter } from './ProtoSourceLocalFooter'
 import { ProtoSourceFilesFooter } from './ProtoSourceFilesFooter'
@@ -22,39 +21,26 @@ const TYPE_BADGE_CONFIG: Record<ProtoSourceType, { bg: string; text: string; lab
 
 interface ProtoSourceCardProps {
   source: ProtoSource
-  selection?: ProtoSelection
   onEdit: (source: ProtoSource) => void
-  onRemoveSelection?: (selectionId: string) => void
 }
 
-export default function ProtoSourceCard({
-  source,
-  selection,
-  onEdit,
-  onRemoveSelection,
-}: ProtoSourceCardProps) {
+export default function ProtoSourceCard({ source, onEdit }: ProtoSourceCardProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
-  const [showTagSelector, setShowTagSelector] = useState(false)
-  const [compileResult, setCompileResult] = useState<{
-    messageTypes: number
-    fileDescriptors: number
-    valid?: boolean
-    diagnostics?: CompileDiagnostic[]
-  } | null>(null)
+  const [showRefPicker, setShowRefPicker] = useState(false)
+  const [outcome, setOutcome] = useState<CompileOutcome | null>(null)
 
   const deleteMutation = useDeleteProtoSource()
-  const selectMutation = useSelectProtoVersion()
+  const selectMutation = useSelectSourceRef()
   const enabledMutation = useSetSourceEnabled()
   const watcherMutation = useSetWatcher()
-  const compileMutation = useCompileLocal()
-  const compileFilesMutation = useCompileFiles()
+  const refreshMutation = useRefreshSource()
   const {
-    data: tags = [],
-    isLoading: isLoadingTags,
-    error: tagsError,
-    refetch: refetchTags,
-  } = useProtoSourceTags(showTagSelector && source.sourceType === 'git' ? source.id : null)
+    data: refs = [],
+    isLoading: isLoadingRefs,
+    error: refsError,
+    refetch: refetchRefs,
+  } = useSourceRefs(showRefPicker && source.sourceType === 'git' ? source.id : null)
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -68,19 +54,26 @@ export default function ProtoSourceCard({
     }
   }
 
-  const handleSelectTag = async (tag: string) => {
-    if (!tag) return
+  const handleSelectRef = async (ref: string) => {
+    if (!ref) return
+    setOutcome(null)
     try {
-      await selectMutation.mutateAsync({ sourceId: source.id, tag })
-      setShowTagSelector(false)
+      const result = await selectMutation.mutateAsync({ sourceId: source.id, ref })
+      setOutcome(result.outcome)
+      if (result.outcome.valid) setShowRefPicker(false)
     } catch {
       /* toasted globally */
     }
   }
 
-  const handleRemoveSelection = () => {
-    if (selection && onRemoveSelection) {
-      onRemoveSelection(selection.id)
+  const handleRefresh = async () => {
+    setOutcome(null)
+    try {
+      const result = await refreshMutation.mutateAsync({ sourceId: source.id })
+      setOutcome(result.outcome)
+      return result.outcome
+    } catch {
+      return undefined
     }
   }
 
@@ -100,22 +93,6 @@ export default function ProtoSourceCard({
     }
   }
 
-  const handleCompileLocal = async () => {
-    try {
-      const result = await compileMutation.mutateAsync({ sourceId: source.id })
-      setCompileResult(result)
-    } catch {
-      /* toasted globally */
-    }
-  }
-
-  const handleCompileFiles = async () => {
-    try {
-      return await compileFilesMutation.mutateAsync({ sourceId: source.id })
-    } catch {
-      return undefined
-    }
-  }
 
   const typeBadge = TYPE_BADGE_CONFIG[source.sourceType]
   const isDisabled = !source.enabled
@@ -126,6 +103,7 @@ export default function ProtoSourceCard({
 
   return (
     <div
+      data-testid="proto-source-card"
       className={`bg-surface-primary border rounded-lg transition-all border-border hover:border-border-strong hover:shadow-sm ${
         isDisabled ? 'opacity-60' : ''
       }`}
@@ -209,18 +187,25 @@ export default function ProtoSourceCard({
         <div className="mt-3 pt-3 border-t border-gray-100">
           {source.sourceType === 'git' && (
             <ProtoSourceGitFooter
-              selection={selection}
-              showTagSelector={showTagSelector}
-              onToggleTagSelector={() => setShowTagSelector((v) => !v)}
-              onRemoveSelection={handleRemoveSelection}
-              tags={tags}
-              isLoadingTags={isLoadingTags}
-              tagsError={tagsError as Error | null}
-              onRetryTags={() => void refetchTags()}
-              isSelecting={selectMutation.isPending}
-              selectError={selectMutation.isError ? (selectMutation.error as Error) : null}
-              onSelectTag={handleSelectTag}
-              diagnostics={source.lastCompile?.diagnostics}
+              selectedRef={source.selectedRef}
+              activeSchema={source.activeSchema}
+              showPicker={showRefPicker}
+              onTogglePicker={() => setShowRefPicker((v) => !v)}
+              refs={refs}
+              isLoadingRefs={isLoadingRefs}
+              refsError={refsError as Error | null}
+              onRetryRefs={() => void refetchRefs()}
+              onSelectRef={(ref) => void handleSelectRef(ref)}
+              onRefresh={() => void handleRefresh()}
+              isBusy={selectMutation.isPending || refreshMutation.isPending}
+              actionError={
+                selectMutation.isError
+                  ? (selectMutation.error as Error)
+                  : refreshMutation.isError
+                    ? (refreshMutation.error as Error)
+                    : null
+              }
+              outcome={outcome}
             />
           )}
 
@@ -229,13 +214,13 @@ export default function ProtoSourceCard({
               localPath={source.localPath}
               enabled={source.enabled}
               watcherEnabled={source.watcherEnabled}
-              onCompile={handleCompileLocal}
+              onCompile={() => void handleRefresh()}
               onToggleWatcher={handleToggleWatcher}
-              isCompiling={compileMutation.isPending}
+              isCompiling={refreshMutation.isPending}
               isWatcherPending={watcherMutation.isPending}
-              compileError={compileMutation.isError ? (compileMutation.error as Error) : null}
-              compileResult={compileResult}
-              diagnostics={compileResult?.diagnostics ?? source.lastCompile?.diagnostics}
+              compileError={refreshMutation.isError ? (refreshMutation.error as Error) : null}
+              compileResult={outcome}
+              diagnostics={outcome?.diagnostics ?? source.lastCompile?.diagnostics}
               detectedRoots={source.lastCompile?.roots}
               rootsOrigin={source.lastCompile?.rootsOrigin}
             />
@@ -245,9 +230,9 @@ export default function ProtoSourceCard({
             <ProtoSourceFilesFooter
               files={source.files}
               includeDirs={source.includeDirs}
-              onCompile={handleCompileFiles}
-              isCompiling={compileFilesMutation.isPending}
-              compileError={compileFilesMutation.isError ? (compileFilesMutation.error as Error) : null}
+              onCompile={handleRefresh}
+              isCompiling={refreshMutation.isPending}
+              compileError={refreshMutation.isError ? (refreshMutation.error as Error) : null}
             />
           )}
         </div>

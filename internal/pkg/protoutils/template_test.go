@@ -80,7 +80,7 @@ func TestTemplate_IsAcceptedByProtojson(t *testing.T) {
 
 			example, err := json.Marshal(protoutils.Template(md))
 			require.NoError(t, err)
-			require.NoError(t, schema.UnmarshalJSON(example, dynamicpb.NewMessage(md)), "example %s must encode", example)
+			require.NoError(t, schema.ParseJSON(example, dynamicpb.NewMessage(md)), "example %s must encode", example)
 		})
 	}
 }

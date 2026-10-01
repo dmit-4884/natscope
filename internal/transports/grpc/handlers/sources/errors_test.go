@@ -29,8 +29,7 @@ func TestStatusErrorConvert(t *testing.T) {
 	}{
 		{"ProtoSourceNotFound", errs.ErrProtoSourceNotFound, codes.NotFound, "PROTO_SOURCE_NOT_FOUND"},
 		{"ProtoSourceNameAlreadyInUse", errs.ErrProtoSourceNameAlreadyInUse, codes.AlreadyExists, "PROTO_SOURCE_NAME_ALREADY_IN_USE"},
-		{"ProtoVersionNotFound", errs.ErrProtoVersionNotFound, codes.NotFound, "PROTO_VERSION_NOT_FOUND"},
-		{"ProtoVersionAlreadyExists", errs.ErrProtoVersionAlreadyExists, codes.AlreadyExists, "PROTO_VERSION_ALREADY_EXISTS"},
+		{"ProtoRefNotFound", errs.ErrProtoRefNotFound, codes.NotFound, "PROTO_REF_NOT_FOUND"},
 		// Fallback
 		{"NoProtoSources_viaFallback", errs.ErrNoProtoSources, codes.FailedPrecondition, "NO_PROTO_SOURCES"},
 	}

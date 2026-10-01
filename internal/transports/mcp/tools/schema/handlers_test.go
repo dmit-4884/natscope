@@ -18,12 +18,12 @@ func TestViews(t *testing.T) {
 
 	conflict := converter.Convert(&entities.SchemaConflict{
 		Kind: entities.SameSymbolSameShape, Severity: entities.SeverityInfo, Symbol: "a.B",
-		Winner: entities.SchemaRef{SourceID: "s1", File: "a.proto"}, Loser: entities.SchemaRef{SourceID: "s2", Tag: "v2", File: "a.proto"},
+		Winner: entities.SchemaRef{SourceID: "s1", File: "a.proto"}, Loser: entities.SchemaRef{SourceID: "s2", Revision: "v2", File: "a.proto"},
 	}, &conflictView{})
 	assert.Equal(t, "same_symbol_same_shape", conflict.Kind)
 	assert.Equal(t, "info", conflict.Severity)
 	assert.Equal(t, "s2", conflict.Loser.SourceID)
-	assert.Equal(t, "v2", conflict.Loser.Tag)
+	assert.Equal(t, "v2", conflict.Loser.Revision)
 
 	res := converter.Convert(&entities.ValidationResult{Violations: []*entities.ValidationViolation{
 		{FieldPath: "id", Message: "value is required", ConstraintId: "required"},
@@ -32,7 +32,7 @@ func TestViews(t *testing.T) {
 	assert.Equal(t, []violationView{{FieldPath: "id", Message: "value is required", ConstraintId: "required"}}, res.Violations)
 
 	pinned := "v1.2.0"
-	mapping := converter.Convert(&entities.SubjectMapping{Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "s1", PinnedTag: &pinned},
+	mapping := converter.Convert(&entities.SubjectMapping{Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "s1", PinnedFingerprint: &pinned},
 		&mappingView{})
-	assert.Equal(t, &mappingView{Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "s1", PinnedTag: &pinned}, mapping)
+	assert.Equal(t, &mappingView{Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "s1", PinnedFingerprint: &pinned}, mapping)
 }

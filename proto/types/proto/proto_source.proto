@@ -62,6 +62,39 @@ message ProtoSource {
   // Never accepted from the client — read-only telemetry that powers the
   // settings page health badges.
   optional ProtoCompileResult last_compile = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Git ref the source tracks.
+  optional ProtoRef selected_ref = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Schema the source decodes with now.
+  optional SchemaRevision active_schema = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Kind of a git ref.
+enum RefKind {
+  REF_KIND_UNSPECIFIED = 0;
+  REF_KIND_TAG = 1;
+  REF_KIND_BRANCH = 2;
+  REF_KIND_COMMIT = 3;
+}
+
+// Git ref and the commit it points to.
+message ProtoRef {
+  string name = 1;
+  RefKind kind = 2;
+  // Commit SHA.
+  string revision = 3;
+}
+
+// Stored compiled schema of a source.
+message SchemaRevision {
+  string revision = 1;
+  // SHA-256 of the descriptor set; mappings pin by it.
+  string fingerprint = 2;
+  // Unix milliseconds.
+  int64 compiled_at = 3;
+  int32 message_count = 4;
+  bool active = 5;
 }
 
 // Outcome of a compilation pass. Stored on ProtoSource so the UI can show

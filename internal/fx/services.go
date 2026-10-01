@@ -46,9 +46,8 @@ import (
 	mappingsBbolt "github.com/dmit-4884/natscope/internal/storages/mappings/bbolt"
 	conflictsBbolt "github.com/dmit-4884/natscope/internal/storages/proto/conflicts/bbolt"
 	descriptorsBbolt "github.com/dmit-4884/natscope/internal/storages/proto/descriptors/bbolt"
-	selectionsBbolt "github.com/dmit-4884/natscope/internal/storages/proto/selections/bbolt"
+	filesetsBbolt "github.com/dmit-4884/natscope/internal/storages/proto/filesets/bbolt"
 	sourcesBbolt "github.com/dmit-4884/natscope/internal/storages/proto/sources/bbolt"
-	versionsBbolt "github.com/dmit-4884/natscope/internal/storages/proto/versions/bbolt"
 	settingsBbolt "github.com/dmit-4884/natscope/internal/storages/settings/bbolt"
 	templatesBbolt "github.com/dmit-4884/natscope/internal/storages/templates/bbolt"
 )
@@ -61,7 +60,6 @@ func ServicesModule() fx.Option {
 			fx.As(new(protosvc.Registry)),
 			fx.As(new(protosvc.Codec)),
 			fx.As(new(protosvc.SourceManager)),
-			fx.As(new(protosvc.SelectionManager)),
 		)),
 		fx.Provide(fx.Annotate(newConnectionsStorage, fx.As(new(connectionsStorageIface.Storage)))),
 		fx.Provide(newLayoutsStorage),
@@ -106,6 +104,8 @@ func AsWorkspaceSection(f any) any {
 	return fx.Annotate(f, fx.As(new(workspacesvc.Section)), fx.ResultTags(`group:"workspace-sections"`))
 }
 
+var obsoleteProtoBuckets = []string{"proto_descriptors", "proto_versions", "proto_selections"}
+
 // newProtoService creates a new unified Proto service backed by bbolt stores.
 func newProtoService(
 	db *bbstore.DB,
@@ -114,21 +114,20 @@ func newProtoService(
 	mappingsSvc mappingssvc.Service,
 	fileWatcher fwsvc.Service,
 ) (*protoService.Service, error) {
+	if err := db.DropBuckets(context.Background(), obsoleteProtoBuckets...); err != nil {
+		return nil, errors.WrapOperation(err, "drop obsolete proto buckets")
+	}
 	sources, err := sourcesBbolt.New(context.Background(), db, vault)
 	if err != nil {
 		return nil, errors.WrapOperation(err, "create proto sources storage")
 	}
-	versions, err := versionsBbolt.New(context.Background(), db)
+	fileSets, err := filesetsBbolt.New(context.Background(), db)
 	if err != nil {
-		return nil, errors.WrapOperation(err, "create proto versions storage")
+		return nil, errors.WrapOperation(err, "create proto file sets storage")
 	}
 	descriptors, err := descriptorsBbolt.New(context.Background(), db)
 	if err != nil {
 		return nil, errors.WrapOperation(err, "create proto descriptors storage")
-	}
-	selections, err := selectionsBbolt.New(context.Background(), db)
-	if err != nil {
-		return nil, errors.WrapOperation(err, "create proto selections storage")
 	}
 	conflicts, err := conflictsBbolt.New(context.Background(), db)
 	if err != nil {
@@ -137,9 +136,8 @@ func newProtoService(
 
 	return protoService.New(
 		sources,
-		versions,
+		fileSets,
 		descriptors,
-		selections,
 		conflicts,
 		gitFetcher,
 		mappingsSvc,
