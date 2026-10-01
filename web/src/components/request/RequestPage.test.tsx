@@ -35,8 +35,9 @@ vi.mock('@/contexts/mappings', () => ({
 }))
 
 vi.mock('@/contexts/proto', () => ({
-  useProtoMessageEntity: () => ({ message: null, isLoading: false, error: null }),
-  useProtoMessageEntities: () => ({ messages: [] }),
+  useTypeDescription: () => ({ data: undefined, isLoading: false }),
+  useMessageTypes: () => ({ messages: [], isLoading: false }),
+  messageCompletions: () => [],
 }))
 
 vi.mock('../streams/publish/TemplateMenu', () => ({

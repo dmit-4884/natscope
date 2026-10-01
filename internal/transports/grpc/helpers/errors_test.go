@@ -105,6 +105,7 @@ func TestStatusErrorConvert(t *testing.T) {
 		// Proto codec/registry shared
 		{name: "ErrNoProtoSources", err: errs.ErrNoProtoSources, wantCode: codes.FailedPrecondition, wantReason: "NO_PROTO_SOURCES"},
 		{name: "ErrProtoMessageNotFound", err: errs.ErrProtoMessageNotFound, wantCode: codes.NotFound, wantReason: "PROTO_MESSAGE_NOT_FOUND"},
+		{name: "ErrProtoTypeNotFound", err: errs.ErrProtoTypeNotFound, wantCode: codes.NotFound, wantReason: "PROTO_TYPE_NOT_FOUND"},
 		{name: "ErrSchemaConflict", err: errs.ErrSchemaConflict, wantCode: codes.FailedPrecondition, wantReason: "SCHEMA_CONFLICT"},
 		{
 			name:       "WrappedProtoEncodeError",

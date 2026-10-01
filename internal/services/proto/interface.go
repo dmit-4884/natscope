@@ -28,13 +28,12 @@ type LiveDecoder interface {
 // Registry exposes read-only inspection of loaded proto message types,
 // examples, stats, and schema conflicts.
 type Registry interface {
-	// ListMessages lists all messages from active snapshots; each entry carries
-	// SourceID + SourceRevision.
-	ListMessages(ctx context.Context) []entities.ProtoMessageInfo
+	// ListTypes returns the messages, enums and services of one source, or of every enabled source when sourceID is empty.
+	ListTypes(ctx context.Context, sourceID string) ([]entities.SchemaType, error)
 
-	// GetMessage returns message-type detail within a source;
-	// ErrProtoMessageNotFound if absent.
-	GetMessage(ctx context.Context, sourceID, messageType string) (*entities.ProtoMessageInfo, error)
+	// DescribeType describes a type of a source, with every type it reaches when reachable is set;
+	// ErrProtoTypeNotFound if absent.
+	DescribeType(ctx context.Context, sourceID, fullName string, reachable bool) (*entities.TypeDescription, error)
 
 	// GenerateExample builds an example JSON object for a message type;
 	// ErrProtoMessageNotFound if absent.

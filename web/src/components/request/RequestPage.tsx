@@ -4,7 +4,7 @@ import { getErrorMessage } from '@/api/errors'
 import { getProtoMessageExample } from '@/api/proto'
 import { useMappingItems, useSubjectMappingEntity } from '@/contexts/mappings'
 import { useRequestMessage } from '@/contexts/messages'
-import { useProtoMessageEntities, useProtoMessageEntity } from '@/contexts/proto'
+import { messageCompletions, useMessageTypes, useTypeDescription } from '@/contexts/proto'
 import { useRequestDraft, withRecentSubject } from '@/stores/requestDraftStore'
 import { SubjectAutocomplete } from '@/components/common/SubjectAutocomplete'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
@@ -57,8 +57,9 @@ export default function RequestPage() {
   const isJsonMode = encodingMode === 'json' || (!mappedMessageType && encodingMode !== 'proto')
   const messageType = isJsonMode ? undefined : mappedMessageType ?? undefined
   const sourceId = isJsonMode ? undefined : mappedSourceId ?? undefined
-  const { message: protoMessage, isLoading: protoLoading } = useProtoMessageEntity(sourceId ?? null, messageType ?? null)
-  const { messages: protoTypes } = useProtoMessageEntities()
+  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null)
+  const protoMessage = protoDescription?.messages[0]
+  const { messages: protoTypes } = useMessageTypes()
 
   const payloadSyntaxError = useMemo(() => jsonSyntaxError(draft.payload), [draft.payload])
   const payloadIsEmpty = !draft.payload.trim()
@@ -157,15 +158,10 @@ export default function RequestPage() {
     [draft.headers],
   )
 
-  const completionFields = useMemo(() => {
-    if (!messageType || !protoMessage) return undefined
-    return protoMessage.fields.map((f) => ({
-      name: f.name,
-      type: f.type,
-      repeated: f.isRepeated(),
-      isMessage: f.isMessage,
-    }))
-  }, [messageType, protoMessage])
+  const completionFields = useMemo(
+    () => (messageType && protoMessage ? messageCompletions(protoMessage) : undefined),
+    [messageType, protoMessage],
+  )
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-surface-primary">
@@ -237,7 +233,7 @@ export default function RequestPage() {
               isJsonMode={isJsonMode}
               messageType={messageType}
               mappedMessageType={mappedMessageType}
-              protoFieldCount={protoMessage?.fieldCount}
+              protoFieldCount={protoMessage?.fields.length}
               onModeChange={setEncodingMode}
               onAddMapping={() => handleOpenMappings(subject)}
             />

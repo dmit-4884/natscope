@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/altessa-s/go-atlas/core/collections/slices"
 	"github.com/altessa-s/go-atlas/core/encoding/hash"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -52,6 +53,7 @@ func (s *Service) storeSchema(
 		d.DescriptorSet = descSet
 		d.Fingerprint = hash.SHA256HexBytes(descSet)
 		d.MessageTypes = s.extractTypes(fds)
+		d.TargetFiles = slices.To(fds, protoreflect.FileDescriptor.Path)
 		d.CompiledAt = time.Now().UnixMilli()
 	})
 	if err := s.descriptorsStorage.Save(ctx, d); err != nil {

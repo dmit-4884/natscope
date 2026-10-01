@@ -187,6 +187,31 @@ func TestMergeWithReport_SameFileNameIdenticalContent_NoConflict(t *testing.T) {
 	}
 }
 
+func TestMergeWithReport_CommentsOnlyDiffer_NoConflict(t *testing.T) {
+	file := func(comment string) *descriptorpb.FileDescriptorProto {
+		return &descriptorpb.FileDescriptorProto{
+			Name:        proto.String("common.proto"),
+			Package:     proto.String("com.example"),
+			MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String("Common")}},
+			Syntax:      proto.String("proto3"),
+			SourceCodeInfo: &descriptorpb.SourceCodeInfo{Location: []*descriptorpb.SourceCodeInfo_Location{
+				{Path: []int32{4, 0}, Span: []int32{1, 0, 20}, LeadingComments: proto.String(comment)},
+			}},
+		}
+	}
+
+	report, err := MergeWithReport([]SchemaInput{
+		{SourceID: "src-A", Bytes: mustMarshalSet(t, file(" first"))},
+		{SourceID: "src-B", Bytes: mustMarshalSet(t, file(" second"))},
+	})
+	if err != nil {
+		t.Fatalf("MergeWithReport: %v", err)
+	}
+	if len(report.Conflicts) != 0 {
+		t.Errorf("files differing only in comments must not conflict, got %d", len(report.Conflicts))
+	}
+}
+
 func TestMergeWithReport_EnumConflict_Error(t *testing.T) {
 	pkg := "com.example"
 

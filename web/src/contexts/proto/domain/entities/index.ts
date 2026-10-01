@@ -1,1 +1,0 @@
-export { ProtoMessage } from './ProtoMessage'

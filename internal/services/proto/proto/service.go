@@ -95,8 +95,7 @@ func (s *Service) notifyReload(ctx context.Context) {
 	if cb == nil {
 		return
 	}
-	msgs := s.ListMessages(ctx)
-	cb(len(msgs))
+	cb(s.Stats(ctx).MessagesCount)
 }
 
 // recomputeConflicts runs MergeWithReport and overwrites conflicts storage;

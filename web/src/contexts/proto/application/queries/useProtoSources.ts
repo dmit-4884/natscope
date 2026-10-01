@@ -28,7 +28,7 @@ const protoSourcesKeys = {
 
 function invalidateSchemas(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: protoSourcesKeys.all })
-  queryClient.invalidateQueries({ queryKey: protoKeys.messages() })
+  queryClient.invalidateQueries({ queryKey: protoKeys.all })
   queryClient.invalidateQueries({ queryKey: ['mappings'] })
 }
 

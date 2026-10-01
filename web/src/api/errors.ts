@@ -74,6 +74,7 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
     'Credentials are set both in the server URL and in the auth fields — keep only one',
   // Proto
   PROTO_MESSAGE_NOT_FOUND: 'Proto message type not found',
+  PROTO_TYPE_NOT_FOUND: 'Proto type not found',
   PROTO_DESCRIPTOR_NOT_FOUND: 'Proto descriptor not found',
   PROTO_SOURCE_NOT_FOUND: 'Proto source not found',
   PROTO_SOURCE_NAME_ALREADY_IN_USE: 'Proto source name already in use',

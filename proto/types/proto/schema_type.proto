@@ -1,0 +1,92 @@
+syntax = "proto3";
+package natscope.types.proto;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/proto;protopb";
+
+// Kind of a named schema type.
+enum SchemaTypeKind {
+  SCHEMA_TYPE_KIND_UNSPECIFIED = 0;
+  SCHEMA_TYPE_KIND_MESSAGE = 1;
+  SCHEMA_TYPE_KIND_ENUM = 2;
+  SCHEMA_TYPE_KIND_SERVICE = 3;
+}
+
+// Message, enum or service of a source schema.
+message SchemaType {
+  string full_name = 1;
+  SchemaTypeKind kind = 2;
+  string file = 3;
+  string package = 4;
+  // First line of the type's comment.
+  string comment = 5;
+  // Fields, values or methods.
+  int32 member_count = 6;
+  // Declared in an imported file rather than the source's own.
+  bool dependency = 7;
+  string source_id = 8;
+  string source_revision = 9;
+}
+
+// Message type.
+message SchemaMessage {
+  string full_name = 1;
+  string file = 2;
+  string comment = 3;
+  bool deprecated = 4;
+  repeated SchemaField fields = 5;
+}
+
+// Message field; kind and type_name describe the element, or the value of a map.
+message SchemaField {
+  string name = 1;
+  string json_name = 2;
+  int32 number = 3;
+  // Protobuf kind: "string", "int64", "message", "enum", ...
+  string kind = 4;
+  // Message or enum full name.
+  string type_name = 5;
+  bool repeated = 6;
+  // Key kind of a map field.
+  string map_key = 7;
+  bool optional = 8;
+  bool required = 9;
+  string oneof = 10;
+  bool deprecated = 11;
+  string comment = 12;
+}
+
+// Enum type.
+message SchemaEnum {
+  string full_name = 1;
+  string file = 2;
+  string comment = 3;
+  bool deprecated = 4;
+  repeated SchemaEnumValue values = 5;
+}
+
+// Enum value.
+message SchemaEnumValue {
+  string name = 1;
+  int32 number = 2;
+  string comment = 3;
+  bool deprecated = 4;
+}
+
+// Service.
+message SchemaService {
+  string full_name = 1;
+  string file = 2;
+  string comment = 3;
+  bool deprecated = 4;
+  repeated SchemaMethod methods = 5;
+}
+
+// Service method.
+message SchemaMethod {
+  string name = 1;
+  string input_type = 2;
+  string output_type = 3;
+  bool client_streaming = 4;
+  bool server_streaming = 5;
+  string comment = 6;
+  bool deprecated = 7;
+}

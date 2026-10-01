@@ -1,17 +1,16 @@
-import { useProtoMessageEntities, groupMessagesByPackage } from '@/contexts/proto'
+import { useSchemaTypes } from '@/contexts/proto'
 import ProtoManager from '@/components/proto/ProtoManager'
 import { plural } from '@/utils/plural'
 import { SettingsPage } from './SettingsPage'
 
 export default function ProtoPage() {
-  const { messages } = useProtoMessageEntities()
-  const groupedByPackage = groupMessagesByPackage(messages)
-  const packageCount = Object.keys(groupedByPackage).length
-  const messageCount = messages.length
+  const { data: types = [] } = useSchemaTypes()
+  const messages = types.filter((t) => t.kind === 'message' && !t.dependency)
+  const packageCount = new Set(messages.map((t) => t.packageName)).size
 
   const meta =
-    messageCount > 0
-      ? `${plural(packageCount, 'package')} · ${plural(messageCount, 'message')}`
+    messages.length > 0
+      ? `${plural(packageCount, 'package')} · ${plural(messages.length, 'message')}`
       : 'No proto files loaded'
 
   return (

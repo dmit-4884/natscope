@@ -9,7 +9,8 @@ import (
 
 type typeView struct {
 	FullName       string `json:"fullName"`
-	ProtoFile      string `json:"file"`
+	File           string `json:"file"`
+	Comment        string `json:"comment,omitempty"`
 	SourceID       string `json:"sourceId"`
 	SourceRevision string `json:"sourceRevision,omitempty"`
 }
@@ -31,17 +32,44 @@ type typeInput struct {
 
 type describeOutput struct {
 	typeView
-	Package string      `json:"package"`
-	Fields  []fieldView `json:"fields"`
-	Example any         `json:"example,omitempty" jsonschema:"example JSON payload for this type"`
+	Package string        `json:"package"`
+	Fields  []fieldView   `json:"fields"`
+	Related []messageView `json:"relatedMessages,omitempty" jsonschema:"messages the type reaches through its fields"`
+	Enums   []enumView    `json:"enums,omitempty" jsonschema:"enums the type reaches through its fields"`
+	Example any           `json:"example,omitempty" jsonschema:"example JSON payload for this type"`
+}
+
+type messageView struct {
+	FullName string      `json:"fullName"`
+	Comment  string      `json:"comment,omitempty"`
+	Fields   []fieldView `json:"fields"`
 }
 
 type fieldView struct {
-	Name      string `json:"name"`
-	Number    int32  `json:"number"`
-	Type      string `json:"type"`
-	Label     string `json:"label,omitempty"`
-	IsMessage bool   `json:"isMessage,omitempty" jsonschema:"the field is itself a message; describe its type for nested fields"`
+	Name       string `json:"name"`
+	JSONName   string `json:"jsonName"`
+	Number     int32  `json:"number"`
+	Kind       string `json:"kind" jsonschema:"protobuf kind of the element or map value: string, int64, bool, message, enum..."`
+	TypeName   string `json:"typeName,omitempty" jsonschema:"message or enum full name, described in relatedMessages or enums"`
+	Repeated   bool   `json:"repeated,omitempty"`
+	MapKey     string `json:"mapKey,omitempty" jsonschema:"key kind of a map field"`
+	Optional   bool   `json:"optional,omitempty"`
+	Required   bool   `json:"required,omitempty"`
+	Oneof      string `json:"oneof,omitempty" jsonschema:"oneof group; set at most one field of a group"`
+	Deprecated bool   `json:"deprecated,omitempty"`
+	Comment    string `json:"comment,omitempty"`
+}
+
+type enumView struct {
+	FullName string          `json:"fullName"`
+	Comment  string          `json:"comment,omitempty"`
+	Values   []enumValueView `json:"values"`
+}
+
+type enumValueView struct {
+	Name    string `json:"name"`
+	Number  int32  `json:"number"`
+	Comment string `json:"comment,omitempty"`
 }
 
 type mappingView struct {

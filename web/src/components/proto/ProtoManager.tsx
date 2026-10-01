@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  useProtoSources,
-  useProtoMessageEntities,
-  groupMessagesByPackage,
-} from '@/contexts/proto'
+import { useProtoSources } from '@/contexts/proto'
 import { Spinner, Button, EmptyState, QueryErrorState } from '@/components/ui'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import type { ProtoSource } from '@/api/protoSources'
 import ProtoSourceCard from './ProtoSourceCard'
+import SchemaBrowser from './SchemaBrowser'
 
 function SourcesIcon({ className }: { className?: string }) {
   return (
@@ -26,29 +23,10 @@ function PackageIcon({ className }: { className?: string }) {
   )
 }
 
-function ChevronIcon({ className, expanded }: { className?: string; expanded: boolean }) {
-  return (
-    <svg
-      className={`${className} transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  )
-}
-
 export default function ProtoManager() {
-  const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set())
-  const [messagesExpanded, setMessagesExpanded] = useState(false)
+  const [browserOpen, setBrowserOpen] = useState(true)
 
   const { data: sources = [], isLoading: isLoadingSources, error: sourcesError, refetch: refetchSources } = useProtoSources()
-  const { messages, packages, isLoading: isLoadingMessages } = useProtoMessageEntities()
-
-  const messageCount = messages.length
-  const packageCount = packages.length
-  const groupedByPackage = groupMessagesByPackage(messages)
 
   // ProtoManager is only rendered inside the dedicated Settings page
   // (/settings/proto), so create/edit always route to full-width pages.
@@ -62,20 +40,7 @@ export default function ProtoManager() {
     navigate(`/settings/proto/${source.id}/edit`)
   }
 
-  const togglePackage = (pkg: string) => {
-    setExpandedPackages(prev => {
-      const next = new Set(prev)
-      if (next.has(pkg)) {
-        next.delete(pkg)
-      } else {
-        next.add(pkg)
-      }
-      return next
-    })
-  }
-
   const hasSchemas = sources.some((source) => source.activeSchema)
-  const hasMessages = messageCount > 0
 
   return (
     <>
@@ -119,59 +84,14 @@ export default function ProtoManager() {
 
       {hasSchemas && (
         <SettingsSection
-          title="Available messages"
-          description="Message types compiled from the active source versions"
+          title="Schema browser"
+          description="Messages, enums and services of the active schemas, with their comments"
           icon={<PackageIcon />}
-          badge={hasMessages ? `${packageCount} pkg · ${messageCount} msg` : undefined}
           collapsible
-          isOpen={messagesExpanded}
-          onToggle={() => setMessagesExpanded((prev) => !prev)}
+          isOpen={browserOpen}
+          onToggle={() => setBrowserOpen((prev) => !prev)}
         >
-          {isLoadingMessages ? (
-            <div className="flex items-center justify-center gap-2 text-sm text-content-tertiary py-6">
-              <Spinner size="sm" />
-              <span>Loading proto files...</span>
-            </div>
-          ) : hasMessages ? (
-            <div className="space-y-1">
-              {Object.entries(groupedByPackage).map(([pkg, msgNames]) => {
-                const isExpanded = expandedPackages.has(pkg)
-                return (
-                  <div key={pkg} className="rounded-md overflow-hidden">
-                    <button
-                      onClick={() => togglePackage(pkg)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-surface-secondary rounded-md transition-colors"
-                    >
-                      <ChevronIcon className="w-3.5 h-3.5 text-content-muted" expanded={isExpanded} />
-                      <PackageIcon className="w-3.5 h-3.5 text-blue-500" />
-                      <span className="text-sm font-medium text-gray-700 truncate flex-1">{pkg}</span>
-                      <span className="text-xs text-content-muted">{msgNames.length}</span>
-                    </button>
-                    {isExpanded && (
-                      <div className="ml-5 pl-3 border-l border-border space-y-0.5 py-1">
-                        {msgNames.map((msgName) => (
-                          <div
-                            key={msgName}
-                            className="text-xs text-content-secondary py-1 px-2 rounded hover:bg-surface-secondary truncate"
-                            title={msgName}
-                          >
-                            {msgName}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <EmptyState
-              size="sm"
-              icon={<PackageIcon />}
-              title="No messages loaded"
-              description="Compile a proto source above to load message types."
-            />
-          )}
+          <SchemaBrowser sources={sources} />
         </SettingsSection>
       )}
     </>

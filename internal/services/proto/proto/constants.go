@@ -7,10 +7,6 @@ import "time"
 
 // File-local named constants for proto-service magic numbers.
 const (
-	// estimatedMessagesPerSnapshot is the initial slice capacity hint when
-	// flattening descriptor sets.
-	estimatedMessagesPerSnapshot = 64
-
 	// minActiveSnapshotsForConflictReport is the smallest active set before
 	// MergeWithReport has anything cross-source to compare.
 	minActiveSnapshotsForConflictReport = 2

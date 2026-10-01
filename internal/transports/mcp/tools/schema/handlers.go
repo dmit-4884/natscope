@@ -21,16 +21,20 @@ import (
 )
 
 func (t *Toolset) listTypes(ctx context.Context, _ *mcp.CallToolRequest, in listTypesInput) (*mcp.CallToolResult, listTypesOutput, error) {
+	all, err := mcptransport.MessageTypes(ctx, t.registry)
+	if err != nil {
+		return nil, listTypesOutput{}, err
+	}
 	filter := strings.ToLower(strings.TrimSpace(in.Filter))
-	var matched []entities.ProtoMessageInfo
-	for _, m := range t.registry.ListMessages(ctx) {
+	var matched []entities.SchemaType
+	for _, m := range all {
 		if strings.Contains(strings.ToLower(m.FullName), filter) {
 			matched = append(matched, m)
 		}
 	}
 	shown := matched[:min(len(matched), mcptransport.Limit(in.Limit, defaultTypesLimit, maxTypesLimit))]
 	return nil, listTypesOutput{
-		Types: mcptransport.Items(slices.To(shown, func(m entities.ProtoMessageInfo) typeView { return *converter.Convert(&m, &typeView{}) })),
+		Types: mcptransport.Items(slices.To(shown, func(m entities.SchemaType) typeView { return *converter.Convert(&m, &typeView{}) })),
 		Total: len(matched),
 	}, nil
 }
@@ -40,15 +44,19 @@ func (t *Toolset) describeType(ctx context.Context, _ *mcp.CallToolRequest, in t
 	if err != nil {
 		return nil, describeOutput{}, err
 	}
-	detail, err := t.registry.GetMessage(ctx, info.SourceID, info.FullName)
+	desc, err := t.registry.DescribeType(ctx, info.SourceID, info.FullName, true)
 	if err != nil {
 		return nil, describeOutput{}, err
 	}
+	root := converter.Convert(desc.Messages[0], &messageView{})
 	out := describeOutput{
-		typeView: *converter.Convert(detail, &typeView{}),
-		Package:  detail.Package,
-		Fields:   slices.To(detail.Fields, func(f *entities.ProtoField) fieldView { return *converter.Convert(f, &fieldView{}) }),
+		typeView: *converter.Convert(&info, &typeView{}),
+		Package:  info.Package,
+		Fields:   root.Fields,
+		Related:  slices.To(desc.Messages[1:], func(m *entities.SchemaMessage) messageView { return *converter.Convert(m, &messageView{}) }),
+		Enums:    slices.To(desc.Enums, func(e *entities.SchemaEnum) enumView { return *converter.Convert(e, &enumView{}) }),
 	}
+	out.Comment = root.Comment
 	if example, exErr := t.registry.GenerateExample(ctx, info.SourceID, info.FullName); exErr == nil {
 		out.Example = example
 	}

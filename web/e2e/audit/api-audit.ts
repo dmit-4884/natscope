@@ -313,8 +313,8 @@ export const createSource = (body: Record<string, unknown>) =>
   call<{ source?: { id: string } }>(SVC.sources, 'CreateSource', body)
 export const refreshSource = (sourceId: string) => call(SVC.sources, 'RefreshSource', { sourceId })
 export const deleteSource = (id: string) => call(SVC.sources, 'DeleteSource', { id })
-export const listProtoMessages = (body: Record<string, unknown>) =>
-  call<{ messages?: Array<{ fullName?: string }> }>(SVC.registry, 'ListProtoMessages', body)
+export const listTypes = (body: Record<string, unknown>) =>
+  call<{ types?: Array<{ fullName?: string; kind?: string }> }>(SVC.registry, 'ListTypes', body)
 export const generateExample = (body: Record<string, unknown>) => call<Record<string, unknown>>(SVC.registry, 'GenerateExample', body)
 export const encodeMessage = (body: Record<string, unknown>) => call<Record<string, unknown>>(SVC.codec, 'EncodeMessage', body)
 export const decodeMessage = (body: Record<string, unknown>) => call<Record<string, unknown>>(SVC.codec, 'DecodeMessage', body)

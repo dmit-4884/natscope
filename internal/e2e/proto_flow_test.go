@@ -28,8 +28,9 @@ const testProtoContent = `syntax = "proto3";
 
 package e2eflow;
 
+// A message flowing through the e2e pipeline.
 message FlowMessage {
-  string name = 1;
+  string name = 1; // Display name.
   int32 count = 2;
   repeated string tags = 3;
 }
@@ -73,11 +74,22 @@ func TestProtoFlow(t *testing.T) {
 		assert.True(t, statusResp.Msg.GetLoaded())
 		assert.Greater(t, statusResp.Msg.GetMessageCount(), int32(0))
 
-		msgResp, err := env.registry.GetProtoMessage(ctx, connect.NewRequest(&registrypb.GetProtoMessageRequest{
+		typesResp, err := env.registry.ListTypes(ctx, connect.NewRequest(&registrypb.ListTypesRequest{SourceId: &sourceID}))
+		require.NoError(t, err)
+		require.Len(t, typesResp.Msg.GetTypes(), 1)
+		assert.Equal(t, fullName, typesResp.Msg.GetTypes()[0].GetFullName())
+		assert.Equal(t, "A message flowing through the e2e pipeline.", typesResp.Msg.GetTypes()[0].GetComment())
+		assert.False(t, typesResp.Msg.GetTypes()[0].GetDependency())
+
+		descResp, err := env.registry.DescribeType(ctx, connect.NewRequest(&registrypb.DescribeTypeRequest{
 			FullName: fullName, SourceId: sourceID,
 		}))
 		require.NoError(t, err)
-		assert.Equal(t, fullName, msgResp.Msg.GetMessage().GetFullName())
+		require.Len(t, descResp.Msg.GetMessages(), 1)
+		fields := descResp.Msg.GetMessages()[0].GetFields()
+		require.Len(t, fields, 3)
+		assert.Equal(t, "Display name.", fields[0].GetComment())
+		assert.True(t, fields[2].GetRepeated())
 
 		exResp, err := env.registry.GenerateExample(ctx, connect.NewRequest(&registrypb.GenerateExampleRequest{
 			FullName: fullName, SourceId: sourceID,

@@ -663,9 +663,9 @@ func TestE2E(t *testing.T) {
 		assert.False(t, statusResp.Msg.GetLoaded(), "no proto sources → not loaded")
 		assert.Zero(t, statusResp.Msg.GetMessageCount())
 
-		listResp, err := env.registry.ListProtoMessages(ctx, connect.NewRequest(&registrypb.ListProtoMessagesRequest{}))
+		listResp, err := env.registry.ListTypes(ctx, connect.NewRequest(&registrypb.ListTypesRequest{}))
 		require.NoError(t, err)
-		assert.Empty(t, listResp.Msg.GetMessages(), "empty registry returns no messages")
+		assert.Empty(t, listResp.Msg.GetTypes(), "empty registry returns no types")
 
 		srcResp, err := env.sources.ListSources(ctx, connect.NewRequest(&sourcespb.ListSourcesRequest{}))
 		require.NoError(t, err)

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { decodeMessage } from '@/api/decode'
 import { getErrorMessage } from '@/api/errors'
 import type { RequestMessageRequest, RequestReply } from '@/contexts/messages'
-import { useProtoMessageEntities } from '@/contexts/proto'
+import { useMessageTypes } from '@/contexts/proto'
 import { Alert, Badge, EmptyState, SearchableSelect, Spinner, SwitchHorizontalIcon } from '@/components/ui'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
 import { formatBytes, formatNanoseconds } from '@/utils/formatters'
@@ -68,7 +68,7 @@ function RequestFailure({ error, request }: { error: unknown; request: RequestMe
 }
 
 export function ReplyPanel({ pending, request, reply, error, decodeAs, onDecodeAsChange }: ReplyPanelProps) {
-  const { messages } = useProtoMessageEntities()
+  const { messages } = useMessageTypes()
   const [decoded, setDecoded] = useState<DecodedReply | null>(null)
 
   const typeOptions = useMemo(

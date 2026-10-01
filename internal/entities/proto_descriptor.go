@@ -13,6 +13,7 @@ type ProtoDescriptor struct {
 	// Fingerprint is the SHA-256 of DescriptorSet.
 	Fingerprint  string
 	MessageTypes []string
+	TargetFiles  []string
 	CompiledAt   int64
 }
 

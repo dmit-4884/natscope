@@ -209,9 +209,11 @@ func writeTree(t *testing.T, dir string, files map[string]string) {
 
 func messageNames(svc *Service, t *testing.T, sourceID string) []string {
 	t.Helper()
+	types, err := svc.ListTypes(t.Context(), "")
+	require.NoError(t, err)
 	var out []string
-	for _, m := range svc.ListMessages(t.Context()) {
-		if m.SourceID == sourceID {
+	for _, m := range types {
+		if m.SourceID == sourceID && m.Kind == entities.SchemaTypeMessage {
 			out = append(out, m.FullName)
 		}
 	}
@@ -617,4 +619,41 @@ func TestListRevisions_UnknownSource(t *testing.T) {
 	env := newTestEnv(t)
 	_, err := env.svc.ListRevisions(t.Context(), "missing")
 	require.ErrorIs(t, err, errs.ErrProtoSourceNotFound)
+}
+
+func TestListTypes_MarksDependenciesAndKeepsComments(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+	src, _ := env.createLocal(t, map[string]string{"shop.proto": `syntax = "proto3";
+package shop;
+import "google/protobuf/timestamp.proto";
+// A placed order.
+message Order {
+  google.protobuf.Timestamp at = 1; // When it was placed.
+}
+`})
+	_, outcome, err := env.svc.RefreshSource(t.Context(), src.Id)
+	require.NoError(t, err)
+	require.True(t, outcome.Valid, "diagnostics: %v", outcome.Diagnostics)
+
+	types, err := env.svc.ListTypes(t.Context(), src.Id)
+	require.NoError(t, err)
+	byName := map[string]entities.SchemaType{}
+	for _, ty := range types {
+		byName[ty.FullName] = ty
+	}
+	assert.False(t, byName["shop.Order"].Dependency)
+	assert.Equal(t, "A placed order.", byName["shop.Order"].Comment)
+	assert.Equal(t, LocalRevision, byName["shop.Order"].SourceRevision)
+	assert.True(t, byName["google.protobuf.Timestamp"].Dependency)
+
+	desc, err := env.svc.DescribeType(t.Context(), src.Id, "shop.Order", true)
+	require.NoError(t, err)
+	assert.Equal(t, "When it was placed.", desc.Messages[0].Fields[0].Comment)
+	assert.Equal(t, "google.protobuf.Timestamp", desc.Messages[1].FullName)
+
+	_, err = env.svc.DescribeType(t.Context(), src.Id, "shop.Missing", false)
+	require.ErrorIs(t, err, errs.ErrProtoTypeNotFound)
+	_, err = env.svc.ListTypes(t.Context(), "missing")
+	require.ErrorIs(t, err, errs.ErrMappingSourceNotFound)
 }

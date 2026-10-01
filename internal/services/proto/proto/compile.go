@@ -95,7 +95,7 @@ func (s *Service) compile(
 	rep := &collectingReporter{}
 	compiler := protocompile.Compiler{
 		Resolver:       resolver,
-		SourceInfoMode: protocompile.SourceInfoNone,
+		SourceInfoMode: protocompile.SourceInfoStandard,
 		Reporter:       rep,
 	}
 
@@ -187,7 +187,7 @@ func (s *Service) serialize(fds []protoreflect.FileDescriptor) ([]byte, error) {
 
 		// Convert to FileDescriptorProto.
 		fdp := protodesc.ToFileDescriptorProto(fd)
-		fdp.SourceCodeInfo = nil // Strip to save ~90 % memory.
+		fdp.SourceCodeInfo = protoutils.KeepComments(fdp.SourceCodeInfo)
 
 		descSet.File = append(descSet.File, fdp)
 	}

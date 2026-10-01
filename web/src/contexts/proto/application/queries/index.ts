@@ -1,6 +1,8 @@
 export {
-  useProtoMessageEntities,
-  useProtoMessageEntity,
+  useSchemaTypes,
+  useMessageTypes,
+  useTypeDescription,
+  useMessageExample,
   protoKeys,
 } from './useProto'
 

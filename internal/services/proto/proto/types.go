@@ -4,6 +4,7 @@
 package proto
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
@@ -11,38 +12,39 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
+	"github.com/dmit-4884/natscope/internal/services/proto/registry"
 )
 
-// ListMessages returns all messages from active snapshots, each annotated
-// with SourceID + SourceRevision so the UI can disambiguate same-FQN sources.
-func (s *Service) ListMessages(ctx context.Context) []entities.ProtoMessageInfo {
-	snaps := s.activeSnapshots(ctx)
-	if len(snaps) == 0 {
-		return nil
+// ListTypes returns the messages, enums and services of one source, or of every enabled source when sourceID is empty.
+func (s *Service) ListTypes(ctx context.Context, sourceID string) ([]entities.SchemaType, error) {
+	var snaps []*registry.Snapshot
+	if sourceID == "" {
+		snaps = s.activeSnapshots(ctx)
+	} else {
+		snap, err := s.snapshotForSource(ctx, sourceID)
+		if err != nil {
+			return nil, err
+		}
+		snaps = []*registry.Snapshot{snap}
 	}
 
-	messages := make([]entities.ProtoMessageInfo, 0, estimatedMessagesPerSnapshot)
+	var out []entities.SchemaType
 	for _, snap := range snaps {
-		for _, md := range snap.Schema.Messages {
-			info := protoutils.Info(md)
-			info.SourceID = snap.SourceID
-			info.SourceRevision = snap.Revision
-			messages = append(messages, info)
+		for _, t := range snap.Schema.Summaries() {
+			t.SourceID = snap.SourceID
+			t.SourceRevision = snap.Revision
+			t.Dependency = !slices.Contains(snap.Descriptor.TargetFiles, t.File)
+			out = append(out, t)
 		}
 	}
-
-	slices.SortFunc(messages, func(a, b entities.ProtoMessageInfo) int {
-		if c := strings.Compare(a.FullName, b.FullName); c != 0 {
-			return c
-		}
-		return strings.Compare(a.SourceID, b.SourceID)
+	slices.SortFunc(out, func(a, b entities.SchemaType) int {
+		return cmp.Or(strings.Compare(a.FullName, b.FullName), strings.Compare(a.SourceID, b.SourceID))
 	})
-
-	return messages
+	return out, nil
 }
 
-// GetMessage returns message-type detail within a source's active snapshot.
-func (s *Service) GetMessage(ctx context.Context, sourceID, messageType string) (*entities.ProtoMessageInfo, error) {
+// DescribeType describes a message, enum or service of a source; reachable adds every type it leads to.
+func (s *Service) DescribeType(ctx context.Context, sourceID, fullName string, reachable bool) (*entities.TypeDescription, error) {
 	if sourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
@@ -50,14 +52,11 @@ func (s *Service) GetMessage(ctx context.Context, sourceID, messageType string) 
 	if err != nil {
 		return nil, err
 	}
-	md, ok := snap.Schema.Message(messageType)
+	desc, ok := snap.Schema.Describe(fullName, reachable)
 	if !ok {
-		return nil, errs.ErrProtoMessageNotFound
+		return nil, errs.ErrProtoTypeNotFound
 	}
-	info := protoutils.Info(md)
-	info.SourceID = snap.SourceID
-	info.SourceRevision = snap.Revision
-	return &info, nil
+	return desc, nil
 }
 
 // GenerateExample generates an example JSON object for a message type within a

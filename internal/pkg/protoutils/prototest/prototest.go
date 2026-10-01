@@ -31,6 +31,7 @@ func DescriptorSet(tb testing.TB, sources map[string]string) []byte {
 		Resolver: protocompile.WithStandardImports(&protocompile.SourceResolver{
 			Accessor: protocompile.SourceAccessorFromMap(sources),
 		}),
+		SourceInfoMode: protocompile.SourceInfoStandard,
 	}
 	files, err := compiler.Compile(tb.Context(), targets...)
 	if err != nil {
@@ -49,7 +50,9 @@ func DescriptorSet(tb testing.TB, sources map[string]string) []byte {
 		for i := range imports.Len() {
 			add(imports.Get(i).FileDescriptor)
 		}
-		set.File = append(set.File, protodesc.ToFileDescriptorProto(fd))
+		fdp := protodesc.ToFileDescriptorProto(fd)
+		fdp.SourceCodeInfo = protoutils.KeepComments(fdp.SourceCodeInfo)
+		set.File = append(set.File, fdp)
 	}
 	for _, f := range files {
 		add(f)

@@ -16,6 +16,7 @@ import (
 
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	registrypb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/registry"
+	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
 )
 
 // --- Mocks ---
@@ -23,20 +24,25 @@ import (
 // mockProtoSvc embeds proto.Registry; only registry methods are overridden.
 type mockProtoSvc struct {
 	protosvc.Registry
-	listResult    []entities.ProtoMessageInfo
-	getResult     *entities.ProtoMessageInfo
-	getErr        error
+	types         []entities.SchemaType
+	description   *entities.TypeDescription
+	describeErr   error
+	gotReachable  bool
 	exampleResult map[string]interface{}
 	exampleErr    error
 	statsResult   *entities.ProtoStats
 }
 
-func (m *mockProtoSvc) ListMessages(_ context.Context) []entities.ProtoMessageInfo {
-	return m.listResult
+func (m *mockProtoSvc) ListTypes(_ context.Context, sourceID string) ([]entities.SchemaType, error) {
+	if sourceID == "missing" {
+		return nil, errs.ErrMappingSourceNotFound
+	}
+	return m.types, nil
 }
 
-func (m *mockProtoSvc) GetMessage(_ context.Context, _, _ string) (*entities.ProtoMessageInfo, error) {
-	return m.getResult, m.getErr
+func (m *mockProtoSvc) DescribeType(_ context.Context, _, _ string, reachable bool) (*entities.TypeDescription, error) {
+	m.gotReachable = reachable
+	return m.description, m.describeErr
 }
 
 func (m *mockProtoSvc) GenerateExample(_ context.Context, _, _ string) (any, error) {
@@ -49,59 +55,78 @@ func (m *mockProtoSvc) Stats(_ context.Context) *entities.ProtoStats {
 
 // --- Tests ---
 
-func TestHandler_ListProtoMessages(t *testing.T) {
+func TestHandler_ListTypes(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Success", func(t *testing.T) {
+	t.Run("maps kinds", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoSvc{listResult: []entities.ProtoMessageInfo{
-			{FullName: "test.Msg", SourceID: "src-1"},
+		svc := &mockProtoSvc{types: []entities.SchemaType{
+			{FullName: "test.Msg", Kind: entities.SchemaTypeMessage, SourceID: "src-1", MemberCount: 2, Comment: "A message."},
+			{FullName: "test.Status", Kind: entities.SchemaTypeEnum, SourceID: "src-1", Dependency: true},
+			{FullName: "test.Api", Kind: entities.SchemaTypeService, SourceID: "src-1"},
 		}}
-		handler := New(svc)
 
-		resp, err := handler.ListProtoMessages(t.Context(), connect.NewRequest(&registrypb.ListProtoMessagesRequest{}))
+		resp, err := New(svc).ListTypes(t.Context(), connect.NewRequest(&registrypb.ListTypesRequest{}))
 		require.NoError(t, err)
-		require.Len(t, resp.Msg.Messages, 1)
-		assert.Equal(t, "test.Msg", resp.Msg.Messages[0].GetFullName())
+		require.Len(t, resp.Msg.Types, 3)
+		assert.Equal(t, "test.Msg", resp.Msg.Types[0].GetFullName())
+		assert.Equal(t, "src-1", resp.Msg.Types[0].GetSourceId())
+		assert.Equal(t, int32(2), resp.Msg.Types[0].GetMemberCount())
+		assert.Equal(t, "A message.", resp.Msg.Types[0].GetComment())
+		assert.Equal(t, protopb.SchemaTypeKind_SCHEMA_TYPE_KIND_MESSAGE, resp.Msg.Types[0].GetKind())
+		assert.Equal(t, protopb.SchemaTypeKind_SCHEMA_TYPE_KIND_ENUM, resp.Msg.Types[1].GetKind())
+		assert.True(t, resp.Msg.Types[1].GetDependency())
+		assert.Equal(t, protopb.SchemaTypeKind_SCHEMA_TYPE_KIND_SERVICE, resp.Msg.Types[2].GetKind())
 	})
 
-	t.Run("Empty", func(t *testing.T) {
+	t.Run("unknown source", func(t *testing.T) {
 		t.Parallel()
-		handler := New(&mockProtoSvc{})
-
-		resp, err := handler.ListProtoMessages(t.Context(), connect.NewRequest(&registrypb.ListProtoMessagesRequest{}))
-		require.NoError(t, err)
-		assert.Empty(t, resp.Msg.Messages)
+		_, err := New(&mockProtoSvc{}).ListTypes(t.Context(), connect.NewRequest(&registrypb.ListTypesRequest{SourceId: new("missing")}))
+		assert.ErrorIs(t, err, errs.ErrMappingSourceNotFound)
 	})
 }
 
-func TestHandler_GetProtoMessage(t *testing.T) {
+func TestHandler_DescribeType(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Success", func(t *testing.T) {
+	t.Run("converts nested members", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoSvc{getResult: &entities.ProtoMessageInfo{FullName: "test.Msg", SourceID: "src-1"}}
-		handler := New(svc)
+		svc := &mockProtoSvc{description: &entities.TypeDescription{
+			Messages: []*entities.SchemaMessage{{
+				FullName: "test.Msg",
+				Comment:  "A message.",
+				Fields: []*entities.SchemaField{
+					{Name: "tags", JSONName: "tags", Number: 1, Kind: "string", MapKey: "string", Comment: "Labels."},
+					{Name: "status", JSONName: "status", Number: 2, Kind: "enum", TypeName: "test.Status", Oneof: "state"},
+				},
+			}},
+			Enums: []*entities.SchemaEnum{{FullName: "test.Status", Values: []*entities.SchemaEnumValue{{Name: "OK", Number: 0}}}},
+			Services: []*entities.SchemaService{{FullName: "test.Api", Methods: []*entities.SchemaMethod{
+				{Name: "Get", InputType: "test.Msg", OutputType: "test.Msg", ServerStreaming: true},
+			}}},
+		}}
 
-		resp, err := handler.GetProtoMessage(t.Context(), connect.NewRequest(&registrypb.GetProtoMessageRequest{
-			SourceId: "src-1",
-			FullName: "test.Msg",
+		resp, err := New(svc).DescribeType(t.Context(), connect.NewRequest(&registrypb.DescribeTypeRequest{
+			SourceId: "src-1", FullName: "test.Msg", IncludeReachable: true,
 		}))
 		require.NoError(t, err)
-		require.NotNil(t, resp.Msg.Message)
-		assert.Equal(t, "test.Msg", resp.Msg.Message.GetFullName())
+		assert.True(t, svc.gotReachable)
+		require.Len(t, resp.Msg.Messages, 1)
+		fields := resp.Msg.Messages[0].GetFields()
+		require.Len(t, fields, 2)
+		assert.Equal(t, "string", fields[0].GetMapKey())
+		assert.Equal(t, "Labels.", fields[0].GetComment())
+		assert.Equal(t, "test.Status", fields[1].GetTypeName())
+		assert.Equal(t, "state", fields[1].GetOneof())
+		assert.Equal(t, "OK", resp.Msg.Enums[0].GetValues()[0].GetName())
+		assert.True(t, resp.Msg.Services[0].GetMethods()[0].GetServerStreaming())
 	})
 
-	t.Run("NotFound", func(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoSvc{getErr: errs.ErrProtoMessageNotFound}
-		handler := New(svc)
-
-		_, err := handler.GetProtoMessage(t.Context(), connect.NewRequest(&registrypb.GetProtoMessageRequest{
-			SourceId: "src-1",
-			FullName: "missing.Msg",
-		}))
-		assert.ErrorIs(t, err, errs.ErrProtoMessageNotFound)
+		_, err := New(&mockProtoSvc{describeErr: errs.ErrProtoTypeNotFound}).DescribeType(t.Context(),
+			connect.NewRequest(&registrypb.DescribeTypeRequest{SourceId: "src-1", FullName: "missing.Msg"}))
+		assert.ErrorIs(t, err, errs.ErrProtoTypeNotFound)
 	})
 }
 

@@ -27,10 +27,10 @@ func (f fakeMappings) Resolver(context.Context) *natsutil.MappingResolver { retu
 
 type fakeRegistry struct {
 	protosvc.Registry
-	types []entities.ProtoMessageInfo
+	types []entities.SchemaType
 }
 
-func (f fakeRegistry) ListMessages(context.Context) []entities.ProtoMessageInfo { return f.types }
+func (f fakeRegistry) ListTypes(context.Context, string) ([]entities.SchemaType, error) { return f.types, nil }
 
 func newToolset() *Toolset {
 	pinned := "fp-2"
@@ -40,7 +40,7 @@ func newToolset() *Toolset {
 		fakeMappings{resolver: natsutil.NewMappingResolver(entities.SubjectMappings{
 			{BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "src", PinnedFingerprint: &pinned},
 		})},
-		fakeRegistry{types: []entities.ProtoMessageInfo{{FullName: "o.v1.Refund", SourceID: "src"}}},
+		fakeRegistry{types: []entities.SchemaType{{FullName: "o.v1.Refund", Kind: entities.SchemaTypeMessage, SourceID: "src"}}},
 	)
 }
 

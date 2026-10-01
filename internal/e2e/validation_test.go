@@ -234,9 +234,9 @@ func TestValidation(t *testing.T) {
 			connect.CodeInvalidArgument,
 		},
 		{
-			"registry.GetProtoMessage missing full_name/source_id",
+			"registry.DescribeType missing full_name/source_id",
 			func() error {
-				_, err := env.registry.GetProtoMessage(ctx, connect.NewRequest(&registrypb.GetProtoMessageRequest{}))
+				_, err := env.registry.DescribeType(ctx, connect.NewRequest(&registrypb.DescribeTypeRequest{}))
 				return err
 			},
 			connect.CodeInvalidArgument,

@@ -42,34 +42,41 @@ func (h *Handler) HTTPHandler(opts ...connect.HandlerOption) (string, http.Handl
 	return registryconnect.NewRegistryServiceHandler(h, opts...)
 }
 
-// ListProtoMessages returns all available proto message types across active
-// source snapshots.
-func (h *Handler) ListProtoMessages(
+// ListTypes lists the schema types of one source, or of every enabled source.
+func (h *Handler) ListTypes(
 	ctx context.Context,
-	_ *connect.Request[registrypb.ListProtoMessagesRequest],
-) (*connect.Response[registrypb.ListProtoMessagesResponse], error) {
-	messages := h.protoService.ListMessages(ctx)
-
-	return connect.NewResponse(&registrypb.ListProtoMessagesResponse{
-		Messages: slices.To(messages, func(m entities.ProtoMessageInfo) *protopb.ProtoMessageInfo {
-			return converter.Convert(m, &protopb.ProtoMessageInfo{})
-		}),
-	}), nil
-}
-
-// GetProtoMessage returns information about a specific message type within a
-// source.
-func (h *Handler) GetProtoMessage(
-	ctx context.Context,
-	req *connect.Request[registrypb.GetProtoMessageRequest],
-) (*connect.Response[registrypb.GetProtoMessageResponse], error) {
-	info, err := h.protoService.GetMessage(ctx, req.Msg.SourceId, req.Msg.FullName)
+	req *connect.Request[registrypb.ListTypesRequest],
+) (*connect.Response[registrypb.ListTypesResponse], error) {
+	types, err := h.protoService.ListTypes(ctx, req.Msg.GetSourceId())
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&registrypb.GetProtoMessageResponse{
-		Message: converter.Convert(info, &protopb.ProtoMessageInfo{}),
-	}), nil
+	return connect.NewResponse(&registrypb.ListTypesResponse{Types: slices.To(types, typeToProto)}), nil
+}
+
+// DescribeType describes a message, enum or service of a source.
+func (h *Handler) DescribeType(
+	ctx context.Context,
+	req *connect.Request[registrypb.DescribeTypeRequest],
+) (*connect.Response[registrypb.DescribeTypeResponse], error) {
+	desc, err := h.protoService.DescribeType(ctx, req.Msg.SourceId, req.Msg.FullName, req.Msg.IncludeReachable)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(converter.Convert(desc, &registrypb.DescribeTypeResponse{})), nil
+}
+
+func typeToProto(t entities.SchemaType) *protopb.SchemaType {
+	pb := converter.Convert(t, &protopb.SchemaType{}, converter.WithIgnoreFields("Kind"))
+	switch t.Kind {
+	case entities.SchemaTypeMessage:
+		pb.Kind = protopb.SchemaTypeKind_SCHEMA_TYPE_KIND_MESSAGE
+	case entities.SchemaTypeEnum:
+		pb.Kind = protopb.SchemaTypeKind_SCHEMA_TYPE_KIND_ENUM
+	case entities.SchemaTypeService:
+		pb.Kind = protopb.SchemaTypeKind_SCHEMA_TYPE_KIND_SERVICE
+	}
+	return pb
 }
 
 // GenerateExample generates an example JSON for a message type within a source.

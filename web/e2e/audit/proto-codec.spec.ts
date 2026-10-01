@@ -28,8 +28,8 @@ test.afterAll(async () => {
 
 test.describe('proto: registry', () => {
   test('CHK compiled source lists its nested message types', async () => {
-    const res = await A.listProtoMessages({ sourceId })
-    const names = (res.messages ?? []).map((m) => m.fullName)
+    const res = await A.listTypes({ sourceId })
+    const names = (res.types ?? []).map((m) => m.fullName)
     expect(names).toContain('audit.codec.Outer')
     expect(names).toContain('audit.codec.Inner')
   })

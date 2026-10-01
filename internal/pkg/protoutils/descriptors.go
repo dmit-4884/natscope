@@ -60,6 +60,7 @@ func MergeWithReport(inputs []SchemaInput) (*MergeReport, error) {
 		}
 
 		for _, file := range fds.File {
+			file.SourceCodeInfo = nil
 			name := file.GetName()
 			fileBytes, _ := proto.Marshal(file) //nolint:errcheck // deterministic marshal; error unreachable
 

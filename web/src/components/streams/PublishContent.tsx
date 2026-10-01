@@ -8,7 +8,7 @@ import { getProtoMessageExample } from '@/api/proto'
 import { getMessages } from '@/api/messages'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
 import { formatBytes } from '@/utils/formatters'
-import { useProtoMessageEntity } from '@/contexts/proto'
+import { messageCompletions, useTypeDescription } from '@/contexts/proto'
 import { useSubjectMappingEntity } from '@/contexts/mappings'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
 import { jsonSyntaxError, processHelpers } from '@/utils/helpers'
@@ -122,10 +122,8 @@ export default function PublishContent({
     onWildcardValuesChange(newValues)
   }
 
-  const { message: protoMessage, isLoading: protoLoading } = useProtoMessageEntity(
-    sourceId ?? null,
-    messageType ?? null,
-  )
+  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null)
+  const protoMessage = protoDescription?.messages[0]
 
   const publishMutation = useMutation({
     mutationFn: publishMessage,
@@ -400,15 +398,10 @@ export default function PublishContent({
   }
 
   // Schema-aware key completion in the editor (proto mode only).
-  const completionFields = useMemo(() => {
-    if (!messageType || !protoMessage) return undefined
-    return protoMessage.fields.map((f) => ({
-      name: f.name,
-      type: f.type,
-      repeated: f.isRepeated(),
-      isMessage: f.isMessage,
-    }))
-  }, [messageType, protoMessage])
+  const completionFields = useMemo(
+    () => (messageType && protoMessage ? messageCompletions(protoMessage) : undefined),
+    [messageType, protoMessage],
+  )
 
   return (
     <div className="p-4 space-y-4" onKeyDown={handleContainerKeyDown}>
@@ -444,7 +437,7 @@ export default function PublishContent({
           isJsonMode={isJsonMode}
           messageType={messageType}
           mappedMessageType={mappedMessageType}
-          protoFieldCount={protoMessage?.fieldCount}
+          protoFieldCount={protoMessage?.fields.length}
           onModeChange={setEncodingMode}
           onAddMapping={handleAddMapping}
         />

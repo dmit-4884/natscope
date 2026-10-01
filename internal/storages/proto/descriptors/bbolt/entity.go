@@ -13,5 +13,6 @@ type descriptorDoc struct {
 	DescriptorSet []byte   `json:"descriptorSet,omitempty"`
 	Fingerprint   string   `json:"fingerprint,omitempty"`
 	MessageTypes  []string `json:"messageTypes,omitempty"`
+	TargetFiles   []string `json:"targetFiles,omitempty"`
 	CompiledAt    int64    `json:"compiledAt,omitempty"`
 }

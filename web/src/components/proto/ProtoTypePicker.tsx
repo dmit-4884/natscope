@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui'
-import { useProtoMessageEntities } from '@/contexts/proto'
+import { shortTypeName, useMessageTypes } from '@/contexts/proto'
 
 interface Props {
   /** Source whose snapshot is queried for available types. */
@@ -31,7 +31,7 @@ export function ProtoTypePicker({
   placeholder = 'Select type…',
   disabled,
 }: Props) {
-  const { messages, isLoading } = useProtoMessageEntities()
+  const { messages, isLoading } = useMessageTypes()
 
   const sourceMessages = useMemo(
     () => messages.filter((m) => m.sourceId === sourceId),
@@ -39,14 +39,15 @@ export function ProtoTypePicker({
   )
 
   const options = useMemo<SearchableSelectOption[]>(() => {
-    const sorted = [...sourceMessages].sort((a, b) => {
-      const pkgCmp = a.packageName.localeCompare(b.packageName)
-      if (pkgCmp !== 0) return pkgCmp
-      return a.shortName().localeCompare(b.shortName())
-    })
+    const sorted = [...sourceMessages].sort(
+      (a, b) =>
+        Number(a.dependency) - Number(b.dependency) ||
+        a.packageName.localeCompare(b.packageName) ||
+        a.fullName.localeCompare(b.fullName),
+    )
     return sorted.map((m) => ({
       value: m.fullName,
-      label: m.packageName ? `${m.packageName} · ${m.shortName()}` : m.shortName(),
+      label: m.packageName ? `${m.packageName} · ${shortTypeName(m.fullName)}` : shortTypeName(m.fullName),
     }))
   }, [sourceMessages])
 

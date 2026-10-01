@@ -4,15 +4,15 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto
 
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
-import "types/proto/proto_message_info.proto";
+import "types/proto/schema_type.proto";
 
 // Provides access to the loaded protobuf message type registry.
 service RegistryService {
-  // Retrieves all registered protobuf message types currently loaded in the registry.
-  rpc ListProtoMessages(ListProtoMessagesRequest) returns (ListProtoMessagesResponse) {}
+  // Lists the messages, enums and services of one source, or of every enabled source.
+  rpc ListTypes(ListTypesRequest) returns (ListTypesResponse) {}
 
-  // Retrieves detailed information about a single protobuf message type by its fully qualified name.
-  rpc GetProtoMessage(GetProtoMessageRequest) returns (GetProtoMessageResponse) {}
+  // Describes a message, enum or service, optionally with every type it reaches.
+  rpc DescribeType(DescribeTypeRequest) returns (DescribeTypeResponse) {}
 
   // Generates an example JSON representation for the specified protobuf message type with default values.
   rpc GenerateExample(GenerateExampleRequest) returns (GenerateExampleResponse) {}
@@ -21,30 +21,31 @@ service RegistryService {
   rpc GetProtoStatus(GetProtoStatusRequest) returns (GetProtoStatusResponse) {}
 }
 
-// Defines the request message for listing all registered protobuf message types.
-message ListProtoMessagesRequest {}
-
-// Defines the response message for listing all registered protobuf message types.
-message ListProtoMessagesResponse {
-  // Required. List of all protobuf message types currently loaded in the registry.
-  repeated .natscope.types.proto.ProtoMessageInfo messages = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+// Request for ListTypes.
+message ListTypesRequest {
+  // Source to list; every enabled source when unset.
+  optional string source_id = 1;
 }
 
-// Defines the request message for retrieving a single protobuf message type.
-message GetProtoMessageRequest {
-  // Required. Fully qualified protobuf message type name.
-  // Format: "package.MessageName" (e.g., "google.protobuf.Timestamp").
-  string full_name = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
-
-  // Required. Identifier of the proto source whose snapshot is queried.
-  // The same FullName can exist in multiple sources with different schemas.
-  string source_id = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+// Response for ListTypes.
+message ListTypesResponse {
+  repeated .natscope.types.proto.SchemaType types = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// Defines the response message for retrieving a single protobuf message type.
-message GetProtoMessageResponse {
-  // Required. Detailed information about the requested protobuf message type.
-  .natscope.types.proto.ProtoMessageInfo message = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+// Request for DescribeType.
+message DescribeTypeRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+  // Fully qualified name of a message, enum or service.
+  string full_name = 2 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
+  // Also describe every message and enum the type leads to.
+  bool include_reachable = 3;
+}
+
+// Response for DescribeType; the requested type comes first in its list.
+message DescribeTypeResponse {
+  repeated .natscope.types.proto.SchemaMessage messages = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated .natscope.types.proto.SchemaEnum enums = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated .natscope.types.proto.SchemaService services = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the request message for generating an example JSON for a protobuf message type.

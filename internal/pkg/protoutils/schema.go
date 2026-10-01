@@ -23,6 +23,7 @@ type Schema struct {
 	Types    *dynamicpb.Types
 	Messages map[string]protoreflect.MessageDescriptor
 	Enums    map[string]protoreflect.EnumDescriptor
+	Services map[string]protoreflect.ServiceDescriptor
 }
 
 // ParseSchema parses FileDescriptorSet bytes; map entry types are left out of Messages.
@@ -46,9 +47,14 @@ func ParseSchema(data []byte) (*Schema, error) {
 		Types:    dynamicpb.NewTypes(files),
 		Messages: make(map[string]protoreflect.MessageDescriptor),
 		Enums:    make(map[string]protoreflect.EnumDescriptor),
+		Services: make(map[string]protoreflect.ServiceDescriptor),
 	}
 	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 		s.collect(fd.Messages(), fd.Enums())
+		services := fd.Services()
+		for i := range services.Len() {
+			s.Services[string(services.Get(i).FullName())] = services.Get(i)
+		}
 		return true
 	})
 	return s, nil

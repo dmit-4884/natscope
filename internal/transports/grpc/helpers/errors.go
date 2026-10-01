@@ -79,6 +79,7 @@ var commonDomainErrors = []struct {
 	// Proto codec/registry — shared by codec, registry, publish, live.
 	{errs.ErrNoProtoSources, errorMapping{codes.FailedPrecondition, "no proto sources configured", "NO_PROTO_SOURCES"}},
 	{errs.ErrProtoMessageNotFound, errorMapping{codes.NotFound, "proto message not found", "PROTO_MESSAGE_NOT_FOUND"}},
+	{errs.ErrProtoTypeNotFound, errorMapping{codes.NotFound, "proto type not found", "PROTO_TYPE_NOT_FOUND"}},
 	{errs.ErrSchemaConflict, errorMapping{codes.FailedPrecondition, "schema conflict", "SCHEMA_CONFLICT"}},
 
 	// Workspace import/export.
