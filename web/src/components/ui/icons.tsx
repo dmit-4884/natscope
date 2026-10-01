@@ -179,8 +179,7 @@ export function LogoIcon({ className }: IconProps) {
     <svg fill="none" stroke="currentColor" viewBox="0 0 32 32" aria-hidden="true" strokeWidth={3} className={className ?? 'w-4 h-4'}>
       <path
         strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M5 11V7a2 2 0 0 1 2-2h4M21 5h4a2 2 0 0 1 2 2v4M27 21v4a2 2 0 0 1-2 2h-4M11 27H7a2 2 0 0 1-2-2v-4"
+        d="M5.19 12.07A11.5 11.5 0 0 1 12.07 5.19M19.93 5.19A11.5 11.5 0 0 1 26.81 12.07M26.81 19.93A11.5 11.5 0 0 1 19.93 26.81M12.07 26.81A11.5 11.5 0 0 1 5.19 19.93"
       />
       <circle cx="16" cy="16" r="4" fill="currentColor" stroke="none" />
     </svg>

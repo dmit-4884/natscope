@@ -19,9 +19,9 @@ export default defineConfig({
     hostname: SITE_URL
   },
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg?v=2' }],
-    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png?v=2' }],
-    ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png?v=2' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg?v=3' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png?v=3' }],
+    ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png?v=3' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'Natscope' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }]
@@ -39,7 +39,7 @@ export default defineConfig({
     ]
   },
   themeConfig: {
-    logo: '/logo.svg?v=2',
+    logo: '/logo.svg?v=3',
     search: {
       provider: 'local'
     },
