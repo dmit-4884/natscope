@@ -20,16 +20,25 @@ import (
 // protoSourceItem is the NON-SECRET projection of a proto source — git auth
 // Token deliberately absent.
 type protoSourceItem struct {
-	Name            string   `json:"name"`
-	SourceType      string   `json:"sourceType"`
-	Repository      string   `json:"repository,omitempty"`
-	LocalPath       *string  `json:"localPath,omitempty"`
-	WatcherEnabled  bool     `json:"watcherEnabled,omitempty"`
-	Files           []string `json:"files,omitempty"`
-	IncludeDirs     []string `json:"includeDirs,omitempty"`
-	ImportRoots     []string `json:"importRoots,omitempty"`
-	ExcludePrefixes []string `json:"excludePrefixes,omitempty"`
-	Ref             string   `json:"ref,omitempty"`
+	Name            string      `json:"name"`
+	SourceType      string      `json:"sourceType"`
+	Repository      string      `json:"repository,omitempty"`
+	LocalPath       *string     `json:"localPath,omitempty"`
+	WatcherEnabled  bool        `json:"watcherEnabled,omitempty"`
+	ImportRoots     []string    `json:"importRoots,omitempty"`
+	ExcludePrefixes []string    `json:"excludePrefixes,omitempty"`
+	Ref             string      `json:"ref,omitempty"`
+	Upload          *uploadItem `json:"upload,omitempty"`
+}
+
+type uploadItem struct {
+	Files         []uploadFileItem `json:"files,omitempty"`
+	DescriptorSet []byte           `json:"descriptorSet,omitempty"`
+}
+
+type uploadFileItem struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
 }
 
 // ProtoSourcesSection exports/imports proto sources WITHOUT git tokens; merge
@@ -58,7 +67,24 @@ func (s *ProtoSourcesSection) Export(ctx context.Context) (json.RawMessage, erro
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(newItemsPayload(slices.To(all, redactProtoSource)))
+	items := make([]protoSourceItem, 0, len(all))
+	for _, src := range all {
+		item := redactProtoSource(src)
+		if src.SourceType == entities.SourceTypeUpload && src.ActiveSchema != nil {
+			upload, uErr := s.svc.UploadedSchema(ctx, src.Id)
+			if uErr != nil {
+				return nil, uErr
+			}
+			item.Upload = &uploadItem{
+				DescriptorSet: upload.DescriptorSet,
+				Files: slices.To(upload.Files, func(f entities.ProtoFileEntry) uploadFileItem {
+					return uploadFileItem{Path: f.Path, Content: f.Content}
+				}),
+			}
+		}
+		items = append(items, item)
+	}
+	return json.Marshal(newItemsPayload(items))
 }
 
 func (s *ProtoSourcesSection) Validate(
@@ -148,15 +174,28 @@ func (s *ProtoSourcesSection) create(ctx context.Context, it protoSourceItem, re
 		return err
 	}
 	res.Created++
-	if it.Ref == "" {
-		return nil
-	}
-	_, outcome, err := s.svc.SelectRef(ctx, src.Id, it.Ref)
 	switch {
-	case err != nil:
-		res.Warnings = append(res.Warnings, fmt.Sprintf("source %q: ref %q not selected: %v", it.Name, it.Ref, err))
-	case !outcome.Valid:
-		res.Warnings = append(res.Warnings, fmt.Sprintf("source %q: ref %q does not compile", it.Name, it.Ref))
+	case it.Ref != "":
+		_, outcome, err := s.svc.SelectRef(ctx, src.Id, it.Ref)
+		switch {
+		case err != nil:
+			res.Warnings = append(res.Warnings, fmt.Sprintf("source %q: ref %q not selected: %v", it.Name, it.Ref, err))
+		case !outcome.Valid:
+			res.Warnings = append(res.Warnings, fmt.Sprintf("source %q: ref %q does not compile", it.Name, it.Ref))
+		}
+	case it.Upload != nil:
+		_, outcome, err := s.svc.UploadSchema(ctx, src.Id, entities.SchemaUpload{
+			DescriptorSet: it.Upload.DescriptorSet,
+			Files: slices.To(it.Upload.Files, func(f uploadFileItem) entities.ProtoFileEntry {
+				return entities.ProtoFileEntry{Path: f.Path, Content: f.Content}
+			}),
+		})
+		switch {
+		case err != nil:
+			res.Warnings = append(res.Warnings, fmt.Sprintf("source %q: upload not restored: %v", it.Name, err))
+		case !outcome.Valid:
+			res.Warnings = append(res.Warnings, fmt.Sprintf("source %q: uploaded schema does not compile", it.Name))
+		}
 	}
 	return nil
 }
@@ -173,8 +212,6 @@ func redactProtoSource(src *entities.ProtoSource) protoSourceItem {
 		Repository:      src.Repository,
 		LocalPath:       src.LocalPath,
 		WatcherEnabled:  src.WatcherEnabled,
-		Files:           src.Files,
-		IncludeDirs:     src.IncludeDirs,
 		ImportRoots:     src.ImportRoots,
 		ExcludePrefixes: src.ExcludePrefixes,
 	}
@@ -187,8 +224,6 @@ func toProtoSourceCreate(it protoSourceItem) *entities.ProtoSourceCreate {
 		Repository:      it.Repository,
 		LocalPath:       it.LocalPath,
 		WatcherEnabled:  ptr.Wrap(it.WatcherEnabled),
-		Files:           it.Files,
-		IncludeDirs:     it.IncludeDirs,
 		ImportRoots:     it.ImportRoots,
 		ExcludePrefixes: it.ExcludePrefixes,
 	}

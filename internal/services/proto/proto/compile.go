@@ -108,15 +108,15 @@ func (s *Service) compile(
 	compiled, compileErr := compiler.Compile(ctx, layout.Targets...)
 
 	for _, e := range rep.errs {
-		out.Diags = append(out.Diags, s.enrichHint(errorWithPosToDiagnostic(e, entities.DiagnosticError, nil), layout))
+		out.Diags = append(out.Diags, s.enrichHint(errorWithPosToDiagnostic(e, entities.DiagnosticError), layout))
 	}
 	for _, w := range rep.warnings {
-		out.Diags = append(out.Diags, errorWithPosToDiagnostic(w, entities.DiagnosticWarning, nil))
+		out.Diags = append(out.Diags, errorWithPosToDiagnostic(w, entities.DiagnosticWarning))
 	}
 	if compileErr != nil && !errors.Is(compileErr, reporter.ErrInvalidSource) {
 		switch ewp, ok := errors.AsType[reporter.ErrorWithPos](compileErr); {
 		case ok:
-			out.Diags = append(out.Diags, s.enrichHint(errorWithPosToDiagnostic(ewp, entities.DiagnosticError, nil), layout))
+			out.Diags = append(out.Diags, s.enrichHint(errorWithPosToDiagnostic(ewp, entities.DiagnosticError), layout))
 		case len(out.Diags) == 0:
 			return nil, compileErr
 		default:

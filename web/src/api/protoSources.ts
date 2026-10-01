@@ -9,7 +9,7 @@ import { SourceType, RefKind } from '../gen/types/proto/proto_source_pb'
 import type { CompileOutcome as PbOutcome } from '../gen/services/grpc/proto/v1/sources/proto_sources_service_pb'
 import { sourcesClient } from './grpc/clients'
 
-export type ProtoSourceType = 'git' | 'local' | 'files'
+export type ProtoSourceType = 'git' | 'local' | 'upload'
 
 /** Snapshot of the most recent compile attempt — server-populated only. */
 interface ProtoCompileResult {
@@ -31,8 +31,6 @@ export interface ProtoSource {
   localPath?: string
   watcherEnabled: boolean
   enabled: boolean
-  files: string[]
-  includeDirs: string[]
   // Manual import roots; non-empty disables auto-detection, empty = auto.
   importRoots?: string[]
   // Slash-relative prefixes excluded from compilation (e.g. "pb", "gen").
@@ -44,7 +42,7 @@ export interface ProtoSource {
   updated_at?: number
 }
 
-export type RefKindName = 'tag' | 'branch' | 'commit'
+type RefKindName = 'tag' | 'branch' | 'commit'
 
 export interface ProtoRef {
   name: string
@@ -82,6 +80,10 @@ export interface SourceUpdateResult {
   outcome: CompileOutcome
 }
 
+export type SchemaUploadContent =
+  | { kind: 'files'; files: Array<{ path: string; content: string }> }
+  | { kind: 'descriptorSet'; data: Uint8Array }
+
 export interface ProtoSourcesList {
   items: ProtoSource[]
   next_cursor?: string
@@ -95,8 +97,6 @@ export interface CreateProtoSourceRequest {
   token?: string
   localPath?: string
   watcherEnabled?: boolean
-  files?: string[]
-  includeDirs?: string[]
   importRoots?: string[]
   excludePrefixes?: string[]
 }
@@ -106,8 +106,6 @@ export interface UpdateProtoSourceRequest {
   repository?: string
   token?: string
   localPath?: string
-  files?: string[]
-  includeDirs?: string[]
   importRoots?: string[]
   excludePrefixes?: string[]
 }
@@ -116,8 +114,8 @@ function sourceTypeFromProto(st: SourceType): ProtoSourceType {
   switch (st) {
     case SourceType.LOCAL:
       return 'local'
-    case SourceType.FILES:
-      return 'files'
+    case SourceType.UPLOAD:
+      return 'upload'
     case SourceType.GIT:
     case SourceType.UNSPECIFIED:
     default:
@@ -129,8 +127,8 @@ function sourceTypeToProto(st: ProtoSourceType): SourceType {
   switch (st) {
     case 'local':
       return SourceType.LOCAL
-    case 'files':
-      return SourceType.FILES
+    case 'upload':
+      return SourceType.UPLOAD
     case 'git':
     default:
       return SourceType.GIT
@@ -146,8 +144,6 @@ function toProtoSource(p: ProtoSourceProto): ProtoSource {
     localPath: p.localPath,
     watcherEnabled: p.watcherEnabled,
     enabled: p.enabled,
-    files: p.files ?? [],
-    includeDirs: p.includeDirs ?? [],
     importRoots: p.importRoots ?? [],
     excludePrefixes: p.excludePrefixes ?? [],
     lastCompile: p.lastCompile
@@ -238,8 +234,6 @@ export async function createProtoSource(data: CreateProtoSourceRequest): Promise
     token: data.token,
     localPath: data.localPath,
     watcherEnabled: data.watcherEnabled,
-    files: data.files ?? [],
-    includeDirs: data.includeDirs ?? [],
     importRoots: data.importRoots ?? [],
     excludePrefixes: data.excludePrefixes ?? [],
   })
@@ -256,8 +250,6 @@ export async function updateProtoSource(
     repository: data.repository,
     token: data.token,
     localPath: data.localPath,
-    files: data.files ?? [],
-    includeDirs: data.includeDirs ?? [],
     importRoots: data.importRoots ?? [],
     excludePrefixes: data.excludePrefixes ?? [],
   })
@@ -318,6 +310,17 @@ export async function listSourceRefs(sourceId: string): Promise<ProtoRef[]> {
 
 export async function selectSourceRef(sourceId: string, ref: string): Promise<SourceUpdateResult> {
   const response = await sourcesClient.selectRef({ sourceId, ref })
+  return { source: toProtoSource(response.source!), outcome: fromPbOutcome(response.outcome) }
+}
+
+export async function uploadSchema(sourceId: string, content: SchemaUploadContent): Promise<SourceUpdateResult> {
+  const response = await sourcesClient.uploadSchema({
+    sourceId,
+    content:
+      content.kind === 'files'
+        ? { case: 'files', value: { files: content.files } }
+        : { case: 'descriptorSet', value: content.data },
+  })
   return { source: toProtoSource(response.source!), outcome: fromPbOutcome(response.outcome) }
 }
 

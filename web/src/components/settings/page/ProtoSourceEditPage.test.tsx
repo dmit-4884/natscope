@@ -9,6 +9,7 @@ vi.mock('@/api/protoSources', async (importOriginal) => ({
   validateLocalPath: vi.fn(),
   validateRepository: vi.fn(),
   createProtoSource: vi.fn(),
+  uploadSchema: vi.fn(),
 }))
 
 const api = vi.mocked(protoSourcesApi)
@@ -60,8 +61,6 @@ describe('ProtoSourceEditPage — validate before save', () => {
       localPath: '/tmp/ok',
       watcherEnabled: true,
       enabled: true,
-      files: [],
-      includeDirs: [],
       created_at: 0,
     })
 
@@ -74,6 +73,52 @@ describe('ProtoSourceEditPage — validate before save', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Source' }))
 
     await waitFor(() => expect(api.createProtoSource).toHaveBeenCalledTimes(1))
+  })
+
+  it('creates an upload source and uploads the picked files', async () => {
+    api.createProtoSource.mockResolvedValue({
+      id: 'src-up',
+      name: 'uploads',
+      sourceType: 'upload',
+      repository: '',
+      watcherEnabled: false,
+      enabled: true,
+      created_at: 0,
+    })
+    api.uploadSchema.mockResolvedValue({
+      source: {} as protoSourcesApi.ProtoSource,
+      outcome: { valid: false, messageTypes: 0, fileDescriptors: 0, diagnostics: [
+        { severity: 'error', file: 'shop/order.proto', line: 3, column: 1, message: 'syntax error: unexpected identifier' },
+      ] },
+    })
+
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: /Upload/ }))
+    fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'uploads' } })
+    fireEvent.change(screen.getByLabelText('Proto files or descriptor set'), {
+      target: {
+        files: [
+          new File(['syntax = "proto3";'], 'order.proto'),
+          new File(['version: v2'], 'buf.yaml'),
+          new File(['# notes'], 'README.md'),
+        ],
+      },
+    })
+    expect(await screen.findByTestId('schema-upload-selected')).toHaveTextContent('1 .proto file · 1 buf config · 1 other skipped')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Source' }))
+
+    await waitFor(() => expect(api.uploadSchema).toHaveBeenCalledTimes(1))
+    expect(api.createProtoSource).toHaveBeenCalledWith(expect.objectContaining({ name: 'uploads', sourceType: 'upload' }))
+    expect(api.uploadSchema).toHaveBeenCalledWith('src-up', {
+      kind: 'files',
+      files: [
+        { path: 'order.proto', content: 'syntax = "proto3";' },
+        { path: 'buf.yaml', content: 'version: v2' },
+      ],
+    })
+    expect(await screen.findByText('syntax error: unexpected identifier')).toBeInTheDocument()
   })
 
   it('blocks Save for a git repository the server cannot reach', async () => {

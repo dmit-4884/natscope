@@ -10,6 +10,7 @@ import {
   useValidateRepository,
   useProtoSource,
   useRefreshSource,
+  useUploadSchema,
 } from '@/contexts/proto'
 import type {
   CompileOutcome,
@@ -18,6 +19,8 @@ import type {
   UpdateProtoSourceRequest,
 } from '@/api/protoSources'
 import { CompileDiagnosticsList } from '@/components/proto/CompileDiagnosticsList'
+import { SchemaUploadPicker } from '@/components/proto/SchemaUploadPicker'
+import type { PreparedUpload } from '@/components/proto/schemaUpload'
 
 // Splits a textarea value into a clean list of paths. Accepts both newlines
 // and commas as separators (often pasted from CLI args, JSON arrays, etc.).
@@ -32,24 +35,16 @@ interface Props {
   mode: 'create' | 'edit'
 }
 
-// Automatic (git/local): heuristic directory/repo walk, flagged experimental
-// in the UI. Manual: explicit .proto path list, strict resolution only.
-type SourceMode = 'automatic' | 'manual'
-
-function modeOf(t: ProtoSourceType): SourceMode {
-  return t === 'files' ? 'manual' : 'automatic'
-}
-
 const TYPE_OPTIONS: { value: ProtoSourceType; label: string; hint: string }[] = [
   { value: 'git', label: 'Git Repository', hint: 'Auto-walk · from tag' },
   { value: 'local', label: 'Local Directory', hint: 'Auto-walk · watched folder' },
-  { value: 'files', label: 'Manual Files', hint: 'Strict · explicit path list' },
+  { value: 'upload', label: 'Upload', hint: 'Files, folder or descriptor set' },
 ]
 
 const TYPE_BADGE: Record<ProtoSourceType, 'primary' | 'warning' | 'success'> = {
   git: 'primary',
   local: 'warning',
-  files: 'success',
+  upload: 'success',
 }
 
 export default function ProtoSourceEditPage({ mode }: Props) {
@@ -66,10 +61,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
   const [token, setToken] = useState('')
   const [localPath, setLocalPath] = useState('')
   const [watcherEnabled, setWatcherEnabled] = useState(true)
-  // Manual Files & Include Directories are bulk-first: the user pastes paths
-  // separated by newlines or commas. Parsed only when validating/saving.
-  const [filesText, setFilesText] = useState('')
-  const [includeDirsText, setIncludeDirsText] = useState('')
+  const [pendingUpload, setPendingUpload] = useState<PreparedUpload | null>(null)
   // Import Roots, when set, disables auto-detection entirely. Exclude Prefixes
   // drop whole subtrees before resolution, fixing duplicate vendored files.
   const [importRootsText, setImportRootsText] = useState('')
@@ -88,7 +80,8 @@ export default function ProtoSourceEditPage({ mode }: Props) {
   const validateLocal = useValidateLocalPath()
   const validateRepo = useValidateRepository()
   const refreshMutation = useRefreshSource()
-  const isCompiling = refreshMutation.isPending
+  const uploadMutation = useUploadSchema()
+  const isCompiling = refreshMutation.isPending || uploadMutation.isPending
   const isValidating = validateLocal.isPending || validateRepo.isPending
 
   const lastHydratedFor = useRef<string | null>(null)
@@ -102,14 +95,10 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     setToken('') // never returned from API
     setLocalPath(existing.localPath || '')
     setWatcherEnabled(existing.watcherEnabled)
-    setFilesText(existing.files.join('\n'))
-    setIncludeDirsText(existing.includeDirs.join('\n'))
     setImportRootsText((existing.importRoots ?? []).join('\n'))
     setExcludePrefixesText((existing.excludePrefixes ?? []).join('\n'))
   }, [isEdit, existing])
 
-  const cleanedFiles = useMemo(() => parsePathList(filesText), [filesText])
-  const cleanedIncludeDirs = useMemo(() => parsePathList(includeDirsText), [includeDirsText])
   const cleanedImportRoots = useMemo(() => parsePathList(importRootsText), [importRootsText])
   const cleanedExcludePrefixes = useMemo(() => parsePathList(excludePrefixesText), [excludePrefixesText])
 
@@ -119,8 +108,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     isValidating ||
     !name.trim() ||
     (sourceType === 'git' && !repository.trim()) ||
-    (sourceType === 'local' && !localPath.trim()) ||
-    (sourceType === 'files' && cleanedFiles.length === 0)
+    (sourceType === 'local' && !localPath.trim())
 
   const handleValidateLocalPath = async () => {
     if (!localPath.trim()) return null
@@ -195,14 +183,8 @@ export default function ProtoSourceEditPage({ mode }: Props) {
           data.localPath = localPath
         }
       }
-      if (modeOf(sourceType) === 'automatic') {
-        data.importRoots = cleanedImportRoots
-        data.excludePrefixes = cleanedExcludePrefixes
-      }
-      if (sourceType === 'files') {
-        data.files = cleanedFiles
-        data.includeDirs = cleanedIncludeDirs
-      }
+      data.importRoots = cleanedImportRoots
+      data.excludePrefixes = cleanedExcludePrefixes
       await updateMutation.mutateAsync({ id: existingId, data })
       return existingId
     }
@@ -215,14 +197,8 @@ export default function ProtoSourceEditPage({ mode }: Props) {
       data.localPath = localPath
       data.watcherEnabled = watcherEnabled
     }
-    if (modeOf(sourceType) === 'automatic') {
-      if (cleanedImportRoots.length) data.importRoots = cleanedImportRoots
-      if (cleanedExcludePrefixes.length) data.excludePrefixes = cleanedExcludePrefixes
-    }
-    if (sourceType === 'files') {
-      data.files = cleanedFiles
-      data.includeDirs = cleanedIncludeDirs
-    }
+    if (cleanedImportRoots.length) data.importRoots = cleanedImportRoots
+    if (cleanedExcludePrefixes.length) data.excludePrefixes = cleanedExcludePrefixes
     const created = await createMutation.mutateAsync(data)
     createdIdRef.current = created.id
     return created.id
@@ -240,7 +216,15 @@ export default function ProtoSourceEditPage({ mode }: Props) {
       return
     }
     try {
-      await persist()
+      const sourceId = await persist()
+      if (sourceId && sourceType === 'upload' && pendingUpload) {
+        setCompileOut(null)
+        const { outcome } = await uploadMutation.mutateAsync({ sourceId, content: pendingUpload.content })
+        if (!outcome.valid) {
+          setCompileOut(outcome)
+          return
+        }
+      }
       navigate('/settings/proto')
     } catch (err) {
       setError(getErrorMessage(err) || 'Failed to save proto source')
@@ -287,9 +271,6 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     )
   }
 
-  // Type-specific main content
-  const showSplitForFiles = sourceType === 'files'
-
   const formColumn = (
     <div className="space-y-5">
       {/* Source Type — disabled in edit mode */}
@@ -321,12 +302,10 @@ export default function ProtoSourceEditPage({ mode }: Props) {
                 )
               })}
             </div>
-            {modeOf(sourceType) === 'automatic' && (
-              <p className="mt-2 text-xs text-amber-700">
-                Auto-detects <code>buf.yaml</code>/<code>buf.work.yaml</code> module roots; otherwise infers
-                import roots from the import graph. Well-known types (<code>google/protobuf/*</code>) resolve automatically.
-              </p>
-            )}
+            <p className="mt-2 text-xs text-amber-700">
+              Auto-detects <code>buf.yaml</code>/<code>buf.work.yaml</code> module roots; otherwise infers
+              import roots from the import graph. Well-known types (<code>google/protobuf/*</code>) resolve automatically.
+            </p>
           </>
         )}
       </div>
@@ -444,135 +423,75 @@ export default function ProtoSourceEditPage({ mode }: Props) {
         </>
       )}
 
-      {/* Advanced overrides — automatic (git/local) sources only */}
-      {modeOf(sourceType) === 'automatic' && (
-        <div className="rounded-md border border-border p-3 space-y-4">
-          <div className="text-xs font-semibold text-content-secondary uppercase tracking-wide">
-            Advanced (optional)
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label htmlFor="excludePrefixesText" className="block text-sm font-medium text-gray-700">
-                Exclude Prefixes
-              </label>
-              <span className="text-xs text-content-tertiary">{cleanedExcludePrefixes.length}</span>
-            </div>
-            <textarea
-              id="excludePrefixesText"
-              value={excludePrefixesText}
-              onChange={(e) => setExcludePrefixesText(e.target.value)}
-              spellCheck={false}
-              className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[60px]"
+      {sourceType === 'upload' && (
+        <div>
+          <span className="block text-sm font-medium text-gray-700 mb-2">Schema</span>
+          {isEdit ? (
+            <p className="text-xs text-content-tertiary">Upload a new version from the source card.</p>
+          ) : (
+            <SchemaUploadPicker
+              onPick={setPendingUpload}
+              busy={uploadMutation.isPending}
               disabled={isLoading}
+              selected={pendingUpload?.summary}
             />
-            <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
-              Folders to skip during compilation, written as path prefixes relative to the source
-              root — one per line, or comma-separated. Use this to drop generated or vendored copies
-              that duplicate real <code>.proto</code> files and break the build. For example, typing{' '}
-              <code>pb</code> ignores everything under <code>pb/</code>. Leave empty to compile the
-              whole tree.
-            </p>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label htmlFor="importRootsText" className="block text-sm font-medium text-gray-700">
-                Import Roots
-              </label>
-              <span className="text-xs text-content-tertiary">{cleanedImportRoots.length}</span>
-            </div>
-            <textarea
-              id="importRootsText"
-              value={importRootsText}
-              onChange={(e) => setImportRootsText(e.target.value)}
-              spellCheck={false}
-              className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[60px]"
-              disabled={isLoading}
-            />
-            <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
-              Advanced — usually leave this empty. These are the base directories that your{' '}
-              <code>import &quot;...&quot;</code> paths are written relative to. When empty, they are
-              detected automatically from the import graph (and any <code>buf.yaml</code>). Fill this
-              in only to override detection when the wrong root is picked — doing so turns
-              auto-detection off completely.
-            </p>
-          </div>
+          )}
         </div>
       )}
 
-      {sourceType === 'files' && (
-        <>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label htmlFor="filesText" className="block text-sm font-medium text-gray-700">
-                Proto Files *
-              </label>
-              <span className="text-xs text-content-tertiary">{cleanedFiles.length} paths</span>
-            </div>
-            <textarea
-              id="filesText"
-              value={filesText}
-              onChange={(e) => setFilesText(e.target.value)}
-              spellCheck={false}
-              className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[140px]"
-              placeholder={'/Users/you/proto/myapi/v1/myapi.proto\n/Users/you/proto/myapi/v1/events.proto'}
-              disabled={isLoading}
-            />
-            <p className="mt-1.5 text-xs text-content-tertiary">
-              Absolute paths, one per line or comma-separated. Strict — only these files are
-              compiled.
-            </p>
+      <div className="rounded-md border border-border p-3 space-y-4">
+        <div className="text-xs font-semibold text-content-secondary uppercase tracking-wide">
+          Advanced (optional)
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="excludePrefixesText" className="block text-sm font-medium text-gray-700">
+              Exclude Prefixes
+            </label>
+            <span className="text-xs text-content-tertiary">{cleanedExcludePrefixes.length}</span>
           </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label htmlFor="includeDirsText" className="block text-sm font-medium text-gray-700">
-                Include Directories
-              </label>
-              <span className="text-xs text-content-tertiary">{cleanedIncludeDirs.length} paths</span>
-            </div>
-            <textarea
-              id="includeDirsText"
-              value={includeDirsText}
-              onChange={(e) => setIncludeDirsText(e.target.value)}
-              spellCheck={false}
-              className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[80px]"
-              placeholder={'/Users/you/proto/third_party'}
-              disabled={isLoading}
-            />
-            <p className="mt-1.5 text-xs text-content-tertiary">
-              Resolves <code>import "..."</code> statements (like <code>protoc -I</code>). Files
-              inside are not compiled, only made available as dependencies. Newline or comma
-              separated.
-            </p>
+          <textarea
+            id="excludePrefixesText"
+            value={excludePrefixesText}
+            onChange={(e) => setExcludePrefixesText(e.target.value)}
+            spellCheck={false}
+            className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[60px]"
+            disabled={isLoading}
+          />
+          <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
+            Folders to skip during compilation, written as path prefixes relative to the source
+            root — one per line, or comma-separated. Use this to drop generated or vendored copies
+            that duplicate real <code>.proto</code> files and break the build. For example, typing{' '}
+            <code>pb</code> ignores everything under <code>pb/</code>. Leave empty to compile the
+            whole tree.
+          </p>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="importRootsText" className="block text-sm font-medium text-gray-700">
+              Import Roots
+            </label>
+            <span className="text-xs text-content-tertiary">{cleanedImportRoots.length}</span>
           </div>
-
-        </>
-      )}
-    </div>
-  )
-
-  // Files-type right column shows only saved counts; no Validate button since
-  // it duplicated Compile now. Diagnostics surface from Compile now after saving.
-  const validationColumn = sourceType === 'files' ? (
-    <div className="space-y-3 lg:sticky lg:top-6">
-      <div className="rounded-lg border border-border bg-surface-primary p-4">
-        <div className="text-sm font-semibold text-gray-700 mb-2">Summary</div>
-        <dl className="text-sm text-content-secondary space-y-1">
-          <div className="flex justify-between">
-            <dt>Files</dt>
-            <dd className="font-mono">{cleanedFiles.length}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Include directories</dt>
-            <dd className="font-mono">{cleanedIncludeDirs.length}</dd>
-          </div>
-        </dl>
-        <p className="mt-3 text-xs text-content-tertiary">
-          Compile is run automatically after saving from the source card.
-        </p>
+          <textarea
+            id="importRootsText"
+            value={importRootsText}
+            onChange={(e) => setImportRootsText(e.target.value)}
+            spellCheck={false}
+            className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[60px]"
+            disabled={isLoading}
+          />
+          <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
+            Advanced — usually leave this empty. These are the base directories that your{' '}
+            <code>import &quot;...&quot;</code> paths are written relative to. When empty, they are
+            detected automatically from the import graph (and any <code>buf.yaml</code>). Fill this
+            in only to override detection when the wrong root is picked — doing so turns
+            auto-detection off completely.
+          </p>
+        </div>
       </div>
     </div>
-  ) : null
+  )
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -610,7 +529,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
               <Button onClick={handleSave} loading={isLoading} disabled={saveDisabled || isCompiling}>
                 {isEdit ? 'Save Changes' : 'Add Source'}
               </Button>
-              {(sourceType === 'local' || sourceType === 'files') && (
+              {(sourceType === 'local' || (sourceType === 'upload' && isEdit)) && (
                 <Button
                   variant="secondary"
                   onClick={handleSaveAndCompile}
@@ -651,7 +570,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
               </div>
             )}
           </div>
-          <div>{showSplitForFiles ? validationColumn : null}</div>
+          <div />
         </div>
       </div>
 

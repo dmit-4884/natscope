@@ -47,9 +47,8 @@ service SourcesService {
   // Enables or disables the file watcher for a local directory source.
   rpc SetWatcher(SetWatcherRequest) returns (SetWatcherResponse) {}
 
-  // Validates a Files-type source by attempting compilation without persisting.
-  // Returns the full list of diagnostics, even on success (warnings).
-  rpc ValidateFiles(ValidateFilesRequest) returns (ValidateFilesResponse) {}
+  // Makes uploaded .proto files, or a compiled descriptor set, the schema of an upload source.
+  rpc UploadSchema(UploadSchemaRequest) returns (UploadSchemaResponse) {}
 }
 
 // --- Create ---
@@ -88,11 +87,8 @@ message CreateSourceRequest {
   // entirely (e.g. "gen", "pb"). No implicit defaults.
   repeated string exclude_prefixes = 8;
 
-  // Explicit list of absolute paths to .proto files (Files type only).
-  repeated string files = 9;
-
-  // Absolute directory paths used to resolve imports (Files type only).
-  repeated string include_dirs = 10;
+  reserved 9, 10;
+  reserved "files", "include_dirs";
 }
 
 message CreateSourceResponse {
@@ -144,10 +140,8 @@ message UpdateSourceRequest {
   repeated string import_roots = 6;
   // Optional. Override exclude prefixes; same semantics as above.
   repeated string exclude_prefixes = 7;
-  // Optional. Override files (Files type only).
-  repeated string files = 8;
-  // Optional. Override include dirs (Files type only).
-  repeated string include_dirs = 9;
+  reserved 8, 9;
+  reserved "files", "include_dirs";
 
   message Options {
     reserved 1;
@@ -269,23 +263,30 @@ message SetWatcherResponse {
   .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// --- Validate Files (dry run) ---
+// --- Upload ---
 
-message ValidateFilesRequest {
-  // Either a saved source id (validate stored config), or inline files+include_dirs
-  // for pre-save validation while creating a source. Exactly one of the two
-  // groups must be provided.
-  optional string source_id = 1;
-  repeated string files = 2;
-  repeated string include_dirs = 3;
+message UploadSchemaRequest {
+  string source_id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
+  oneof content {
+    option (buf.validate.oneof).required = true;
+    // .proto files and buf configs.
+    UploadedFiles files = 2;
+    // Output of `buf build` or `protoc --include_imports --descriptor_set_out`.
+    bytes descriptor_set = 3 [(buf.validate.field).bytes.max_len = 25165824];
+  }
 }
 
-message ValidateFilesResponse {
-  bool valid = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // Number of message types extracted on success. 0 if invalid.
-  int32 message_types = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // Number of file descriptors compiled on success. 0 if invalid.
-  int32 file_descriptors = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // Full list of diagnostics. Empty when valid=true and no warnings.
-  repeated .natscope.types.proto.CompileDiagnostic diagnostics = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+message UploadedFiles {
+  repeated UploadedFile files = 1 [(buf.validate.field).repeated.min_items = 1, (buf.validate.field).repeated.max_items = 10000];
+}
+
+message UploadedFile {
+  // Path relative to the upload root.
+  string path = 1 [(buf.validate.field).string.min_len = 1, (buf.validate.field).string.max_len = 1024];
+  string content = 2;
+}
+
+message UploadSchemaResponse {
+  .natscope.types.proto.ProtoSource source = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CompileOutcome outcome = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

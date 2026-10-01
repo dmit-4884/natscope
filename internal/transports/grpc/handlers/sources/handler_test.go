@@ -50,8 +50,9 @@ type mockProtoService struct {
 	enabledErr     error
 	watcherResult  *entities.ProtoSource
 	watcherErr     error
-	validateResult *entities.CompileOutcome
-	validateErr    error
+	gotUpload      entities.SchemaUpload
+	uploadOutcome  *entities.CompileOutcome
+	uploadErr      error
 }
 
 func (m *mockProtoService) CreateSource(_ context.Context, _ *entities.ProtoSourceCreate) (*entities.ProtoSource, error) {
@@ -106,8 +107,13 @@ func (m *mockProtoService) SetWatcher(_ context.Context, _ string, _ bool) (*ent
 	return m.watcherResult, m.watcherErr
 }
 
-func (m *mockProtoService) ValidateFiles(_ context.Context, _ *string, _, _ []string) (*entities.CompileOutcome, error) {
-	return m.validateResult, m.validateErr
+func (m *mockProtoService) UploadSchema(
+	_ context.Context,
+	_ string,
+	upload entities.SchemaUpload,
+) (*entities.ProtoSource, *entities.CompileOutcome, error) {
+	m.gotUpload = upload
+	return entities.ProtoSourceNew(), m.uploadOutcome, m.uploadErr
 }
 
 // --- Tests ---
@@ -459,28 +465,44 @@ func TestHandler_SetWatcher(t *testing.T) {
 	})
 }
 
-func TestHandler_ValidateFiles(t *testing.T) {
+func TestHandler_UploadSchema(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Success", func(t *testing.T) {
+	t.Run("files", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoService{validateResult: &entities.CompileOutcome{Valid: true, MessageTypes: 4, FileDescriptors: 1}}
-		handler := New(svc)
+		svc := &mockProtoService{uploadOutcome: &entities.CompileOutcome{Valid: true, MessageTypes: 4, FileDescriptors: 1}}
 
-		resp, err := handler.ValidateFiles(t.Context(), connect.NewRequest(&sourcespb.ValidateFilesRequest{
-			Files: []string{"/tmp/a.proto"},
+		resp, err := New(svc).UploadSchema(t.Context(), connect.NewRequest(&sourcespb.UploadSchemaRequest{
+			SourceId: "src-1",
+			Content: &sourcespb.UploadSchemaRequest_Files{Files: &sourcespb.UploadedFiles{Files: []*sourcespb.UploadedFile{
+				{Path: "shop/order.proto", Content: "syntax = \"proto3\";"},
+			}}},
 		}))
 		require.NoError(t, err)
-		assert.True(t, resp.Msg.Valid)
-		assert.Equal(t, int32(4), resp.Msg.MessageTypes)
+		assert.True(t, resp.Msg.Outcome.Valid)
+		assert.Equal(t, int32(4), resp.Msg.Outcome.MessageTypes)
+		assert.Equal(t, []entities.ProtoFileEntry{{Path: "shop/order.proto", Content: "syntax = \"proto3\";"}}, svc.gotUpload.Files)
+		assert.Empty(t, svc.gotUpload.DescriptorSet)
 	})
 
-	t.Run("ServiceError", func(t *testing.T) {
+	t.Run("descriptor set", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoService{validateErr: errors.New("compile error")}
-		handler := New(svc)
+		svc := &mockProtoService{uploadOutcome: &entities.CompileOutcome{Valid: true}}
 
-		_, err := handler.ValidateFiles(t.Context(), connect.NewRequest(&sourcespb.ValidateFilesRequest{}))
-		assert.Error(t, err)
+		_, err := New(svc).UploadSchema(t.Context(), connect.NewRequest(&sourcespb.UploadSchemaRequest{
+			SourceId: "src-1",
+			Content:  &sourcespb.UploadSchemaRequest_DescriptorSet{DescriptorSet: []byte{1, 2}},
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, []byte{1, 2}, svc.gotUpload.DescriptorSet)
+		assert.Empty(t, svc.gotUpload.Files)
+	})
+
+	t.Run("service error", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockProtoService{uploadErr: errs.ErrProtoSourceNotFound}
+
+		_, err := New(svc).UploadSchema(t.Context(), connect.NewRequest(&sourcespb.UploadSchemaRequest{SourceId: "x"}))
+		assert.ErrorIs(t, err, errs.ErrProtoSourceNotFound)
 	})
 }

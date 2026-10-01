@@ -6,6 +6,7 @@ package proto
 import (
 	"context"
 	"log/slog"
+	"slices"
 
 	"github.com/altessa-s/go-atlas/core/runtime/panics"
 
@@ -15,15 +16,17 @@ import (
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 )
 
-// Start restores file watchers, then builds missing schemas and refreshes tracked branches in the background.
+// Start drops sources of retired types, restores file watchers, then builds missing schemas and refreshes tracked
+// branches in the background.
 func (s *Service) Start(ctx context.Context) {
-	s.RestoreWatchers(ctx)
-
 	sources, err := s.allSources(ctx)
 	if err != nil {
 		s.logger.WarnContext(ctx, "startup: list sources failed", slogx.Error(err))
 		return
 	}
+	sources = slices.DeleteFunc(sources, func(src *entities.ProtoSource) bool { return s.dropRetired(ctx, src) })
+	s.RestoreWatchers(ctx)
+
 	bg := context.WithoutCancel(ctx)
 	go func() {
 		defer panics.Handle(bg)
@@ -33,6 +36,21 @@ func (s *Service) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (s *Service) dropRetired(ctx context.Context, src *entities.ProtoSource) bool {
+	switch src.SourceType {
+	case entities.SourceTypeGit, entities.SourceTypeLocal, entities.SourceTypeUpload:
+		return false
+	default:
+	}
+	if err := s.DeleteSource(ctx, src.Id); err != nil {
+		s.logger.WarnContext(ctx, "startup: delete retired source failed", slog.String("source_id", src.Id), slogx.Error(err))
+		return true
+	}
+	s.logger.WarnContext(ctx, "startup: deleted a proto source of a retired type",
+		slog.String("name", src.Name), slog.String("type", string(src.SourceType)))
+	return true
 }
 
 func (s *Service) warmUp(ctx context.Context, src *entities.ProtoSource) {

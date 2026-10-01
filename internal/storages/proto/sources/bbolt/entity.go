@@ -18,8 +18,6 @@ type sourceDoc struct {
 	Token           *string           `json:"-" behavior:"input_only" secret:"git.token"`
 	LocalPath       *string           `json:"localPath,omitempty"`
 	WatcherEnabled  bool              `json:"watcherEnabled,omitempty"`
-	Files           []string          `json:"files,omitempty"`
-	IncludeDirs     []string          `json:"includeDirs,omitempty"`
 	ImportRoots     []string          `json:"importRoots,omitempty"`
 	ExcludePrefixes []string          `json:"excludePrefixes,omitempty"`
 	LastCompile     *compileResultDoc `json:"lastCompile,omitempty"`

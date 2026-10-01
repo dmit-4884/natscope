@@ -137,7 +137,10 @@ type SourceManager interface {
 	// SetWatcher enables or disables file watcher for a local directory source.
 	SetWatcher(ctx context.Context, sourceID string, enabled bool) (*entities.ProtoSource, error)
 
-	// ValidateFiles compiles a Files-type source (or inline files/includeDirs when
-	// sourceID empty) without persisting.
-	ValidateFiles(ctx context.Context, sourceID *string, files []string, includeDirs []string) (*entities.CompileOutcome, error)
+	// UploadSchema makes uploaded .proto files, or a compiled descriptor set, the active schema of an upload source;
+	// compile errors come back in the outcome.
+	UploadSchema(ctx context.Context, sourceID string, upload entities.SchemaUpload) (*entities.ProtoSource, *entities.CompileOutcome, error)
+
+	// UploadedSchema returns what was uploaded for the active schema of an upload source.
+	UploadedSchema(ctx context.Context, sourceID string) (*entities.SchemaUpload, error)
 }

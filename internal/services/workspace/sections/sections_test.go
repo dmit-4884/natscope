@@ -20,8 +20,8 @@ import (
 
 	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	mappingssvc "github.com/dmit-4884/natscope/internal/services/mappings"
-	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	mappingsService "github.com/dmit-4884/natscope/internal/services/mappings/mappings"
+	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	settingsService "github.com/dmit-4884/natscope/internal/services/settings/settings"
 	templatesService "github.com/dmit-4884/natscope/internal/services/templates/templates"
 	mappingsBbolt "github.com/dmit-4884/natscope/internal/storages/mappings/bbolt"
@@ -94,13 +94,29 @@ func TestProtoSourcesExport_HasNoToken(t *testing.T) {
 
 type fakeSources struct {
 	protosvc.SourceManager
+	items    entities.ProtoSources
 	created  []*entities.ProtoSourceCreate
 	selected map[string]string
 	failRef  string
+	stored   map[string]*entities.SchemaUpload
+	uploads  []entities.SchemaUpload
 }
 
 func (f *fakeSources) ListSources(context.Context, *entities.ProtoSourcesList) (*entities.List[entities.ProtoSources], error) {
-	return &entities.List[entities.ProtoSources]{}, nil
+	return &entities.List[entities.ProtoSources]{Items: f.items}, nil
+}
+
+func (f *fakeSources) UploadedSchema(_ context.Context, sourceID string) (*entities.SchemaUpload, error) {
+	return f.stored[sourceID], nil
+}
+
+func (f *fakeSources) UploadSchema(
+	_ context.Context,
+	_ string,
+	upload entities.SchemaUpload,
+) (*entities.ProtoSource, *entities.CompileOutcome, error) {
+	f.uploads = append(f.uploads, upload)
+	return nil, &entities.CompileOutcome{Valid: true}, nil
 }
 
 func (f *fakeSources) CreateSource(_ context.Context, in *entities.ProtoSourceCreate) (*entities.ProtoSource, error) {
@@ -143,6 +159,37 @@ func TestProtoSourcesSection_RoundTripsSelectedRef(t *testing.T) {
 	assert.Equal(t, []string{"main"}, picked)
 	require.NotEmpty(t, res.Warnings)
 	assert.Contains(t, strings.Join(res.Warnings, "\n"), `source "broken": ref "gone" not selected`)
+}
+
+func TestProtoSourcesSection_RoundTripsUploads(t *testing.T) {
+	t.Parallel()
+	files := entities.ProtoSourceNew(func(s *entities.ProtoSource) {
+		s.Name, s.SourceType = "uploaded files", entities.SourceTypeUpload
+		s.ActiveSchema = &entities.SchemaRevision{Revision: "aaa"}
+	})
+	set := entities.ProtoSourceNew(func(s *entities.ProtoSource) {
+		s.Name, s.SourceType = "uploaded set", entities.SourceTypeUpload
+		s.ActiveSchema = &entities.SchemaRevision{Revision: "bbb"}
+	})
+	empty := entities.ProtoSourceNew(func(s *entities.ProtoSource) { s.Name, s.SourceType = "nothing yet", entities.SourceTypeUpload })
+	exporter := &fakeSources{
+		items: entities.ProtoSources{files, set, empty},
+		stored: map[string]*entities.SchemaUpload{
+			files.Id: {Files: []entities.ProtoFileEntry{{Path: "shop/order.proto", Content: "syntax = \"proto3\";"}}},
+			set.Id:   {DescriptorSet: []byte{1, 2, 3}},
+		},
+	}
+	payload, err := NewProtoSourcesSection(exporter).Export(t.Context())
+	require.NoError(t, err)
+
+	importer := &fakeSources{selected: map[string]string{}}
+	res, err := NewProtoSourcesSection(importer).Import(t.Context(), payload, entities.WorkspaceStrategyMerge)
+	require.NoError(t, err)
+	assert.Equal(t, int32(3), res.Created)
+	assert.Empty(t, res.Warnings)
+	require.Len(t, importer.uploads, 2)
+	assert.Equal(t, []entities.ProtoFileEntry{{Path: "shop/order.proto", Content: "syntax = \"proto3\";"}}, importer.uploads[0].Files)
+	assert.Equal(t, []byte{1, 2, 3}, importer.uploads[1].DescriptorSet)
 }
 
 // --- mappings section roundtrip (real SQLite-backed service) ---

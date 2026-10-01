@@ -20,4 +20,5 @@ export {
   useSourceRefs,
   useSelectSourceRef,
   useSourceRevisions,
+  useUploadSchema,
 } from './useProtoSources'

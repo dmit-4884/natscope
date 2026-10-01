@@ -50,11 +50,7 @@ func summarizeDiagnostics(diags []entities.CompileDiagnostic) string {
 
 // errorWithPosToDiagnostic converts a protocompile diagnostic into a
 // CompileDiagnostic, surfacing "file not found" as MissingImport with a hint.
-func errorWithPosToDiagnostic(
-	e reporter.ErrorWithPos,
-	sev entities.DiagnosticSeverity,
-	includeDirs []string,
-) entities.CompileDiagnostic {
+func errorWithPosToDiagnostic(e reporter.ErrorWithPos, sev entities.DiagnosticSeverity) entities.CompileDiagnostic {
 	pos := e.GetPosition()
 	underlying := e.Unwrap()
 	msg := underlying.Error()
@@ -67,30 +63,7 @@ func errorWithPosToDiagnostic(
 		Message:  msg,
 	}
 
-	if imp := extractMissingImport(msg); imp != "" {
-		d.MissingImport = imp
-		switch {
-		case strings.HasPrefix(imp, "google/protobuf/"):
-			// Files type is strict: well-known types are not auto-included, user must
-			// list them explicitly.
-			d.Hint = fmt.Sprintf(
-				"Files type is strict: well-known types are not auto-included. "+
-					"Add %q to Files, or add the directory containing it to Include Directories.",
-				imp,
-			)
-		case len(includeDirs) == 0:
-			d.Hint = fmt.Sprintf(
-				"add a directory containing %q to Include Directories, or add the file path to Files",
-				imp,
-			)
-		default:
-			d.Hint = fmt.Sprintf(
-				"%q was not found under any of the configured Include Directories — add another directory that contains it, or add the file path to Files",
-				imp,
-			)
-		}
-	}
-
+	d.MissingImport = extractMissingImport(msg)
 	return d
 }
 

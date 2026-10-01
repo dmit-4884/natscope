@@ -44,8 +44,6 @@ func TestSources_LastCompileAndChildrenRoundTrip(t *testing.T) {
 		p.Repository = "https://example.com/repo.git"
 		p.Token = ptr.Wrap("plain-token")
 		p.WatcherEnabled = false
-		p.Files = []string{"a/x.proto", "a/y.proto"}
-		p.IncludeDirs = []string{"inc1", "inc2"}
 		p.ImportRoots = []string{"root1"}
 		p.ExcludePrefixes = []string{"gen", "pb"}
 		p.LastCompile = &entities.ProtoCompileResult{
@@ -71,8 +69,7 @@ func TestSources_LastCompileAndChildrenRoundTrip(t *testing.T) {
 	if got.Token == nil || *got.Token != "plain-token" {
 		t.Fatalf("token round-trip: %v", got.Token)
 	}
-	if len(got.Files) != 2 || got.Files[1] != "a/y.proto" || len(got.IncludeDirs) != 2 ||
-		len(got.ImportRoots) != 1 || len(got.ExcludePrefixes) != 2 || got.ExcludePrefixes[1] != "pb" {
+	if len(got.ImportRoots) != 1 || len(got.ExcludePrefixes) != 2 || got.ExcludePrefixes[1] != "pb" {
 		t.Fatalf("string-list children mismatch: %+v", got)
 	}
 	lc := got.LastCompile

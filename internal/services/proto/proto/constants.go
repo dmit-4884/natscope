@@ -18,8 +18,5 @@ const (
 	// LocalRevision is the revision of a local directory source's schema.
 	LocalRevision = "local"
 
-	// FilesRevision is the revision of a Files-type source's schema.
-	FilesRevision = "files"
-
 	startupCompileTimeout = 5 * time.Minute
 )

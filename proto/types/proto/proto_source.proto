@@ -12,9 +12,10 @@ enum SourceType {
   SOURCE_TYPE_GIT = 1;
   // Local directory on server disk — optionally watched for changes.
   SOURCE_TYPE_LOCAL = 2;
-  // Manual: explicit list of .proto files plus optional include directories
-  // for resolving imports. No file watcher; recompilation is user-triggered.
-  SOURCE_TYPE_FILES = 3;
+  reserved 3;
+  reserved "SOURCE_TYPE_FILES";
+  // Files or a descriptor set uploaded from the browser.
+  SOURCE_TYPE_UPLOAD = 4;
 }
 
 // Defines a registered source of .proto files.
@@ -48,14 +49,8 @@ message ProtoSource {
   // entirely (e.g. "gen", "pb"). No implicit defaults.
   repeated string exclude_prefixes = 11;
 
-  // Explicit list of absolute paths to .proto files (Files type only).
-  // Only these files are compile targets.
-  repeated string files = 12;
-
-  // Absolute directory paths used to resolve imports (Files type only).
-  // Files inside are NOT compiled — they only satisfy `import "..."` statements.
-  // Equivalent to JMeter's "Library Directory" or `protoc -I` flag.
-  repeated string include_dirs = 13;
+  reserved 12, 13;
+  reserved "files", "include_dirs";
 
   // Snapshot of the most recent compile attempt. Populated by the backend
   // after every FetchAndCompile / file-watcher recompile / manual compile.

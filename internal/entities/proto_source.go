@@ -14,11 +14,9 @@ import (
 type SourceType string
 
 const (
-	SourceTypeGit   SourceType = "git"
-	SourceTypeLocal SourceType = "local"
-	// SourceTypeFiles is a manual source: explicit .proto files + include dirs;
-	// recompile is always user-triggered.
-	SourceTypeFiles SourceType = "files"
+	SourceTypeGit    SourceType = "git"
+	SourceTypeLocal  SourceType = "local"
+	SourceTypeUpload SourceType = "upload"
 )
 
 // ProtoCompileResult snapshots the most recent compile attempt; server-side
@@ -65,14 +63,6 @@ type ProtoSource struct {
 	// only).
 	WatcherEnabled bool
 
-	// Files are the explicit .proto compile targets (Files type only); their dirs
-	// are NOT auto-added as import paths.
-	Files []string
-
-	// IncludeDirs are import-resolution dirs (Files type only); not compiled —
-	// like `protoc -I`.
-	IncludeDirs []string
-
 	// ImportRoots, when non-empty, DISABLES auto root detection: these become the
 	// only roots (else buf/suffix inference).
 	ImportRoots []string
@@ -88,7 +78,7 @@ type ProtoSource struct {
 	// SelectedRef is the git ref a git source tracks.
 	SelectedRef *ProtoRef
 
-	// ActiveSchema is computed on read, never stored.
+	// ActiveSchema is the schema the source decodes with.
 	ActiveSchema *SchemaRevision
 }
 
@@ -164,10 +154,6 @@ type ProtoSourceCreate struct {
 	LocalPath      *string `normalize:"trim,nil_on_empty"`
 	WatcherEnabled *bool
 
-	// Files type fields
-	Files       []string
-	IncludeDirs []string
-
 	// Compilation tweaks (optional; sensible defaults applied when nil/empty)
 	ImportRoots     []string
 	ExcludePrefixes []string
@@ -181,8 +167,6 @@ type ProtoSourceUpdate struct {
 	Repository      *string `normalize:"trim"`
 	Token           *string
 	LocalPath       *string `normalize:"trim,nil_on_empty"`
-	Files           []string
-	IncludeDirs     []string
 	Enabled         *bool
 	ImportRoots     []string
 	ExcludePrefixes []string

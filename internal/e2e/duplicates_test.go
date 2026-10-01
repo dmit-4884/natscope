@@ -37,14 +37,12 @@ func TestDuplicates(t *testing.T) {
 
 	t.Run("proto source name", func(t *testing.T) {
 		_, err := env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
-			Name: "dup-source", SourceType: protopb.SourceType_SOURCE_TYPE_FILES,
-			Files: []string{"/nonexistent/does-not-matter-for-this-test.proto"},
+			Name: "dup-source", SourceType: protopb.SourceType_SOURCE_TYPE_UPLOAD,
 		}))
 		require.NoError(t, err)
 
 		_, err = env.sources.CreateSource(ctx, connect.NewRequest(&sourcespb.CreateSourceRequest{
-			Name: "dup-source", SourceType: protopb.SourceType_SOURCE_TYPE_FILES,
-			Files: []string{"/nonexistent/does-not-matter-for-this-test.proto"},
+			Name: "dup-source", SourceType: protopb.SourceType_SOURCE_TYPE_UPLOAD,
 		}))
 		require.Error(t, err)
 		assert.Equal(t, connect.CodeAlreadyExists, connect.CodeOf(err))

@@ -15,6 +15,23 @@ Object.defineProperty(navigator, 'clipboard', {
   configurable: true,
 })
 
+function readBlob<T extends string | ArrayBuffer>(blob: Blob, as: 'text' | 'buffer'): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as T)
+    reader.onerror = () => reject(reader.error)
+    if (as === 'text') reader.readAsText(blob)
+    else reader.readAsArrayBuffer(blob)
+  })
+}
+
+Blob.prototype.text ??= function text(this: Blob) {
+  return readBlob<string>(this, 'text')
+}
+Blob.prototype.arrayBuffer ??= function arrayBuffer(this: Blob) {
+  return readBlob<ArrayBuffer>(this, 'buffer')
+}
+
 // Cleanup after each test
 afterEach(() => {
   cleanup()

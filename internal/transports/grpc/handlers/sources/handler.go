@@ -84,8 +84,8 @@ func sourceTypeToProto(st entities.SourceType) protopb.SourceType {
 		return protopb.SourceType_SOURCE_TYPE_GIT
 	case entities.SourceTypeLocal:
 		return protopb.SourceType_SOURCE_TYPE_LOCAL
-	case entities.SourceTypeFiles:
-		return protopb.SourceType_SOURCE_TYPE_FILES
+	case entities.SourceTypeUpload:
+		return protopb.SourceType_SOURCE_TYPE_UPLOAD
 	default:
 		return protopb.SourceType_SOURCE_TYPE_GIT
 	}
@@ -98,8 +98,8 @@ func sourceTypeFromProto(st protopb.SourceType) (_ entities.SourceType, ok bool)
 		return entities.SourceTypeGit, true
 	case protopb.SourceType_SOURCE_TYPE_LOCAL:
 		return entities.SourceTypeLocal, true
-	case protopb.SourceType_SOURCE_TYPE_FILES:
-		return entities.SourceTypeFiles, true
+	case protopb.SourceType_SOURCE_TYPE_UPLOAD:
+		return entities.SourceTypeUpload, true
 	default:
 		return "", false
 	}
@@ -309,20 +309,21 @@ func (h *Handler) SetWatcher(
 	return connect.NewResponse(&sourcespb.SetWatcherResponse{Source: h.sourceToProto(source)}), nil
 }
 
-// ValidateFiles validates a Files-type source without persisting anything.
-func (h *Handler) ValidateFiles(
+// UploadSchema makes uploaded .proto files, or a compiled descriptor set, the schema of an upload source.
+func (h *Handler) UploadSchema(
 	ctx context.Context,
-	req *connect.Request[sourcespb.ValidateFilesRequest],
-) (*connect.Response[sourcespb.ValidateFilesResponse], error) {
-	in := req.Msg
-	outcome, err := h.protoService.ValidateFiles(ctx, in.SourceId, in.Files, in.IncludeDirs)
+	req *connect.Request[sourcespb.UploadSchemaRequest],
+) (*connect.Response[sourcespb.UploadSchemaResponse], error) {
+	upload := entities.SchemaUpload{DescriptorSet: req.Msg.GetDescriptorSet()}
+	for _, f := range req.Msg.GetFiles().GetFiles() {
+		upload.Files = append(upload.Files, entities.ProtoFileEntry{Path: f.GetPath(), Content: f.GetContent()})
+	}
+	source, outcome, err := h.protoService.UploadSchema(ctx, req.Msg.SourceId, upload)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&sourcespb.ValidateFilesResponse{
-		Valid:           outcome.Valid,
-		MessageTypes:    int32(outcome.MessageTypes),    //nolint:gosec // bounded by descriptor size
-		FileDescriptors: int32(outcome.FileDescriptors), //nolint:gosec // bounded by descriptor size
-		Diagnostics:     diagnosticsToProto(outcome.Diagnostics),
+	return connect.NewResponse(&sourcespb.UploadSchemaResponse{
+		Source:  h.sourceToProto(source),
+		Outcome: outcomeToProto(outcome),
 	}), nil
 }

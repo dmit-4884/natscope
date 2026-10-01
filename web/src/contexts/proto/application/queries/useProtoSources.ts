@@ -13,7 +13,9 @@ import {
   listSourceRefs,
   selectSourceRef,
   listSourceRevisions,
+  uploadSchema,
   type CreateProtoSourceRequest,
+  type SchemaUploadContent,
   type UpdateProtoSourceRequest,
 } from '@/api/protoSources'
 import { protoKeys } from './useProto'
@@ -144,5 +146,13 @@ export function useSourceRevisions(sourceId: string | null) {
     queryKey: protoSourcesKeys.revisions(sourceId || ''),
     queryFn: () => listSourceRevisions(sourceId!),
     enabled: !!sourceId,
+  })
+}
+
+export function useUploadSchema() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sourceId, content }: { sourceId: string; content: SchemaUploadContent }) => uploadSchema(sourceId, content),
+    onSuccess: () => invalidateSchemas(queryClient),
   })
 }

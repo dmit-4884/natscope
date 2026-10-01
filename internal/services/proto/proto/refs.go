@@ -60,8 +60,8 @@ func (s *Service) RefreshSource(ctx context.Context, sourceID string) (*entities
 		return s.activateGitRef(ctx, src.Id, resolved)
 	case entities.SourceTypeLocal:
 		outcome, err = s.compileLocal(ctx, src)
-	case entities.SourceTypeFiles:
-		outcome, err = s.compileFiles(ctx, src)
+	case entities.SourceTypeUpload:
+		outcome, err = s.compileUpload(ctx, src)
 	default:
 		return nil, nil, fmt.Errorf("%w: unsupported source type %q", errs.ErrInvalidRequest, src.SourceType)
 	}

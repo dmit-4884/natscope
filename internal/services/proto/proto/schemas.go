@@ -26,8 +26,11 @@ func activeRevision(src *entities.ProtoSource) (string, error) {
 	switch src.SourceType {
 	case entities.SourceTypeLocal:
 		return LocalRevision, nil
-	case entities.SourceTypeFiles:
-		return FilesRevision, nil
+	case entities.SourceTypeUpload:
+		if src.ActiveSchema == nil {
+			return "", errs.ErrMappingSelectionMissing
+		}
+		return src.ActiveSchema.Revision, nil
 	case entities.SourceTypeGit:
 		if src.SelectedRef == nil || src.SelectedRef.Revision == "" {
 			return "", errs.ErrMappingSelectionMissing
@@ -47,13 +50,22 @@ func (s *Service) storeSchema(
 	if err != nil {
 		return nil, coreerrs.WrapOperation(err, "serialize descriptors")
 	}
+	return s.saveSchema(ctx, sourceID, revision, descSet, s.extractTypes(fds), slices.To(fds, protoreflect.FileDescriptor.Path))
+}
+
+func (s *Service) saveSchema(
+	ctx context.Context,
+	sourceID, revision string,
+	descSet []byte,
+	messageTypes, targetFiles []string,
+) (*entities.ProtoDescriptor, error) {
 	d := entities.ProtoDescriptorNew(func(d *entities.ProtoDescriptor) {
 		d.SourceID = sourceID
 		d.Revision = revision
 		d.DescriptorSet = descSet
 		d.Fingerprint = hash.SHA256HexBytes(descSet)
-		d.MessageTypes = s.extractTypes(fds)
-		d.TargetFiles = slices.To(fds, protoreflect.FileDescriptor.Path)
+		d.MessageTypes = messageTypes
+		d.TargetFiles = targetFiles
 		d.CompiledAt = time.Now().UnixMilli()
 	})
 	if err := s.descriptorsStorage.Save(ctx, d); err != nil {

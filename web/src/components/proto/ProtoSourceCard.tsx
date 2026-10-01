@@ -7,16 +7,18 @@ import {
   useSetSourceEnabled,
   useSetWatcher,
   useRefreshSource,
+  useUploadSchema,
 } from '@/contexts/proto'
 import type { ProtoSource, ProtoSourceType, CompileOutcome } from '@/api/protoSources'
 import { ProtoSourceGitFooter } from './ProtoSourceGitFooter'
 import { ProtoSourceLocalFooter } from './ProtoSourceLocalFooter'
-import { ProtoSourceFilesFooter } from './ProtoSourceFilesFooter'
+import { ProtoSourceUploadFooter } from './ProtoSourceUploadFooter'
+import type { PreparedUpload } from './schemaUpload'
 
 const TYPE_BADGE_CONFIG: Record<ProtoSourceType, { bg: string; text: string; label: string }> = {
   git: { bg: 'bg-accent-muted', text: 'text-accent-text', label: 'Git' },
   local: { bg: 'bg-status-warning-light', text: 'text-amber-700', label: 'Local' },
-  files: { bg: 'bg-status-success-light', text: 'text-emerald-700', label: 'Files' },
+  upload: { bg: 'bg-status-success-light', text: 'text-green-700', label: 'Upload' },
 }
 
 interface ProtoSourceCardProps {
@@ -35,6 +37,7 @@ export default function ProtoSourceCard({ source, onEdit }: ProtoSourceCardProps
   const enabledMutation = useSetSourceEnabled()
   const watcherMutation = useSetWatcher()
   const refreshMutation = useRefreshSource()
+  const uploadMutation = useUploadSchema()
   const {
     data: refs = [],
     isLoading: isLoadingRefs,
@@ -72,6 +75,14 @@ export default function ProtoSourceCard({ source, onEdit }: ProtoSourceCardProps
       const result = await refreshMutation.mutateAsync({ sourceId: source.id })
       setOutcome(result.outcome)
       return result.outcome
+    } catch {
+      return undefined
+    }
+  }
+
+  const handleUpload = async (upload: PreparedUpload) => {
+    try {
+      return (await uploadMutation.mutateAsync({ sourceId: source.id, content: upload.content })).outcome
     } catch {
       return undefined
     }
@@ -226,13 +237,12 @@ export default function ProtoSourceCard({ source, onEdit }: ProtoSourceCardProps
             />
           )}
 
-          {source.sourceType === 'files' && (
-            <ProtoSourceFilesFooter
-              files={source.files}
-              includeDirs={source.includeDirs}
-              onCompile={handleRefresh}
-              isCompiling={refreshMutation.isPending}
-              compileError={refreshMutation.isError ? (refreshMutation.error as Error) : null}
+          {source.sourceType === 'upload' && (
+            <ProtoSourceUploadFooter
+              activeSchema={source.activeSchema}
+              onUpload={handleUpload}
+              isUploading={uploadMutation.isPending}
+              uploadError={uploadMutation.isError ? (uploadMutation.error as Error) : null}
             />
           )}
         </div>
