@@ -7,6 +7,7 @@ import { ConsumerInfoSchema, StreamInfoSchema } from '../gen/types/nats/nats_str
 const createConsumerCall = vi.fn()
 const updateConsumerCall = vi.fn()
 const putKVKeyCall = vi.fn()
+const getKVKeyCall = vi.fn()
 const createStreamCall = vi.fn()
 const updateStreamCall = vi.fn()
 const resetConsumerCall = vi.fn()
@@ -17,13 +18,14 @@ vi.mock('./grpc/clients', () => ({
     createConsumer: createConsumerCall,
     updateConsumer: updateConsumerCall,
     putKVKey: putKVKeyCall,
+    getKVKey: getKVKeyCall,
     createStream: createStreamCall,
     updateStream: updateStreamCall,
     resetConsumer: resetConsumerCall,
   },
 }))
 
-const { createConsumer, updateConsumer, putKVKey, createStream, updateStream, resetConsumer } = await import('./management')
+const { createConsumer, updateConsumer, putKVKey, getKVKey, createStream, updateStream, resetConsumer } = await import('./management')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -216,6 +218,65 @@ describe('putKVKey', () => {
     await putKVKey('conn-1', 'config', 'greeting', 'hello')
 
     expect(putKVKeyCall.mock.calls[0][0].revision).toBe(0n)
+  })
+
+  it('sends text as base64 bytes', async () => {
+    await putKVKey('conn-1', 'config', 'greeting', 'hi')
+
+    expect(putKVKeyCall.mock.calls[0][0].payload).toEqual({ case: 'value', value: 'aGk=' })
+  })
+
+  it('sends JSON for the server to encode as Protobuf', async () => {
+    await putKVKey('conn-1', 'config', 'limits', {
+      messageType: 'shop.Limits',
+      sourceId: 'src-1',
+      json: '{"max":3}',
+      framing: { kind: 'grpc', schemaId: 0, prefix: new Uint8Array(), suffix: new Uint8Array() },
+    })
+
+    const payload = putKVKeyCall.mock.calls[0][0].payload
+    expect(payload.case).toBe('proto')
+    expect(payload.value).toMatchObject({ messageType: 'shop.Limits', sourceId: 'src-1', json: '{"max":3}' })
+    expect(payload.value.framing.kind).toBe(1)
+  })
+})
+
+describe('getKVKey', () => {
+  it('maps a decoded Protobuf value', async () => {
+    getKVKeyCall.mockResolvedValue({
+      entry: {
+        key: 'limits',
+        value: 'CgNtYXg=',
+        revision: 3n,
+        operation: 'put',
+        decoded: {
+          data: '{"max":3}',
+          messageType: 'shop.Limits',
+          sourceId: 'src-1',
+          auto: true,
+          validBytes: 0,
+          unknownFields: [{ number: 9 }],
+        },
+      },
+    })
+
+    const entry = await getKVKey('conn-1', 'config', 'limits')
+    expect(entry.revision).toBe(3)
+    expect(entry.decoded).toEqual({
+      data: { max: 3 },
+      messageType: 'shop.Limits',
+      sourceId: 'src-1',
+      auto: true,
+      error: undefined,
+      validBytes: 0,
+      unknownFields: 1,
+    })
+  })
+
+  it('leaves values without a decoded form alone', async () => {
+    getKVKeyCall.mockResolvedValue({ entry: { key: 'plain', value: 'aGk=', revision: 1n, operation: 'put' } })
+
+    expect((await getKVKey('conn-1', 'config', 'plain')).decoded).toBeUndefined()
   })
 })
 

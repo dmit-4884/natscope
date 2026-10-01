@@ -91,7 +91,7 @@ func TestHandler_ResetConsumer(t *testing.T) {
 			Consumer: &entities.ConsumerInfo{Name: "worker", Stream: "ORDERS", NumPending: 7},
 			ResetSeq: 0,
 		}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.ResetConsumer(t.Context(), connect.NewRequest(&managementpb.ResetConsumerRequest{
 			ConnectionId: "conn-1", StreamName: "ORDERS", ConsumerName: "worker",
@@ -111,7 +111,7 @@ func TestHandler_ResetConsumer(t *testing.T) {
 			Consumer: &entities.ConsumerInfo{Name: "worker"},
 			ResetSeq: 42,
 		}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.ResetConsumer(t.Context(), connect.NewRequest(&managementpb.ResetConsumerRequest{
 			ConnectionId: "conn-1", StreamName: "ORDERS", ConsumerName: "worker", Sequence: new(uint64(42)),
@@ -127,7 +127,7 @@ func TestHandler_ResetConsumer(t *testing.T) {
 		svc := &consumerActionsService{actionErr: &errs.FeatureUnsupportedError{
 			Feature: "consumer reset", MinVersion: "2.14", ServerVersion: "2.12.3",
 		}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.ResetConsumer(t.Context(), connect.NewRequest(&managementpb.ResetConsumerRequest{
 			ConnectionId: "conn-1", StreamName: "ORDERS", ConsumerName: "worker",
@@ -142,7 +142,7 @@ func TestHandler_UnpinConsumer(t *testing.T) {
 	t.Run("forwards the group", func(t *testing.T) {
 		t.Parallel()
 		svc := &consumerActionsService{}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.UnpinConsumer(t.Context(), connect.NewRequest(&managementpb.UnpinConsumerRequest{
 			ConnectionId: "conn-1", StreamName: "ORDERS", ConsumerName: "worker", Group: "jobs",
@@ -156,7 +156,7 @@ func TestHandler_UnpinConsumer(t *testing.T) {
 	t.Run("service error", func(t *testing.T) {
 		t.Parallel()
 		svc := &consumerActionsService{actionErr: errs.ErrConsumerNotFound}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.UnpinConsumer(t.Context(), connect.NewRequest(&managementpb.UnpinConsumerRequest{
 			ConnectionId: "conn-1", StreamName: "ORDERS", ConsumerName: "worker", Group: "jobs",
@@ -179,7 +179,7 @@ func TestHandler_ConsumerPriorityGroups(t *testing.T) {
 		},
 		PriorityGroups: []entities.PriorityGroupState{{Group: "jobs", PinnedClientID: "pin-1", PinnedTS: pinnedAt}},
 	}
-	handler := New(svc, svc, svc, svc, svc)
+	handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 	resp, err := handler.CreateConsumer(t.Context(), connect.NewRequest(&managementpb.CreateConsumerRequest{
 		ConnectionId:   "conn-1",
@@ -211,7 +211,7 @@ func TestHandler_UpdateConsumerPriority(t *testing.T) {
 		t.Parallel()
 		svc := &consumerActionsService{}
 		svc.consumerInfo = &entities.ConsumerInfo{Name: "worker"}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.UpdateConsumer(t.Context(), connect.NewRequest(&managementpb.UpdateConsumerRequest{
 			ConnectionId: "conn-1", StreamName: "ORDERS", ConsumerName: "worker",
@@ -231,7 +231,7 @@ func TestHandler_UpdateConsumerPriority(t *testing.T) {
 		t.Parallel()
 		svc := &consumerActionsService{}
 		svc.consumerInfo = &entities.ConsumerInfo{Name: "worker"}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.UpdateConsumer(t.Context(), connect.NewRequest(&managementpb.UpdateConsumerRequest{
 			ConnectionId: "conn-1", StreamName: "ORDERS", ConsumerName: "worker", Description: new("d"),

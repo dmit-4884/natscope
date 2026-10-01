@@ -60,7 +60,8 @@ test.describe('KV store', () => {
     await expect(page.getByText('to-delete', { exact: true })).toHaveCount(0)
 
     // Delete the bucket (type-to-confirm).
-    await page.getByRole('button', { name: 'Delete Bucket' }).click()
+    await page.getByRole('button', { name: 'Bucket actions' }).click()
+    await page.getByRole('menuitem', { name: 'Delete bucket…' }).click()
     await page.getByPlaceholder(bucket).fill(bucket)
     await page.getByRole('button', { name: 'Delete KV Store' }).click()
     await expect(page).not.toHaveURL(new RegExp(`/kv/${bucket}$`))

@@ -270,7 +270,7 @@ func TestMCPReadOnly(t *testing.T) {
 		require.NoError(t, err)
 		for _, kv := range []struct{ key, value string }{{"users.1.profile", `{"name":"ann"}`}, {"users.1.profile", "v2"}, {"flags.dark", "on"}} {
 			_, err = env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
-				ConnectionId: connID, Bucket: bucket, Key: kv.key, Value: base64.StdEncoding.EncodeToString([]byte(kv.value)),
+				ConnectionId: connID, Bucket: bucket, Key: kv.key, Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte(kv.value))},
 			}))
 			require.NoError(t, err)
 		}
@@ -367,6 +367,31 @@ func TestMCPProtoPublishAndDecode(t *testing.T) {
 	require.NoError(t, err)
 
 	const fullName = "e2eflow.FlowMessage"
+
+	t.Run("Protobuf KV values come back decoded", func(t *testing.T) {
+		_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+			ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "mcp_proto"},
+		}))
+		require.NoError(t, err)
+		_, err = env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+			ConnectionId: connID, Bucket: "mcp_proto", Key: "cfg",
+			Payload: &managementpb.PutKVKeyRequest_Proto{Proto: &managementpb.KVProtoValue{
+				MessageType: fullName, SourceId: sourceID, Json: `{"name":"kv","count":4,"tags":["x"]}`,
+			}},
+		}))
+		require.NoError(t, err)
+
+		entry := callTool[struct {
+			DecodedType string          `json:"decodedType"`
+			DecodedAuto bool            `json:"decodedAuto"`
+			Decoded     json.RawMessage `json:"decoded"`
+			Value       *mcpBody        `json:"value"`
+		}](t, cs, "get_kv_entry", map[string]any{"bucket": "mcp_proto", "key": "cfg"})
+		assert.Equal(t, fullName, entry.DecodedType)
+		assert.True(t, entry.DecodedAuto)
+		assert.JSONEq(t, `{"name":"kv","count":4,"tags":["x"]}`, string(entry.Decoded))
+		assert.Nil(t, entry.Value)
+	})
 
 	t.Run("write tool is exposed", func(t *testing.T) {
 		assert.Contains(t, toolNames(t, cs), "publish_message")

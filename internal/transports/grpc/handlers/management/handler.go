@@ -13,6 +13,8 @@ import (
 	"github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
 
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
+	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
+	settingssvc "github.com/dmit-4884/natscope/internal/services/settings"
 	managementconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management/grpc_nats_managementconnect"
 )
 
@@ -30,17 +32,25 @@ type natsDeps struct {
 // Handler implements the Connect ManagementServiceHandler interface.
 type Handler struct {
 	natsService natsDeps
+	codec       protosvc.Codec
+	settings    settingssvc.Service
 }
 
-// New creates a new ManagementService handler.
+// New creates a new ManagementService handler; codec and settings decode and encode KV values.
 func New(
 	streamReader natssvc.StreamReader,
 	streamManager natssvc.StreamManager,
 	consumerManager natssvc.ConsumerManager,
 	kvStore natssvc.KVStore,
 	objectStore natssvc.ObjectStore,
+	codec protosvc.Codec,
+	settings settingssvc.Service,
 ) *Handler {
-	return &Handler{natsService: natsDeps{streamReader, streamManager, consumerManager, kvStore, objectStore}}
+	return &Handler{
+		natsService: natsDeps{streamReader, streamManager, consumerManager, kvStore, objectStore},
+		codec:       codec,
+		settings:    settings,
+	}
 }
 
 // HTTPHandler returns the Connect route + handler; registers the shared error

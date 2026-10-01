@@ -111,7 +111,7 @@ func TestManagementOps(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
 				ConnectionId: connID, Bucket: bucket, Key: "k",
-				Value: base64.StdEncoding.EncodeToString([]byte("v")),
+				Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte("v"))},
 			}))
 			require.NoError(t, err)
 		}

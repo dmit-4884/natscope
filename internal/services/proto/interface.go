@@ -61,6 +61,10 @@ type Codec interface {
 	// no manual source pick.
 	DecodeForMapping(ctx context.Context, data []byte, m *entities.SubjectMapping) (*entities.DecodeResult, error)
 
+	// DecodeSubject decodes a payload published on subject through its mapping or, with detect, a detected type;
+	// nil when neither applies.
+	DecodeSubject(ctx context.Context, subject string, data []byte, detect bool) *entities.DecodeResult
+
 	// DecodeMessages batch-decodes messages, grouping by resolved snapshot; detect auto-detects unmapped types.
 	DecodeMessages(ctx context.Context, messages []*entities.Message, detect bool)
 

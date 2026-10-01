@@ -364,3 +364,30 @@ export async function deleteTemplatesByPrefix(prefix: string): Promise<void> {
     }
   }
 }
+
+const MANAGEMENT_SERVICE = 'natscope.nats.management.v1.ManagementService'
+
+/** Create a Key/Value bucket. */
+export async function createKVBucket(connectionId: string, bucket: string): Promise<void> {
+  await call(MANAGEMENT_SERVICE, 'CreateKVBucket', { connectionId, config: { bucket, history: 5 } })
+}
+
+/** Delete a Key/Value bucket, ignoring a missing one. */
+export async function deleteKVBucket(connectionId: string, bucket: string): Promise<void> {
+  await call(MANAGEMENT_SERVICE, 'DeleteKVBucket', { connectionId, bucket }).catch(() => undefined)
+}
+
+/** Store JSON under a key, encoded by the server as a Protobuf message. */
+export async function putKVProto(
+  connectionId: string,
+  bucket: string,
+  key: string,
+  proto: { messageType: string; sourceId: string; json: string },
+): Promise<void> {
+  await call(MANAGEMENT_SERVICE, 'PutKVKey', { connectionId, bucket, key, proto })
+}
+
+/** Create a subject mapping. */
+export async function createMapping(pattern: string, messageType: string, sourceId: string): Promise<void> {
+  await call('natscope.mappings.v1.MappingsService', 'CreateMapping', { pattern, messageType, sourceId })
+}

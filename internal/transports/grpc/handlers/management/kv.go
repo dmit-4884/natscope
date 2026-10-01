@@ -14,6 +14,7 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
+	"github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
 
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
 	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
@@ -112,7 +113,7 @@ func (h *Handler) ListKVKeys(
 	return connect.NewResponse(&managementpb.ListKVKeysResponse{Keys: keys}), nil
 }
 
-// GetKVKey gets a key from a KeyValue bucket.
+// GetKVKey gets a key from a KeyValue bucket, its value decoded when a mapping or detected type applies.
 func (h *Handler) GetKVKey(
 	ctx context.Context,
 	req *connect.Request[managementpb.GetKVKeyRequest],
@@ -123,7 +124,7 @@ func (h *Handler) GetKVKey(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.GetKVKeyResponse{
-		Entry: converter.Convert(entry, &natspb.KVEntry{}, protoCodecs),
+		Entry: h.kvEntryToProto(ctx, entry, h.detectsTypes(ctx)),
 	}), nil
 }
 
@@ -137,22 +138,38 @@ func (h *Handler) GetKVKeyHistory(
 	if err != nil {
 		return nil, err
 	}
+	detect := h.detectsTypes(ctx)
 	return connect.NewResponse(&managementpb.GetKVKeyHistoryResponse{
 		Entries: slices.To(entries, func(e entities.KVEntry) *natspb.KVEntry {
-			return converter.Convert(&e, &natspb.KVEntry{}, protoCodecs)
+			return h.kvEntryToProto(ctx, &e, detect)
 		}),
 	}), nil
 }
 
-// PutKVKey puts a key in a KeyValue bucket; value must be base64-encoded.
+func (h *Handler) kvEntryToProto(ctx context.Context, e *entities.KVEntry, detect bool) *natspb.KVEntry {
+	pb := converter.Convert(e, &natspb.KVEntry{}, protoCodecs)
+	data, err := base64.StdEncoding.DecodeString(e.Value)
+	if err != nil || len(data) == 0 {
+		return pb
+	}
+	pb.Decoded = grpchelpers.DecodeResultToProto(h.codec.DecodeSubject(ctx, e.Subject(), data, detect))
+	return pb
+}
+
+func (h *Handler) detectsTypes(ctx context.Context) bool {
+	cfg, err := h.settings.Get(ctx)
+	return err != nil || cfg.DetectsTypes()
+}
+
+// PutKVKey stores base64 bytes, or JSON encoded as a Protobuf message, under a key.
 func (h *Handler) PutKVKey(
 	ctx context.Context,
 	req *connect.Request[managementpb.PutKVKeyRequest],
 ) (*connect.Response[managementpb.PutKVKeyResponse], error) {
 	in := req.Msg
-	value, err := base64.StdEncoding.DecodeString(in.GetValue())
+	value, err := h.kvValue(ctx, in)
 	if err != nil {
-		return nil, &errs.NATSValidationError{Description: "value must be base64-encoded", Cause: err}
+		return nil, err
 	}
 
 	revision, err := h.natsService.PutKVKey(ctx, in.GetConnectionId(), in.GetBucket(), in.GetKey(), value, in.GetRevision())
@@ -160,6 +177,27 @@ func (h *Handler) PutKVKey(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.PutKVKeyResponse{Revision: revision}), nil
+}
+
+func (h *Handler) kvValue(ctx context.Context, in *managementpb.PutKVKeyRequest) ([]byte, error) {
+	pv := in.GetProto()
+	if pv == nil {
+		value, err := base64.StdEncoding.DecodeString(in.GetValue())
+		if err != nil {
+			return nil, &errs.NATSValidationError{Description: "value must be base64-encoded", Cause: err}
+		}
+		return value, nil
+	}
+	value, err := h.codec.EncodeRaw(ctx, entities.CodecRequest{
+		JSON:        []byte(pv.GetJson()),
+		SourceID:    pv.GetSourceId(),
+		MessageType: pv.GetMessageType(),
+		Framing:     grpchelpers.FramingFromProto(pv.GetFraming()),
+	})
+	if err != nil {
+		return nil, &errs.ProtoEncodeError{Description: err.Error()}
+	}
+	return value, nil
 }
 
 // DeleteKVKey deletes a key from a KeyValue bucket.

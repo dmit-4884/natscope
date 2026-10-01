@@ -150,13 +150,13 @@ func TestNATSErrors_ServerErrorClasses(t *testing.T) {
 		}},
 		{"value above server max_payload", connect.CodeInvalidArgument, func() error {
 			_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
-				ConnectionId: connID, Bucket: "tiny", Key: "big", Value: base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("!"), 1<<20+1)),
+				ConnectionId: connID, Bucket: "tiny", Key: "big", Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("!"), 1<<20+1))},
 			}))
 			return err
 		}},
 		{"bucket max_bytes exceeded", connect.CodeResourceExhausted, func() error {
 			_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
-				ConnectionId: connID, Bucket: "tiny", Key: "k", Value: base64.StdEncoding.EncodeToString([]byte("value")),
+				ConnectionId: connID, Bucket: "tiny", Key: "k", Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte("value"))},
 			}))
 			return err
 		}},

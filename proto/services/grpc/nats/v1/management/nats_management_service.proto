@@ -8,6 +8,7 @@ import "google/protobuf/duration.proto";
 import "types/nats/nats_stream.proto";
 import "types/nats/nats_kv.proto";
 import "types/nats/nats_object.proto";
+import "types/proto/proto_codec.proto";
 
 // Provides comprehensive JetStream resource management including streams, consumers,
 // KeyValue stores, and Object stores.
@@ -903,12 +904,32 @@ message PutKVKeyRequest {
   // Required. Name of the key to create or update.
   string key = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
-  // Optional. Base64-encoded value (standard alphabet, padded) to store for the key; empty stores an empty value.
-  string value = 4;
+  // Value to store; unset stores an empty value.
+  oneof payload {
+    // Base64-encoded bytes (standard alphabet, padded).
+    string value = 4;
+    // JSON encoded as a Protobuf message.
+    KVProtoValue proto = 6;
+  }
 
   // Optional. Expected revision number for compare-and-swap updates.
   // When non-zero, the update will fail if the current revision does not match.
   uint64 revision = 5;
+}
+
+// JSON stored as a Protobuf message.
+message KVProtoValue {
+  // Required. Fully-qualified message type.
+  string message_type = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).string.min_len = 1];
+
+  // Required. Proto source defining the type.
+  string source_id = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).string.min_len = 1];
+
+  // Required. The value as JSON.
+  string json = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Wrapper around the encoded message.
+  .natscope.types.proto.Framing framing = 4;
 }
 
 // Defines the response message for creating or updating a key-value entry.

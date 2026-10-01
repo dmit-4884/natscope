@@ -5,6 +5,7 @@ package kv
 
 import (
 	"context"
+	"encoding/base64"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -56,10 +57,30 @@ func (t *Toolset) listKeys(ctx context.Context, _ *mcp.CallToolRequest, in listK
 	}, nil
 }
 
-func newEntryView(e *entities.KVEntry, limit int) entryView {
+func newEntryView(e *entities.KVEntry, limit int, r *entities.DecodeResult) entryView {
 	v := converter.Convert(e, &entryView{}, converter.WithIgnoreFields("Value"))
+	if r != nil {
+		v.DecodedType, v.DecodedAuto, v.DecodeError = r.MessageType, r.Auto, r.Error
+		if r.Success && len(r.Decoded) <= limit {
+			v.Decoded = r.Decoded
+			return *v
+		}
+	}
 	v.Value, v.Truncated = mcptransport.NewBodyFromBase64(e.Value, limit, false)
 	return *v
+}
+
+func (t *Toolset) decode(ctx context.Context, e *entities.KVEntry, detect bool) *entities.DecodeResult {
+	data, err := base64.StdEncoding.DecodeString(e.Value)
+	if err != nil || len(data) == 0 {
+		return nil
+	}
+	return t.codec.DecodeSubject(ctx, e.Subject(), data, detect)
+}
+
+func (t *Toolset) detectsTypes(ctx context.Context) bool {
+	cfg, err := t.settings.Get(ctx)
+	return err != nil || cfg.DetectsTypes()
 }
 
 func (t *Toolset) getEntry(ctx context.Context, _ *mcp.CallToolRequest, in keyInput) (*mcp.CallToolResult, entryView, error) {
@@ -71,7 +92,8 @@ func (t *Toolset) getEntry(ctx context.Context, _ *mcp.CallToolRequest, in keyIn
 	if err != nil {
 		return nil, entryView{}, err
 	}
-	return nil, newEntryView(entry, mcptransport.Limit(in.MaxValueBytes, defaultValueBytes, maxValueBytes)), nil
+	limit := mcptransport.Limit(in.MaxValueBytes, defaultValueBytes, maxValueBytes)
+	return nil, newEntryView(entry, limit, t.decode(ctx, entry, t.detectsTypes(ctx))), nil
 }
 
 func (t *Toolset) getHistory(ctx context.Context, _ *mcp.CallToolRequest, in historyInput) (*mcp.CallToolResult, historyOutput, error) {
@@ -86,8 +108,9 @@ func (t *Toolset) getHistory(ctx context.Context, _ *mcp.CallToolRequest, in his
 	limit := mcptransport.Limit(in.MaxValueBytes, defaultValueBytes, maxValueBytes)
 	count := min(len(entries), mcptransport.Limit(in.Limit, defaultHistoryLimit, maxHistoryLimit))
 	out := historyOutput{Entries: make([]entryView, 0, count), Total: len(entries)}
+	detect := t.detectsTypes(ctx)
 	for i := len(entries) - 1; i >= len(entries)-count; i-- {
-		out.Entries = append(out.Entries, newEntryView(&entries[i], limit))
+		out.Entries = append(out.Entries, newEntryView(&entries[i], limit, t.decode(ctx, &entries[i], detect)))
 	}
 	return nil, out, nil
 }

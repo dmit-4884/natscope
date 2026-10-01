@@ -17,6 +17,7 @@ type messageView struct {
 	Headers     map[string]string  `json:"headers,omitempty"`
 	DataSize    int                `json:"size" jsonschema:"payload size in bytes"`
 	DecodedType string             `json:"decodedType,omitempty" jsonschema:"Protobuf message type the payload was decoded as"`
+	DecodedAuto bool               `json:"decodedAuto,omitempty" jsonschema:"no mapping matched the subject; natscope detected decodedType"`
 	Decoded     json.RawMessage    `json:"decoded,omitempty" jsonschema:"payload decoded from Protobuf to JSON"`
 	DecodeError string             `json:"decodeError,omitempty"`
 	Body        *mcptransport.Body `json:"body,omitempty" jsonschema:"raw payload, present when there is no decoded form"`
@@ -65,6 +66,7 @@ type liveMessageView struct {
 	Headers     map[string][]string `json:"headers,omitempty"`
 	Size        int                 `json:"size" jsonschema:"payload size in bytes"`
 	DecodedType string              `json:"decodedType,omitempty"`
+	DecodedAuto bool                `json:"decodedAuto,omitempty"`
 	Decoded     json.RawMessage     `json:"decoded,omitempty"`
 	DecodeError string              `json:"decodeError,omitempty"`
 	Body        *mcptransport.Body  `json:"body,omitempty"`

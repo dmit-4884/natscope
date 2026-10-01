@@ -33,7 +33,7 @@ func TestHandler_StreamFeatureFlags(t *testing.T) {
 			PersistMode:            entities.PersistAsync,
 			AllowBatchPublish:      true,
 		}}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.CreateStream(t.Context(), connect.NewRequest(&managementpb.CreateStreamRequest{
 			ConnectionId:           "conn-1",
@@ -66,7 +66,7 @@ func TestHandler_StreamFeatureFlags(t *testing.T) {
 	t.Run("update sets mutable flags", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{streamInfo: &entities.StreamInfo{}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.UpdateStream(t.Context(), connect.NewRequest(&managementpb.UpdateStreamRequest{
 			ConnectionId:           "conn-1",
@@ -89,7 +89,7 @@ func TestHandler_StreamFeatureFlags(t *testing.T) {
 	t.Run("update leaves unset flags nil", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{streamInfo: &entities.StreamInfo{}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.UpdateStream(t.Context(), connect.NewRequest(&managementpb.UpdateStreamRequest{
 			ConnectionId: "conn-1",
@@ -106,7 +106,7 @@ func TestHandler_StreamFeatureFlags(t *testing.T) {
 	t.Run("update with zero delete marker ttl clears it", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{streamInfo: &entities.StreamInfo{}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.UpdateStream(t.Context(), connect.NewRequest(&managementpb.UpdateStreamRequest{
 			ConnectionId:           "conn-1",

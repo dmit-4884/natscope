@@ -89,6 +89,25 @@ func (s *Service) DecodeForMapping(
 	return decodeWithSnapshot(snap, data, m.MessageType, m.Framing), nil
 }
 
+// DecodeSubject decodes a payload published on subject through its mapping or, with detect, a detected type;
+// nil when neither applies.
+func (s *Service) DecodeSubject(ctx context.Context, subject string, data []byte, detect bool) *entities.DecodeResult {
+	if resolver := s.mappingsService.Resolver(ctx); resolver != nil {
+		if m := resolver.Resolve(subject); m != nil {
+			r, err := s.DecodeForMapping(ctx, data, m)
+			if err != nil {
+				r = &entities.DecodeResult{Error: err.Error()}
+			}
+			r.MessageType, r.SourceID = m.MessageType, m.SourceID
+			return r
+		}
+	}
+	if detect && entities.DetectContentType(data) == entities.ContentTypeBinary {
+		return s.autoDecode(ctx, subject, data)
+	}
+	return nil
+}
+
 // decodeWithSnapshot decodes a single protobuf payload against a parsed
 // snapshot.
 func decodeWithSnapshot(snap *registry.Snapshot, data []byte, messageType string, framing entities.Framing) *entities.DecodeResult {

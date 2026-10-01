@@ -7,6 +7,7 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "types/nats/nats_stream.proto";
+import "types/proto/proto_codec.proto";
 
 // Defines the information about a NATS JetStream Key-Value bucket.
 message KVBucketInfo {
@@ -108,6 +109,9 @@ message KVEntry {
 
   // Required. Operation type (e.g., "PUT", "DEL", "PURGE").
   string operation = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Value decoded through the mapping of $KV.<bucket>.<key>, or as a detected type; unset when neither applies.
+  .natscope.types.proto.DecodeResult decoded = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the placement preferences for a NATS JetStream resource.

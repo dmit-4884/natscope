@@ -67,7 +67,7 @@ export function usePutKVKey(connectionId: string | undefined, bucket: string | u
       expectedRevision,
     }: {
       key: string
-      value: string | Uint8Array
+      value: string | Uint8Array | api.KVProtoValue
       expectedRevision?: number
     }) => {
       if (!connectionId || !bucket) throw new Error('No connection or bucket')

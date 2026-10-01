@@ -226,7 +226,7 @@ export const getKVBucket = (connectionId: string, bucket: string) =>
 export const deleteKVBucket = (connectionId: string, bucket: string) =>
   call(SVC.management, 'DeleteKVBucket', { connectionId, bucket })
 export const putKVKey = (connectionId: string, bucket: string, key: string, value: string, revision = 0) =>
-  call<{ revision?: string }>(SVC.management, 'PutKVKey', { connectionId, bucket, key, value, ...(revision ? { revision: String(revision) } : {}) })
+  call<{ revision?: string }>(SVC.management, 'PutKVKey', { connectionId, bucket, key, value: b64(value), ...(revision ? { revision: String(revision) } : {}) })
 // NOTE: entry.value is base64-encoded in the JSON response; use kvText() to decode.
 export const getKVKey = (connectionId: string, bucket: string, key: string) =>
   call<{ entry?: { value?: string; revision?: string; operation?: string } }>(SVC.management, 'GetKVKey', { connectionId, bucket, key })

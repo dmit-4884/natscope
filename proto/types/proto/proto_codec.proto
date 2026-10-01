@@ -17,6 +17,10 @@ message DecodeResult {
   repeated UnknownField unknown_fields = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Set when decoding failed but the first valid_bytes decoded into data.
   int32 valid_bytes = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // No mapping matched; Natscope detected message_type.
+  bool auto = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Proto source of message_type.
+  string source_id = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Message type a payload decodes as.

@@ -103,6 +103,7 @@ func newLiveMessageView(m *entities.LiveMessage, limit int) liveMessageView {
 		Headers:     nm.Header,
 		Size:        max(m.OriginalSize, len(nm.Data)),
 		DecodedType: ptr.Unwrap(m.DecodedType),
+		DecodedAuto: m.DecodedAuto,
 		DecodeError: ptr.Unwrap(m.DecodeError),
 		Truncated:   m.Truncated,
 	}

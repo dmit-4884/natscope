@@ -8,6 +8,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
+	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
+	settingssvc "github.com/dmit-4884/natscope/internal/services/settings"
 	mcptransport "github.com/dmit-4884/natscope/internal/transports/mcp"
 )
 
@@ -22,13 +24,15 @@ const (
 
 // Toolset serves list_kv_buckets, list_kv_keys, get_kv_entry and get_kv_history.
 type Toolset struct {
-	conns *mcptransport.Connections
-	kv    natssvc.KVStore
+	conns    *mcptransport.Connections
+	kv       natssvc.KVStore
+	codec    protosvc.Codec
+	settings settingssvc.Service
 }
 
-// New creates the Key/Value toolset.
-func New(conns *mcptransport.Connections, kv natssvc.KVStore) *Toolset {
-	return &Toolset{conns: conns, kv: kv}
+// New creates the Key/Value toolset; codec and settings decode Protobuf values.
+func New(conns *mcptransport.Connections, kv natssvc.KVStore, codec protosvc.Codec, settings settingssvc.Service) *Toolset {
+	return &Toolset{conns: conns, kv: kv, codec: codec, settings: settings}
 }
 
 // Register adds the toolset's tools to s.
@@ -46,8 +50,9 @@ func (t *Toolset) Register(s *mcp.Server) {
 	}, t.listKeys)
 
 	mcptransport.AddTool(s, &mcp.Tool{
-		Name:        "get_kv_entry",
-		Description: "Read the current value of a key with its revision and timestamp.",
+		Name: "get_kv_entry",
+		Description: "Read the current value of a key with its revision and timestamp. A Protobuf value comes back decoded " +
+			"through the subject mapping matching $KV.<bucket>.<key>, or as a detected type.",
 		Annotations: mcptransport.ReadOnly("Get KV entry"),
 	}, t.getEntry)
 

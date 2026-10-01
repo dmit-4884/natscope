@@ -28,6 +28,8 @@ import type {
   StatusResponse,
   RevisionResponse,
 } from '../types/management'
+import type { KVEntry as PbKVEntry } from '../gen/types/nats/nats_kv_pb'
+import { framingToProto, type Framing } from './framing'
 import { managementClient } from './grpc/clients'
 import { toStreamInfo, toConsumerInfo, RETENTION_INT, STORAGE_INT, STORAGE_STR, DISCARD_INT, COMPRESSION_INT, PERSIST_MODE_INT, DELIVER_POLICY_INT, ACK_POLICY_INT, REPLAY_POLICY_INT, PRIORITY_POLICY_INT } from './streams'
 
@@ -434,7 +436,10 @@ export async function getKVKey(
   signal?: AbortSignal,
 ): Promise<KVEntry> {
   const response = await managementClient.getKVKey({ connectionId, bucket, key }, { signal })
-  const entry = response.entry!
+  return toKVEntry(response.entry!, bucket)
+}
+
+function toKVEntry(entry: PbKVEntry, bucket: string): KVEntry {
   return {
     bucket,
     key: entry.key,
@@ -442,6 +447,24 @@ export async function getKVKey(
     revision: Number(entry.revision),
     created: tsToMillis(entry.created),
     operation: entry.operation as 'put' | 'delete' | 'purge',
+    decoded: entry.decoded && {
+      data: parseJson(entry.decoded.data),
+      messageType: entry.decoded.messageType,
+      sourceId: entry.decoded.sourceId,
+      auto: entry.decoded.auto,
+      error: entry.decoded.error,
+      validBytes: entry.decoded.validBytes,
+      unknownFields: entry.decoded.unknownFields.length,
+    },
+  }
+}
+
+function parseJson(raw: string): unknown {
+  if (!raw) return undefined
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
   }
 }
 
@@ -455,33 +478,46 @@ export async function getKVKeyHistory(
     { connectionId, bucket, key },
     { signal },
   )
-  return response.entries.map((entry) => ({
-    bucket,
-    key: entry.key,
-    value: entry.value,
-    revision: Number(entry.revision),
-    created: tsToMillis(entry.created),
-    operation: entry.operation as 'put' | 'delete' | 'purge',
-  }))
+  return response.entries.map((entry) => toKVEntry(entry, bucket))
 }
 
+/** JSON the server encodes as a Protobuf message before storing it. */
+export interface KVProtoValue {
+  messageType: string
+  sourceId: string
+  json: string
+  framing?: Framing
+}
+
+/** Stores text, bytes, or JSON the server encodes as a Protobuf message. */
 export async function putKVKey(
   connectionId: string,
   bucket: string,
   key: string,
-  value: string | Uint8Array,
+  value: string | Uint8Array | KVProtoValue,
   expectedRevision?: number
 ): Promise<RevisionResponse> {
-  const base64Value =
-    typeof value === 'string'
-      ? encodeBytesToBase64(new TextEncoder().encode(value))
-      : encodeBytesToBase64(value)
+  const payload =
+    typeof value === 'string' || value instanceof Uint8Array
+      ? {
+          case: 'value' as const,
+          value: encodeBytesToBase64(typeof value === 'string' ? new TextEncoder().encode(value) : value),
+        }
+      : {
+          case: 'proto' as const,
+          value: {
+            messageType: value.messageType,
+            sourceId: value.sourceId,
+            json: value.json,
+            framing: framingToProto(value.framing),
+          },
+        }
 
   const response = await managementClient.putKVKey({
     connectionId,
     bucket,
     key,
-    value: base64Value,
+    payload,
     revision: expectedRevision != null ? BigInt(expectedRevision) : BigInt(0),
   })
   return { revision: Number(response.revision) }

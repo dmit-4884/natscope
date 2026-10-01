@@ -10,14 +10,30 @@ import {
   usePurgeKVKey,
   useDeleteKVBucket,
 } from '@/contexts/kv'
-import { decodeBase64 } from '@/api/management'
+import { decodeBase64, type KVProtoValue } from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
 import { formatBytes, formatDateTime } from '@/utils/formatters'
+import { decodeBase64ToBytes } from '@/utils/base64'
 import { plural } from '@/utils/plural'
 import { useConfirmation } from '@/contexts/settings'
+import type { KVEntry } from '@/types/management'
 import { Button, Modal, Input, Badge, Alert, Spinner, SearchInput, CloseIcon, PlusIcon, RefreshIcon, OverflowMenu } from '@/components/ui'
 import Tooltip from '../common/Tooltip'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
+import { WireView } from '../messages/WireView'
+import { KVProtoBar } from './KVProtoBar'
+import { useKVProtoTarget, type KVProtoTarget } from './useKVProtoTarget'
+
+function editableValue(entry: KVEntry, asProto: boolean): string {
+  if (!asProto) return decodeBase64(entry.value)
+  return entry.decoded?.data === undefined ? '{}' : JSON.stringify(entry.decoded.data, null, 2)
+}
+
+function storedValue(target: KVProtoTarget | null, text: string): string | KVProtoValue {
+  return target
+    ? { messageType: target.messageType, sourceId: target.sourceId, framing: target.framing, json: text }
+    : text
+}
 
 type KVConfirmAction = {
   type: 'delete-bucket' | 'delete-key' | 'purge-key'
@@ -38,6 +54,7 @@ export default function KVStorePage() {
   const [editingValue, setEditingValue] = useState('')
   const [valueDirty, setValueDirty] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [showRaw, setShowRaw] = useState(false)
   const [confirmAction, setConfirmAction] = useState<KVConfirmAction | null>(null)
 
   const deleteKeyConfirmation = useConfirmation('deleteKvKey')
@@ -72,6 +89,9 @@ export default function KVStorePage() {
     showHistory && selectedKey ? selectedKey : undefined
   )
 
+  const target = useKVProtoTarget(bucketName ?? '', selectedKey ?? '', keyEntry?.decoded)
+  const newKeyTarget = useKVProtoTarget(bucketName ?? '', newKeyName.trim())
+
   // Mutations
   const deleteBucket = useDeleteKVBucket(connectionId)
   const putKey = usePutKVKey(connectionId, bucketName)
@@ -85,13 +105,14 @@ export default function KVStorePage() {
 
   useEffect(() => {
     if (keyEntry && !isCreatingKey && !valueDirty) {
-      setEditingValue(decodeBase64(keyEntry.value))
+      setEditingValue(editableValue(keyEntry, !!target))
     }
-  }, [keyEntry, isCreatingKey, valueDirty])
+  }, [keyEntry, isCreatingKey, valueDirty, target])
 
   useEffect(() => {
     setValueDirty(false)
     setEditingValue('')
+    setShowRaw(false)
   }, [selectedKey])
 
   // Reset selection AND search on bucket change — a stale search filter
@@ -111,14 +132,14 @@ export default function KVStorePage() {
     try {
       if (isCreatingKey) {
         if (!newKeyName.trim()) return
-        await putKey.mutateAsync({ key: newKeyName, value: newKeyValue })
+        await putKey.mutateAsync({ key: newKeyName, value: storedValue(newKeyTarget, newKeyValue) })
         setIsCreatingKey(false)
         setNewKeyName('')
         setNewKeyValue('')
       } else if (selectedKey) {
         await putKey.mutateAsync({
           key: selectedKey,
-          value: editingValue,
+          value: storedValue(target, editingValue),
           expectedRevision: keyEntry?.revision,
         })
         setValueDirty(false)
@@ -338,6 +359,12 @@ export default function KVStorePage() {
                     onChange={(e) => setNewKeyName(e.target.value)}
                     placeholder="my.key.name"
                   />
+                  {newKeyTarget && (
+                    <p className="mt-1 text-xs text-content-tertiary" data-testid="kv-new-proto">
+                      Stored as Protobuf <span className="font-mono">{newKeyTarget.messageType}</span> (mapping{' '}
+                      <span className="font-mono">{newKeyTarget.pattern}</span>)
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex-1 flex flex-col">
@@ -346,7 +373,7 @@ export default function KVStorePage() {
                     value={newKeyValue}
                     onChange={(e) => setNewKeyValue(e.target.value)}
                     className="flex-1 w-full p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
-                    placeholder="Enter value (text or JSON)"
+                    placeholder={newKeyTarget ? `JSON for ${newKeyTarget.messageType}` : 'Enter value (text or JSON)'}
                     spellCheck={false}
                   />
                 </div>
@@ -413,11 +440,29 @@ export default function KVStorePage() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-auto p-4">
+              {target && keyEntry && (
+                <KVProtoBar
+                  bucket={bucketName}
+                  target={target}
+                  decoded={keyEntry.decoded}
+                  showRaw={showRaw}
+                  onToggleRaw={() => setShowRaw((v) => !v)}
+                />
+              )}
+
+              <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+                {target && keyEntry?.decoded?.error && !showRaw && (
+                  <Alert variant="warning">
+                    The stored value does not decode as {target.messageType}: {keyEntry.decoded.error}. Saving encodes the
+                    JSON below as {target.messageType}.
+                  </Alert>
+                )}
                 {keyLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <Spinner size="lg" />
                   </div>
+                ) : target && showRaw && keyEntry ? (
+                  <WireView dataBase64={keyEntry.value} totalBytes={decodeBase64ToBytes(keyEntry.value).length} />
                 ) : (
                   <textarea
                     value={editingValue}
@@ -426,7 +471,7 @@ export default function KVStorePage() {
                       setValueDirty(true)
                     }}
                     aria-label="Key value"
-                    className="w-full h-full p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
+                    className="w-full flex-1 min-h-0 p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
                     spellCheck={false}
                   />
                 )}
@@ -437,7 +482,7 @@ export default function KVStorePage() {
                   variant="secondary"
                   onClick={() => {
                     if (keyEntry) {
-                      setEditingValue(decodeBase64(keyEntry.value))
+                      setEditingValue(editableValue(keyEntry, !!target))
                       setValueDirty(false)
                     }
                   }}
@@ -446,7 +491,7 @@ export default function KVStorePage() {
                 </Button>
                 <Button
                   onClick={handleSaveKey}
-                  disabled={putKey.isPending}
+                  disabled={putKey.isPending || showRaw}
                 >
                   {putKey.isPending ? 'Saving...' : 'Save Value'}
                 </Button>
@@ -518,7 +563,9 @@ export default function KVStorePage() {
                     </div>
                     {entry.operation === 'put' ? (
                       <pre className="text-xs font-mono bg-surface-secondary rounded p-2 max-h-32 overflow-auto whitespace-pre-wrap break-all">
-                        {decodeBase64(entry.value)}
+                        {entry.decoded?.data !== undefined && !entry.decoded.error
+                          ? JSON.stringify(entry.decoded.data, null, 2)
+                          : decodeBase64(entry.value)}
                       </pre>
                     ) : (
                       <p className="text-xs text-content-muted italic">

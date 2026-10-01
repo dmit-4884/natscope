@@ -243,6 +243,20 @@ export interface KVEntry {
   revision: number
   created: number // Unix milliseconds
   operation: 'put' | 'delete' | 'purge'
+  /** Set when the $KV.<bucket>.<key> mapping or a detected type applies. */
+  decoded?: KVDecodedValue
+}
+
+export interface KVDecodedValue {
+  /** Parsed JSON; a broken payload keeps the part that decoded. */
+  data?: unknown
+  messageType: string
+  sourceId: string
+  /** No mapping matched; Natscope detected the type. */
+  auto: boolean
+  error?: string
+  validBytes: number
+  unknownFields: number
 }
 
 // Object Store Types

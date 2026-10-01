@@ -537,6 +537,11 @@ type KVEntry struct {
 	Operation string
 }
 
+// Subject is the stream subject holding the entry; subject mappings match it.
+func (e *KVEntry) Subject() string {
+	return "$KV." + e.Bucket + "." + e.Key
+}
+
 // ObjectBucketConfig is the create/update config for an Object Store bucket.
 type ObjectBucketConfig struct {
 	// Bucket is the bucket name (required).

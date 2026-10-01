@@ -357,4 +357,74 @@ func TestProtoFlow(t *testing.T) {
 		_, err = env.settings.ResetSettings(ctx, connect.NewRequest(&settingspb.ResetSettingsRequest{}))
 		require.NoError(t, err)
 	})
+
+	t.Run("KV values encode and decode through mappings", func(t *testing.T) {
+		for _, bucket := range []string{"PROTO_CFG", "PROTO_RAW"} {
+			_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+				ConnectionId: connID, Config: &natspb.KVBucketConfig{Bucket: bucket, History: 5},
+			}))
+			require.NoError(t, err)
+		}
+		_, err := env.mappings.CreateMapping(ctx, connect.NewRequest(&mappingspb.CreateMappingRequest{
+			Pattern: "$KV.PROTO_CFG.>", MessageType: fullName, SourceId: sourceID,
+		}))
+		require.NoError(t, err)
+
+		put := func(bucket, key, json string) error {
+			_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+				ConnectionId: connID, Bucket: bucket, Key: key,
+				Payload: &managementpb.PutKVKeyRequest_Proto{Proto: &managementpb.KVProtoValue{
+					MessageType: fullName, SourceId: sourceID, Json: json,
+				}},
+			}))
+			return err
+		}
+		require.NoError(t, put("PROTO_CFG", "app.limits", `{"name":"kv","count":5}`))
+		require.NoError(t, put("PROTO_CFG", "app.limits", `{"name":"kv","count":6}`))
+
+		got, err := env.management.GetKVKey(ctx, connect.NewRequest(&managementpb.GetKVKeyRequest{
+			ConnectionId: connID, Bucket: "PROTO_CFG", Key: "app.limits",
+		}))
+		require.NoError(t, err)
+		decoded := got.Msg.GetEntry().GetDecoded()
+		require.NotNil(t, decoded)
+		assert.JSONEq(t, `{"name":"kv","count":6,"tags":[]}`, decoded.GetData())
+		assert.Equal(t, fullName, decoded.GetMessageType())
+		assert.Equal(t, sourceID, decoded.GetSourceId())
+		assert.False(t, decoded.GetAuto())
+		raw, err := base64.StdEncoding.DecodeString(got.Msg.GetEntry().GetValue())
+		require.NoError(t, err)
+		assert.Equal(t, byte(0x0a), raw[0], "stored as Protobuf, not JSON")
+
+		history, err := env.management.GetKVKeyHistory(ctx, connect.NewRequest(&managementpb.GetKVKeyHistoryRequest{
+			ConnectionId: connID, Bucket: "PROTO_CFG", Key: "app.limits",
+		}))
+		require.NoError(t, err)
+		require.Len(t, history.Msg.GetEntries(), 2)
+		assert.Contains(t, history.Msg.GetEntries()[0].GetDecoded().GetData(), `"count":5`)
+
+		err = put("PROTO_CFG", "app.limits", `{"count":"many"}`)
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+		assert.Equal(t, "PROTO_ENCODE_FAILED", errorReason(t, err))
+
+		require.NoError(t, put("PROTO_RAW", "guess", `{"name":"raw","count":2,"tags":["a"]}`))
+		auto, err := env.management.GetKVKey(ctx, connect.NewRequest(&managementpb.GetKVKeyRequest{
+			ConnectionId: connID, Bucket: "PROTO_RAW", Key: "guess",
+		}))
+		require.NoError(t, err)
+		assert.True(t, auto.Msg.GetEntry().GetDecoded().GetAuto())
+		assert.Equal(t, fullName, auto.Msg.GetEntry().GetDecoded().GetMessageType())
+
+		_, err = env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+			ConnectionId: connID, Bucket: "PROTO_RAW", Key: "text",
+			Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte("plain"))},
+		}))
+		require.NoError(t, err)
+		text, err := env.management.GetKVKey(ctx, connect.NewRequest(&managementpb.GetKVKeyRequest{
+			ConnectionId: connID, Bucket: "PROTO_RAW", Key: "text",
+		}))
+		require.NoError(t, err)
+		assert.Nil(t, text.Msg.GetEntry().GetDecoded())
+	})
 }

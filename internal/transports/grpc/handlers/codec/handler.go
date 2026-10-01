@@ -59,21 +59,7 @@ func (h *Handler) DecodeMessage(
 	if err != nil {
 		return nil, err
 	}
-
-	pbResult := &protopb.DecodeResult{
-		Data:        string(result.Decoded),
-		MessageType: result.MessageType,
-		ValidBytes:  int32(result.ValidBytes), //nolint:gosec // bounded by the request size
-		UnknownFields: slices.To(result.UnknownFields, func(f entities.UnknownField) *protopb.UnknownField {
-			pb := converter.Convert(f, &protopb.UnknownField{}, converter.WithIgnoreFields("WireType"))
-			pb.WireType = wireTypes[f.WireType]
-			return pb
-		}),
-	}
-	if result.Error != "" {
-		pbResult.Error = &result.Error
-	}
-	return connect.NewResponse(&codecpb.DecodeMessageResponse{Result: pbResult}), nil
+	return connect.NewResponse(&codecpb.DecodeMessageResponse{Result: grpchelpers.DecodeResultToProto(result)}), nil
 }
 
 // DecodeWire reads protobuf binary data without a schema.
@@ -116,18 +102,10 @@ func (h *Handler) DetectMessageType(
 
 const defaultDetectLimit = 5
 
-var wireTypes = map[entities.WireType]protopb.WireType{
-	entities.WireVarint:  protopb.WireType_WIRE_TYPE_VARINT,
-	entities.WireFixed64: protopb.WireType_WIRE_TYPE_FIXED64,
-	entities.WireBytes:   protopb.WireType_WIRE_TYPE_BYTES,
-	entities.WireGroup:   protopb.WireType_WIRE_TYPE_GROUP,
-	entities.WireFixed32: protopb.WireType_WIRE_TYPE_FIXED32,
-}
-
 func wireFieldsToProto(fields []*entities.WireField) []*protopb.WireField {
 	return slices.To(fields, func(f *entities.WireField) *protopb.WireField {
 		pb := converter.Convert(f, &protopb.WireField{}, converter.WithIgnoreFields("WireType", "Message"))
-		pb.WireType = wireTypes[f.WireType]
+		pb.WireType = grpchelpers.WireTypeToProto(f.WireType)
 		pb.Message = wireFieldsToProto(f.Message)
 		return pb
 	})

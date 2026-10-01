@@ -417,7 +417,7 @@ func TestE2E(t *testing.T) {
 			ConnectionId: connectionID,
 			Bucket:       bucket,
 			Key:          "greeting",
-			Value:        base64.StdEncoding.EncodeToString([]byte("hello-kv")),
+			Payload:      &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte("hello-kv"))},
 		}))
 		require.NoError(t, err)
 		assert.Greater(t, putResp.Msg.GetRevision(), uint64(0))
@@ -426,18 +426,18 @@ func TestE2E(t *testing.T) {
 		// kv.Put). A wrong expected revision must now fail; the current one succeeds.
 		casPut, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
 			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key",
-			Value: base64.StdEncoding.EncodeToString([]byte("v1")),
+			Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte("v1"))},
 		}))
 		require.NoError(t, err)
 		casRev := casPut.Msg.GetRevision()
 		_, casErr := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
 			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key",
-			Value: base64.StdEncoding.EncodeToString([]byte("stale")), Revision: casRev + 99,
+			Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte("stale"))}, Revision: casRev + 99,
 		}))
 		require.Error(t, casErr, "CAS put with a wrong expected revision must be rejected")
 		casOK, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
 			ConnectionId: connectionID, Bucket: bucket, Key: "cas-key",
-			Value: base64.StdEncoding.EncodeToString([]byte("v2")), Revision: casRev,
+			Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte("v2"))}, Revision: casRev,
 		}))
 		require.NoError(t, err)
 		assert.Equal(t, casRev+1, casOK.Msg.GetRevision())

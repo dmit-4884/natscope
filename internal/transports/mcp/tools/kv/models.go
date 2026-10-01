@@ -4,6 +4,7 @@
 package kv
 
 import (
+	"encoding/json"
 	"time"
 
 	mcptransport "github.com/dmit-4884/natscope/internal/transports/mcp"
@@ -43,12 +44,16 @@ type listKeysOutput struct {
 }
 
 type entryView struct {
-	Key       string             `json:"key"`
-	Revision  uint64             `json:"revision"`
-	Created   time.Time          `json:"created"`
-	Operation string             `json:"operation" jsonschema:"put, delete or purge"`
-	Value     *mcptransport.Body `json:"value,omitempty"`
-	Truncated bool               `json:"truncated,omitempty"`
+	Key         string             `json:"key"`
+	Revision    uint64             `json:"revision"`
+	Created     time.Time          `json:"created"`
+	Operation   string             `json:"operation" jsonschema:"put, delete or purge"`
+	DecodedType string             `json:"decodedType,omitempty" jsonschema:"Protobuf message type the value was decoded as"`
+	DecodedAuto bool               `json:"decodedAuto,omitempty" jsonschema:"no mapping matched; natscope detected decodedType"`
+	Decoded     json.RawMessage    `json:"decoded,omitempty" jsonschema:"value decoded from Protobuf to JSON"`
+	DecodeError string             `json:"decodeError,omitempty"`
+	Value       *mcptransport.Body `json:"value,omitempty" jsonschema:"raw value, present when there is no decoded form"`
+	Truncated   bool               `json:"truncated,omitempty"`
 }
 
 type keyInput struct {

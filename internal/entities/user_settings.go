@@ -29,6 +29,11 @@ type MessageSettings struct {
 }
 
 // DetectsTypes reports whether unmapped payloads get auto-detected types.
+func (s *UserSettings) DetectsTypes() bool {
+	return s == nil || s.Messages.DetectsTypes()
+}
+
+// DetectsTypes reports whether unmapped payloads get auto-detected types.
 func (m *MessageSettings) DetectsTypes() bool {
 	return m == nil || m.DetectTypes == nil || *m.DetectTypes
 }

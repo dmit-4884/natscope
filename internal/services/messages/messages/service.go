@@ -102,10 +102,7 @@ func (s *Service) Get(ctx context.Context, in *entities.MessageGetRequest) (*ent
 
 func (s *Service) detectsTypes(ctx context.Context) bool {
 	cfg, err := s.settingsService.Get(ctx)
-	if err != nil || cfg == nil {
-		return true
-	}
-	return cfg.Messages.DetectsTypes()
+	return err != nil || cfg.DetectsTypes()
 }
 
 // buildOptions builds NATS-service options, applying user-settings

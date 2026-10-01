@@ -140,7 +140,7 @@ func TestHandler_CreateStream(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{streamInfo: &entities.StreamInfo{}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.CreateStream(t.Context(), connect.NewRequest(&managementpb.CreateStreamRequest{
 			ConnectionId: "conn-1",
@@ -154,7 +154,7 @@ func TestHandler_CreateStream(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{streamErr: errs.ErrJetStreamNotEnabled}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.CreateStream(t.Context(), connect.NewRequest(&managementpb.CreateStreamRequest{
 			ConnectionId: "conn-1",
@@ -170,7 +170,7 @@ func TestHandler_DeleteStream(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.DeleteStream(t.Context(), connect.NewRequest(&managementpb.DeleteStreamRequest{
 			ConnectionId: "conn-1",
@@ -184,7 +184,7 @@ func TestHandler_DeleteStream(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{streamErr: errs.ErrNATSTimeout}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.DeleteStream(t.Context(), connect.NewRequest(&managementpb.DeleteStreamRequest{
 			ConnectionId: "conn-1",
@@ -205,7 +205,7 @@ func TestHandler_ListConsumers(t *testing.T) {
 			{Name: "c1", Stream: "orders"},
 			{Name: "c2", Stream: "orders"},
 		}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.ListConsumers(t.Context(), connect.NewRequest(&managementpb.ListConsumersRequest{
 			ConnectionId: "conn-1",
@@ -219,7 +219,7 @@ func TestHandler_ListConsumers(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{consumerErr: errors.New("fetch failed")}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.ListConsumers(t.Context(), connect.NewRequest(&managementpb.ListConsumersRequest{
 			ConnectionId: "conn-1",
@@ -235,7 +235,7 @@ func TestHandler_CreateConsumer(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{consumerInfo: &entities.ConsumerInfo{Name: "c1", Stream: "orders"}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.CreateConsumer(t.Context(), connect.NewRequest(&managementpb.CreateConsumerRequest{
 			ConnectionId: "conn-1",
@@ -250,7 +250,7 @@ func TestHandler_CreateConsumer(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{consumerErr: errs.ErrWorkQueueConsumerNotAllowed}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.CreateConsumer(t.Context(), connect.NewRequest(&managementpb.CreateConsumerRequest{
 			ConnectionId: "conn-1",
@@ -267,7 +267,7 @@ func TestHandler_DeleteConsumer(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.DeleteConsumer(t.Context(), connect.NewRequest(&managementpb.DeleteConsumerRequest{
 			ConnectionId: "conn-1",
@@ -282,7 +282,7 @@ func TestHandler_DeleteConsumer(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{consumerErr: errs.ErrNATSTimeout}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.DeleteConsumer(t.Context(), connect.NewRequest(&managementpb.DeleteConsumerRequest{
 			ConnectionId: "conn-1",
@@ -301,7 +301,7 @@ func TestHandler_CreateKVBucket(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{kvInfo: &entities.KVBucketInfo{Bucket: "kv1"}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.CreateKVBucket(t.Context(), connect.NewRequest(&managementpb.CreateKVBucketRequest{
 			ConnectionId: "conn-1",
@@ -315,7 +315,7 @@ func TestHandler_CreateKVBucket(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{kvErr: errs.ErrJetStreamNotEnabled}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.CreateKVBucket(t.Context(), connect.NewRequest(&managementpb.CreateKVBucketRequest{
 			ConnectionId: "conn-1",
@@ -331,7 +331,7 @@ func TestHandler_GetKVBucket(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{kvInfo: &entities.KVBucketInfo{Bucket: "kv1"}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.GetKVBucket(t.Context(), connect.NewRequest(&managementpb.GetKVBucketRequest{
 			ConnectionId: "conn-1",
@@ -345,7 +345,7 @@ func TestHandler_GetKVBucket(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{kvErr: errs.ErrNotFound}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.GetKVBucket(t.Context(), connect.NewRequest(&managementpb.GetKVBucketRequest{
 			ConnectionId: "conn-1",
@@ -361,7 +361,7 @@ func TestHandler_DeleteKVBucket(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.DeleteKVBucket(t.Context(), connect.NewRequest(&managementpb.DeleteKVBucketRequest{
 			ConnectionId: "conn-1",
@@ -375,7 +375,7 @@ func TestHandler_DeleteKVBucket(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{kvErr: errors.New("delete failed")}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.DeleteKVBucket(t.Context(), connect.NewRequest(&managementpb.DeleteKVBucketRequest{
 			ConnectionId: "conn-1",
@@ -393,7 +393,7 @@ func TestHandler_CreateObjectBucket(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{objInfo: &entities.ObjectBucketInfo{Bucket: "obj1"}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.CreateObjectBucket(t.Context(), connect.NewRequest(&managementpb.CreateObjectBucketRequest{
 			ConnectionId: "conn-1",
@@ -407,7 +407,7 @@ func TestHandler_CreateObjectBucket(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{objErr: errs.ErrObjectAlreadyExists}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.CreateObjectBucket(t.Context(), connect.NewRequest(&managementpb.CreateObjectBucketRequest{
 			ConnectionId: "conn-1",
@@ -423,7 +423,7 @@ func TestHandler_GetObjectBucket(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{objInfo: &entities.ObjectBucketInfo{Bucket: "obj1"}}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.GetObjectBucket(t.Context(), connect.NewRequest(&managementpb.GetObjectBucketRequest{
 			ConnectionId: "conn-1",
@@ -437,7 +437,7 @@ func TestHandler_GetObjectBucket(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{objErr: errs.ErrNotFound}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.GetObjectBucket(t.Context(), connect.NewRequest(&managementpb.GetObjectBucketRequest{
 			ConnectionId: "conn-1",
@@ -453,7 +453,7 @@ func TestHandler_DeleteObjectBucket(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		resp, err := handler.DeleteObjectBucket(t.Context(), connect.NewRequest(&managementpb.DeleteObjectBucketRequest{
 			ConnectionId: "conn-1",
@@ -467,7 +467,7 @@ func TestHandler_DeleteObjectBucket(t *testing.T) {
 	t.Run("ServiceError", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockNatsService{objErr: errors.New("delete failed")}
-		handler := New(svc, svc, svc, svc, svc)
+		handler := New(svc, svc, svc, svc, svc, nil, nil)
 
 		_, err := handler.DeleteObjectBucket(t.Context(), connect.NewRequest(&managementpb.DeleteObjectBucketRequest{
 			ConnectionId: "conn-1",

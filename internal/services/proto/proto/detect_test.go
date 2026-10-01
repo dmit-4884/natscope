@@ -154,6 +154,41 @@ func TestDecodeMessages_Detect(t *testing.T) {
 	assert.False(t, off.DecodedAuto)
 }
 
+func TestDecodeSubject(t *testing.T) {
+	t.Parallel()
+	env, sourceID := newDetectEnv(t, nil)
+	env.svc.mappingsService = &fakeMappings{resolver: natsutil.NewMappingResolver(entities.SubjectMappings{
+		{BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "$KV.notes.>", MessageType: "det.Note", SourceID: sourceID},
+	})}
+	ctx := t.Context()
+
+	mapped := env.svc.DecodeSubject(ctx, "$KV.notes.a", userWire("ann"), false)
+	require.NotNil(t, mapped)
+	assert.Equal(t, "det.Note", mapped.MessageType)
+	assert.Equal(t, sourceID, mapped.SourceID)
+	assert.False(t, mapped.Auto)
+	assert.True(t, mapped.Success)
+	assert.NotEmpty(t, mapped.UnknownFields)
+
+	auto := env.svc.DecodeSubject(ctx, "$KV.users.a", userWire("ann"), true)
+	require.NotNil(t, auto)
+	assert.True(t, auto.Auto)
+	assert.Equal(t, "det.User", auto.MessageType)
+
+	assert.Nil(t, env.svc.DecodeSubject(ctx, "$KV.users.b", userWire("ann"), false))
+	assert.Nil(t, env.svc.DecodeSubject(ctx, "$KV.users.c", []byte("plain text"), true))
+
+	missing := &fakeMappings{resolver: natsutil.NewMappingResolver(entities.SubjectMappings{
+		{BaseEntity: entities.BaseEntity{Id: "m2"}, Pattern: "$KV.gone.>", MessageType: "det.Note", SourceID: "missing"},
+	})}
+	env.svc.mappingsService = missing
+	broken := env.svc.DecodeSubject(ctx, "$KV.gone.a", userWire("ann"), true)
+	require.NotNil(t, broken)
+	assert.False(t, broken.Success)
+	assert.NotEmpty(t, broken.Error)
+	assert.Equal(t, "det.Note", broken.MessageType)
+}
+
 func TestLiveDecoder_Detect(t *testing.T) {
 	t.Parallel()
 	env, sourceID := newDetectEnv(t, entities.SubjectMappings{})

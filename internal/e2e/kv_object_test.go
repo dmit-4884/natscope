@@ -92,7 +92,7 @@ func TestKVKeyValidation(t *testing.T) {
 		const badKey = "a..b"
 
 		_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
-			ConnectionId: connID, Bucket: "keys1", Key: badKey, Value: value,
+			ConnectionId: connID, Bucket: "keys1", Key: badKey, Payload: &managementpb.PutKVKeyRequest_Value{Value: value},
 		}))
 		require.Error(t, err)
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "PutKVKey")
@@ -125,7 +125,7 @@ func TestKVKeyValidation(t *testing.T) {
 	t.Run("GetKVKeyHistory rejects wildcards like every other key RPC", func(t *testing.T) {
 		for _, k := range []string{"a.1", "a.2", "b.1"} {
 			_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
-				ConnectionId: connID, Bucket: "keys1", Key: k, Value: value,
+				ConnectionId: connID, Bucket: "keys1", Key: k, Payload: &managementpb.PutKVKeyRequest_Value{Value: value},
 			}))
 			require.NoError(t, err)
 		}
