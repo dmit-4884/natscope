@@ -46,7 +46,6 @@ vi.mock('@/contexts/mappings', () => ({
 
 vi.mock('@/contexts/proto', () => ({
   useTypeDescription: () => ({ data: undefined, isLoading: false }),
-  messageCompletions: () => [],
 }))
 
 vi.mock('./publish/TemplateMenu', () => ({

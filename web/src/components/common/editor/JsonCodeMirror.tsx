@@ -3,22 +3,11 @@ import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view'
 import { Prec } from '@codemirror/state'
-import {
-  autocompletion,
-  type Completion,
-  type CompletionContext,
-  type CompletionResult,
-} from '@codemirror/autocomplete'
+import { autocompletion } from '@codemirror/autocomplete'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
-
-/** Field metadata for schema-aware key completion (from the proto registry). */
-export interface CompletionField {
-  name: string
-  type: string
-  repeated?: boolean
-  isMessage?: boolean
-}
+import type { ProtoSchema } from './protoSchema'
+import { protoCompletionSource } from './protoCompletion'
 
 interface Props {
   value: string
@@ -29,8 +18,8 @@ interface Props {
   onSubmit?: () => void
   /** Called on Cmd/Ctrl+S. */
   onFormat?: () => void
-  /** When set, typing a key inside an object suggests these fields. */
-  completionFields?: CompletionField[]
+  /** When set, completes field names and enum values of this message type. */
+  schema?: ProtoSchema
 }
 
 // Dark theme matching the app's gray-900 editor chrome.
@@ -83,52 +72,6 @@ const jsonHighlight = HighlightStyle.define([
   { tag: tags.invalid, color: '#fca5a5' },
 ])
 
-/**
- * Suggests proto message field names while typing an object key.
- * Root-message only — doesn't resolve nested object context, so a cursor
- * inside a nested value still gets top-level field suggestions.
- */
-function protoFieldSource(fields: CompletionField[]) {
-  return (context: CompletionContext): CompletionResult | null => {
-    const word = context.matchBefore(/"[\w]*$|[A-Za-z_][\w]*$/)
-    if (!word && !context.explicit) return null
-    // `from` must exclude the opening quote: CodeMirror filters options
-    // against doc text from `from` to cursor, and a leading `"` never matches.
-    const hasQuote = word?.text.startsWith('"') ?? false
-    const wordStart = word ? word.from : context.pos
-    const from = wordStart + (hasQuote ? 1 : 0)
-    // Keys are only valid right after `{` or `,` — stay quiet in value positions.
-    const beforeText = context.state.sliceDoc(0, wordStart).replace(/\s+$/, '')
-    const prevChar = beforeText.slice(-1)
-    if (prevChar !== '' && prevChar !== '{' && prevChar !== ',') return null
-
-    const applyField =
-      (name: string): Completion['apply'] =>
-      (view, _completion, applyFrom, applyTo) => {
-        // closeBrackets pairs the opening quote — consume the auto-inserted
-        // closing quote so the result is `"name": `, not `"name": "`.
-        const nextChar = view.state.sliceDoc(applyTo, applyTo + 1)
-        const to = hasQuote && nextChar === '"' ? applyTo + 1 : applyTo
-        const insert = hasQuote ? `${name}": ` : `"${name}": `
-        view.dispatch({
-          changes: { from: applyFrom, to, insert },
-          selection: { anchor: applyFrom + insert.length },
-        })
-      }
-
-    return {
-      from,
-      options: fields.map((f) => ({
-        label: f.name,
-        type: f.isMessage ? 'class' : 'property',
-        detail: f.repeated ? `${f.type}[]` : f.type,
-        apply: applyField(f.name),
-      })),
-      validFor: /^[\w]*$/,
-    }
-  }
-}
-
 export default function JsonCodeMirror({
   value,
   onChange,
@@ -136,7 +79,7 @@ export default function JsonCodeMirror({
   placeholder,
   onSubmit,
   onFormat,
-  completionFields,
+  schema,
 }: Props) {
   // Keymap handlers go through refs so the extensions array stays stable and
   // CodeMirror isn't reconfigured on every parent render.
@@ -176,11 +119,11 @@ export default function JsonCodeMirror({
       ),
     ]
     if (placeholder) ext.push(cmPlaceholder(placeholder))
-    if (completionFields && completionFields.length > 0) {
-      ext.push(autocompletion({ override: [protoFieldSource(completionFields)] }))
+    if (schema) {
+      ext.push(autocompletion({ override: [protoCompletionSource(schema.description, schema.messageType)] }))
     }
     return ext
-  }, [completionFields, placeholder])
+  }, [schema, placeholder])
 
   return (
     <CodeMirror

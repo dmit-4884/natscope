@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '@/utils/toast'
 import { copyText } from '@/utils/clipboard'
-import type { CompletionField } from '@/components/common/editor/JsonCodeMirror'
+import type { ProtoSchema } from '@/components/common/editor/protoSchema'
 import { CopyIcon, RefreshIcon } from '@/components/ui'
 import HelpersDropdown from './HelpersDropdown'
 import Tooltip from './Tooltip'
@@ -25,8 +25,8 @@ interface JsonEditorProps {
   sizeBytes?: number
   /** Stream max_msg_size; counter turns red above this. 0/undefined = unlimited. */
   sizeLimitBytes?: number
-  /** Proto message fields for schema-aware key autocomplete. */
-  completionFields?: CompletionField[]
+  /** Message type for schema-aware autocomplete. */
+  schema?: ProtoSchema
   height?: string
   /** Called on Cmd/Ctrl+Enter */
   onSubmit?: () => void
@@ -57,7 +57,7 @@ export default function TemplateJsonEditor({
   prefillLoading,
   sizeBytes,
   sizeLimitBytes,
-  completionFields,
+  schema,
   height = 'h-64',
   onSubmit,
 }: JsonEditorProps) {
@@ -284,7 +284,7 @@ export default function TemplateJsonEditor({
             placeholder={placeholder}
             onSubmit={onSubmit}
             onFormat={handleFormat}
-            completionFields={completionFields}
+            schema={schema}
           />
         </Suspense>
       </div>

@@ -8,7 +8,7 @@ import { getProtoMessageExample } from '@/api/proto'
 import { getMessages } from '@/api/messages'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
 import { formatBytes } from '@/utils/formatters'
-import { messageCompletions, useTypeDescription } from '@/contexts/proto'
+import { useTypeDescription } from '@/contexts/proto'
 import { useSubjectMappingEntity } from '@/contexts/mappings'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
 import { jsonSyntaxError, processHelpers } from '@/utils/helpers'
@@ -124,7 +124,7 @@ export default function PublishContent({
     onWildcardValuesChange(newValues)
   }
 
-  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null)
+  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null, true)
   const protoMessage = protoDescription?.messages[0]
 
   const publishMutation = useMutation({
@@ -401,9 +401,9 @@ export default function PublishContent({
   }
 
   // Schema-aware key completion in the editor (proto mode only).
-  const completionFields = useMemo(
-    () => (messageType && protoMessage ? messageCompletions(protoMessage) : undefined),
-    [messageType, protoMessage],
+  const completionSchema = useMemo(
+    () => (messageType && protoDescription ? { messageType, description: protoDescription } : undefined),
+    [messageType, protoDescription],
   )
 
   return (
@@ -468,7 +468,7 @@ export default function PublishContent({
               prefillLoading={prefillLoading}
               sizeBytes={payloadBytes}
               sizeLimitBytes={maxMsgSize}
-              completionFields={completionFields}
+              schema={completionSchema}
               height="h-96"
               onSubmit={handlePublish}
             />

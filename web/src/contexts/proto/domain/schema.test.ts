@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SchemaField, SchemaType } from '@/api/proto'
-import { fieldTypeLabel, groupByPackage, messageCompletions, shortTypeName } from './schema'
+import { fieldTypeLabel, groupByPackage, shortTypeName } from './schema'
 
 const field = (overrides: Partial<SchemaField>): SchemaField => ({
   name: 'f',
@@ -42,17 +42,6 @@ describe('schema helpers', () => {
     expect(fieldTypeLabel(field({ repeated: true }))).toBe('repeated string')
     expect(fieldTypeLabel(field({ kind: 'message', typeName: 'shop.Item', repeated: true }))).toBe('repeated shop.Item')
     expect(fieldTypeLabel(field({ kind: 'enum', typeName: 'shop.Status', mapKey: 'string' }))).toBe('map<string, shop.Status>')
-  })
-
-  it('builds editor completions from the root message', () => {
-    const completions = messageCompletions({
-      fullName: 'shop.Order',
-      file: 'a.proto',
-      comment: '',
-      deprecated: false,
-      fields: [field({ name: 'items', kind: 'message', typeName: 'shop.Item', repeated: true })],
-    })
-    expect(completions).toEqual([{ name: 'items', type: 'repeated shop.Item', repeated: true, isMessage: true }])
   })
 
   it('groups types by package in name order', () => {

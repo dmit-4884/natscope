@@ -1,4 +1,4 @@
-import type { SchemaField, SchemaMessage, SchemaType } from '@/api/proto'
+import type { SchemaField, SchemaType } from '@/api/proto'
 
 export function shortTypeName(fullName: string): string {
   return fullName.slice(fullName.lastIndexOf('.') + 1)
@@ -8,15 +8,6 @@ export function fieldTypeLabel(field: SchemaField): string {
   const element = field.typeName || field.kind
   if (field.mapKey) return `map<${field.mapKey}, ${element}>`
   return field.repeated ? `repeated ${element}` : element
-}
-
-export function messageCompletions(message: SchemaMessage) {
-  return message.fields.map((f) => ({
-    name: f.name,
-    type: fieldTypeLabel(f),
-    repeated: f.repeated,
-    isMessage: f.kind === 'message',
-  }))
 }
 
 export function groupByPackage(types: SchemaType[]): Array<[string, SchemaType[]]> {

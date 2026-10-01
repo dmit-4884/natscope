@@ -4,7 +4,7 @@ import { getErrorMessage } from '@/api/errors'
 import { getProtoMessageExample } from '@/api/proto'
 import { useMappingItems, useSubjectMappingEntity } from '@/contexts/mappings'
 import { useRequestMessage } from '@/contexts/messages'
-import { messageCompletions, useMessageTypes, useTypeDescription } from '@/contexts/proto'
+import { useMessageTypes, useTypeDescription } from '@/contexts/proto'
 import { useRequestDraft, withRecentSubject } from '@/stores/requestDraftStore'
 import { SubjectAutocomplete } from '@/components/common/SubjectAutocomplete'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
@@ -61,7 +61,7 @@ export default function RequestPage() {
   const isJsonMode = encodingMode === 'json' || (!mappedMessageType && encodingMode !== 'proto')
   const messageType = isJsonMode ? undefined : mappedMessageType ?? undefined
   const sourceId = isJsonMode ? undefined : mappedSourceId ?? undefined
-  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null)
+  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null, true)
   const protoMessage = protoDescription?.messages[0]
   const { messages: protoTypes } = useMessageTypes()
 
@@ -163,9 +163,9 @@ export default function RequestPage() {
     [draft.headers],
   )
 
-  const completionFields = useMemo(
-    () => (messageType && protoMessage ? messageCompletions(protoMessage) : undefined),
-    [messageType, protoMessage],
+  const completionSchema = useMemo(
+    () => (messageType && protoDescription ? { messageType, description: protoDescription } : undefined),
+    [messageType, protoDescription],
   )
 
   return (
@@ -255,7 +255,7 @@ export default function RequestPage() {
               exampleLoading={exampleLoading}
               exampleDisabled={protoLoading}
               sizeBytes={payloadBytes}
-              completionFields={completionFields}
+              schema={completionSchema}
               onSubmit={handleSend}
             />
             {sendsPlainText && (
