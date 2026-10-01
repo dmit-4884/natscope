@@ -277,7 +277,7 @@ func (s *Service) subscribeTarget(
 // resolveEffectiveMode falls back to core NATS when a WorkQueue stream would
 // be drained by a JS-Ordered (AckNone) consumer.
 func (s *Service) resolveEffectiveMode(ctx context.Context, connectionID, streamName, mode string) string {
-	if mode != subscriptionModeJetStreamOrdered || streamName == "" {
+	if streamName == "" {
 		return mode
 	}
 	info, err := s.natsService.GetStreamInfo(ctx, connectionID, streamName)
@@ -285,9 +285,17 @@ func (s *Service) resolveEffectiveMode(ctx context.Context, connectionID, stream
 		return mode
 	}
 	if info.Config.Retention == entities.RetentionWorkQueue {
+		if mode != subscriptionModeJetStreamOrdered {
+			return mode
+		}
 		s.logger.Warn("downgrading live subscription to core_nats: WorkQueue stream would be drained by a JS-Ordered consumer",
 			slog.String("stream", streamName))
 		return subscriptionModeCoreNATS
+	}
+	if mode == subscriptionModeCoreNATS && (info.Config.Mirror != nil || len(info.Config.Sources) > 0) {
+		s.logger.Debug("upgrading live subscription to jetstream_ordered: the stream copies messages from other streams",
+			slog.String("stream", streamName))
+		return subscriptionModeJetStreamOrdered
 	}
 	return mode
 }
