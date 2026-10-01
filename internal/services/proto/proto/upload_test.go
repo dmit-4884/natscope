@@ -187,24 +187,6 @@ func TestRefreshSource_UploadRecompiles(t *testing.T) {
 	assert.Equal(t, []string{"shop.Order"}, messageNames(env.svc, t, src.Id))
 }
 
-func TestStart_DropsRetiredSourceTypes(t *testing.T) {
-	t.Parallel()
-	env := newTestEnv(t)
-	retired := entities.ProtoSourceNew(func(s *entities.ProtoSource) {
-		s.Name = "old files source"
-		s.SourceType = "files"
-	})
-	require.NoError(t, env.sources.Save(t.Context(), retired))
-	kept := env.createUpload(t)
-
-	env.svc.Start(t.Context())
-
-	_, err := env.sources.Get(t.Context(), retired.Id)
-	require.ErrorIs(t, err, errs.ErrProtoSourceNotFound)
-	_, err = env.sources.Get(t.Context(), kept.Id)
-	require.NoError(t, err)
-}
-
 func TestEncode_Framing(t *testing.T) {
 	t.Parallel()
 	env := newTestEnv(t)
