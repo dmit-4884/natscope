@@ -51,6 +51,7 @@ type mockProtoService struct {
 	watcherResult  *entities.ProtoSource
 	watcherErr     error
 	gotUpload      entities.SchemaUpload
+	gotSourceType  entities.SourceType
 	uploadOutcome  *entities.CompileOutcome
 	uploadErr      error
 }
@@ -75,7 +76,13 @@ func (m *mockProtoService) DeleteSource(_ context.Context, _ string) error {
 	return m.deleteErr
 }
 
-func (m *mockProtoService) ValidateRepository(_ context.Context, _ string, _ *string) (*entities.RepositoryValidation, error) {
+func (m *mockProtoService) ValidateRepository(
+	_ context.Context,
+	sourceType entities.SourceType,
+	_ string,
+	_ *string,
+) (*entities.RepositoryValidation, error) {
+	m.gotSourceType = sourceType
 	return m.repoResult, m.repoErr
 }
 
@@ -285,6 +292,18 @@ func TestHandler_ValidateRepository(t *testing.T) {
 		}))
 		require.NoError(t, err)
 		assert.True(t, resp.Msg.Valid)
+		assert.Equal(t, entities.SourceTypeGit, svc.gotSourceType)
+	})
+
+	t.Run("BSR module", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockProtoService{repoResult: &entities.RepositoryValidation{Valid: true}}
+
+		_, err := New(svc).ValidateRepository(t.Context(), connect.NewRequest(&sourcespb.ValidateRepositoryRequest{
+			Repository: "buf.build/acme/payments", SourceType: protopb.SourceType_SOURCE_TYPE_BSR,
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, entities.SourceTypeBSR, svc.gotSourceType)
 	})
 
 	t.Run("ServiceError", func(t *testing.T) {

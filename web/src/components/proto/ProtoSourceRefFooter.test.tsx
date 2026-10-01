@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import type { ComponentProps } from 'react'
 import { render, screen, fireEvent } from '@/test/utils'
-import { ProtoSourceGitFooter } from './ProtoSourceGitFooter'
+import { ProtoSourceRefFooter } from './ProtoSourceRefFooter'
 
-type Props = ComponentProps<typeof ProtoSourceGitFooter>
+type Props = ComponentProps<typeof ProtoSourceRefFooter>
 
 const SHA_A = 'a'.repeat(40)
 const SHA_B = 'b'.repeat(40)
 
 function renderFooter(overrides: Partial<Props> = {}) {
   const props: Props = {
+    registry: 'git',
     showPicker: false,
     onTogglePicker: vi.fn(),
     refs: [],
@@ -23,11 +24,11 @@ function renderFooter(overrides: Partial<Props> = {}) {
     outcome: null,
     ...overrides,
   }
-  render(<ProtoSourceGitFooter {...props} />)
+  render(<ProtoSourceRefFooter {...props} />)
   return props
 }
 
-describe('ProtoSourceGitFooter', () => {
+describe('ProtoSourceRefFooter', () => {
   const originalScrollIntoView = Element.prototype.scrollIntoView
   beforeAll(() => {
     Element.prototype.scrollIntoView = vi.fn()
@@ -40,7 +41,7 @@ describe('ProtoSourceGitFooter', () => {
     const props = renderFooter()
     fireEvent.click(screen.getByText('Pick a tag, branch or commit to compile'))
     expect(props.onTogglePicker).toHaveBeenCalledTimes(1)
-    expect(screen.queryByTestId('git-ref-refresh')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ref-refresh')).not.toBeInTheDocument()
   })
 
   it('shows the selected ref and refreshes it', () => {
@@ -48,13 +49,22 @@ describe('ProtoSourceGitFooter', () => {
       selectedRef: { name: 'main', kind: 'branch', revision: SHA_A },
       activeSchema: { revision: SHA_A, fingerprint: 'fp', compiledAt: 1, messageCount: 12, active: true },
     })
-    expect(screen.getByTestId('git-ref-badge')).toHaveTextContent('main')
+    expect(screen.getByTestId('ref-badge')).toHaveTextContent('main')
     expect(screen.getByText('branch')).toBeInTheDocument()
     expect(screen.getByText('aaaaaaa')).toHaveAttribute('title', SHA_A)
     expect(screen.getByText('· 12 message types')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('git-ref-refresh'))
+    fireEvent.click(screen.getByTestId('ref-refresh'))
     expect(props.onRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('speaks in labels and commit ids for a BSR source', () => {
+    const props = renderFooter({ registry: 'bsr', showPicker: true })
+    expect(screen.getByText('Pick a label or commit to load')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Label' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Commit ID'), { target: { value: '0123456789abcdef0123456789abcdef' } })
+    fireEvent.click(screen.getByTestId('ref-commit-use'))
+    expect(props.onSelectRef).toHaveBeenCalledWith('0123456789abcdef0123456789abcdef')
   })
 
   it('lists tags and branches and selects one', () => {
@@ -72,9 +82,9 @@ describe('ProtoSourceGitFooter', () => {
 
   it('selects a commit by SHA', () => {
     const props = renderFooter({ showPicker: true })
-    expect(screen.getByTestId('git-commit-use')).toBeDisabled()
-    fireEvent.change(screen.getByTestId('git-commit-input'), { target: { value: ` ${SHA_B} ` } })
-    fireEvent.click(screen.getByTestId('git-commit-use'))
+    expect(screen.getByTestId('ref-commit-use')).toBeDisabled()
+    fireEvent.change(screen.getByTestId('ref-commit-input'), { target: { value: ` ${SHA_B} ` } })
+    fireEvent.click(screen.getByTestId('ref-commit-use'))
     expect(props.onSelectRef).toHaveBeenCalledWith(SHA_B)
   })
 
@@ -89,7 +99,7 @@ describe('ProtoSourceGitFooter', () => {
 
   it('reports the compile outcome', () => {
     renderFooter({ outcome: { valid: true, messageTypes: 3, fileDescriptors: 2, diagnostics: [] } })
-    expect(screen.getByTestId('git-compile-ok')).toHaveTextContent('Compiled 3 message types')
+    expect(screen.getByTestId('ref-compile-ok')).toHaveTextContent('Compiled 3 message types')
   })
 
   it('shows diagnostics when the selected ref does not compile', () => {
@@ -101,7 +111,7 @@ describe('ProtoSourceGitFooter', () => {
         diagnostics: [{ severity: 'error', file: 'shop.proto', line: 3, column: 17, message: 'syntax error' }],
       },
     })
-    expect(screen.queryByTestId('git-compile-ok')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ref-compile-ok')).not.toBeInTheDocument()
     expect(screen.getByText(/syntax error/)).toBeInTheDocument()
   })
 

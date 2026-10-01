@@ -113,19 +113,24 @@ type SourceManager interface {
 
 	// ValidateRepository probes a Git repo; outcome is always in the result, error
 	// only on unexpected internal failure.
-	ValidateRepository(ctx context.Context, repository string, token *string) (*entities.RepositoryValidation, error)
+	ValidateRepository(
+		ctx context.Context,
+		sourceType entities.SourceType,
+		repository string,
+		token *string,
+	) (*entities.RepositoryValidation, error)
 
 	// ValidateLocalPath probes a filesystem root; same contract as
 	// ValidateRepository.
 	ValidateLocalPath(ctx context.Context, dirPath string) (*entities.LocalPathValidation, error)
 
-	// ListRefs returns the tags and branches of a git source.
+	// ListRefs returns the tags and branches of a Git source, or the labels of a BSR source.
 	ListRefs(ctx context.Context, sourceID string) ([]entities.ProtoRef, error)
 
-	// SelectRef points a git source at a tag, branch or commit; compile errors come back in the outcome.
+	// SelectRef points a Git or BSR source at a ref; compile errors come back in the outcome.
 	SelectRef(ctx context.Context, sourceID, ref string) (*entities.ProtoSource, *entities.CompileOutcome, error)
 
-	// RefreshSource rebuilds the active schema: re-resolves the git ref or recompiles local files.
+	// RefreshSource rebuilds the active schema: re-resolves the selected ref or recompiles the files.
 	RefreshSource(ctx context.Context, sourceID string) (*entities.ProtoSource, *entities.CompileOutcome, error)
 
 	// ListRevisions returns the stored schemas of a source, newest first.

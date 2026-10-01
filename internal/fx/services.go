@@ -6,12 +6,15 @@ package fx
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	"go.uber.org/fx"
 
 	"github.com/altessa-s/go-atlas/core/errors"
 
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
+	"github.com/dmit-4884/natscope/internal/pkg/bsr"
 	"github.com/dmit-4884/natscope/internal/pkg/secrets"
 
 	connectionssvc "github.com/dmit-4884/natscope/internal/services/connections"
@@ -106,6 +109,8 @@ func AsWorkspaceSection(f any) any {
 
 var obsoleteProtoBuckets = []string{"proto_descriptors", "proto_versions", "proto_selections"}
 
+const bsrRequestTimeout = 2 * time.Minute
+
 // newProtoService creates a new unified Proto service backed by bbolt stores.
 func newProtoService(
 	db *bbstore.DB,
@@ -140,6 +145,7 @@ func newProtoService(
 		descriptors,
 		conflicts,
 		gitFetcher,
+		bsr.New(&http.Client{Timeout: bsrRequestTimeout}),
 		mappingsSvc,
 		fileWatcher,
 	), nil

@@ -15,6 +15,7 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
+	"github.com/dmit-4884/natscope/internal/pkg/bsr"
 
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 )
@@ -59,6 +60,11 @@ func (s *Service) RestoreWatchers(ctx context.Context) {
 // CreateSource creates a new proto source for a user.
 func (s *Service) CreateSource(ctx context.Context, in *entities.ProtoSourceCreate) (*entities.ProtoSource, error) {
 	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
+	if in.SourceType == entities.SourceTypeBSR {
+		if _, err := bsr.ParseModule(in.Repository); err != nil {
+			return nil, err
+		}
+	}
 
 	source := converter.Convert(in, entities.ProtoSourceNew())
 
@@ -220,9 +226,17 @@ func (s *Service) SetWatcher(ctx context.Context, sourceID string, enabled bool)
 // returned entity, error reserved for genuine internal failures.
 func (s *Service) ValidateRepository(
 	ctx context.Context,
+	sourceType entities.SourceType,
 	repository string,
 	token *string,
 ) (*entities.RepositoryValidation, error) {
+	if sourceType == entities.SourceTypeBSR {
+		if err := s.validateModule(ctx, repository, token); err != nil {
+			msg := "Module is not accessible: " + err.Error()
+			return &entities.RepositoryValidation{Valid: false, Error: &msg}, nil
+		}
+		return &entities.RepositoryValidation{Valid: true}, nil
+	}
 	source := &entities.ProtoSource{Repository: repository, Token: token}
 	if err := s.gitFetcher.ValidateRepository(ctx, source.AuthenticatedURL()); err != nil {
 		msg := "Repository is not accessible: " + err.Error()

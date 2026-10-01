@@ -31,7 +31,7 @@ func activeRevision(src *entities.ProtoSource) (string, error) {
 			return "", errs.ErrMappingSelectionMissing
 		}
 		return src.ActiveSchema.Revision, nil
-	case entities.SourceTypeGit:
+	case entities.SourceTypeGit, entities.SourceTypeBSR:
 		if src.SelectedRef == nil || src.SelectedRef.Revision == "" {
 			return "", errs.ErrMappingSelectionMissing
 		}

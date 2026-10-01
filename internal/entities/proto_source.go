@@ -17,6 +17,7 @@ const (
 	SourceTypeGit    SourceType = "git"
 	SourceTypeLocal  SourceType = "local"
 	SourceTypeUpload SourceType = "upload"
+	SourceTypeBSR    SourceType = "bsr"
 )
 
 // ProtoCompileResult snapshots the most recent compile attempt; server-side
@@ -50,10 +51,10 @@ type ProtoSource struct {
 	// Enabled controls whether this source participates in descriptor compilation.
 	Enabled bool
 
-	// Repository is the Git repository URL (Git type only).
+	// Repository is the Git repository URL, or the BSR module such as buf.build/acme/payments.
 	Repository string
 
-	// Token is the access token for Git authentication (Git type only).
+	// Token authenticates against the Git host or the BSR.
 	Token *string
 
 	// LocalPath is the directory path on server disk (Local type only).
@@ -75,7 +76,7 @@ type ProtoSource struct {
 	// never accepted from clients.
 	LastCompile *ProtoCompileResult
 
-	// SelectedRef is the git ref a git source tracks.
+	// SelectedRef is the ref a Git or BSR source tracks.
 	SelectedRef *ProtoRef
 
 	// ActiveSchema is the schema the source decodes with.

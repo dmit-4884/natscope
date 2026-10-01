@@ -7,7 +7,29 @@ import { plural } from '@/utils/plural'
 import { CompileDiagnosticsList } from './CompileDiagnosticsList'
 import { TagIcon } from './protoCardIcons'
 
+const TEXT = {
+  git: {
+    pick: 'Pick a tag, branch or commit to compile',
+    select: 'Tag or branch',
+    none: 'No tags or branches',
+    placeholder: 'Select a tag or branch…',
+    commit: 'Commit SHA',
+    commitPlaceholder: 'or a 40-character commit SHA',
+    busy: 'Fetching and compiling…',
+  },
+  bsr: {
+    pick: 'Pick a label or commit to load',
+    select: 'Label',
+    none: 'No labels',
+    placeholder: 'Select a label…',
+    commit: 'Commit ID',
+    commitPlaceholder: 'or a 32-character commit ID',
+    busy: 'Downloading the schema…',
+  },
+}
+
 interface Props {
+  registry: keyof typeof TEXT
   selectedRef?: ProtoRef
   activeSchema?: SchemaRevision
   showPicker: boolean
@@ -25,7 +47,8 @@ interface Props {
 
 const shortRevision = (revision: string) => revision.slice(0, 7)
 
-export function ProtoSourceGitFooter({
+export function ProtoSourceRefFooter({
+  registry,
   selectedRef,
   activeSchema,
   showPicker,
@@ -41,6 +64,7 @@ export function ProtoSourceGitFooter({
   outcome,
 }: Props) {
   const [commit, setCommit] = useState('')
+  const text = TEXT[registry]
 
   return (
     <div className="space-y-2">
@@ -48,7 +72,7 @@ export function ProtoSourceGitFooter({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <TagIcon className="w-3.5 h-3.5 text-content-muted shrink-0" />
-            <Badge variant="primary" size="sm" data-testid="git-ref-badge">
+            <Badge variant="primary" size="sm" data-testid="ref-badge">
               {selectedRef.name}
             </Badge>
             <span className="text-2xs text-content-tertiary shrink-0">{selectedRef.kind}</span>
@@ -60,10 +84,10 @@ export function ProtoSourceGitFooter({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" variant="secondary" onClick={onRefresh} loading={isBusy} data-testid="git-ref-refresh">
+            <Button size="sm" variant="secondary" onClick={onRefresh} loading={isBusy} data-testid="ref-refresh">
               Refresh
             </Button>
-            <Button size="sm" variant="ghost" onClick={onTogglePicker} data-testid="git-ref-change">
+            <Button size="sm" variant="ghost" onClick={onTogglePicker} data-testid="ref-change">
               Change
             </Button>
           </div>
@@ -73,10 +97,10 @@ export function ProtoSourceGitFooter({
           type="button"
           onClick={onTogglePicker}
           className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent-text transition-colors"
-          data-testid="git-ref-change"
+          data-testid="ref-change"
         >
           <TagIcon className="w-3.5 h-3.5" />
-          Pick a tag, branch or commit to compile
+          {text.pick}
         </button>
       )}
 
@@ -93,11 +117,11 @@ export function ProtoSourceGitFooter({
             </div>
           ) : (
             <SearchableSelect
-              label="Tag or branch"
+              label={text.select}
               value={selectedRef?.kind === 'commit' ? undefined : selectedRef?.name}
               loading={isLoadingRefs}
               disabled={isBusy || (!isLoadingRefs && refs.length === 0)}
-              placeholder={isLoadingRefs ? 'Loading refs…' : refs.length === 0 ? 'No tags or branches' : 'Select a tag or branch…'}
+              placeholder={isLoadingRefs ? 'Loading refs…' : refs.length === 0 ? text.none : text.placeholder}
               searchPlaceholder="Filter refs…"
               onChange={onSelectRef}
               options={refs.map((ref) => ({
@@ -114,15 +138,15 @@ export function ProtoSourceGitFooter({
             }}
           >
             <Input
-              aria-label="Commit SHA"
+              aria-label={text.commit}
               value={commit}
               onChange={(e) => setCommit(e.target.value)}
-              placeholder="or a 40-character commit SHA"
+              placeholder={text.commitPlaceholder}
               size="sm"
               mono
-              data-testid="git-commit-input"
+              data-testid="ref-commit-input"
             />
-            <Button type="submit" size="sm" variant="secondary" disabled={isBusy || !commit.trim()} data-testid="git-commit-use">
+            <Button type="submit" size="sm" variant="secondary" disabled={isBusy || !commit.trim()} data-testid="ref-commit-use">
               Use
             </Button>
           </form>
@@ -132,12 +156,12 @@ export function ProtoSourceGitFooter({
       {isBusy && (
         <div className="flex items-center gap-2 text-xs text-content-secondary py-2 px-3 bg-accent-light rounded-md">
           <Spinner size="sm" />
-          <span>Fetching and compiling…</span>
+          <span>{text.busy}</span>
         </div>
       )}
       {actionError && <ErrorAlert compact message={getErrorMessage(actionError)} />}
       {outcome?.valid && (
-        <div className="text-xs text-status-success-text p-2 bg-status-success-bg rounded" data-testid="git-compile-ok">
+        <div className="text-xs text-status-success-text p-2 bg-status-success-bg rounded" data-testid="ref-compile-ok">
           Compiled {plural(outcome.messageTypes, 'message type')}
         </div>
       )}

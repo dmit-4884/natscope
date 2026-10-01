@@ -10,7 +10,7 @@ import {
   useUploadSchema,
 } from '@/contexts/proto'
 import type { ProtoSource, ProtoSourceType, CompileOutcome } from '@/api/protoSources'
-import { ProtoSourceGitFooter } from './ProtoSourceGitFooter'
+import { ProtoSourceRefFooter } from './ProtoSourceRefFooter'
 import { ProtoSourceLocalFooter } from './ProtoSourceLocalFooter'
 import { ProtoSourceUploadFooter } from './ProtoSourceUploadFooter'
 import type { PreparedUpload } from './schemaUpload'
@@ -19,6 +19,7 @@ const TYPE_BADGE_CONFIG: Record<ProtoSourceType, { bg: string; text: string; lab
   git: { bg: 'bg-accent-muted', text: 'text-accent-text', label: 'Git' },
   local: { bg: 'bg-status-warning-light', text: 'text-amber-700', label: 'Local' },
   upload: { bg: 'bg-status-success-light', text: 'text-green-700', label: 'Upload' },
+  bsr: { bg: 'bg-accent-muted', text: 'text-accent-text', label: 'BSR' },
 }
 
 interface ProtoSourceCardProps {
@@ -43,7 +44,7 @@ export default function ProtoSourceCard({ source, onEdit }: ProtoSourceCardProps
     isLoading: isLoadingRefs,
     error: refsError,
     refetch: refetchRefs,
-  } = useSourceRefs(showRefPicker && source.sourceType === 'git' ? source.id : null)
+  } = useSourceRefs(showRefPicker && (source.sourceType === 'git' || source.sourceType === 'bsr') ? source.id : null)
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -108,7 +109,7 @@ export default function ProtoSourceCard({ source, onEdit }: ProtoSourceCardProps
   const typeBadge = TYPE_BADGE_CONFIG[source.sourceType]
   const isDisabled = !source.enabled
   const repoDisplayName =
-    source.sourceType === 'git'
+    source.sourceType === 'git' || source.sourceType === 'bsr'
       ? source.repository.replace(/^https?:\/\//, '').replace(/\.git$/, '')
       : undefined
 
@@ -196,8 +197,9 @@ export default function ProtoSourceCard({ source, onEdit }: ProtoSourceCardProps
 
         {/* Type-specific footer */}
         <div className="mt-3 pt-3 border-t border-gray-100">
-          {source.sourceType === 'git' && (
-            <ProtoSourceGitFooter
+          {(source.sourceType === 'git' || source.sourceType === 'bsr') && (
+            <ProtoSourceRefFooter
+              registry={source.sourceType}
               selectedRef={source.selectedRef}
               activeSchema={source.activeSchema}
               showPicker={showRefPicker}

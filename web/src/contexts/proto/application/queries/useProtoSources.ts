@@ -16,6 +16,7 @@ import {
   uploadSchema,
   type CreateProtoSourceRequest,
   type SchemaUploadContent,
+  type ProtoSourceType,
   type UpdateProtoSourceRequest,
 } from '@/api/protoSources'
 import { protoKeys } from './useProto'
@@ -120,8 +121,8 @@ export function useValidateLocalPath() {
 
 export function useValidateRepository() {
   return useMutation({
-    mutationFn: ({ repository, token }: { repository: string; token?: string }) =>
-      validateRepository(repository, token),
+    mutationFn: ({ repository, token, sourceType }: { repository: string; token?: string; sourceType?: ProtoSourceType }) =>
+      validateRepository(repository, token, sourceType),
   })
 }
 

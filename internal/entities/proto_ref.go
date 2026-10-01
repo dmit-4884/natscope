@@ -3,16 +3,22 @@
 
 package entities
 
-// RefKind is the kind of a git ref.
+// RefKind is the kind of a Git or BSR ref.
 type RefKind string
 
 const (
 	RefKindTag    RefKind = "tag"
 	RefKindBranch RefKind = "branch"
 	RefKindCommit RefKind = "commit"
+	RefKindLabel  RefKind = "label"
 )
 
-// ProtoRef is a git ref and the commit it points to.
+// Movable reports whether the ref can point at another commit later.
+func (k RefKind) Movable() bool {
+	return k == RefKindBranch || k == RefKindLabel
+}
+
+// ProtoRef is a Git or BSR ref and the commit it points to.
 type ProtoRef struct {
 	Name     string
 	Kind     RefKind

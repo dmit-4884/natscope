@@ -16,6 +16,8 @@ enum SourceType {
   reserved "SOURCE_TYPE_FILES";
   // Files or a descriptor set uploaded from the browser.
   SOURCE_TYPE_UPLOAD = 4;
+  // Module of a Buf Schema Registry, read by label or commit.
+  SOURCE_TYPE_BSR = 5;
 }
 
 // Defines a registered source of .proto files.
@@ -24,7 +26,7 @@ message ProtoSource {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // Required. Human-readable name of the proto source.
   string name = 2 [(google.api.field_behavior) = REQUIRED];
-  // Git repository URL (Git type only).
+  // Git repository URL, or BSR module such as buf.build/acme/payments.
   string repository = 3;
   // Required. Creation timestamp.
   google.protobuf.Timestamp created_at = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -58,22 +60,23 @@ message ProtoSource {
   // settings page health badges.
   optional ProtoCompileResult last_compile = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Git ref the source tracks.
+  // Ref a Git or BSR source tracks.
   optional ProtoRef selected_ref = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Schema the source decodes with now.
   optional SchemaRevision active_schema = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// Kind of a git ref.
+// Kind of a Git or BSR ref.
 enum RefKind {
   REF_KIND_UNSPECIFIED = 0;
   REF_KIND_TAG = 1;
   REF_KIND_BRANCH = 2;
   REF_KIND_COMMIT = 3;
+  REF_KIND_LABEL = 4;
 }
 
-// Git ref and the commit it points to.
+// Git or BSR ref and the commit it points to.
 message ProtoRef {
   string name = 1;
   RefKind kind = 2;

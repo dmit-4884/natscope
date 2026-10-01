@@ -29,10 +29,10 @@ service SourcesService {
   // Validates that a local directory path exists and contains .proto files.
   rpc ValidateLocalPath(ValidateLocalPathRequest) returns (ValidateLocalPathResponse) {}
 
-  // Lists tags and branches of a Git source.
+  // Lists tags and branches of a Git source, or labels of a BSR source.
   rpc ListRefs(ListRefsRequest) returns (ListRefsResponse) {}
 
-  // Points a Git source at a tag, branch or commit and compiles it.
+  // Points a Git or BSR source at a ref and builds its schema.
   rpc SelectRef(SelectRefRequest) returns (SelectRefResponse) {}
 
   // Rebuilds the active schema: re-resolves a Git ref, recompiles local files.
@@ -168,8 +168,10 @@ message DeleteSourceResponse {}
 // --- Validate Repository ---
 
 message ValidateRepositoryRequest {
+  // Git URL, or BSR module when source_type is SOURCE_TYPE_BSR.
   string repository = 1 [(buf.validate.field).required = true, (buf.validate.field).string.min_len = 1, (google.api.field_behavior) = REQUIRED];
   optional string token = 2;
+  .natscope.types.proto.SourceType source_type = 3;
 }
 
 message ValidateRepositoryResponse {

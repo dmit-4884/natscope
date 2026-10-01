@@ -9,7 +9,7 @@ import { SourceType, RefKind } from '../gen/types/proto/proto_source_pb'
 import type { CompileOutcome as PbOutcome } from '../gen/services/grpc/proto/v1/sources/proto_sources_service_pb'
 import { sourcesClient } from './grpc/clients'
 
-export type ProtoSourceType = 'git' | 'local' | 'upload'
+export type ProtoSourceType = 'git' | 'local' | 'upload' | 'bsr'
 
 /** Snapshot of the most recent compile attempt — server-populated only. */
 interface ProtoCompileResult {
@@ -42,7 +42,7 @@ export interface ProtoSource {
   updated_at?: number
 }
 
-type RefKindName = 'tag' | 'branch' | 'commit'
+type RefKindName = 'tag' | 'branch' | 'commit' | 'label'
 
 export interface ProtoRef {
   name: string
@@ -116,6 +116,8 @@ function sourceTypeFromProto(st: SourceType): ProtoSourceType {
       return 'local'
     case SourceType.UPLOAD:
       return 'upload'
+    case SourceType.BSR:
+      return 'bsr'
     case SourceType.GIT:
     case SourceType.UNSPECIFIED:
     default:
@@ -129,6 +131,8 @@ function sourceTypeToProto(st: ProtoSourceType): SourceType {
       return SourceType.LOCAL
     case 'upload':
       return SourceType.UPLOAD
+    case 'bsr':
+      return SourceType.BSR
     case 'git':
     default:
       return SourceType.GIT
@@ -166,7 +170,12 @@ function toProtoSource(p: ProtoSourceProto): ProtoSource {
 }
 
 function fromPbRef(r: PbRef): ProtoRef {
-  const kind: RefKindName = r.kind === RefKind.BRANCH ? 'branch' : r.kind === RefKind.COMMIT ? 'commit' : 'tag'
+  const kinds: Partial<Record<RefKind, RefKindName>> = {
+    [RefKind.BRANCH]: 'branch',
+    [RefKind.COMMIT]: 'commit',
+    [RefKind.LABEL]: 'label',
+  }
+  const kind = kinds[r.kind] ?? 'tag'
   return { name: r.name, kind, revision: r.revision }
 }
 
@@ -295,8 +304,9 @@ export async function validateLocalPath(path: string): Promise<{ valid: boolean;
 export async function validateRepository(
   repository: string,
   token?: string,
+  sourceType: ProtoSourceType = 'git',
 ): Promise<{ valid: boolean; error?: string }> {
-  const response = await sourcesClient.validateRepository({ repository, token })
+  const response = await sourcesClient.validateRepository({ repository, token, sourceType: sourceTypeToProto(sourceType) })
   return {
     valid: response.valid,
     error: response.error,

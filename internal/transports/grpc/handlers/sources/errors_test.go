@@ -30,6 +30,10 @@ func TestStatusErrorConvert(t *testing.T) {
 		{"ProtoSourceNotFound", errs.ErrProtoSourceNotFound, codes.NotFound, "PROTO_SOURCE_NOT_FOUND"},
 		{"ProtoSourceNameAlreadyInUse", errs.ErrProtoSourceNameAlreadyInUse, codes.AlreadyExists, "PROTO_SOURCE_NAME_ALREADY_IN_USE"},
 		{"ProtoRefNotFound", errs.ErrProtoRefNotFound, codes.NotFound, "PROTO_REF_NOT_FOUND"},
+		{"BSRNotFound", &errs.RegistryError{Code: "not_found", Message: "module not found"}, codes.NotFound, "BSR_NOT_FOUND"},
+		{"BSRUnauthenticated", &errs.RegistryError{Code: "unauthenticated", Message: "bad token"}, codes.PermissionDenied, "BSR_ACCESS_DENIED"},
+		{"BSRPermissionDenied", &errs.RegistryError{Code: "permission_denied", Message: "private"}, codes.PermissionDenied, "BSR_ACCESS_DENIED"},
+		{"BSRUnavailable", &errs.RegistryError{Code: "unavailable", Message: "down"}, codes.Unavailable, "BSR_UNAVAILABLE"},
 		// Fallback
 		{"NoProtoSources_viaFallback", errs.ErrNoProtoSources, codes.FailedPrecondition, "NO_PROTO_SOURCES"},
 	}

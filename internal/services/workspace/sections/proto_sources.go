@@ -106,8 +106,8 @@ func (s *ProtoSourcesSection) Validate(
 		strategy,
 	)
 	rep := entities.WorkspaceSectionReport{Created: created, Deleted: deleted, Conflicts: conflicts}
-	if hasGitSource(items) {
-		rep.Warnings = append(rep.Warnings, "git sources are imported without tokens — set them after import")
+	if hasTokenSource(items) {
+		rep.Warnings = append(rep.Warnings, "Git and BSR sources are imported without tokens — set them after import")
 	}
 	if deleted > 0 {
 		rep.Warnings = append(rep.Warnings,
@@ -145,8 +145,8 @@ func (s *ProtoSourcesSection) Import(
 				return res, cErr
 			}
 		}
-		if hasGitSource(items) {
-			res.Warnings = append(res.Warnings, "git sources imported without tokens — set them before fetching")
+		if hasTokenSource(items) {
+			res.Warnings = append(res.Warnings, "Git and BSR sources imported without tokens — set them before fetching")
 		}
 		return res, nil
 	}
@@ -162,8 +162,8 @@ func (s *ProtoSourcesSection) Import(
 			return res, cErr
 		}
 	}
-	if hasGitSource(items) {
-		res.Warnings = append(res.Warnings, "git sources imported without tokens — set them before fetching")
+	if hasTokenSource(items) {
+		res.Warnings = append(res.Warnings, "Git and BSR sources imported without tokens — set them before fetching")
 	}
 	return res, nil
 }
@@ -229,9 +229,9 @@ func toProtoSourceCreate(it protoSourceItem) *entities.ProtoSourceCreate {
 	}
 }
 
-func hasGitSource(items []protoSourceItem) bool {
+func hasTokenSource(items []protoSourceItem) bool {
 	return slices.Any(items, func(it protoSourceItem) bool {
-		return it.SourceType == string(entities.SourceTypeGit)
+		return it.SourceType == string(entities.SourceTypeGit) || it.SourceType == string(entities.SourceTypeBSR)
 	})
 }
 

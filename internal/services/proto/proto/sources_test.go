@@ -150,6 +150,7 @@ func (w *fakeWatcher) Stop()                            {}
 type testEnv struct {
 	svc         *Service
 	git         *fakeGit
+	bsr         *fakeBSR
 	watcher     *fakeWatcher
 	descriptors *descriptorsBbolt.Storage
 	fileSets    *filesetsBbolt.Storage
@@ -169,13 +170,13 @@ func newTestEnv(t *testing.T) *testEnv {
 	conflicts, err := conflictsBbolt.New(ctx, db)
 	require.NoError(t, err)
 
-	env := &testEnv{git: newFakeGit(), watcher: &fakeWatcher{}, descriptors: descriptors, fileSets: fileSets, sources: sources}
-	env.svc = New(sources, fileSets, descriptors, conflicts, env.git, nil, env.watcher)
+	env := &testEnv{git: newFakeGit(), bsr: newFakeBSR(), watcher: &fakeWatcher{}, descriptors: descriptors, fileSets: fileSets, sources: sources}
+	env.svc = New(sources, fileSets, descriptors, conflicts, env.git, env.bsr, nil, env.watcher)
 	return env
 }
 
 func newBareService() *Service {
-	return New(nil, nil, nil, nil, nil, nil, nil)
+	return New(nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
 func (e *testEnv) createGit(t *testing.T) *entities.ProtoSource {
@@ -609,7 +610,7 @@ func TestValidateLocalPath(t *testing.T) {
 func TestValidateRepository(t *testing.T) {
 	t.Parallel()
 	env := newTestEnv(t)
-	got, err := env.svc.ValidateRepository(t.Context(), "https://example.com/x.git", nil)
+	got, err := env.svc.ValidateRepository(t.Context(), entities.SourceTypeGit, "https://example.com/x.git", nil)
 	require.NoError(t, err)
 	assert.True(t, got.Valid)
 }

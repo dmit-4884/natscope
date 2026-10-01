@@ -119,13 +119,7 @@ func (s *Service) storeUploadedSet(
 	}
 
 	own := protoutils.OwnFiles(schema)
-	var messageTypes []string
-	for name, md := range schema.Messages {
-		if slices.Contains(own, md.ParentFile().Path()) {
-			messageTypes = append(messageTypes, name)
-		}
-	}
-	slices.Sort(messageTypes)
+	messageTypes := schema.MessagesIn(own)
 
 	fingerprint := hash.SHA256HexBytes(set)
 	d, err := s.saveSchema(ctx, src.Id, fingerprint[:uploadRevisionChars], set, messageTypes, own)

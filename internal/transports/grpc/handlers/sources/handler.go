@@ -62,6 +62,8 @@ func refToProto(r entities.ProtoRef) *protopb.ProtoRef {
 		pb.Kind = protopb.RefKind_REF_KIND_BRANCH
 	case entities.RefKindCommit:
 		pb.Kind = protopb.RefKind_REF_KIND_COMMIT
+	case entities.RefKindLabel:
+		pb.Kind = protopb.RefKind_REF_KIND_LABEL
 	}
 	return pb
 }
@@ -86,6 +88,8 @@ func sourceTypeToProto(st entities.SourceType) protopb.SourceType {
 		return protopb.SourceType_SOURCE_TYPE_LOCAL
 	case entities.SourceTypeUpload:
 		return protopb.SourceType_SOURCE_TYPE_UPLOAD
+	case entities.SourceTypeBSR:
+		return protopb.SourceType_SOURCE_TYPE_BSR
 	default:
 		return protopb.SourceType_SOURCE_TYPE_GIT
 	}
@@ -100,6 +104,8 @@ func sourceTypeFromProto(st protopb.SourceType) (_ entities.SourceType, ok bool)
 		return entities.SourceTypeLocal, true
 	case protopb.SourceType_SOURCE_TYPE_UPLOAD:
 		return entities.SourceTypeUpload, true
+	case protopb.SourceType_SOURCE_TYPE_BSR:
+		return entities.SourceTypeBSR, true
 	default:
 		return "", false
 	}
@@ -201,7 +207,11 @@ func (h *Handler) ValidateRepository(
 	req *connect.Request[sourcespb.ValidateRepositoryRequest],
 ) (*connect.Response[sourcespb.ValidateRepositoryResponse], error) {
 	in := req.Msg
-	result, err := h.protoService.ValidateRepository(ctx, in.Repository, in.Token)
+	sourceType := entities.SourceTypeGit
+	if in.SourceType == protopb.SourceType_SOURCE_TYPE_BSR {
+		sourceType = entities.SourceTypeBSR
+	}
+	result, err := h.protoService.ValidateRepository(ctx, sourceType, in.Repository, in.Token)
 	if err != nil {
 		return nil, err
 	}

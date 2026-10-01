@@ -18,29 +18,32 @@ import (
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
-// ListRefs returns the tags and branches of a git source.
+// ListRefs returns the tags and branches of a Git source, or the labels of a BSR source.
 func (s *Service) ListRefs(ctx context.Context, sourceID string) ([]entities.ProtoRef, error) {
-	src, err := s.gitSource(ctx, sourceID)
+	src, err := s.refSource(ctx, sourceID)
 	if err != nil {
 		return nil, err
+	}
+	if src.SourceType == entities.SourceTypeBSR {
+		return s.bsrRefs(ctx, src)
 	}
 	return s.gitFetcher.ListRefs(ctx, src.AuthenticatedURL())
 }
 
-// SelectRef points a git source at a tag, branch or commit; compile errors come back in the outcome.
+// SelectRef points a Git or BSR source at a ref; compile errors come back in the outcome.
 func (s *Service) SelectRef(ctx context.Context, sourceID, ref string) (*entities.ProtoSource, *entities.CompileOutcome, error) {
-	src, err := s.gitSource(ctx, sourceID)
+	src, err := s.refSource(ctx, sourceID)
 	if err != nil {
 		return nil, nil, err
 	}
-	resolved, err := s.gitFetcher.ResolveRef(ctx, src.AuthenticatedURL(), ref)
+	resolved, err := s.resolveRef(ctx, src, ref)
 	if err != nil {
 		return nil, nil, err
 	}
-	return s.activateGitRef(ctx, src.Id, resolved)
+	return s.activateRef(ctx, src.Id, resolved)
 }
 
-// RefreshSource rebuilds the active schema: re-resolves the git ref or recompiles local files.
+// RefreshSource rebuilds the active schema: re-resolves the selected ref or recompiles the files.
 func (s *Service) RefreshSource(ctx context.Context, sourceID string) (*entities.ProtoSource, *entities.CompileOutcome, error) {
 	src, err := s.sourcesStorage.Get(ctx, sourceID, false)
 	if err != nil {
@@ -49,15 +52,15 @@ func (s *Service) RefreshSource(ctx context.Context, sourceID string) (*entities
 
 	var outcome *entities.CompileOutcome
 	switch src.SourceType {
-	case entities.SourceTypeGit:
+	case entities.SourceTypeGit, entities.SourceTypeBSR:
 		if src.SelectedRef == nil {
-			return nil, nil, fmt.Errorf("%w: select a tag, branch or commit first", errs.ErrInvalidRequest)
+			return nil, nil, fmt.Errorf("%w: select a ref first", errs.ErrInvalidRequest)
 		}
-		resolved, resolveErr := s.gitFetcher.ResolveRef(ctx, src.AuthenticatedURL(), src.SelectedRef.Name)
+		resolved, resolveErr := s.resolveRef(ctx, src, src.SelectedRef.Name)
 		if resolveErr != nil {
 			return nil, nil, resolveErr
 		}
-		return s.activateGitRef(ctx, src.Id, resolved)
+		return s.activateRef(ctx, src.Id, resolved)
 	case entities.SourceTypeLocal:
 		outcome, err = s.compileLocal(ctx, src)
 	case entities.SourceTypeUpload:
@@ -91,18 +94,25 @@ func (s *Service) ListRevisions(ctx context.Context, sourceID string) ([]entitie
 	return out, nil
 }
 
-func (s *Service) gitSource(ctx context.Context, sourceID string) (*entities.ProtoSource, error) {
+func (s *Service) refSource(ctx context.Context, sourceID string) (*entities.ProtoSource, error) {
 	src, err := s.sourcesStorage.Get(ctx, sourceID, false)
 	if err != nil {
 		return nil, err
 	}
-	if src.SourceType != entities.SourceTypeGit {
-		return nil, fmt.Errorf("%w: refs exist only for git sources", errs.ErrInvalidRequest)
+	if src.SourceType != entities.SourceTypeGit && src.SourceType != entities.SourceTypeBSR {
+		return nil, fmt.Errorf("%w: refs exist only for Git and BSR sources", errs.ErrInvalidRequest)
 	}
 	return src, nil
 }
 
-func (s *Service) activateGitRef(
+func (s *Service) resolveRef(ctx context.Context, src *entities.ProtoSource, ref string) (entities.ProtoRef, error) {
+	if src.SourceType == entities.SourceTypeBSR {
+		return s.resolveBSRRef(ctx, src, ref)
+	}
+	return s.gitFetcher.ResolveRef(ctx, src.AuthenticatedURL(), ref)
+}
+
+func (s *Service) activateRef(
 	ctx context.Context,
 	sourceID string,
 	ref entities.ProtoRef,
@@ -121,7 +131,11 @@ func (s *Service) activateGitRef(
 	case err == nil:
 		outcome.MessageTypes = len(d.MessageTypes)
 	case errors.Is(err, errs.ErrProtoDescriptorNotFound):
-		d, outcome, err = s.compileGitRevision(ctx, src, ref)
+		if src.SourceType == entities.SourceTypeBSR {
+			d, outcome, err = s.storeBSRRevision(ctx, src, ref)
+		} else {
+			d, outcome, err = s.compileGitRevision(ctx, src, ref)
+		}
 		if err != nil {
 			return nil, outcome, err
 		}
@@ -141,7 +155,7 @@ func (s *Service) activateGitRef(
 	s.registryCache.InvalidateSource(sourceID)
 	s.notifyReload(ctx)
 
-	s.logger.InfoContext(ctx, "selected git ref",
+	s.logger.InfoContext(ctx, "selected ref",
 		slog.String("source_id", sourceID),
 		slog.String("ref", ref.Name),
 		slog.String("revision", ref.Revision))

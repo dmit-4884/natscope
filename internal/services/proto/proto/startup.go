@@ -40,7 +40,7 @@ func (s *Service) Start(ctx context.Context) {
 
 func (s *Service) dropRetired(ctx context.Context, src *entities.ProtoSource) bool {
 	switch src.SourceType {
-	case entities.SourceTypeGit, entities.SourceTypeLocal, entities.SourceTypeUpload:
+	case entities.SourceTypeGit, entities.SourceTypeLocal, entities.SourceTypeUpload, entities.SourceTypeBSR:
 		return false
 	default:
 	}
@@ -57,7 +57,8 @@ func (s *Service) warmUp(ctx context.Context, src *entities.ProtoSource) {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, startupCompileTimeout)
 	defer cancel()
 
-	if src.SourceType == entities.SourceTypeGit && src.SelectedRef != nil && src.SelectedRef.Kind == entities.RefKindBranch {
+	tracksRef := src.SourceType == entities.SourceTypeGit || src.SourceType == entities.SourceTypeBSR
+	if tracksRef && src.SelectedRef != nil && src.SelectedRef.Kind.Movable() {
 		s.logRefresh(ctx, src)
 		return
 	}
@@ -68,9 +69,9 @@ func (s *Service) warmUp(ctx context.Context, src *entities.ProtoSource) {
 	if ok, err := s.hasSchema(ctx, src.Id, revision); err != nil || ok {
 		return
 	}
-	if src.SourceType == entities.SourceTypeGit {
-		if _, _, err := s.activateGitRef(ctx, src.Id, *src.SelectedRef); err != nil {
-			s.logger.WarnContext(ctx, "startup: compile git source failed", slog.String("source_id", src.Id), slogx.Error(err))
+	if tracksRef {
+		if _, _, err := s.activateRef(ctx, src.Id, *src.SelectedRef); err != nil {
+			s.logger.WarnContext(ctx, "startup: build source schema failed", slog.String("source_id", src.Id), slogx.Error(err))
 		}
 		return
 	}

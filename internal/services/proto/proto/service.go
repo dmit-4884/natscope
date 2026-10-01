@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/pkg/bsr"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 	"github.com/dmit-4884/natscope/internal/services/proto/registry"
 
@@ -36,6 +37,7 @@ type Service struct {
 	descriptorsStorage descriptorsstorage.Storage
 	conflictsStorage   conflictsstorage.Storage
 	gitFetcher         gitfetchersvc.Service
+	bsrRegistry        bsr.Registry
 	mappingsService    mappingssvc.Service
 	fileWatcher        fwsvc.Service
 	registryCache      *registry.Cache
@@ -55,6 +57,7 @@ func New(
 	descriptorsStorage descriptorsstorage.Storage,
 	conflictsStorage conflictsstorage.Storage,
 	gitFetcher gitfetchersvc.Service,
+	bsrRegistry bsr.Registry,
 	mappingsService mappingssvc.Service,
 	fileWatcher fwsvc.Service,
 ) *Service {
@@ -65,6 +68,7 @@ func New(
 		descriptorsStorage: descriptorsStorage,
 		conflictsStorage:   conflictsStorage,
 		gitFetcher:         gitFetcher,
+		bsrRegistry:        bsrRegistry,
 		mappingsService:    mappingsService,
 		fileWatcher:        fileWatcher,
 		registryCache:      registry.NewCache(descriptorsStorage),

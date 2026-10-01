@@ -38,6 +38,18 @@ func NormalizeDescriptorSet(data []byte) ([]byte, *Schema, error) {
 	return out, schema, nil
 }
 
+// MessagesIn lists the full names of the messages declared in files, sorted.
+func (s *Schema) MessagesIn(files []string) []string {
+	var names []string
+	for name, md := range s.Messages {
+		if slices.Contains(files, md.ParentFile().Path()) {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
 // OwnFiles lists the files of a schema outside well-known dependency trees, or every file when all of them are.
 func OwnFiles(schema *Schema) []string {
 	var own, all []string

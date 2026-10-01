@@ -39,12 +39,14 @@ const TYPE_OPTIONS: { value: ProtoSourceType; label: string; hint: string }[] = 
   { value: 'git', label: 'Git Repository', hint: 'Auto-walk · from tag' },
   { value: 'local', label: 'Local Directory', hint: 'Auto-walk · watched folder' },
   { value: 'upload', label: 'Upload', hint: 'Files, folder or descriptor set' },
+  { value: 'bsr', label: 'Buf Schema Registry', hint: 'Module · by label or commit' },
 ]
 
 const TYPE_BADGE: Record<ProtoSourceType, 'primary' | 'warning' | 'success'> = {
   git: 'primary',
   local: 'warning',
   upload: 'success',
+  bsr: 'primary',
 }
 
 export default function ProtoSourceEditPage({ mode }: Props) {
@@ -107,7 +109,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     isLoading ||
     isValidating ||
     !name.trim() ||
-    (sourceType === 'git' && !repository.trim()) ||
+    ((sourceType === 'git' || sourceType === 'bsr') && !repository.trim()) ||
     (sourceType === 'local' && !localPath.trim())
 
   const handleValidateLocalPath = async () => {
@@ -128,7 +130,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     if (!repository.trim()) return null
     setGitValidate(null)
     try {
-      const r = await validateRepo.mutateAsync({ repository: repository.trim(), token: token || undefined })
+      const r = await validateRepo.mutateAsync({ repository: repository.trim(), token: token || undefined, sourceType })
       setGitValidate(r)
       return r
     } catch (err) {
@@ -141,7 +143,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
   const pathOrRepoChanged =
     !isEdit ||
     (sourceType === 'local' && localPath !== (existing?.localPath || '')) ||
-    (sourceType === 'git' && repository !== (existing?.repository || ''))
+    ((sourceType === 'git' || sourceType === 'bsr') && repository !== (existing?.repository || ''))
 
   const validateBeforeSave = async (): Promise<boolean> => {
     if (!pathOrRepoChanged) return true
@@ -149,7 +151,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
       const result = await handleValidateLocalPath()
       return result?.valid ?? false
     }
-    if (sourceType === 'git') {
+    if (sourceType === 'git' || sourceType === 'bsr') {
       const result = await handleValidateRepository()
       return result?.valid ?? false
     }
@@ -166,7 +168,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
       const data: UpdateProtoSourceRequest = {}
       if (isEdit && existing) {
         data.name = name !== existing.name ? name : undefined
-        if (sourceType === 'git') {
+        if (sourceType === 'git' || sourceType === 'bsr') {
           data.repository = repository !== existing.repository ? repository : undefined
           if (token) data.token = token
         }
@@ -175,7 +177,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
         }
       } else {
         data.name = name
-        if (sourceType === 'git') {
+        if (sourceType === 'git' || sourceType === 'bsr') {
           data.repository = repository
           if (token) data.token = token
         }
@@ -189,7 +191,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
       return existingId
     }
     const data: CreateProtoSourceRequest = { name, sourceType }
-    if (sourceType === 'git') {
+    if (sourceType === 'git' || sourceType === 'bsr') {
       data.repository = repository
       data.token = token || undefined
     }
@@ -211,7 +213,9 @@ export default function ProtoSourceEditPage({ mode }: Props) {
       setError(
         sourceType === 'local'
           ? 'Directory path is not valid — see the error below.'
-          : 'Repository is not accessible — see the error below.',
+          : sourceType === 'bsr'
+            ? 'Module is not accessible — see the error below.'
+            : 'Repository is not accessible — see the error below.',
       )
       return
     }
@@ -242,7 +246,9 @@ export default function ProtoSourceEditPage({ mode }: Props) {
       setError(
         sourceType === 'local'
           ? 'Directory path is not valid — see the error below.'
-          : 'Repository is not accessible — see the error below.',
+          : sourceType === 'bsr'
+            ? 'Module is not accessible — see the error below.'
+            : 'Repository is not accessible — see the error below.',
       )
       return
     }
@@ -280,7 +286,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
           <Badge variant={TYPE_BADGE[sourceType]} size="sm">{sourceType.toUpperCase()}</Badge>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {TYPE_OPTIONS.map((opt) => {
                 const selected = sourceType === opt.value
                 return (
@@ -302,10 +308,12 @@ export default function ProtoSourceEditPage({ mode }: Props) {
                 )
               })}
             </div>
-            <p className="mt-2 text-xs text-amber-700">
-              Auto-detects <code>buf.yaml</code>/<code>buf.work.yaml</code> module roots; otherwise infers
-              import roots from the import graph. Well-known types (<code>google/protobuf/*</code>) resolve automatically.
-            </p>
+            {sourceType !== 'bsr' && (
+              <p className="mt-2 text-xs text-amber-700">
+                Auto-detects <code>buf.yaml</code>/<code>buf.work.yaml</code> module roots; otherwise infers
+                import roots from the import graph. Well-known types (<code>google/protobuf/*</code>) resolve automatically.
+              </p>
+            )}
           </>
         )}
       </div>
@@ -321,10 +329,12 @@ export default function ProtoSourceEditPage({ mode }: Props) {
         />
       </div>
 
-      {sourceType === 'git' && (
+      {(sourceType === 'git' || sourceType === 'bsr') && (
         <>
           <div>
-            <label htmlFor="repository" className="block text-sm font-medium text-gray-700 mb-2">Repository URL *</label>
+            <label htmlFor="repository" className="block text-sm font-medium text-gray-700 mb-2">
+              {sourceType === 'bsr' ? 'Module *' : 'Repository URL *'}
+            </label>
             <div className="flex gap-2">
               <div className="flex-1">
                 <Input
@@ -334,7 +344,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
                     setRepository(e.target.value)
                     setGitValidate(null)
                   }}
-                  placeholder="https://gitlab.com/org/proto.git"
+                  placeholder={sourceType === 'bsr' ? 'buf.build/owner/module' : 'https://gitlab.com/org/proto.git'}
                   disabled={isLoading}
                 />
               </div>
@@ -353,7 +363,11 @@ export default function ProtoSourceEditPage({ mode }: Props) {
               <div className={`mt-2 text-xs px-3 py-2 rounded ${
                 gitValidate.valid ? 'bg-status-success-bg text-green-700' : 'bg-status-error-bg text-red-700'
               }`}>
-                {gitValidate.valid ? 'Repository is accessible' : gitValidate.error || 'Repository not accessible'}
+                {gitValidate.valid
+                  ? sourceType === 'bsr'
+                    ? 'Module is accessible'
+                    : 'Repository is accessible'
+                  : gitValidate.error || 'Not accessible'}
               </div>
             )}
           </div>
@@ -366,7 +380,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder={isEdit ? '********' : 'Personal access token'}
+              placeholder={isEdit ? '********' : sourceType === 'bsr' ? 'BSR token, for private modules' : 'Personal access token'}
               disabled={isLoading}
             />
           </div>
@@ -439,57 +453,59 @@ export default function ProtoSourceEditPage({ mode }: Props) {
         </div>
       )}
 
-      <div className="rounded-md border border-border p-3 space-y-4">
-        <div className="text-xs font-semibold text-content-secondary uppercase tracking-wide">
-          Advanced (optional)
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label htmlFor="excludePrefixesText" className="block text-sm font-medium text-gray-700">
-              Exclude Prefixes
-            </label>
-            <span className="text-xs text-content-tertiary">{cleanedExcludePrefixes.length}</span>
+      {sourceType !== 'bsr' && (
+        <div className="rounded-md border border-border p-3 space-y-4">
+          <div className="text-xs font-semibold text-content-secondary uppercase tracking-wide">
+            Advanced (optional)
           </div>
-          <textarea
-            id="excludePrefixesText"
-            value={excludePrefixesText}
-            onChange={(e) => setExcludePrefixesText(e.target.value)}
-            spellCheck={false}
-            className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[60px]"
-            disabled={isLoading}
-          />
-          <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
-            Folders to skip during compilation, written as path prefixes relative to the source
-            root — one per line, or comma-separated. Use this to drop generated or vendored copies
-            that duplicate real <code>.proto</code> files and break the build. For example, typing{' '}
-            <code>pb</code> ignores everything under <code>pb/</code>. Leave empty to compile the
-            whole tree.
-          </p>
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label htmlFor="importRootsText" className="block text-sm font-medium text-gray-700">
-              Import Roots
-            </label>
-            <span className="text-xs text-content-tertiary">{cleanedImportRoots.length}</span>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="excludePrefixesText" className="block text-sm font-medium text-gray-700">
+                Exclude Prefixes
+              </label>
+              <span className="text-xs text-content-tertiary">{cleanedExcludePrefixes.length}</span>
+            </div>
+            <textarea
+              id="excludePrefixesText"
+              value={excludePrefixesText}
+              onChange={(e) => setExcludePrefixesText(e.target.value)}
+              spellCheck={false}
+              className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[60px]"
+              disabled={isLoading}
+            />
+            <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
+              Folders to skip during compilation, written as path prefixes relative to the source
+              root — one per line, or comma-separated. Use this to drop generated or vendored copies
+              that duplicate real <code>.proto</code> files and break the build. For example, typing{' '}
+              <code>pb</code> ignores everything under <code>pb/</code>. Leave empty to compile the
+              whole tree.
+            </p>
           </div>
-          <textarea
-            id="importRootsText"
-            value={importRootsText}
-            onChange={(e) => setImportRootsText(e.target.value)}
-            spellCheck={false}
-            className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[60px]"
-            disabled={isLoading}
-          />
-          <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
-            Advanced — usually leave this empty. These are the base directories that your{' '}
-            <code>import &quot;...&quot;</code> paths are written relative to. When empty, they are
-            detected automatically from the import graph (and any <code>buf.yaml</code>). Fill this
-            in only to override detection when the wrong root is picked — doing so turns
-            auto-detection off completely.
-          </p>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="importRootsText" className="block text-sm font-medium text-gray-700">
+                Import Roots
+              </label>
+              <span className="text-xs text-content-tertiary">{cleanedImportRoots.length}</span>
+            </div>
+            <textarea
+              id="importRootsText"
+              value={importRootsText}
+              onChange={(e) => setImportRootsText(e.target.value)}
+              spellCheck={false}
+              className="w-full px-3 py-2 font-mono text-sm text-gray-800 bg-surface-primary border border-border-strong rounded-md focus:border-border-focus focus:outline-none resize-y min-h-[60px]"
+              disabled={isLoading}
+            />
+            <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
+              Advanced — usually leave this empty. These are the base directories that your{' '}
+              <code>import &quot;...&quot;</code> paths are written relative to. When empty, they are
+              detected automatically from the import graph (and any <code>buf.yaml</code>). Fill this
+              in only to override detection when the wrong root is picked — doing so turns
+              auto-detection off completely.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 

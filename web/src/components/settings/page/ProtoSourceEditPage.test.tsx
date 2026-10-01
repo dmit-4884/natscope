@@ -121,6 +121,35 @@ describe('ProtoSourceEditPage — validate before save', () => {
     expect(await screen.findByText('syntax error: unexpected identifier')).toBeInTheDocument()
   })
 
+  it('validates a BSR module before creating the source', async () => {
+    api.validateRepository.mockResolvedValue({ valid: true })
+    api.createProtoSource.mockResolvedValue({
+      id: 'src-bsr',
+      name: 'payments',
+      sourceType: 'bsr',
+      repository: 'buf.build/acme/payments',
+      watcherEnabled: false,
+      enabled: true,
+      created_at: 0,
+    })
+
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: /Buf Schema Registry/ }))
+    fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'payments' } })
+    fireEvent.change(screen.getByLabelText('Module *'), { target: { value: 'buf.build/acme/payments' } })
+    fireEvent.change(screen.getByLabelText(/Access Token/), { target: { value: 'bsr-token' } })
+    expect(screen.queryByText('Advanced (optional)')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Source' }))
+
+    await waitFor(() => expect(api.createProtoSource).toHaveBeenCalledTimes(1))
+    expect(api.validateRepository).toHaveBeenCalledWith('buf.build/acme/payments', 'bsr-token', 'bsr')
+    expect(api.createProtoSource).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceType: 'bsr', repository: 'buf.build/acme/payments', token: 'bsr-token' }),
+    )
+  })
+
   it('blocks Save for a git repository the server cannot reach', async () => {
     api.validateRepository.mockResolvedValue({
       valid: false,
@@ -137,7 +166,7 @@ describe('ProtoSourceEditPage — validate before save', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Source' }))
 
     await waitFor(() =>
-      expect(api.validateRepository).toHaveBeenCalledWith('file:///tmp/repo', undefined),
+      expect(api.validateRepository).toHaveBeenCalledWith('file:///tmp/repo', undefined, 'git'),
     )
     await waitFor(() =>
       expect(screen.getByText('unsupported repository URL scheme: file')).toBeInTheDocument(),
