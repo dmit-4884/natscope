@@ -54,6 +54,7 @@ func (h *Handler) DecodeMessage(
 		SourceID:    in.SourceId,
 		Fingerprint: ptr.Unwrap(in.Fingerprint, ""),
 		MessageType: in.MessageType,
+		Framing:     grpchelpers.FramingFromProto(in.Framing),
 	})
 	if err != nil {
 		return nil, err
@@ -120,6 +121,7 @@ func (h *Handler) EncodeMessage(
 		SourceID:    in.SourceId,
 		Fingerprint: ptr.Unwrap(in.Fingerprint, ""),
 		MessageType: in.MessageType,
+		Framing:     grpchelpers.FramingFromProto(in.Framing),
 	})
 	if err != nil {
 		return nil, err

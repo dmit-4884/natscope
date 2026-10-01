@@ -1,9 +1,12 @@
+import { useState } from 'react'
+import type { Framing } from '@/api/framing'
 import {
   SubjectPattern,
   type PatternValidationError,
 } from '@/contexts/mappings/domain/value-objects/SubjectPattern'
 import { SourcePicker } from '../proto/SourcePicker'
 import { ProtoTypePicker } from '../proto/ProtoTypePicker'
+import { FramingFields } from './FramingFields'
 
 const PATTERN_ERROR_MESSAGE: Record<PatternValidationError, string> = {
   EMPTY_PATTERN: 'Subject pattern is required.',
@@ -21,6 +24,8 @@ interface Props {
   onProtoTypeChange: (value: string) => void
   sourceId: string
   onSourceIdChange: (value: string) => void
+  framing: Framing
+  onFramingChange: (value: Framing) => void
   unmappedPatterns: string[]
   onSubmit: () => void
   onCancel: () => void
@@ -41,6 +46,8 @@ export function MappingAddForm({
   onProtoTypeChange,
   sourceId,
   onSourceIdChange,
+  framing,
+  onFramingChange,
   unmappedPatterns,
   onSubmit,
   onCancel,
@@ -49,7 +56,8 @@ export function MappingAddForm({
 }: Props) {
   const patternResult = pattern ? SubjectPattern.create(pattern) : null
   const patternError = patternResult?.isErr() ? PATTERN_ERROR_MESSAGE[patternResult.error] : undefined
-  const canSubmit = !!pattern && !patternError && !!protoType && !!sourceId && !isSubmitting
+  const [framingValid, setFramingValid] = useState(true)
+  const canSubmit = !!pattern && !patternError && !!protoType && !!sourceId && framingValid && !isSubmitting
 
   return (
     <div className="mt-4 p-4 bg-surface-primary rounded-lg border border-border space-y-4">
@@ -98,6 +106,11 @@ export function MappingAddForm({
           </datalist>
         )}
         {patternError && <p className="text-xs text-status-error-text mt-1">{patternError}</p>}
+      </div>
+
+      <div>
+        <span className="block text-xs font-medium text-gray-700 mb-1">4. Framing</span>
+        <FramingFields value={framing} onChange={onFramingChange} onValidityChange={setFramingValid} />
       </div>
 
       <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">

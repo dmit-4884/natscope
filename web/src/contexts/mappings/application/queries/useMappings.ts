@@ -26,6 +26,8 @@ function useMappingEntities() {
           pattern: m.pattern,
           message_type: m.messageType,
           source_id: m.sourceId,
+          pinned_fingerprint: m.pinnedFingerprint,
+          framing: m.framing,
           created_at: m.createdAt,
           updated_at: m.updatedAt,
         }),
@@ -139,6 +141,7 @@ export function useSubjectMappingEntity(subject: string | null, sourceFilter?: s
     mapping,
     messageType: mapping?.messageType ?? null,
     sourceId: mapping?.sourceId ?? null,
+    framing: mapping?.framing,
     isLoading,
   }
 }

@@ -15,4 +15,6 @@ type CodecRequest struct {
 	Fingerprint string
 	// MessageType is the fully-qualified name of the protobuf message type.
 	MessageType string
+	// Framing wraps the encoded message, or is stripped before decoding.
+	Framing Framing
 }

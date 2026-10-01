@@ -52,7 +52,8 @@ func (h *Handler) PublishMessage(
 	req *connect.Request[publishpb.PublishMessageRequest],
 ) (*connect.Response[publishpb.PublishMessageResponse], error) {
 	in := req.Msg
-	pr := converter.Convert(in, &entities.PublishRequest{})
+	pr := converter.Convert(in, &entities.PublishRequest{}, converter.WithIgnoreFields("Framing"))
+	pr.Framing = grpchelpers.FramingFromProto(in.Framing)
 	result, err := h.publishService.Publish(ctx, pr)
 	if err != nil {
 		return nil, err
@@ -77,7 +78,9 @@ func (h *Handler) RequestMessage(
 		&entities.RequestMessage{},
 		converter.WithHandleEmbeddedStructs(true),
 		grpchelpers.ProtoCodecs,
+		converter.WithIgnoreFields("Framing"),
 	)
+	in.Framing = grpchelpers.FramingFromProto(req.Msg.Framing)
 	reply, err := h.publishService.Request(ctx, in)
 	if err != nil {
 		return nil, err

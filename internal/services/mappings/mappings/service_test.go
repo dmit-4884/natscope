@@ -162,6 +162,41 @@ func TestService_Create(t *testing.T) {
 	})
 }
 
+func TestService_Update(t *testing.T) {
+	t.Parallel()
+	pinned := "fp-1"
+	current := func() *entities.SubjectMapping {
+		return entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+			m.Pattern, m.MessageType, m.SourceID, m.PinnedFingerprint = "orders.*", "api.v1.Order", "src-1", &pinned
+			m.Framing = entities.Framing{Kind: entities.FramingGRPC}
+		})
+	}
+
+	t.Run("an empty pin unpins and the framing changes", func(t *testing.T) {
+		t.Parallel()
+		svc := New(&mockStorage{getResult: current()})
+		got, err := svc.Update(t.Context(), &entities.SubjectMappingUpdate{
+			Id:                "m1",
+			PinnedFingerprint: new(""),
+			Framing:           &entities.Framing{Kind: entities.FramingDelimited},
+		})
+		require.NoError(t, err)
+		assert.Nil(t, got.PinnedFingerprint)
+		assert.Equal(t, entities.FramingDelimited, got.Framing.Kind)
+		assert.Equal(t, "api.v1.Order", got.MessageType)
+	})
+
+	t.Run("unset fields stay", func(t *testing.T) {
+		t.Parallel()
+		svc := New(&mockStorage{getResult: current()})
+		got, err := svc.Update(t.Context(), &entities.SubjectMappingUpdate{Id: "m1", MessageType: new("api.v1.Refund")})
+		require.NoError(t, err)
+		assert.Equal(t, "fp-1", *got.PinnedFingerprint)
+		assert.Equal(t, entities.FramingGRPC, got.Framing.Kind)
+		assert.Equal(t, "api.v1.Refund", got.MessageType)
+	})
+}
+
 func TestService_Get(t *testing.T) {
 	t.Parallel()
 

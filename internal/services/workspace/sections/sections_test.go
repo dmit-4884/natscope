@@ -205,9 +205,11 @@ func TestMappingsSection_ExportThenImportMerge(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	src := newMappingsSvc(t)
-	_, err := src.Create(ctx, &entities.SubjectMappingCreate{Pattern: "a.*", MessageType: "pkg.A", SourceID: "s1"})
+	confluent := entities.Framing{Kind: entities.FramingConfluent, SchemaID: 12}
+	custom := entities.Framing{Kind: entities.FramingCustom, Prefix: []byte{0xca, 0xfe}}
+	_, err := src.Create(ctx, &entities.SubjectMappingCreate{Pattern: "a.*", MessageType: "pkg.A", SourceID: "s1", Framing: confluent})
 	require.NoError(t, err)
-	_, err = src.Create(ctx, &entities.SubjectMappingCreate{Pattern: "b.*", MessageType: "pkg.B", SourceID: "s1"})
+	_, err = src.Create(ctx, &entities.SubjectMappingCreate{Pattern: "b.*", MessageType: "pkg.B", SourceID: "s1", Framing: custom})
 	require.NoError(t, err)
 
 	raw, err := NewMappingsSection(src, nil).Export(ctx)
@@ -236,9 +238,14 @@ func TestMappingsSection_ExportThenImportMerge(t *testing.T) {
 	all, err := dst.GetAll(ctx)
 	require.NoError(t, err)
 	got := map[string]string{}
+	framings := map[string]entities.Framing{}
 	for _, m := range all {
 		got[m.Pattern] = m.MessageType
+		framings[m.Pattern] = m.Framing
 	}
+	assert.Equal(t, confluent, framings["a.*"], "the update carries the framing")
+	assert.Equal(t, custom, framings["b.*"])
+	assert.Equal(t, entities.Framing{}, framings["c.*"])
 	assert.Equal(t, "pkg.A", got["a.*"], "a.* updated from import")
 	assert.Equal(t, "pkg.B", got["b.*"], "b.* created")
 	assert.Equal(t, "pkg.C", got["c.*"], "c.* untouched by merge")

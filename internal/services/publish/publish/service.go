@@ -123,6 +123,7 @@ func (s *Service) resolvePayload(ctx context.Context, in *entities.PublishReques
 		JSON:        []byte(in.Data),
 		SourceID:    *in.SourceID,
 		MessageType: *in.MessageType,
+		Framing:     in.Framing,
 	}
 	if in.SchemaFingerprint != nil {
 		req.Fingerprint = *in.SchemaFingerprint

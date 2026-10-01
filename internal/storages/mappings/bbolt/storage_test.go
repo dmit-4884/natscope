@@ -6,6 +6,7 @@ package bbolt_test
 import (
 	"errors"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
@@ -40,6 +41,7 @@ func TestMappings_SaveGetRoundTrip(t *testing.T) {
 		m.MessageType = "api.v1.OrderEvent"
 		m.SourceID = "src-1"
 		m.PinnedFingerprint = ptr.Wrap("fp-123")
+		m.Framing = entities.Framing{Kind: entities.FramingCustom, SchemaID: 7, Prefix: []byte{0xca, 0xfe}, Suffix: []byte{0x0a}}
 	})
 	if err := s.Save(ctx, in); err != nil {
 		t.Fatalf("save: %v", err)
@@ -57,6 +59,9 @@ func TestMappings_SaveGetRoundTrip(t *testing.T) {
 	}
 	if got.PinnedFingerprint == nil || *got.PinnedFingerprint != "fp-123" {
 		t.Fatalf("pinned fingerprint mismatch: %v", got.PinnedFingerprint)
+	}
+	if !reflect.DeepEqual(got.Framing, in.Framing) {
+		t.Fatalf("framing mismatch: %+v vs %+v", got.Framing, in.Framing)
 	}
 	// time.Time <-> ms round-trip is lossless at ms precision.
 	if !got.CreatedAt.Equal(in.CreatedAt.Truncate(0)) && got.CreatedAt.UnixMilli() != in.CreatedAt.UnixMilli() {

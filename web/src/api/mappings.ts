@@ -1,4 +1,6 @@
 import { tsToMillis } from '@/utils/timestamp'
+import type { SubjectMapping as PbMapping } from '../gen/types/mappings/mappings_mapping_pb'
+import { framingFromProto, framingToProto, type Framing } from './framing'
 import { mappingsClient } from './grpc/clients'
 
 /** Mapping resolvability against current proto sources; mirrors backend enum. */
@@ -26,8 +28,32 @@ export interface MappingItem {
   pattern: string
   messageType: string
   sourceId: string
+  pinnedFingerprint?: string
+  framing: Framing
   createdAt: number // Unix milliseconds
   updatedAt: number // Unix milliseconds
+}
+
+function toMappingItem(m: PbMapping): MappingItem {
+  return {
+    id: m.id,
+    pattern: m.pattern,
+    messageType: m.messageType,
+    sourceId: m.sourceId,
+    pinnedFingerprint: m.pinnedFingerprint || undefined,
+    framing: framingFromProto(m.framing),
+    createdAt: tsToMillis(m.createdAt),
+    updatedAt: tsToMillis(m.updatedAt),
+  }
+}
+
+export interface MappingPatch {
+  pattern?: string
+  messageType?: string
+  sourceId?: string
+  /** Empty string unpins. */
+  pinnedFingerprint?: string
+  framing?: Framing
 }
 
 export interface MappingsListResult {
@@ -52,14 +78,7 @@ export async function listMappings(): Promise<MappingsListResult> {
       includeTotalCount: page === 0,
     })
     for (const m of response.mappings) {
-      items.push({
-        id: m.id,
-        pattern: m.pattern,
-        messageType: m.messageType,
-        sourceId: m.sourceId,
-        createdAt: tsToMillis(m.createdAt),
-        updatedAt: tsToMillis(m.updatedAt),
-      })
+      items.push(toMappingItem(m))
     }
     if (page === 0 && response.totalSize !== undefined) {
       total = Number(response.totalSize)
@@ -75,31 +94,43 @@ export async function createMapping(
   pattern: string,
   messageType: string,
   sourceId: string,
+  framing?: Framing,
 ): Promise<MappingItem> {
   if (!sourceId) {
     throw new Error('createMapping: sourceId is required')
   }
-  const response = await mappingsClient.createMapping({ pattern, messageType, sourceId })
-  const m = response.mapping!
-  return {
-    id: m.id,
-    pattern: m.pattern,
-    messageType: m.messageType,
-    sourceId: m.sourceId,
-    createdAt: tsToMillis(m.createdAt),
-    updatedAt: tsToMillis(m.updatedAt),
-  }
+  const response = await mappingsClient.createMapping({ pattern, messageType, sourceId, framing: framingToProto(framing) })
+  return toMappingItem(response.mapping!)
+}
+
+export async function updateMapping(id: string, patch: MappingPatch): Promise<MappingItem> {
+  const response = await mappingsClient.updateMapping({
+    id,
+    pattern: patch.pattern,
+    messageType: patch.messageType,
+    sourceId: patch.sourceId,
+    pinnedFingerprint: patch.pinnedFingerprint,
+    framing: patch.framing ? (framingToProto(patch.framing) ?? {}) : undefined,
+  })
+  return toMappingItem(response.mapping!)
 }
 
 export async function bulkSaveMappings(
-  items: Array<{ pattern: string; messageType: string; sourceId: string }>,
+  items: Array<{ pattern: string; messageType: string; sourceId: string; framing?: Framing }>,
 ): Promise<{ created: number; updated: number; deleted: number }> {
   for (const item of items) {
     if (!item.sourceId) {
       throw new Error('bulkSaveMappings: every item must have sourceId')
     }
   }
-  const response = await mappingsClient.batchSaveMappings({ mappings: items })
+  const response = await mappingsClient.batchSaveMappings({
+    mappings: items.map((item) => ({
+      pattern: item.pattern,
+      messageType: item.messageType,
+      sourceId: item.sourceId,
+      framing: framingToProto(item.framing),
+    })),
+  })
   return {
     created: response.created,
     updated: response.updated,

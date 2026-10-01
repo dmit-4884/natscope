@@ -4,6 +4,7 @@
 package e2e
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
@@ -252,5 +253,51 @@ func TestProtoFlow(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, decResp.Msg.GetResult().GetUnknownFields(), 1)
 		assert.Equal(t, int32(15), decResp.Msg.GetResult().GetUnknownFields()[0].GetNumber())
+	})
+
+	t.Run("framing on the mapping", func(t *testing.T) {
+		grpcFraming := &protopb.Framing{Kind: protopb.FramingKind_FRAMING_KIND_GRPC}
+		upd, err := env.mappings.UpdateMapping(ctx, connect.NewRequest(&mappingspb.UpdateMappingRequest{
+			Id: mappingResp.Msg.GetMapping().GetId(), Framing: grpcFraming,
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, protopb.FramingKind_FRAMING_KIND_GRPC, upd.Msg.GetMapping().GetFraming().GetKind())
+		assert.Equal(t, fullName, upd.Msg.GetMapping().GetMessageType(), "unset fields stay")
+
+		msgType := fullName
+		pubResp, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
+			ConnectionId: connID, Subject: subject, MessageType: &msgType, SourceId: &sourceID,
+			Data: `{"name":"framed"}`, Framing: grpcFraming,
+		}))
+		require.NoError(t, err)
+		require.Empty(t, pubResp.Msg.GetError())
+
+		var got *natspb.NatsMessage
+		require.Eventually(t, func() bool {
+			resp, err := env.messages.GetMessage(ctx, connect.NewRequest(&messagespb.GetMessageRequest{
+				ConnectionId: connID, StreamName: stream, Sequence: pubResp.Msg.GetSequence(),
+			}))
+			if err != nil {
+				return false
+			}
+			got = resp.Msg.GetMessage()
+			return got != nil
+		}, 5*time.Second, 100*time.Millisecond)
+		assert.Empty(t, got.GetDecodeError())
+		assert.Contains(t, got.GetDecoded(), "framed")
+		raw, err := base64.StdEncoding.DecodeString(got.GetDataBase64())
+		require.NoError(t, err)
+		assert.Equal(t, []byte{0, 0, 0, 0, byte(len(raw) - 5)}, raw[:5], "published inside a gRPC frame")
+
+		dec, err := env.codec.DecodeMessage(ctx, connect.NewRequest(&codecpb.DecodeMessageRequest{
+			Data: raw, MessageType: fullName, SourceId: sourceID,
+		}))
+		require.NoError(t, err)
+		assert.Contains(t, dec.Msg.GetResult().GetError(), "set the mapping's framing to gRPC")
+
+		_, err = env.mappings.UpdateMapping(ctx, connect.NewRequest(&mappingspb.UpdateMappingRequest{
+			Id: mappingResp.Msg.GetMapping().GetId(), Framing: &protopb.Framing{},
+		}))
+		require.NoError(t, err)
 	})
 }

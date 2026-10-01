@@ -1,5 +1,6 @@
 import { encodeBytesToBase64 } from '@/utils/base64'
 import { durToMillis, millisToDur } from '@/utils/timestamp'
+import { framingToProto, type Framing } from './framing'
 import { publishClient } from './grpc/clients'
 
 // Legacy interface types kept for existing consumers
@@ -10,6 +11,7 @@ export interface PublishRequest {
   message_type?: string
   source_id?: string
   schema_fingerprint?: string
+  framing?: Framing
   /** null publishes without a body (counter increments). */
   data: Record<string, unknown> | null
   headers?: Record<string, string>
@@ -51,6 +53,7 @@ export async function publishMessage(request: PublishRequest): Promise<PublishRe
     data: request.data === null ? '' : JSON.stringify(request.data),
     headers: request.headers ?? {},
     subjectPattern: request.subject_pattern || undefined,
+    framing: framingToProto(request.framing),
   })
   if (response.error) {
     throw new Error(response.error)
@@ -71,6 +74,7 @@ export interface RequestMessageRequest {
   message_type?: string
   source_id?: string
   schema_fingerprint?: string
+  framing?: Framing
   timeout_ms?: number
 }
 
@@ -91,6 +95,7 @@ export async function requestMessage(request: RequestMessageRequest): Promise<Re
     messageType: request.message_type || undefined,
     sourceId: request.source_id || undefined,
     schemaFingerprint: request.schema_fingerprint || undefined,
+    framing: framingToProto(request.framing),
     timeout: millisToDur(request.timeout_ms),
   })
   return {

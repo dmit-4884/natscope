@@ -66,7 +66,7 @@ func benchmarkDecode(b *testing.B, bodySize int) {
 
 	b.SetBytes(int64(len(data)))
 	for b.Loop() {
-		_ = decodeWithDescriptor(schema, md, data, "bench.Payload")
+		_ = decodeWithDescriptor(schema, md, data, "bench.Payload", true)
 	}
 }
 

@@ -77,6 +77,7 @@ type mappingView struct {
 	MessageType       string  `json:"messageType"`
 	SourceID          string  `json:"sourceId"`
 	PinnedFingerprint *string `json:"pinnedFingerprint,omitempty"`
+	FramingKind       string  `json:"framing,omitempty" jsonschema:"wrapper around the protobuf message: grpc, confluent, varint_delimited or custom"`
 }
 
 type subjectInput struct {

@@ -96,6 +96,9 @@ func (s *Service) Update(
 	}
 
 	existing.ApplyUpdate(in)
+	if existing.PinnedFingerprint != nil && *existing.PinnedFingerprint == "" {
+		existing.PinnedFingerprint = nil
+	}
 
 	// Validate the merged result.
 	if existing.SourceID == "" {

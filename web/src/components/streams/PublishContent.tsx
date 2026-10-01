@@ -94,9 +94,11 @@ export default function PublishContent({
 
   const queryClient = useQueryClient()
 
-  const { messageType: mappedMessageType, sourceId: mappedSourceId } = useSubjectMappingEntity(
-    subjectPattern || null,
-  )
+  const {
+    messageType: mappedMessageType,
+    sourceId: mappedSourceId,
+    framing: mappedFraming,
+  } = useSubjectMappingEntity(subjectPattern || null)
   const isJsonMode = encodingMode === 'json' || (!mappedMessageType && encodingMode !== 'proto')
   const messageType = isJsonMode ? undefined : mappedMessageType
   const sourceId = isJsonMode ? undefined : mappedSourceId ?? undefined
@@ -328,6 +330,7 @@ export default function PublishContent({
         subject_pattern: subjectPattern,
         message_type: incrementMode ? undefined : messageType || undefined,
         source_id: incrementMode ? undefined : sourceId || undefined,
+        framing: incrementMode || !messageType ? undefined : mappedFraming,
         data,
         headers: Object.keys(headersMap).length > 0 ? headersMap : undefined,
       })

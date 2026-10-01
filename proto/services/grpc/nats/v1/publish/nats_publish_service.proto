@@ -60,6 +60,9 @@ message PublishMessageRequest {
 
   // Optional. Schema fingerprint; empty uses the source's active schema.
   optional string schema_fingerprint = 8;
+
+  // Optional. Wrapper around the encoded protobuf message.
+  .natscope.types.proto.Framing framing = 9;
 }
 
 // Defines the response message for publishing a message to NATS.
@@ -112,6 +115,9 @@ message RequestMessageRequest {
 
   // Optional. How long to wait for a reply. Defaults to 5 seconds.
   google.protobuf.Duration timeout = 8 [(buf.validate.field).duration = {gt: {}, lte: {seconds: 60}}];
+
+  // Optional. Wrapper around the encoded protobuf message.
+  .natscope.types.proto.Framing framing = 9;
 }
 
 // Defines the response message for a core NATS request: the first reply received.

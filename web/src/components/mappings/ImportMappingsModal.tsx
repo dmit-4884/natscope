@@ -64,6 +64,7 @@ export function ImportMappingsModal({
         rid: `${i}-${r.pattern}`,
         pattern: r.pattern,
         messageType: r.messageType,
+        framing: r.framing,
         sourceId: '',
       })),
     )
@@ -112,6 +113,7 @@ export function ImportMappingsModal({
       pattern: r.pattern,
       messageType: r.messageType,
       sourceId: r.sourceId,
+      framing: r.framing,
     }))
     const ok = await commit(payload)
     if (ok) onClose()

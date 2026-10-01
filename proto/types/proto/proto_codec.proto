@@ -2,6 +2,7 @@ syntax = "proto3";
 package natscope.types.proto;
 option go_package = "github.com/dmit-4884/natscope/proto/gen/types/proto;protopb";
 
+import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 
 // Defines result of protobuf message decoding.
@@ -16,6 +17,30 @@ message DecodeResult {
   repeated UnknownField unknown_fields = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Set when decoding failed but the first valid_bytes decoded into data.
   int32 valid_bytes = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// How a payload wraps its protobuf message.
+enum FramingKind {
+  FRAMING_KIND_UNSPECIFIED = 0;
+  // 1-byte compression flag and 4-byte big-endian length; a set flag means gzip.
+  FRAMING_KIND_GRPC = 1;
+  // Confluent Schema Registry: magic byte, 4-byte schema id, message indexes.
+  FRAMING_KIND_CONFLUENT = 2;
+  // Varint length prefix, as written by writeDelimitedTo.
+  FRAMING_KIND_VARINT_DELIMITED = 3;
+  // Fixed bytes before and after the message.
+  FRAMING_KIND_CUSTOM = 4;
+}
+
+// Wrapper around the protobuf message of a payload.
+message Framing {
+  FramingKind kind = 1;
+  // Confluent schema id written on encode.
+  int32 schema_id = 2 [(buf.validate.field).int32.gte = 0];
+  // Custom framing bytes before the message.
+  bytes prefix = 3 [(buf.validate.field).bytes.max_len = 64];
+  // Custom framing bytes after the message.
+  bytes suffix = 4 [(buf.validate.field).bytes.max_len = 64];
 }
 
 // How a field is encoded on the wire.

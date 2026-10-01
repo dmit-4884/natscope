@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { createMapping, bulkSaveMappings, deleteMapping } from '@/api/mappings'
+import { createMapping, bulkSaveMappings, deleteMapping, updateMapping, type MappingPatch } from '@/api/mappings'
+import type { Framing } from '@/api/framing'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { mappingKeys } from '../queries/mappingKeys'
 
@@ -25,11 +26,13 @@ export function useCreateMapping() {
       pattern,
       messageType,
       sourceId,
+      framing,
     }: {
       pattern: string
       messageType: string
       sourceId: string
-    }) => createMapping(pattern, messageType, sourceId),
+      framing?: Framing
+    }) => createMapping(pattern, messageType, sourceId, framing),
     onSuccess: () => invalidateMappings(queryClient),
   })
 }
@@ -56,26 +59,7 @@ export function useUpdateMapping() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      pattern,
-      messageType,
-      sourceId,
-    }: {
-      id: string
-      pattern: string
-      messageType: string
-      sourceId: string
-    }) => {
-      const created = await createMapping(pattern, messageType, sourceId)
-      try {
-        await deleteMapping(id)
-      } catch (err) {
-        queryClient.invalidateQueries({ queryKey: mappingKeys.all })
-        throw err
-      }
-      return created
-    },
+    mutationFn: ({ id, patch }: { id: string; patch: MappingPatch }) => updateMapping(id, patch),
     onSuccess: () => invalidateMappings(queryClient),
   })
 }

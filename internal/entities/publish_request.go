@@ -23,6 +23,8 @@ type PublishRequest struct {
 	SourceID *string `normalize:"trim,nil_on_empty"`
 	// SchemaFingerprint picks a stored schema; empty uses the active one.
 	SchemaFingerprint *string `normalize:"trim,nil_on_empty"`
+	// Framing wraps the encoded message.
+	Framing Framing
 	// SubjectPattern is the UI subject template, for history bookkeeping; not used
 	// during publish.
 	SubjectPattern *string `normalize:"trim,nil_on_empty"`

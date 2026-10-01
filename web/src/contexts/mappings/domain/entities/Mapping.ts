@@ -1,4 +1,5 @@
 import { Entity } from '@/shared'
+import { NO_FRAMING, type Framing } from '@/api/framing'
 import { SubjectPattern } from '../value-objects/SubjectPattern'
 
 export type MappingHealth =
@@ -17,6 +18,8 @@ interface MappingProps {
   /** Source the mapping is bound to (required); a pattern can repeat across
    *  sources. */
   sourceId: string
+  pinnedFingerprint?: string
+  framing: Framing
   createdAt: Date
   updatedAt: Date | null
   /** Optional. Computed lazily via mappings.HealthBatch RPC. */
@@ -38,6 +41,8 @@ export class Mapping extends Entity<MappingProps> {
     pattern: string
     message_type: string
     source_id: string
+    pinned_fingerprint?: string
+    framing?: Framing
     created_at: number
     updated_at?: number
   }): Mapping {
@@ -46,6 +51,8 @@ export class Mapping extends Entity<MappingProps> {
       pattern: SubjectPattern.fromTrusted(data.pattern),
       messageType: data.message_type,
       sourceId: data.source_id,
+      pinnedFingerprint: data.pinned_fingerprint,
+      framing: data.framing ?? NO_FRAMING,
       createdAt: new Date(data.created_at),
       updatedAt: data.updated_at ? new Date(data.updated_at) : null,
     })
@@ -60,6 +67,7 @@ export class Mapping extends Entity<MappingProps> {
       pattern: SubjectPattern.fromTrusted(pattern),
       messageType,
       sourceId,
+      framing: NO_FRAMING,
       createdAt: new Date(),
       updatedAt: null,
     })
@@ -83,6 +91,14 @@ export class Mapping extends Entity<MappingProps> {
 
   get sourceId(): string {
     return this.props.sourceId
+  }
+
+  get pinnedFingerprint(): string | undefined {
+    return this.props.pinnedFingerprint
+  }
+
+  get framing(): Framing {
+    return this.props.framing
   }
 
   get createdAt(): Date {

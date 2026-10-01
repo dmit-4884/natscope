@@ -2,6 +2,7 @@ import { Code, ConnectError } from '@connectrpc/connect'
 import { decodeBase64ToBytes } from '@/utils/base64'
 import { WireType as PbWireType } from '../gen/types/proto/proto_codec_pb'
 import type { WireField as PbWireField } from '../gen/types/proto/proto_codec_pb'
+import { framingToProto, type Framing } from './framing'
 import { codecClient } from './grpc/clients'
 
 type WireTypeName = 'varint' | 'fixed64' | 'bytes' | 'group' | 'fixed32'
@@ -47,6 +48,7 @@ export interface DecodeRequest {
   source_id: string
   /** Empty uses the source's active schema. */
   schema_fingerprint?: string
+  framing?: Framing
 }
 
 export interface DecodeResponse {
@@ -69,6 +71,7 @@ export async function decodeMessage(request: DecodeRequest): Promise<DecodeRespo
       messageType: request.message_type,
       sourceId: request.source_id,
       fingerprint: request.schema_fingerprint || undefined,
+      framing: framingToProto(request.framing),
     })
 
     const result = response.result

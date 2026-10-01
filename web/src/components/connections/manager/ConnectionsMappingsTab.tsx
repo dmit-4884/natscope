@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
+import { NO_FRAMING, type Framing } from '@/api/framing'
 import { Button, Dropdown, SearchInput, DestructiveConfirm, PlusIcon, QueryErrorState, SkeletonRows } from '@/components/ui'
 import { toast } from '@/utils/toast'
 import { useStreamEntities } from '@/contexts/streams'
@@ -28,6 +29,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
   const [newPattern, setNewPattern] = useState('')
   const [newProtoType, setNewProtoType] = useState('')
   const [newSourceId, setNewSourceId] = useState('')
+  const [newFraming, setNewFraming] = useState<Framing>(NO_FRAMING)
   const [searchFilter, setSearchFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -96,6 +98,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
     setNewPattern('')
     setNewProtoType('')
     setNewSourceId('')
+    setNewFraming(NO_FRAMING)
     setShowAddForm(false)
     setEditingId(null)
   }
@@ -106,9 +109,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
       if (editingId) {
         await updateMappingMutation.mutateAsync({
           id: editingId,
-          pattern: newPattern,
-          messageType: newProtoType,
-          sourceId: newSourceId,
+          patch: { pattern: newPattern, messageType: newProtoType, sourceId: newSourceId, framing: newFraming },
         })
         toast.success('Mapping updated')
       } else {
@@ -116,6 +117,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
           pattern: newPattern,
           messageType: newProtoType,
           sourceId: newSourceId,
+          framing: newFraming,
         })
       }
       resetForm()
@@ -127,6 +129,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
     setNewPattern(item.pattern)
     setNewProtoType(item.messageType)
     setNewSourceId(item.sourceId)
+    setNewFraming(item.framing)
     setShowAddForm(true)
   }
 
@@ -186,6 +189,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
 
       {showAddForm && (
         <MappingAddForm
+          key={editingId ?? 'new'}
           mode={editingId ? 'edit' : 'create'}
           pattern={newPattern}
           onPatternChange={setNewPattern}
@@ -193,6 +197,8 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
           onProtoTypeChange={setNewProtoType}
           sourceId={newSourceId}
           onSourceIdChange={setNewSourceId}
+          framing={newFraming}
+          onFramingChange={setNewFraming}
           unmappedPatterns={unmappedPatterns}
           isSubmitting={createMappingMutation.isPending || updateMappingMutation.isPending}
           onSubmit={handleAdd}

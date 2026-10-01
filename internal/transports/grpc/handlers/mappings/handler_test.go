@@ -19,6 +19,7 @@ import (
 	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	mappingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/mappings/v1/mappings"
+	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
 )
 
 // --- Mocks ---
@@ -38,6 +39,9 @@ type mockMappingsService struct {
 	getAllResult   entities.SubjectMappings
 	getAllErr      error
 
+	gotCreate      *entities.SubjectMappingCreate
+	gotUpdate      *entities.SubjectMappingUpdate
+	gotBulk        entities.SubjectMappings
 	createCalled   bool
 	deleteCalled   bool
 	deleteID       string
@@ -47,6 +51,7 @@ type mockMappingsService struct {
 
 func (m *mockMappingsService) Create(_ context.Context, in *entities.SubjectMappingCreate) (*entities.SubjectMapping, error) {
 	m.createCalled = true
+	m.gotCreate = in
 	if m.createResult != nil {
 		return m.createResult, m.createErr
 	}
@@ -54,6 +59,7 @@ func (m *mockMappingsService) Create(_ context.Context, in *entities.SubjectMapp
 		sm.Pattern = in.Pattern
 		sm.MessageType = in.MessageType
 		sm.SourceID = in.SourceID
+		sm.Framing = in.Framing
 	})
 	return mapping, m.createErr
 }
@@ -62,7 +68,8 @@ func (m *mockMappingsService) Get(_ context.Context, _ string) (*entities.Subjec
 	return m.getResult, m.getErr
 }
 
-func (m *mockMappingsService) Update(_ context.Context, _ *entities.SubjectMappingUpdate) (*entities.SubjectMapping, error) {
+func (m *mockMappingsService) Update(_ context.Context, in *entities.SubjectMappingUpdate) (*entities.SubjectMapping, error) {
+	m.gotUpdate = in
 	return m.updateResult, m.updateErr
 }
 
@@ -306,5 +313,52 @@ func TestHandler_HealthBatch(t *testing.T) {
 		assert.Equal(t, "ok", resp.Msg.Items[0].Health)
 		assert.Equal(t, "selection_missing", resp.Msg.Items[1].Health)
 		assert.Equal(t, "no selection", resp.Msg.Items[1].Detail)
+	})
+}
+
+func TestHandler_MappingFraming(t *testing.T) {
+	t.Parallel()
+
+	t.Run("create keeps the framing", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockMappingsService{}
+		resp, err := New(svc, nil).CreateMapping(t.Context(), connect.NewRequest(&mappingspb.CreateMappingRequest{
+			Pattern: "orders.>", MessageType: "shop.Order", SourceId: "src",
+			Framing: &protopb.Framing{Kind: protopb.FramingKind_FRAMING_KIND_CUSTOM, Prefix: []byte{0xca}},
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, entities.Framing{Kind: entities.FramingCustom, Prefix: []byte{0xca}}, svc.gotCreate.Framing)
+		assert.Equal(t, protopb.FramingKind_FRAMING_KIND_CUSTOM, resp.Msg.Mapping.GetFraming().GetKind())
+	})
+
+	t.Run("update changes only what is set", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockMappingsService{updateResult: entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
+			m.Pattern, m.Framing = "orders.>", entities.Framing{Kind: entities.FramingConfluent, SchemaID: 3}
+		})}
+		resp, err := New(svc, nil).UpdateMapping(t.Context(), connect.NewRequest(&mappingspb.UpdateMappingRequest{
+			Id: "m1", PinnedFingerprint: ptr.Wrap(""),
+			Framing: &protopb.Framing{Kind: protopb.FramingKind_FRAMING_KIND_CONFLUENT, SchemaId: 3},
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, "m1", svc.gotUpdate.Id)
+		assert.Nil(t, svc.gotUpdate.Pattern)
+		assert.Equal(t, "", *svc.gotUpdate.PinnedFingerprint)
+		assert.Equal(t, &entities.Framing{Kind: entities.FramingConfluent, SchemaID: 3}, svc.gotUpdate.Framing)
+		assert.Equal(t, int32(3), resp.Msg.Mapping.GetFraming().GetSchemaId())
+
+		_, err = New(svc, nil).UpdateMapping(t.Context(), connect.NewRequest(&mappingspb.UpdateMappingRequest{Id: "m1"}))
+		require.NoError(t, err)
+		assert.Nil(t, svc.gotUpdate.Framing, "an unset framing keeps the current one")
+	})
+
+	t.Run("no framing is omitted on the wire", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockMappingsService{}
+		resp, err := New(svc, nil).CreateMapping(t.Context(), connect.NewRequest(&mappingspb.CreateMappingRequest{
+			Pattern: "orders.>", MessageType: "shop.Order", SourceId: "src",
+		}))
+		require.NoError(t, err)
+		assert.Nil(t, resp.Msg.Mapping.GetFraming())
 	})
 }

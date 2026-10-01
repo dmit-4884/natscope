@@ -51,7 +51,11 @@ export default function RequestPage() {
     [draft.recentSubjects, mappings],
   )
 
-  const { messageType: mappedMessageType, sourceId: mappedSourceId } = useSubjectMappingEntity(
+  const {
+    messageType: mappedMessageType,
+    sourceId: mappedSourceId,
+    framing: mappedFraming,
+  } = useSubjectMappingEntity(
     subject && !subjectError ? subject : null,
   )
   const isJsonMode = encodingMode === 'json' || (!mappedMessageType && encodingMode !== 'proto')
@@ -105,6 +109,7 @@ export default function RequestPage() {
       headers,
       message_type: messageType,
       source_id: sourceId,
+      framing: messageType ? mappedFraming : undefined,
       timeout_ms: draft.timeoutMs,
     })
   }

@@ -5,11 +5,15 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/mappi
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "types/mappings/mappings_mapping.proto";
+import "types/proto/proto_codec.proto";
 
 // Provides operations for managing subject-to-protobuf-type mappings for automatic message decoding.
 service MappingsService {
   // Creates a new subject-to-protobuf-type mapping for automatic message decoding.
   rpc CreateMapping(CreateMappingRequest) returns (CreateMappingResponse) {}
+
+  // Changes a mapping; unset fields keep their value, an empty pinned_fingerprint unpins.
+  rpc UpdateMapping(UpdateMappingRequest) returns (UpdateMappingResponse) {}
 
   // Retrieves a paginated list of all subject-to-protobuf-type mappings.
   // Pagination: Cursor-based.
@@ -44,6 +48,24 @@ message CreateMappingRequest {
 
   // Optional. Pin resolution to a specific descriptor by content hash.
   optional string pinned_fingerprint = 5;
+
+  // Optional. Wrapper around the protobuf message of every payload on the pattern.
+  .natscope.types.proto.Framing framing = 6;
+}
+
+// Request for UpdateMapping.
+message UpdateMappingRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+  optional string pattern = 2 [(buf.validate.field).string.min_len = 1];
+  optional string message_type = 3 [(buf.validate.field).string.min_len = 1];
+  optional string source_id = 4 [(buf.validate.field).string.min_len = 1];
+  optional string pinned_fingerprint = 5;
+  optional .natscope.types.proto.Framing framing = 6;
+}
+
+// Response for UpdateMapping.
+message UpdateMappingResponse {
+  .natscope.types.mappings.SubjectMapping mapping = 1;
 }
 
 // Defines the response message for creating a new subject mapping.
@@ -125,6 +147,9 @@ message MappingBulkItem {
 
   // Optional. Pin resolution to a specific descriptor by content hash; unset keeps an existing pin.
   optional string pinned_fingerprint = 5;
+
+  // Optional. Wrapper around the protobuf message of every payload on the pattern.
+  .natscope.types.proto.Framing framing = 6;
 }
 
 // Defines the response message for bulk saving subject mappings.

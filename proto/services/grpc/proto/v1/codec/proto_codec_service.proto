@@ -51,6 +51,9 @@ message DecodeMessageRequest {
 
   // Optional. Schema fingerprint; empty uses the source's active schema.
   optional string fingerprint = 4;
+
+  // Optional. Wrapper to strip before decoding.
+  .natscope.types.proto.Framing framing = 5;
 }
 
 // Defines the response message for decoding binary protobuf data.
@@ -73,6 +76,9 @@ message EncodeMessageRequest {
 
   // Optional. Schema fingerprint; empty uses the source's active schema.
   optional string fingerprint = 4;
+
+  // Optional. Wrapper around the encoded message.
+  .natscope.types.proto.Framing framing = 5;
 }
 
 // Defines the response message for encoding a protobuf message.

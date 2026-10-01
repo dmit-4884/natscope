@@ -10,4 +10,6 @@ type BatchDecodeItem struct {
 
 	// MessageType is the fully qualified protobuf message type.
 	MessageType string
+
+	Framing Framing
 }

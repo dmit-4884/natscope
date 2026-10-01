@@ -200,3 +200,33 @@ func TestStart_DropsRetiredSourceTypes(t *testing.T) {
 	_, err = env.sources.Get(t.Context(), kept.Id)
 	require.NoError(t, err)
 }
+
+func TestEncode_Framing(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+	src := env.createUpload(t)
+	_, outcome, err := env.svc.UploadSchema(t.Context(), src.Id, uploadFiles(map[string]string{"shop.proto": orderV2}))
+	require.NoError(t, err)
+	require.True(t, outcome.Valid)
+
+	req := entities.CodecRequest{
+		SourceID: src.Id, MessageType: "shop.Refund", JSON: []byte(`{"order_id":"o1"}`),
+		Framing: entities.Framing{Kind: entities.FramingConfluent, SchemaID: 7},
+	}
+	raw, err := env.svc.EncodeRaw(t.Context(), req)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0, 0, 0, 0, 7, 2, 2, 0x0a, 0x02, 'o', '1'}, raw)
+
+	result, violations, err := env.svc.EncodeWithValidation(t.Context(), req)
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	assert.Empty(t, violations)
+	assert.Equal(t, len(raw), result.DataSize)
+
+	decoded, err := env.svc.Decode(t.Context(), entities.CodecRequest{
+		SourceID: src.Id, MessageType: "shop.Refund", Data: raw, Framing: req.Framing,
+	})
+	require.NoError(t, err)
+	require.True(t, decoded.Success, decoded.Error)
+	assert.JSONEq(t, `{"order_id":"o1"}`, string(decoded.Decoded))
+}

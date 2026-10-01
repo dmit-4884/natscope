@@ -52,6 +52,9 @@ type SubjectMapping struct {
 	// PinnedFingerprint pins resolution to a descriptor by content hash (survives
 	// identical recompiles).
 	PinnedFingerprint *string
+
+	// Framing wraps the protobuf message of every payload on the pattern.
+	Framing Framing
 }
 
 // SubjectMappingNew creates a new SubjectMapping with generated Id and
@@ -76,7 +79,10 @@ func (m *SubjectMapping) ApplyUpdate(req *SubjectMappingUpdate) {
 
 	converter.Convert(req, m,
 		converter.WithIgnoreNilValues(),
-		converter.WithIgnoreFields("etag"))
+		converter.WithIgnoreFields("etag", "Framing"))
+	if req.Framing != nil {
+		m.Framing = *req.Framing
+	}
 	m.BeforeUpdate()
 }
 
@@ -94,6 +100,7 @@ type SubjectMappingCreate struct {
 	MessageType       string  `normalize:"trim"`
 	SourceID          string  `normalize:"trim"`
 	PinnedFingerprint *string `normalize:"trim,nil_on_empty"`
+	Framing           Framing
 }
 
 // SubjectMappingUpdate is the update DTO for a mapping.
@@ -103,6 +110,7 @@ type SubjectMappingUpdate struct {
 	MessageType       *string `normalize:"trim"`
 	SourceID          *string `normalize:"trim"`
 	PinnedFingerprint *string `normalize:"trim"`
+	Framing           *Framing
 }
 
 // SubjectMappingHealth wraps a SubjectMapping with computed health state and a

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { getErrorMessage } from '@/api/errors'
+import type { Framing, FramingKindName } from '@/api/framing'
+import { bytesToHex, hexToBytes } from '@/utils/hex'
 import { downloadBlob } from '@/utils/download'
 import { useMappingItems, useBulkSaveMappings } from '@/contexts/mappings'
 
@@ -17,13 +19,44 @@ export interface MappingsExportV3 {
   mappings: Array<{
     pattern: string
     messageType: string
+    framing?: ExportedFraming
   }>
+}
+
+interface ExportedFraming {
+  kind: Exclude<FramingKindName, 'none'>
+  schemaId?: number
+  prefixHex?: string
+  suffixHex?: string
+}
+
+const FRAMING_KINDS: FramingKindName[] = ['grpc', 'confluent', 'varint_delimited', 'custom']
+
+function exportFraming(f: Framing): ExportedFraming | undefined {
+  if (f.kind === 'none') return undefined
+  return {
+    kind: f.kind,
+    schemaId: f.schemaId || undefined,
+    prefixHex: f.prefix.length ? bytesToHex(f.prefix) : undefined,
+    suffixHex: f.suffix.length ? bytesToHex(f.suffix) : undefined,
+  }
+}
+
+function importFraming(raw: unknown): Framing | undefined | null {
+  if (raw === undefined) return undefined
+  const f = raw as Partial<ExportedFraming> | null
+  if (!f || typeof f !== 'object' || !FRAMING_KINDS.includes(f.kind as FramingKindName)) return null
+  const prefix = hexToBytes(f.prefixHex ?? '')
+  const suffix = hexToBytes(f.suffixHex ?? '')
+  if (!prefix || !suffix) return null
+  return { kind: f.kind as FramingKindName, schemaId: Number(f.schemaId) || 0, prefix, suffix }
 }
 
 /** Parsed import row, ready to be reviewed and assigned a sourceId in the UI. */
 export interface ImportDraftRow {
   pattern: string
   messageType: string
+  framing?: Framing
 }
 
 export interface ParseResult {
@@ -50,6 +83,7 @@ export function useMappingImportExport(opts?: Options) {
       mappings: filtered.map((m) => ({
         pattern: m.pattern,
         messageType: m.messageType,
+        framing: exportFraming(m.framing),
       })),
     }
   }
@@ -88,7 +122,7 @@ export function useMappingImportExport(opts?: Options) {
   }
 
   const commit = async (
-    rows: Array<{ pattern: string; messageType: string; sourceId: string }>,
+    rows: Array<{ pattern: string; messageType: string; sourceId: string; framing?: Framing }>,
   ): Promise<boolean> => {
     setImportError('')
     if (rows.length === 0) {
@@ -140,18 +174,22 @@ function parseObject(parsed: unknown): ParseResult | ParseError {
   }
   const rows: ImportDraftRow[] = []
   for (let i = 0; i < obj.mappings.length; i++) {
-    const item = obj.mappings[i] as { pattern?: unknown; messageType?: unknown } | null
+    const item = obj.mappings[i] as { pattern?: unknown; messageType?: unknown; framing?: unknown } | null
     if (!item || typeof item !== 'object') {
       return { ok: false, error: `mappings[${i}] is not an object.` }
     }
     const { pattern, messageType } = item
+    const framing = importFraming(item.framing)
+    if (framing === null) {
+      return { ok: false, error: `mappings[${i}].framing is not valid.` }
+    }
     if (typeof pattern !== 'string' || !pattern) {
       return { ok: false, error: `mappings[${i}].pattern is required.` }
     }
     if (typeof messageType !== 'string' || !messageType) {
       return { ok: false, error: `mappings[${i}].messageType is required.` }
     }
-    rows.push({ pattern, messageType })
+    rows.push({ pattern, messageType, framing })
   }
   if (rows.length === 0) {
     return { ok: false, error: 'No mappings in the file.' }

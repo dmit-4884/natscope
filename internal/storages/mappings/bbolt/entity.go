@@ -9,8 +9,16 @@ import "github.com/dmit-4884/natscope/internal/pkg/bbstore"
 type mappingDoc struct {
 	bbstore.Base
 
-	Pattern           string  `json:"pattern"`
-	MessageType       string  `json:"messageType,omitempty"`
-	SourceID          string  `json:"sourceId"`
-	PinnedFingerprint *string `json:"pinnedFingerprint,omitempty"`
+	Pattern           string     `json:"pattern"`
+	MessageType       string     `json:"messageType,omitempty"`
+	SourceID          string     `json:"sourceId"`
+	PinnedFingerprint *string    `json:"pinnedFingerprint,omitempty"`
+	Framing           framingDoc `json:"framing,omitzero"`
+}
+
+type framingDoc struct {
+	Kind     string `json:"kind,omitempty"`
+	SchemaID int32  `json:"schemaId,omitempty"`
+	Prefix   []byte `json:"prefix,omitempty"`
+	Suffix   []byte `json:"suffix,omitempty"`
 }

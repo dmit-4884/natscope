@@ -51,17 +51,40 @@ func (h *Handler) CreateMapping(
 	ctx context.Context,
 	req *connect.Request[mappingspb.CreateMappingRequest],
 ) (*connect.Response[mappingspb.CreateMappingResponse], error) {
-	createReq := converter.Convert(req.Msg, &entities.SubjectMappingCreate{})
+	createReq := converter.Convert(req.Msg, &entities.SubjectMappingCreate{}, converter.WithIgnoreFields("Framing"))
+	createReq.Framing = grpchelpers.FramingFromProto(req.Msg.Framing)
 
 	mapping, err := h.mappingsService.Create(ctx, createReq)
 	if err != nil {
 		return nil, err
 	}
 
-	return connect.NewResponse(&mappingspb.CreateMappingResponse{
-		Mapping: converter.Convert(mapping, &mappingstypespb.SubjectMapping{},
-			converter.WithHandleEmbeddedStructs(true), grpchelpers.ProtoCodecs),
-	}), nil
+	return connect.NewResponse(&mappingspb.CreateMappingResponse{Mapping: mappingToProto(mapping)}), nil
+}
+
+// UpdateMapping changes the fields set in the request.
+func (h *Handler) UpdateMapping(
+	ctx context.Context,
+	req *connect.Request[mappingspb.UpdateMappingRequest],
+) (*connect.Response[mappingspb.UpdateMappingResponse], error) {
+	updateReq := converter.Convert(req.Msg, &entities.SubjectMappingUpdate{}, converter.WithIgnoreFields("Framing"))
+	if req.Msg.Framing != nil {
+		framing := grpchelpers.FramingFromProto(req.Msg.Framing)
+		updateReq.Framing = &framing
+	}
+
+	mapping, err := h.mappingsService.Update(ctx, updateReq)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&mappingspb.UpdateMappingResponse{Mapping: mappingToProto(mapping)}), nil
+}
+
+func mappingToProto(m *entities.SubjectMapping) *mappingstypespb.SubjectMapping {
+	pb := converter.Convert(m, &mappingstypespb.SubjectMapping{},
+		converter.WithHandleEmbeddedStructs(true), grpchelpers.ProtoCodecs, converter.WithIgnoreFields("Framing"))
+	pb.Framing = grpchelpers.FramingToProto(m.Framing)
+	return pb
 }
 
 // ListMappings returns subject mappings with AIP-158 pagination (page_token
@@ -84,10 +107,7 @@ func (h *Handler) ListMappings(
 	}
 
 	return connect.NewResponse(&mappingspb.ListMappingsResponse{
-		Mappings: slices.To(list.Items, func(m *entities.SubjectMapping) *mappingstypespb.SubjectMapping {
-			return converter.Convert(m, &mappingstypespb.SubjectMapping{},
-				converter.WithHandleEmbeddedStructs(true), grpchelpers.ProtoCodecs)
-		}),
+		Mappings:      slices.To(list.Items, mappingToProto),
 		NextPageToken: list.NextCursor,
 		TotalSize:     list.Total,
 	}), nil
@@ -111,7 +131,9 @@ func (h *Handler) BatchSaveMappings(
 ) (*connect.Response[mappingspb.BatchSaveMappingsResponse], error) {
 	in := req.Msg
 	mappingEntities := slices.To(in.Mappings, func(m *mappingspb.MappingBulkItem) *entities.SubjectMapping {
-		return converter.Convert(m, entities.SubjectMappingNew())
+		mapping := converter.Convert(m, entities.SubjectMappingNew(), converter.WithIgnoreFields("Framing"))
+		mapping.Framing = grpchelpers.FramingFromProto(m.Framing)
+		return mapping
 	})
 
 	result, err := h.mappingsService.BulkSave(ctx, mappingEntities)

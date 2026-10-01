@@ -69,34 +69,14 @@ func jsonConvertError(messageType string, err error) error {
 	return &codecError{msg: fmt.Sprintf("Cannot convert JSON to '%s': %v", messageType, err), cause: err}
 }
 
-// Encode converts JSON data to protobuf binary format using the resolved
-// snapshot.
-func (s *Service) Encode(ctx context.Context, req entities.CodecRequest) (*entities.EncodeResult, error) {
-	snap, err := s.snapshotForRequest(ctx, req)
-	if err != nil {
-		return &entities.EncodeResult{Success: false, Error: snapshotError(req.SourceID, err).Error()}, nil
-	}
-
-	md, ok := snap.Schema.Message(req.MessageType)
-	if !ok {
-		return &entities.EncodeResult{Success: false, Error: typeNotFoundError(req.MessageType, snap.SourceID).Error()}, nil
-	}
-
-	data, err := jsonToBinary(snap.Schema, md, req.MessageType, req.JSON)
-	if err != nil {
-		return &entities.EncodeResult{Success: false, Error: err.Error()}, nil
-	}
-
-	return &entities.EncodeResult{
-		Success:    true,
-		DataBase64: base64.StdEncoding.EncodeToString(data),
-		DataSize:   len(data),
-	}, nil
+type encoded struct {
+	schema  *protoutils.Schema
+	md      protoreflect.MessageDescriptor
+	message []byte
+	framed  []byte
 }
 
-// EncodeRaw converts JSON data to raw protobuf bytes using the resolved
-// snapshot.
-func (s *Service) EncodeRaw(ctx context.Context, req entities.CodecRequest) ([]byte, error) {
+func (s *Service) encode(ctx context.Context, req entities.CodecRequest) (*encoded, error) {
 	snap, err := s.snapshotForRequest(ctx, req)
 	if err != nil {
 		return nil, snapshotError(req.SourceID, err)
@@ -105,7 +85,37 @@ func (s *Service) EncodeRaw(ctx context.Context, req entities.CodecRequest) ([]b
 	if !ok {
 		return nil, typeNotFoundError(req.MessageType, snap.SourceID)
 	}
-	return jsonToBinary(snap.Schema, md, req.MessageType, req.JSON)
+	message, err := jsonToBinary(snap.Schema, md, req.MessageType, req.JSON)
+	if err != nil {
+		return nil, err
+	}
+	framed, err := protoutils.Frame(message, req.Framing, md)
+	if err != nil {
+		return nil, &codecError{msg: fmt.Sprintf("Cannot apply the %s framing: %v", req.Framing.Kind, err), cause: err}
+	}
+	return &encoded{schema: snap.Schema, md: md, message: message, framed: framed}, nil
+}
+
+// Encode converts JSON data to framed protobuf binary using the resolved snapshot.
+func (s *Service) Encode(ctx context.Context, req entities.CodecRequest) (*entities.EncodeResult, error) {
+	out, err := s.encode(ctx, req)
+	if err != nil {
+		return &entities.EncodeResult{Success: false, Error: err.Error()}, nil
+	}
+	return &entities.EncodeResult{
+		Success:    true,
+		DataBase64: base64.StdEncoding.EncodeToString(out.framed),
+		DataSize:   len(out.framed),
+	}, nil
+}
+
+// EncodeRaw converts JSON data to framed protobuf bytes using the resolved snapshot.
+func (s *Service) EncodeRaw(ctx context.Context, req entities.CodecRequest) ([]byte, error) {
+	out, err := s.encode(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return out.framed, nil
 }
 
 // Validate validates protobuf data against buf.validate rules within the
@@ -131,24 +141,21 @@ func (s *Service) Validate(
 	return snap.Schema.Validate(md, data), nil
 }
 
-// EncodeWithValidation encodes JSON to protobuf and validates the result.
+// EncodeWithValidation encodes JSON to framed protobuf and validates the message.
 func (s *Service) EncodeWithValidation(
 	ctx context.Context,
 	req entities.CodecRequest,
 ) (*entities.EncodeResult, []*entities.ValidationViolation, error) {
-	result, err := s.Encode(ctx, req)
+	out, err := s.encode(ctx, req)
 	if err != nil {
-		return result, nil, err
+		return &entities.EncodeResult{Success: false, Error: err.Error()}, nil, nil
 	}
-	if !result.Success {
-		return result, nil, nil
+	result := &entities.EncodeResult{
+		Success:    true,
+		DataBase64: base64.StdEncoding.EncodeToString(out.framed),
+		DataSize:   len(out.framed),
 	}
-
-	validationResult, err := s.Validate(ctx, result.DataBase64, req)
-	if err != nil {
-		return result, nil, err
-	}
-	return result, validationResult.Violations, nil
+	return result, out.schema.Validate(out.md, out.message).Violations, nil
 }
 
 // ValidateJSON is the one-shot encode+validate pipeline; encode, snapshot,

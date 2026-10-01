@@ -51,7 +51,7 @@ func (s *Service) Decode(ctx context.Context, req entities.CodecRequest) (*entit
 		return &entities.DecodeResult{Success: false, Error: snapshotError(req.SourceID, err).Error()}, nil
 	}
 
-	result := decodeWithSnapshot(snap, req.Data, req.MessageType)
+	result := decodeWithSnapshot(snap, req.Data, req.MessageType, req.Framing)
 
 	// Add formatted JSON for single-message decode (used by codec UI).
 	if result.Success && len(result.Decoded) > 0 {
@@ -86,12 +86,12 @@ func (s *Service) DecodeForMapping(
 	if err != nil {
 		return nil, err
 	}
-	return decodeWithSnapshot(snap, data, m.MessageType), nil
+	return decodeWithSnapshot(snap, data, m.MessageType, m.Framing), nil
 }
 
 // decodeWithSnapshot decodes a single protobuf payload against a parsed
 // snapshot.
-func decodeWithSnapshot(snap *registry.Snapshot, data []byte, messageType string) *entities.DecodeResult {
+func decodeWithSnapshot(snap *registry.Snapshot, data []byte, messageType string, framing entities.Framing) *entities.DecodeResult {
 	if snap == nil {
 		return &entities.DecodeResult{Success: false, Error: "snapshot unavailable"}
 	}
@@ -102,7 +102,15 @@ func decodeWithSnapshot(snap *registry.Snapshot, data []byte, messageType string
 			Error:   fmt.Sprintf("Proto type '%s' not found in source '%s' (revision '%s').", messageType, snap.SourceID, snap.Revision),
 		}
 	}
-	return decodeWithDescriptor(snap.Schema, md, data, messageType)
+	msg, offset, err := protoutils.Unframe(data, framing)
+	if err != nil {
+		return &entities.DecodeResult{Success: false, Error: fmt.Sprintf("Cannot unwrap the %s framing: %v", framing.Kind, err)}
+	}
+	result := decodeWithDescriptor(snap.Schema, md, msg, messageType, framing.Kind == entities.FramingNone)
+	if result.ValidBytes > 0 {
+		result.ValidBytes += offset
+	}
+	return result
 }
 
 // decodeWithDescriptor decodes a single payload against a MessageDescriptor;
@@ -112,15 +120,17 @@ func decodeWithDescriptor(
 	md protoreflect.MessageDescriptor,
 	data []byte,
 	messageType string,
+	hintFraming bool,
 ) *entities.DecodeResult {
 	msg := dynamicpb.NewMessage(md)
 	if unmarshalErr := schema.ParseBinary(data, msg); unmarshalErr != nil {
+		hint := ""
+		if hintFraming {
+			hint = protoutils.FramingHint(data)
+		}
 		result := &entities.DecodeResult{
 			Success: false,
-			Error: fmt.Sprintf(
-				"Cannot decode message as %q: %s%s",
-				messageType, unmarshalErr.Error(), protoutils.FramingHint(data),
-			),
+			Error:   fmt.Sprintf("Cannot decode message as %q: %s%s", messageType, unmarshalErr.Error(), hint),
 		}
 		result.Decoded, result.ValidBytes = decodePrefix(schema, md, data)
 		return result
@@ -173,9 +183,10 @@ func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Messa
 
 	// Per-snapshot grouping. snapKey = sourceID + tag.
 	type group struct {
-		snap *registry.Snapshot
-		idxs []int
-		mts  []string
+		snap     *registry.Snapshot
+		idxs     []int
+		mts      []string
+		framings []entities.Framing
 	}
 	groups := make(map[string]*group)
 
@@ -197,12 +208,13 @@ func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Messa
 		}
 		g.idxs = append(g.idxs, i)
 		g.mts = append(g.mts, m.MessageType)
+		g.framings = append(g.framings, m.Framing)
 	}
 
 	t1 := time.Now()
 
 	for _, g := range groups {
-		items, decErrs := messagesToBatch(messages, g.idxs, g.mts)
+		items, decErrs := messagesToBatch(messages, g.idxs, g.mts, g.framings)
 		results := decodeBatchWithSnapshot(ctx, g.snap, items)
 		for j, idx := range g.idxs {
 			if decErrs[j] != "" {
@@ -234,7 +246,12 @@ func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Messa
 // messagesToBatch builds a BatchDecodeItem slice from selected message indices,
 // plus a per-index decode error (empty when none) carrying the base64 failure
 // for payloads that fail to decode.
-func messagesToBatch(messages []*entities.Message, idxs []int, mts []string) ([]entities.BatchDecodeItem, []string) {
+func messagesToBatch(
+	messages []*entities.Message,
+	idxs []int,
+	mts []string,
+	framings []entities.Framing,
+) ([]entities.BatchDecodeItem, []string) {
 	items := make([]entities.BatchDecodeItem, len(idxs))
 	decErrs := make([]string, len(idxs))
 	for j, idx := range idxs {
@@ -246,6 +263,7 @@ func messagesToBatch(messages []*entities.Message, idxs []int, mts []string) ([]
 		items[j] = entities.BatchDecodeItem{
 			Data:        data,
 			MessageType: mts[j],
+			Framing:     framings[j],
 		}
 	}
 	return items, decErrs
@@ -283,7 +301,7 @@ func decodeBatchWithSnapshot(
 			results[i] = &entities.DecodeResult{Success: false, Error: "Missing message type"}
 			return nil
 		}
-		results[i] = decodeWithSnapshot(snap, item.Data, item.MessageType)
+		results[i] = decodeWithSnapshot(snap, item.Data, item.MessageType, item.Framing)
 		return nil
 	}, concurrency.WithConcurrency[int](workers))
 

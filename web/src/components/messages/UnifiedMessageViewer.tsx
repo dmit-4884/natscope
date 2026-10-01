@@ -10,6 +10,7 @@ import ErrorAlert from '@/components/ui/ErrorAlert'
 import { RefreshIcon, TrashIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon, DocumentIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import { decodeMessage } from '@/api/decode'
+import type { Framing } from '@/api/framing'
 import { getMessage } from '@/api/messages'
 import { deleteMessage } from '@/api/management'
 import { getSubjectPattern as getPatternFromSubject, matchesPattern as subjectMatchesPattern } from '@/contexts/messages'
@@ -77,6 +78,7 @@ export default function UnifiedMessageViewer({
   const [deleting, setDeleting] = useState(false)
   const [selectedProtoType, setSelectedProtoType] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState('')
+  const [selectedFraming, setSelectedFraming] = useState<Framing | undefined>()
   const [decodedData, setDecodedData] = useState<unknown>(null)
   const [decoding, setDecoding] = useState(false)
   const [decodeError, setDecodeError] = useState<string | null>(null)
@@ -279,6 +281,7 @@ export default function UnifiedMessageViewer({
       setDecodedData(null)
       setSelectedProtoType('')
       setSelectedSourceId('')
+      setSelectedFraming(undefined)
       setHasDecodedForType(null)
       setDecodeNotes(null)
     }
@@ -294,6 +297,7 @@ export default function UnifiedMessageViewer({
       if (match) {
         setSelectedProtoType(match.messageType)
         setSelectedSourceId(match.sourceId)
+        setSelectedFraming(match.framing)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -326,6 +330,7 @@ export default function UnifiedMessageViewer({
             data_base64: message.data_base64,
             message_type: currentProtoType,
             source_id: currentSourceId,
+            framing: selectedFraming,
           })
           if (selectionIdRef.current !== idAtCall) return
 

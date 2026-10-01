@@ -70,7 +70,7 @@ func (t *Toolset) resolveSubject(ctx context.Context, _ *mcp.CallToolRequest, in
 	if m == nil {
 		return nil, out, nil
 	}
-	out.Mapped, out.Mapping = true, converter.Convert(m, &mappingView{})
+	out.Mapped, out.Mapping = true, toMappingView(m)
 	health, err := t.registry.MappingHealth(ctx, []string{m.Id})
 	if err != nil {
 		return nil, resolveOutput{}, err
@@ -87,7 +87,7 @@ func (t *Toolset) listMappings(ctx context.Context, _ *mcp.CallToolRequest, _ st
 		return nil, listMappingsOutput{}, err
 	}
 	return nil, listMappingsOutput{Mappings: mcptransport.Items(slices.To(all, func(m *entities.SubjectMapping) mappingView {
-		return *converter.Convert(m, &mappingView{})
+		return *toMappingView(m)
 	}))}, nil
 }
 
@@ -176,4 +176,10 @@ func (t *Toolset) status(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}
 		out.MessageTypes, out.Error = stats.MessagesCount, stats.Error
 	}
 	return nil, out, nil
+}
+
+func toMappingView(m *entities.SubjectMapping) *mappingView {
+	v := converter.Convert(m, &mappingView{})
+	v.FramingKind = string(m.Framing.Kind)
+	return v
 }

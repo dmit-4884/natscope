@@ -22,9 +22,31 @@ type mappingItem struct {
 	MessageType string `json:"messageType"`
 	// SourceName is the portable export-time key, resolved back to the local id on
 	// import; SourceID is only a same-machine fallback.
-	SourceName        string  `json:"sourceName,omitempty"`
-	SourceID          string  `json:"sourceId,omitempty"`
-	PinnedFingerprint *string `json:"pinnedFingerprint,omitempty"`
+	SourceName        string       `json:"sourceName,omitempty"`
+	SourceID          string       `json:"sourceId,omitempty"`
+	PinnedFingerprint *string      `json:"pinnedFingerprint,omitempty"`
+	Framing           *framingItem `json:"framing,omitempty"`
+}
+
+type framingItem struct {
+	Kind     string `json:"kind"`
+	SchemaID int32  `json:"schemaId,omitempty"`
+	Prefix   []byte `json:"prefix,omitempty"`
+	Suffix   []byte `json:"suffix,omitempty"`
+}
+
+func exportFraming(f entities.Framing) *framingItem {
+	if f.Kind == entities.FramingNone {
+		return nil
+	}
+	return &framingItem{Kind: string(f.Kind), SchemaID: f.SchemaID, Prefix: f.Prefix, Suffix: f.Suffix}
+}
+
+func (it mappingItem) framing() entities.Framing {
+	if it.Framing == nil {
+		return entities.Framing{}
+	}
+	return entities.Framing{Kind: entities.FramingKind(it.Framing.Kind), SchemaID: it.Framing.SchemaID, Prefix: it.Framing.Prefix, Suffix: it.Framing.Suffix}
 }
 
 // MappingsSection exports/imports subject→message-type mappings, keyed by
@@ -67,6 +89,7 @@ func (s *MappingsSection) Export(ctx context.Context) (json.RawMessage, error) {
 			SourceName:        idToName[m.SourceID], // "" when unresolved — falls back to SourceID on import
 			SourceID:          m.SourceID,
 			PinnedFingerprint: m.PinnedFingerprint,
+			Framing:           exportFraming(m.Framing),
 		})
 	}
 	return json.Marshal(newItemsPayload(items))
@@ -132,6 +155,7 @@ func (s *MappingsSection) Import(
 				Id:                ex.Id,
 				MessageType:       ptr.Wrap(it.MessageType),
 				PinnedFingerprint: it.PinnedFingerprint,
+				Framing:           new(it.framing()),
 			}
 			// Only overwrite the source id when concrete — an empty value must NOT
 			// clobber the existing source with "".
@@ -149,6 +173,7 @@ func (s *MappingsSection) Import(
 			MessageType:       it.MessageType,
 			SourceID:          resolvedSourceID,
 			PinnedFingerprint: it.PinnedFingerprint,
+			Framing:           it.framing(),
 		}); err != nil {
 			return res, err
 		}

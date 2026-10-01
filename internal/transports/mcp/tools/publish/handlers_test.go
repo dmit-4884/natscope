@@ -38,7 +38,10 @@ func newToolset() *Toolset {
 		&appconfig.Config{MCP: &appconfig.MCPConfig{AllowWrites: true}},
 		nil, nil,
 		fakeMappings{resolver: natsutil.NewMappingResolver(entities.SubjectMappings{
-			{BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "src", PinnedFingerprint: &pinned},
+			{
+				BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "src", PinnedFingerprint: &pinned,
+				Framing: entities.Framing{Kind: entities.FramingGRPC},
+			},
 		})},
 		fakeRegistry{types: []entities.SchemaType{{FullName: "o.v1.Refund", Kind: entities.SchemaTypeMessage, SourceID: "src"}}},
 	)
@@ -55,6 +58,7 @@ func TestRequest(t *testing.T) {
 	assert.Equal(t, "o.v1.Order", *req.MessageType)
 	assert.Equal(t, "src", *req.SourceID)
 	assert.Equal(t, "fp-2", *req.SchemaFingerprint)
+	assert.Equal(t, entities.FramingGRPC, req.Framing.Kind)
 	assert.Equal(t, publishOutput{Encoding: encodingProtobuf, MessageType: "o.v1.Order"}, out)
 
 	req, out, err = ts.request(t.Context(), publishInput{Subject: "orders.created", JSON: payload, Raw: true})

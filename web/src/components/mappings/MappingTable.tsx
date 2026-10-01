@@ -1,6 +1,7 @@
 import type { MappingItem, MappingHealthInfo } from '@/contexts/mappings'
-import { Button, ClipboardIcon, DataTable, EmptyState, PlusIcon, RowActionButton, WarningIcon, type DataTableColumn } from '@/components/ui'
+import { Badge, Button, ClipboardIcon, DataTable, EmptyState, PlusIcon, RowActionButton, WarningIcon, type DataTableColumn } from '@/components/ui'
 import { MappingHealthBadge } from './MappingHealthBadge'
+import { FRAMING_LABELS } from './framingLabels'
 
 const MAPPINGS_ICON = <ClipboardIcon className="w-full h-full" />
 
@@ -66,12 +67,17 @@ export function MappingTable({ items, healthById, sourceNamesById, onEdit, onDel
       header: 'Proto Type',
       width: 'w-[34%]',
       render: (item) => (
-        <span
-          className="block text-xs text-accent-text font-mono truncate"
-          title={item.messageType}
-        >
-          {item.messageType}
-        </span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="block text-xs text-accent-text font-mono truncate" title={item.messageType}>
+            {item.messageType}
+          </span>
+          {item.framing.kind !== 'none' && (
+            <Badge size="sm" className="shrink-0" data-testid="mapping-framing">
+              {FRAMING_LABELS[item.framing.kind]}
+              {item.framing.kind === 'confluent' && ` #${item.framing.schemaId}`}
+            </Badge>
+          )}
+        </div>
       ),
     },
     {

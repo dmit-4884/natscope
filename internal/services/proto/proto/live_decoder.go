@@ -67,7 +67,7 @@ func (d *liveDecoder) Decode(
 		return nil, "", err.Error()
 	}
 
-	result := decodeWithSnapshot(snap, data, m.MessageType)
+	result := decodeWithSnapshot(snap, data, m.MessageType, m.Framing)
 	if result.Success {
 		return result.Decoded, m.MessageType, ""
 	}
