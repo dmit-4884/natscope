@@ -168,16 +168,15 @@ type violationView struct {
 
 type statusOutput struct {
 	MessageTypes int            `json:"messageTypes"`
-	Error        string         `json:"error,omitempty"`
-	Conflicts    []conflictView `json:"conflicts,omitempty"`
+	Conflicts    []conflictView `json:"conflicts,omitempty" jsonschema:"clashes between enabled proto sources"`
 }
 
 type conflictView struct {
 	Kind     string        `json:"kind"`
 	Severity string        `json:"severity"`
 	Symbol   string        `json:"symbol"`
-	Winner   schemaRefView `json:"winner"`
-	Loser    schemaRefView `json:"loser"`
+	First    schemaRefView `json:"first"`
+	Second   schemaRefView `json:"second"`
 	Reason   string        `json:"reason,omitempty"`
 }
 

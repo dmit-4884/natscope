@@ -5,7 +5,6 @@ package protoutils
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -14,165 +13,105 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// SchemaInput is one descriptor set fed to MergeWithReport, tagged with its
-// source snapshot so conflict reports can name winners and losers.
+// SchemaInput is the descriptor set of one proto source revision.
 type SchemaInput struct {
 	SourceID string
 	Revision string
 	Bytes    []byte
 }
 
-// MergeReport carries the merged result and any conflicts detected during merge.
-type MergeReport struct {
-	Result    []byte
-	Conflicts []*entities.SchemaConflict
+type owner struct {
+	ref   entities.SchemaRef
+	shape []byte
 }
 
-// symbolOwner records who owns an FQN symbol and its source file. Used to
-// detect cross-file conflicts.
-type symbolOwner struct {
-	ref       entities.SchemaRef
-	fileName  string
-	fileBytes []byte // marshaled FileDescriptorProto containing this symbol
+type namedShape struct {
+	name  string
+	shape []byte
 }
 
-// MergeWithReport merges schema inputs into one FileDescriptorSet, recording
-// each dropped file/symbol as a SchemaConflict. First-wins.
-func MergeWithReport(inputs []SchemaInput) (*MergeReport, error) {
-	merged := &descriptorpb.FileDescriptorSet{}
-	report := &MergeReport{}
+var conflictReasons = map[entities.ConflictKind]string{
+	entities.ConflictFileContent:    "the file has different content in two sources",
+	entities.ConflictSameShape:      "two sources define the type identically",
+	entities.ConflictDifferentShape: "two sources define the type differently",
+}
 
-	type seenFile struct {
-		ref     entities.SchemaRef
-		content []byte
-	}
-	seen := make(map[string]seenFile)
-
-	typeOwner := make(map[string]symbolOwner)
+// FindConflicts reports clashes between the inputs: one file path with different content, or one type name
+// defined twice. Comments never count as a difference.
+func FindConflicts(inputs []SchemaInput) entities.SchemaConflicts {
+	var out entities.SchemaConflicts
+	files := make(map[string]owner)
+	types := make(map[string]owner)
 
 	for _, in := range inputs {
-		if len(in.Bytes) == 0 {
-			continue
-		}
 		fds := &descriptorpb.FileDescriptorSet{}
-		if err := proto.Unmarshal(in.Bytes, fds); err != nil {
+		if len(in.Bytes) == 0 || proto.Unmarshal(in.Bytes, fds) != nil {
 			continue
 		}
-
 		for _, file := range fds.File {
 			file.SourceCodeInfo = nil
 			name := file.GetName()
-			fileBytes, _ := proto.Marshal(file) //nolint:errcheck // deterministic marshal; error unreachable
-
-			// === File-level conflict ===
-			if existing, ok := seen[name]; ok {
-				if bytes.Equal(existing.content, fileBytes) {
-					continue // identical, harmless duplicate
-				}
-				if strings.HasPrefix(name, "google/") {
-					continue // well-known types, skip silently
-				}
-				report.Conflicts = append(report.Conflicts, entities.SchemaConflictNew(func(c *entities.SchemaConflict) {
-					c.Kind = entities.DuplicateFileDifferentContent
-					c.Severity = entities.SeverityError
-					c.Symbol = name
-					c.Winner = existing.ref
-					c.Loser = entities.SchemaRef{SourceID: in.SourceID, Revision: in.Revision, File: name}
-					c.Reason = fmt.Sprintf("file %q has different content in two snapshots", name)
-					c.Policy = "first-wins; reject by strict policy"
-				}))
-				continue
-			}
-
-			// === Symbol-level conflict ===
-			conflictedSymbols := scanFileForExistingSymbols(file, typeOwner)
-			if len(conflictedSymbols) > 0 {
-				first := conflictedSymbols[0]
-				prev := typeOwner[first]
-
-				kind := entities.SameSymbolDifferentShape
-				severity := entities.SeverityError
-				if bytes.Equal(prev.fileBytes, fileBytes) {
-					kind = entities.SameSymbolSameShape
-					severity = entities.SeverityInfo
-				}
-
-				report.Conflicts = append(report.Conflicts, entities.SchemaConflictNew(func(c *entities.SchemaConflict) {
-					c.Kind = kind
-					c.Severity = severity
-					c.Symbol = first
-					c.Winner = prev.ref
-					c.Loser = entities.SchemaRef{SourceID: in.SourceID, Revision: in.Revision, File: name}
-					if kind == entities.SameSymbolSameShape {
-						c.Reason = fmt.Sprintf("symbol %q duplicated with identical shape", first)
-						c.Policy = "first-wins; allowed (info only)"
-					} else {
-						c.Reason = fmt.Sprintf("symbol %q has different shape in another snapshot", first)
-						c.Policy = "first-wins; reject by strict policy"
-					}
-				}))
-				continue
-			}
-
 			ref := entities.SchemaRef{SourceID: in.SourceID, Revision: in.Revision, File: name}
-			registerFileSymbols(file, typeOwner, ref, fileBytes)
+			content := shapeOf(file)
 
-			seen[name] = seenFile{ref: ref, content: fileBytes}
-			merged.File = append(merged.File, file)
+			if first, ok := files[name]; ok {
+				if !bytes.Equal(first.shape, content) && !strings.HasPrefix(name, "google/") {
+					out = append(out, newConflict(entities.ConflictFileContent, name, first.ref, ref))
+				}
+				continue
+			}
+			files[name] = owner{ref: ref, shape: content}
+
+			for _, t := range topLevelTypes(file) {
+				first, ok := types[t.name]
+				if !ok {
+					types[t.name] = owner{ref: ref, shape: t.shape}
+					continue
+				}
+				kind := entities.ConflictDifferentShape
+				if bytes.Equal(first.shape, t.shape) {
+					kind = entities.ConflictSameShape
+				}
+				out = append(out, newConflict(kind, t.name, first.ref, ref))
+			}
 		}
-	}
-
-	out, err := proto.Marshal(merged)
-	if err != nil {
-		return nil, err
-	}
-	report.Result = out
-	return report, nil
-}
-
-// scanFileForExistingSymbols returns the FQNs declared in `file` that are
-// already registered in `typeOwner` from a previous file.
-func scanFileForExistingSymbols(file *descriptorpb.FileDescriptorProto, typeOwner map[string]symbolOwner) []string {
-	pkg := file.GetPackage()
-	out := []string{}
-	check := func(fqn string) {
-		if owner, exists := typeOwner[fqn]; exists && owner.fileName != file.GetName() {
-			out = append(out, fqn)
-		}
-	}
-	for _, msg := range file.GetMessageType() {
-		check(qualifiedName(pkg, msg.GetName()))
-	}
-	for _, enum := range file.GetEnumType() {
-		check(qualifiedName(pkg, enum.GetName()))
-	}
-	for _, svc := range file.GetService() {
-		check(qualifiedName(pkg, svc.GetName()))
 	}
 	return out
 }
 
-// registerFileSymbols records ownership of every top-level FQN in the file.
-func registerFileSymbols(
-	file *descriptorpb.FileDescriptorProto,
-	typeOwner map[string]symbolOwner,
-	ref entities.SchemaRef,
-	fileBytes []byte,
-) {
-	pkg := file.GetPackage()
-	owner := symbolOwner{ref: ref, fileName: file.GetName(), fileBytes: fileBytes}
-	for _, msg := range file.GetMessageType() {
-		typeOwner[qualifiedName(pkg, msg.GetName())] = owner
-	}
-	for _, enum := range file.GetEnumType() {
-		typeOwner[qualifiedName(pkg, enum.GetName())] = owner
-	}
-	for _, svc := range file.GetService() {
-		typeOwner[qualifiedName(pkg, svc.GetName())] = owner
-	}
+func newConflict(kind entities.ConflictKind, symbol string, first, second entities.SchemaRef) *entities.SchemaConflict {
+	return entities.SchemaConflictNew(func(c *entities.SchemaConflict) {
+		c.Kind = kind
+		c.Severity = entities.SeverityError
+		if kind == entities.ConflictSameShape {
+			c.Severity = entities.SeverityInfo
+		}
+		c.Symbol = symbol
+		c.First, c.Second = first, second
+		c.Reason = conflictReasons[kind]
+	})
 }
 
-// qualifiedName builds a fully qualified proto type name.
+func topLevelTypes(file *descriptorpb.FileDescriptorProto) []namedShape {
+	pkg := file.GetPackage()
+	out := make([]namedShape, 0, len(file.GetMessageType())+len(file.GetEnumType())+len(file.GetService()))
+	for _, m := range file.GetMessageType() {
+		out = append(out, namedShape{qualifiedName(pkg, m.GetName()), shapeOf(m)})
+	}
+	for _, e := range file.GetEnumType() {
+		out = append(out, namedShape{qualifiedName(pkg, e.GetName()), shapeOf(e)})
+	}
+	for _, s := range file.GetService() {
+		out = append(out, namedShape{qualifiedName(pkg, s.GetName()), shapeOf(s)})
+	}
+	return out
+}
+
+func shapeOf(m proto.Message) []byte {
+	b, _ := proto.MarshalOptions{Deterministic: true}.Marshal(m) //nolint:errcheck // descriptors always marshal
+	return b
+}
+
 func qualifiedName(pkg, name string) string {
 	if pkg == "" {
 		return name

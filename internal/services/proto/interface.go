@@ -35,17 +35,12 @@ type Registry interface {
 	// ErrProtoMessageNotFound if absent.
 	GenerateExample(ctx context.Context, sourceID, messageType string) (any, error)
 
-	// Stats returns aggregated statistics about loaded proto descriptors across
-	// active selections.
-	Stats(ctx context.Context) *entities.ProtoStats
-
 	// MappingHealth returns resolvability state for the given mapping ids, in
 	// input order.
 	MappingHealth(ctx context.Context, ids []string) ([]entities.SubjectMappingHealth, error)
 
-	// ListSchemaConflicts returns cross-source conflicts from the last
-	// compile/reload; empty overwrites prior state.
-	ListSchemaConflicts(ctx context.Context) (entities.SchemaConflicts, error)
+	// SchemaStatus counts the loaded message types and lists clashes between enabled sources.
+	SchemaStatus(ctx context.Context) (*entities.SchemaStatus, error)
 }
 
 // Codec encodes, decodes, and validates protobuf payloads against pinned

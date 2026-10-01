@@ -86,9 +86,6 @@ message CreateSourceRequest {
   // Optional. Slash-relative path prefixes excluded from compilation
   // entirely (e.g. "gen", "pb"). No implicit defaults.
   repeated string exclude_prefixes = 8;
-
-  reserved 9, 10;
-  reserved "files", "include_dirs";
 }
 
 message CreateSourceResponse {
@@ -140,13 +137,6 @@ message UpdateSourceRequest {
   repeated string import_roots = 6;
   // Optional. Override exclude prefixes; same semantics as above.
   repeated string exclude_prefixes = 7;
-  reserved 8, 9;
-  reserved "files", "include_dirs";
-
-  message Options {
-    reserved 1;
-  }
-  optional Options options = 99;
 }
 
 message UpdateSourceResponse {
@@ -157,10 +147,6 @@ message UpdateSourceResponse {
 
 message DeleteSourceRequest {
   string id = 1 [(buf.validate.field).required = true, (buf.validate.field).string.uuid = true, (google.api.field_behavior) = REQUIRED];
-  message Options {
-    reserved 1;
-  }
-  optional Options options = 99;
 }
 
 message DeleteSourceResponse {}

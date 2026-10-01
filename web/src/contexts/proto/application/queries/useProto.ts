@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { listSchemaTypes, describeSchemaType, getProtoMessageExample } from '@/api/proto'
+import { listSchemaTypes, describeSchemaType, getProtoMessageExample, getSchemaStatus } from '@/api/proto'
 import { decodeWire, detectMessageType } from '@/api/decode'
 
 export const protoKeys = {
@@ -11,6 +11,7 @@ export const protoKeys = {
   example: (sourceId: string, fullName: string) => [...protoKeys.all, 'example', sourceId, fullName] as const,
   wire: (dataBase64: string) => [...protoKeys.all, 'wire', dataBase64] as const,
   candidates: (dataBase64: string) => [...protoKeys.all, 'candidates', dataBase64] as const,
+  status: () => [...protoKeys.all, 'status'] as const,
 }
 
 export function useSchemaTypes(sourceId?: string) {
@@ -57,4 +58,8 @@ export function useTypeCandidates(dataBase64: string, enabled: boolean) {
     queryFn: () => detectMessageType(dataBase64),
     enabled: enabled && dataBase64 !== '',
   })
+}
+
+export function useSchemaStatus() {
+  return useQuery({ queryKey: protoKeys.status(), queryFn: getSchemaStatus })
 }

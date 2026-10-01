@@ -1,16 +1,25 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProtoSources } from '@/contexts/proto'
+import { useProtoSources, useSchemaStatus } from '@/contexts/proto'
 import { Spinner, Button, EmptyState, QueryErrorState } from '@/components/ui'
 import { SettingsSection } from '@/components/settings/SettingsSection'
 import type { ProtoSource } from '@/api/protoSources'
 import ProtoSourceCard from './ProtoSourceCard'
 import SchemaBrowser from './SchemaBrowser'
+import SchemaConflicts from './SchemaConflicts'
 
 function SourcesIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    </svg>
+  )
+}
+
+function ConflictIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
     </svg>
   )
 }
@@ -27,6 +36,8 @@ export default function ProtoManager() {
   const [browserOpen, setBrowserOpen] = useState(true)
 
   const { data: sources = [], isLoading: isLoadingSources, error: sourcesError, refetch: refetchSources } = useProtoSources()
+  const { data: status } = useSchemaStatus()
+  const conflicts = status?.conflicts ?? []
 
   // ProtoManager is only rendered inside the dedicated Settings page
   // (/settings/proto), so create/edit always route to full-width pages.
@@ -81,6 +92,17 @@ export default function ProtoManager() {
           />
         )}
       </SettingsSection>
+
+      {conflicts.length > 0 && (
+        <SettingsSection
+          title="Schema conflicts"
+          description="Files and types that more than one enabled source defines"
+          icon={<ConflictIcon />}
+          badge={conflicts.length}
+        >
+          <SchemaConflicts conflicts={conflicts} sources={sources} />
+        </SettingsSection>
+      )}
 
       {hasSchemas && (
         <SettingsSection

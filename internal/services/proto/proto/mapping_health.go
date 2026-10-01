@@ -95,15 +95,6 @@ func mappingVersionLabel(m *entities.SubjectMapping) string {
 	}
 }
 
-// ListSchemaConflicts returns cross-source schema conflicts from the most
-// recent compile/reload.
-func (s *Service) ListSchemaConflicts(ctx context.Context) (entities.SchemaConflicts, error) {
-	if s.conflictsStorage == nil {
-		return nil, nil
-	}
-	return s.conflictsStorage.GetAll(ctx)
-}
-
 // NewLiveDecoder creates a stateful decoder for live streams; detect adds auto-detected types to unmapped payloads.
 func (s *Service) NewLiveDecoder(detect bool) protosvc.LiveDecoder {
 	return &liveDecoder{service: s, detect: detect}

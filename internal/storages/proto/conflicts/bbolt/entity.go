@@ -5,18 +5,16 @@ package bbolt
 
 import "github.com/dmit-4884/natscope/internal/pkg/bbstore"
 
-// conflictDoc is the persistence model for one schema conflict. Winner and Loser
-// refs are nested instead of flattened into winner_*/loser_* columns.
+// conflictDoc is the persistence model for one schema conflict.
 type conflictDoc struct {
 	bbstore.Base
 
 	Kind     string       `json:"kind,omitempty"`
 	Severity string       `json:"severity,omitempty"`
 	Symbol   string       `json:"symbol,omitempty"`
-	Winner   schemaRefDoc `json:"winner"`
-	Loser    schemaRefDoc `json:"loser"`
+	First    schemaRefDoc `json:"first"`
+	Second   schemaRefDoc `json:"second"`
 	Reason   string       `json:"reason,omitempty"`
-	Policy   string       `json:"policy,omitempty"`
 }
 
 type schemaRefDoc struct {

@@ -186,17 +186,14 @@ func (t *Toolset) validate(ctx context.Context, _ *mcp.CallToolRequest, in valid
 }
 
 func (t *Toolset) status(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, statusOutput, error) {
-	conflicts, err := t.registry.ListSchemaConflicts(ctx)
+	status, err := t.registry.SchemaStatus(ctx)
 	if err != nil {
 		return nil, statusOutput{}, err
 	}
-	out := statusOutput{
-		Conflicts: slices.To(conflicts, func(c *entities.SchemaConflict) conflictView { return *converter.Convert(c, &conflictView{}) }),
-	}
-	if stats := t.registry.Stats(ctx); stats != nil {
-		out.MessageTypes, out.Error = stats.MessagesCount, stats.Error
-	}
-	return nil, out, nil
+	return nil, statusOutput{
+		MessageTypes: status.MessageTypes,
+		Conflicts:    slices.To(status.Conflicts, func(c *entities.SchemaConflict) conflictView { return *converter.Convert(c, &conflictView{}) }),
+	}, nil
 }
 
 func toMappingView(m *entities.SubjectMapping) *mappingView {

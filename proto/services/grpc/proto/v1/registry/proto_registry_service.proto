@@ -4,6 +4,7 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto
 
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
+import "types/proto/schema_conflict.proto";
 import "types/proto/schema_type.proto";
 
 // Provides access to the loaded protobuf message type registry.
@@ -17,8 +18,8 @@ service RegistryService {
   // Generates an example JSON representation for the specified protobuf message type with default values.
   rpc GenerateExample(GenerateExampleRequest) returns (GenerateExampleResponse) {}
 
-  // Returns the current status of the protobuf registry, including load state and statistics.
-  rpc GetProtoStatus(GetProtoStatusRequest) returns (GetProtoStatusResponse) {}
+  // Counts the loaded message types and lists clashes between enabled sources.
+  rpc GetSchemaStatus(GetSchemaStatusRequest) returns (GetSchemaStatusResponse) {}
 }
 
 // Request for ListTypes.
@@ -64,17 +65,13 @@ message GenerateExampleResponse {
   string json = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// Defines the request message for retrieving the protobuf registry status.
-message GetProtoStatusRequest {}
+// Request for GetSchemaStatus.
+message GetSchemaStatusRequest {}
 
-// Defines the response message for retrieving the protobuf registry status.
-message GetProtoStatusResponse {
-  // Required. Indicates whether protobuf descriptors have been successfully loaded into the registry.
-  bool loaded = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Required. Total number of protobuf message types available in the registry.
-  int32 message_count = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Required. Total number of protobuf files loaded into the registry.
-  int32 file_count = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+// Response for GetSchemaStatus.
+message GetSchemaStatusResponse {
+  // Message types of every enabled source.
+  int32 message_types = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Clashes between enabled sources, recomputed on every schema reload.
+  repeated .natscope.types.proto.SchemaConflict conflicts = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

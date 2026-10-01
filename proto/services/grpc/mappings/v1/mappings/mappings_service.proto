@@ -43,9 +43,6 @@ message CreateMappingRequest {
   // Required. Identifier of the proto source this mapping is bound to.
   string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
 
-  reserved 4;
-  reserved "pinned_tag";
-
   // Optional. Pin resolution to a specific descriptor by content hash.
   optional string pinned_fingerprint = 5;
 
@@ -109,14 +106,6 @@ message DeleteMappingRequest {
   // Required. Unique identifier of the mapping to delete.
   // Format: UUID (e.g., "550e8400-e29b-41d4-a716-446655440000").
   string id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
-
-  // Defines optional delete control parameters.
-  message Options {
-    reserved 1;
-  }
-
-  // Optional. Delete control options including optimistic concurrency.
-  optional Options options = 99;
 }
 
 // Defines the response message for deleting a subject mapping.
@@ -141,9 +130,6 @@ message MappingBulkItem {
 
   // Required. Identifier of the proto source this mapping is bound to.
   string source_id = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
-
-  reserved 4;
-  reserved "pinned_tag";
 
   // Optional. Pin resolution to a specific descriptor by content hash; unset keeps an existing pin.
   optional string pinned_fingerprint = 5;

@@ -12,8 +12,6 @@ enum SourceType {
   SOURCE_TYPE_GIT = 1;
   // Local directory on server disk — optionally watched for changes.
   SOURCE_TYPE_LOCAL = 2;
-  reserved 3;
-  reserved "SOURCE_TYPE_FILES";
   // Files or a descriptor set uploaded from the browser.
   SOURCE_TYPE_UPLOAD = 4;
   // Module of a Buf Schema Registry, read by label or commit.
@@ -50,9 +48,6 @@ message ProtoSource {
   // Optional. Slash-relative path prefixes excluded from compilation
   // entirely (e.g. "gen", "pb"). No implicit defaults.
   repeated string exclude_prefixes = 11;
-
-  reserved 12, 13;
-  reserved "files", "include_dirs";
 
   // Snapshot of the most recent compile attempt. Populated by the backend
   // after every FetchAndCompile / file-watcher recompile / manual compile.

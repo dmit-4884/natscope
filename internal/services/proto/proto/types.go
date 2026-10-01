@@ -69,12 +69,24 @@ func (s *Service) GenerateExample(ctx context.Context, sourceID, messageType str
 	return protoutils.Template(md), nil
 }
 
-// Stats returns aggregated statistics across all active source snapshots.
-func (s *Service) Stats(ctx context.Context) *entities.ProtoStats {
-	snaps := s.activeSnapshots(ctx)
+// SchemaStatus counts the loaded message types and lists clashes between enabled sources.
+func (s *Service) SchemaStatus(ctx context.Context) (*entities.SchemaStatus, error) {
+	status := &entities.SchemaStatus{MessageTypes: s.messageTypeCount(ctx)}
+	if s.conflictsStorage == nil {
+		return status, nil
+	}
+	conflicts, err := s.conflictsStorage.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	status.Conflicts = conflicts
+	return status, nil
+}
+
+func (s *Service) messageTypeCount(ctx context.Context) int {
 	count := 0
-	for _, snap := range snaps {
+	for _, snap := range s.activeSnapshots(ctx) {
 		count += len(snap.Schema.Messages)
 	}
-	return &entities.ProtoStats{MessagesCount: count}
+	return count
 }

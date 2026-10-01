@@ -13,8 +13,7 @@ import (
 	conflictsbbolt "github.com/dmit-4884/natscope/internal/storages/proto/conflicts/bbolt"
 )
 
-// TestConflicts_WinnerLoserRoundTrip guards the winner/loser nested refs.
-func TestConflicts_WinnerLoserRoundTrip(t *testing.T) {
+func TestConflicts_RoundTrip(t *testing.T) {
 	db, err := bbstore.NewDB(filepath.Join(t.TempDir(), "test.bolt"))
 	if err != nil {
 		t.Fatalf("new db: %v", err)
@@ -28,13 +27,12 @@ func TestConflicts_WinnerLoserRoundTrip(t *testing.T) {
 
 	in := entities.SchemaConflicts{
 		entities.SchemaConflictNew(func(c *entities.SchemaConflict) {
-			c.Kind = entities.SameSymbolDifferentShape
+			c.Kind = entities.ConflictDifferentShape
 			c.Severity = entities.SeverityError
 			c.Symbol = "api.v1.Order"
-			c.Winner = entities.SchemaRef{SourceID: "src-w", Revision: "v2", File: "order.proto"}
-			c.Loser = entities.SchemaRef{SourceID: "src-l", Revision: "v1", File: "old/order.proto"}
+			c.First = entities.SchemaRef{SourceID: "src-w", Revision: "v2", File: "order.proto"}
+			c.Second = entities.SchemaRef{SourceID: "src-l", Revision: "v1", File: "old/order.proto"}
 			c.Reason = "shape differs"
-			c.Policy = "first-wins"
 		}),
 	}
 	if err := s.ReplaceAll(ctx, in); err != nil {
@@ -48,14 +46,14 @@ func TestConflicts_WinnerLoserRoundTrip(t *testing.T) {
 		t.Fatalf("want 1 conflict, got %d", len(got))
 	}
 	c := got[0]
-	if c.Kind != entities.SameSymbolDifferentShape || c.Severity != entities.SeverityError || c.Symbol != "api.v1.Order" ||
-		c.Reason != "shape differs" || c.Policy != "first-wins" {
+	if c.Kind != entities.ConflictDifferentShape || c.Severity != entities.SeverityError || c.Symbol != "api.v1.Order" ||
+		c.Reason != "shape differs" {
 		t.Fatalf("scalar mismatch: %+v", c)
 	}
-	if c.Winner != (entities.SchemaRef{SourceID: "src-w", Revision: "v2", File: "order.proto"}) {
-		t.Fatalf("winner mismatch: %+v", c.Winner)
+	if c.First != (entities.SchemaRef{SourceID: "src-w", Revision: "v2", File: "order.proto"}) {
+		t.Fatalf("first mismatch: %+v", c.First)
 	}
-	if c.Loser != (entities.SchemaRef{SourceID: "src-l", Revision: "v1", File: "old/order.proto"}) {
-		t.Fatalf("loser mismatch: %+v", c.Loser)
+	if c.Second != (entities.SchemaRef{SourceID: "src-l", Revision: "v1", File: "old/order.proto"}) {
+		t.Fatalf("second mismatch: %+v", c.Second)
 	}
 }

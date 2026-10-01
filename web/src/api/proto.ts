@@ -1,4 +1,5 @@
 import { SchemaTypeKind as PbKind } from '../gen/types/proto/schema_type_pb'
+import { ConflictKind as PbConflictKind, ConflictSeverity as PbSeverity } from '../gen/types/proto/schema_conflict_pb'
 import type {
   SchemaType as PbType,
   SchemaField as PbField,
@@ -194,5 +195,55 @@ export async function getProtoMessageExample(
   return {
     message_type: messageName,
     example: JSON.parse(response.json || '{}'),
+  }
+}
+
+export type ConflictKind = 'file_content' | 'same_shape' | 'different_shape'
+
+export interface SchemaRef {
+  sourceId: string
+  revision: string
+  file: string
+}
+
+/** A clash between two enabled proto sources. */
+export interface SchemaConflict {
+  kind: ConflictKind
+  severity: 'info' | 'error'
+  /** File path of a file conflict, fully-qualified type name otherwise. */
+  symbol: string
+  first: SchemaRef
+  second: SchemaRef
+}
+
+export interface SchemaStatus {
+  messageTypes: number
+  conflicts: SchemaConflict[]
+}
+
+const CONFLICT_KINDS: Record<PbConflictKind, ConflictKind> = {
+  [PbConflictKind.UNSPECIFIED]: 'different_shape',
+  [PbConflictKind.FILE_CONTENT]: 'file_content',
+  [PbConflictKind.SAME_SHAPE]: 'same_shape',
+  [PbConflictKind.DIFFERENT_SHAPE]: 'different_shape',
+}
+
+const toRef = (r?: { sourceId: string; revision: string; file: string }): SchemaRef => ({
+  sourceId: r?.sourceId ?? '',
+  revision: r?.revision ?? '',
+  file: r?.file ?? '',
+})
+
+export async function getSchemaStatus(): Promise<SchemaStatus> {
+  const response = await registryClient.getSchemaStatus({})
+  return {
+    messageTypes: response.messageTypes,
+    conflicts: response.conflicts.map((c) => ({
+      kind: CONFLICT_KINDS[c.kind],
+      severity: c.severity === PbSeverity.INFO ? 'info' : 'error',
+      symbol: c.symbol,
+      first: toRef(c.first),
+      second: toRef(c.second),
+    })),
   }
 }

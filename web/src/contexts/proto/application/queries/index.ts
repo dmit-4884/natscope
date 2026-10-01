@@ -5,6 +5,7 @@ export {
   useMessageExample,
   useWireDump,
   useTypeCandidates,
+  useSchemaStatus,
   protoKeys,
 } from './useProto'
 

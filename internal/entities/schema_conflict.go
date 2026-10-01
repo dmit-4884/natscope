@@ -3,24 +3,21 @@
 
 package entities
 
-// ConflictKind classifies a schema conflict detected during snapshot
-// aggregation.
+// ConflictKind classifies a clash between two enabled proto sources.
 type ConflictKind string
 
 const (
-	// DuplicateFileDifferentContent same proto file path but content differs
-	// (versioning bug or accidental fork).
-	DuplicateFileDifferentContent ConflictKind = "duplicate_file_different_content"
+	// ConflictFileContent is one file path with different content.
+	ConflictFileContent ConflictKind = "file_content"
 
-	// SameSymbolSameShape same FQN in two files with identical wire-shape.
-	SameSymbolSameShape ConflictKind = "same_symbol_same_shape"
+	// ConflictSameShape is one type name defined identically twice.
+	ConflictSameShape ConflictKind = "same_shape"
 
-	// SameSymbolDifferentShape same FQN, different wire shape; decoding the wrong
-	// one silently mis-interprets bytes.
-	SameSymbolDifferentShape ConflictKind = "same_symbol_different_shape"
+	// ConflictDifferentShape is one type name defined two different ways.
+	ConflictDifferentShape ConflictKind = "different_shape"
 )
 
-// ConflictSeverity drives whether the policy gates compilation.
+// ConflictSeverity tells a harmless duplicate from a real clash.
 type ConflictSeverity string
 
 const (
@@ -28,30 +25,27 @@ const (
 	SeverityError ConflictSeverity = "error"
 )
 
-// SchemaRef points to a specific file in a specific snapshot.
+// SchemaRef points to a file in one revision of a proto source.
 type SchemaRef struct {
 	SourceID string
 	Revision string
 	File     string
 }
 
-// SchemaConflict records one merge conflict; persisted so the UI lists
-// conflicts without re-running merge.
+// SchemaConflict is a clash between two enabled proto sources, recomputed on every schema reload.
 type SchemaConflict struct {
 	BaseEntity
 
 	Kind     ConflictKind
 	Severity ConflictSeverity
 
-	// Symbol identifies the conflict: file name for file-kinds, FQN for
-	// symbol-kinds.
+	// Symbol is the file path of a file conflict, the fully-qualified type name otherwise.
 	Symbol string
 
-	Winner SchemaRef
-	Loser  SchemaRef
+	First  SchemaRef
+	Second SchemaRef
 
 	Reason string
-	Policy string
 }
 
 // SchemaConflictNew creates a new SchemaConflict with generated Id and
@@ -66,3 +60,10 @@ func SchemaConflictNew(init ...func(*SchemaConflict)) *SchemaConflict {
 
 // SchemaConflicts is a slice alias for the generic List/Paginate helpers.
 type SchemaConflicts []*SchemaConflict
+
+// SchemaStatus is the loaded schema at a glance.
+type SchemaStatus struct {
+	// MessageTypes counts the message types of every enabled source.
+	MessageTypes int
+	Conflicts    SchemaConflicts
+}

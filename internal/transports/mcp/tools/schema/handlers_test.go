@@ -17,13 +17,13 @@ func TestViews(t *testing.T) {
 	t.Parallel()
 
 	conflict := converter.Convert(&entities.SchemaConflict{
-		Kind: entities.SameSymbolSameShape, Severity: entities.SeverityInfo, Symbol: "a.B",
-		Winner: entities.SchemaRef{SourceID: "s1", File: "a.proto"}, Loser: entities.SchemaRef{SourceID: "s2", Revision: "v2", File: "a.proto"},
+		Kind: entities.ConflictSameShape, Severity: entities.SeverityInfo, Symbol: "a.B",
+		First: entities.SchemaRef{SourceID: "s1", File: "a.proto"}, Second: entities.SchemaRef{SourceID: "s2", Revision: "v2", File: "a.proto"},
 	}, &conflictView{})
-	assert.Equal(t, "same_symbol_same_shape", conflict.Kind)
+	assert.Equal(t, "same_shape", conflict.Kind)
 	assert.Equal(t, "info", conflict.Severity)
-	assert.Equal(t, "s2", conflict.Loser.SourceID)
-	assert.Equal(t, "v2", conflict.Loser.Revision)
+	assert.Equal(t, "s2", conflict.Second.SourceID)
+	assert.Equal(t, "v2", conflict.Second.Revision)
 
 	res := converter.Convert(&entities.ValidationResult{Violations: []*entities.ValidationViolation{
 		{FieldPath: "id", Message: "value is required", ConstraintId: "required"},

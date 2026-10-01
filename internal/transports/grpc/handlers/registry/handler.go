@@ -96,17 +96,34 @@ func (h *Handler) GenerateExample(
 	return connect.NewResponse(&registrypb.GenerateExampleResponse{Json: string(jsonBytes)}), nil
 }
 
-// GetProtoStatus returns the current proto loading status.
-func (h *Handler) GetProtoStatus(
+// GetSchemaStatus counts the loaded message types and lists clashes between enabled sources.
+func (h *Handler) GetSchemaStatus(
 	ctx context.Context,
-	_ *connect.Request[registrypb.GetProtoStatusRequest],
-) (*connect.Response[registrypb.GetProtoStatusResponse], error) {
-	stats := h.protoService.Stats(ctx)
-	if stats == nil {
-		return connect.NewResponse(&registrypb.GetProtoStatusResponse{}), nil
+	_ *connect.Request[registrypb.GetSchemaStatusRequest],
+) (*connect.Response[registrypb.GetSchemaStatusResponse], error) {
+	status, err := h.protoService.SchemaStatus(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return connect.NewResponse(&registrypb.GetProtoStatusResponse{
-		Loaded:       stats.MessagesCount > 0,
-		MessageCount: int32(stats.MessagesCount),
+	return connect.NewResponse(&registrypb.GetSchemaStatusResponse{
+		MessageTypes: int32(status.MessageTypes), //nolint:gosec // bounded by the loaded schemas
+		Conflicts:    slices.To(status.Conflicts, conflictToProto),
 	}), nil
+}
+
+var conflictKinds = map[entities.ConflictKind]protopb.ConflictKind{
+	entities.ConflictFileContent:    protopb.ConflictKind_CONFLICT_KIND_FILE_CONTENT,
+	entities.ConflictSameShape:      protopb.ConflictKind_CONFLICT_KIND_SAME_SHAPE,
+	entities.ConflictDifferentShape: protopb.ConflictKind_CONFLICT_KIND_DIFFERENT_SHAPE,
+}
+
+var conflictSeverities = map[entities.ConflictSeverity]protopb.ConflictSeverity{
+	entities.SeverityInfo:  protopb.ConflictSeverity_CONFLICT_SEVERITY_INFO,
+	entities.SeverityError: protopb.ConflictSeverity_CONFLICT_SEVERITY_ERROR,
+}
+
+func conflictToProto(c *entities.SchemaConflict) *protopb.SchemaConflict {
+	pb := converter.Convert(c, &protopb.SchemaConflict{}, converter.WithIgnoreFields("Kind", "Severity"))
+	pb.Kind, pb.Severity = conflictKinds[c.Kind], conflictSeverities[c.Severity]
+	return pb
 }

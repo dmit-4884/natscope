@@ -30,7 +30,8 @@ type mockProtoSvc struct {
 	gotReachable  bool
 	exampleResult map[string]interface{}
 	exampleErr    error
-	statsResult   *entities.ProtoStats
+	status        *entities.SchemaStatus
+	statusErr     error
 }
 
 func (m *mockProtoSvc) ListTypes(_ context.Context, sourceID string) ([]entities.SchemaType, error) {
@@ -49,8 +50,8 @@ func (m *mockProtoSvc) GenerateExample(_ context.Context, _, _ string) (any, err
 	return m.exampleResult, m.exampleErr
 }
 
-func (m *mockProtoSvc) Stats(_ context.Context) *entities.ProtoStats {
-	return m.statsResult
+func (m *mockProtoSvc) SchemaStatus(_ context.Context) (*entities.SchemaStatus, error) {
+	return m.status, m.statusErr
 }
 
 // --- Tests ---
@@ -159,26 +160,35 @@ func TestHandler_GenerateExample(t *testing.T) {
 	})
 }
 
-func TestHandler_GetProtoStatus(t *testing.T) {
+func TestHandler_GetSchemaStatus(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Loaded", func(t *testing.T) {
+	t.Run("conflicts", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoSvc{statsResult: &entities.ProtoStats{MessagesCount: 3}}
-		handler := New(svc)
+		svc := &mockProtoSvc{status: &entities.SchemaStatus{MessageTypes: 3, Conflicts: entities.SchemaConflicts{{
+			Kind: entities.ConflictDifferentShape, Severity: entities.SeverityError, Symbol: "shop.Order",
+			First:  entities.SchemaRef{SourceID: "a", Revision: "v1", File: "order.proto"},
+			Second: entities.SchemaRef{SourceID: "b", File: "legacy/order.proto"},
+			Reason: "two sources define the type differently",
+		}}}}
 
-		resp, err := handler.GetProtoStatus(t.Context(), connect.NewRequest(&registrypb.GetProtoStatusRequest{}))
+		resp, err := New(svc).GetSchemaStatus(t.Context(), connect.NewRequest(&registrypb.GetSchemaStatusRequest{}))
 		require.NoError(t, err)
-		assert.True(t, resp.Msg.Loaded)
-		assert.Equal(t, int32(3), resp.Msg.MessageCount)
+		assert.Equal(t, int32(3), resp.Msg.MessageTypes)
+		require.Len(t, resp.Msg.Conflicts, 1)
+		c := resp.Msg.Conflicts[0]
+		assert.Equal(t, protopb.ConflictKind_CONFLICT_KIND_DIFFERENT_SHAPE, c.Kind)
+		assert.Equal(t, protopb.ConflictSeverity_CONFLICT_SEVERITY_ERROR, c.Severity)
+		assert.Equal(t, "shop.Order", c.Symbol)
+		assert.Equal(t, "v1", c.First.Revision)
+		assert.Equal(t, "legacy/order.proto", c.Second.File)
+		assert.Equal(t, "two sources define the type differently", c.Reason)
 	})
 
-	t.Run("NilStats", func(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
 		t.Parallel()
-		handler := New(&mockProtoSvc{})
-
-		resp, err := handler.GetProtoStatus(t.Context(), connect.NewRequest(&registrypb.GetProtoStatusRequest{}))
-		require.NoError(t, err)
-		assert.False(t, resp.Msg.Loaded)
+		_, err := New(&mockProtoSvc{statusErr: errs.ErrMappingSourceNotFound}).
+			GetSchemaStatus(t.Context(), connect.NewRequest(&registrypb.GetSchemaStatusRequest{}))
+		require.ErrorIs(t, err, errs.ErrMappingSourceNotFound)
 	})
 }

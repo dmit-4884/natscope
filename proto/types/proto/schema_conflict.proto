@@ -1,0 +1,39 @@
+syntax = "proto3";
+package natscope.types.proto;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/proto;protopb";
+
+// How two enabled proto sources clash.
+enum ConflictKind {
+  CONFLICT_KIND_UNSPECIFIED = 0;
+  // One file path with different content.
+  CONFLICT_KIND_FILE_CONTENT = 1;
+  // One type name defined identically twice.
+  CONFLICT_KIND_SAME_SHAPE = 2;
+  // One type name defined two different ways.
+  CONFLICT_KIND_DIFFERENT_SHAPE = 3;
+}
+
+// Harmless duplicate or real clash.
+enum ConflictSeverity {
+  CONFLICT_SEVERITY_UNSPECIFIED = 0;
+  CONFLICT_SEVERITY_INFO = 1;
+  CONFLICT_SEVERITY_ERROR = 2;
+}
+
+// A file in one revision of a proto source.
+message SchemaRef {
+  string source_id = 1;
+  string revision = 2;
+  string file = 3;
+}
+
+// A clash between two enabled proto sources.
+message SchemaConflict {
+  ConflictKind kind = 1;
+  ConflictSeverity severity = 2;
+  // File path of a file conflict, fully-qualified type name otherwise.
+  string symbol = 3;
+  SchemaRef first = 4;
+  SchemaRef second = 5;
+  string reason = 6;
+}

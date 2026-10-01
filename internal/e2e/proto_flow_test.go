@@ -64,6 +64,45 @@ func createLocalSource(t *testing.T, env *e2eEnv, name string, files map[string]
 	return sourceID
 }
 
+func TestSchemaConflicts(t *testing.T) {
+	env := setupE2E(t)
+	const money = "syntax = \"proto3\";\npackage fin;\nmessage Money { int64 units = 1; }\n"
+	first := createLocalSource(t, env, "conflict-a", map[string]string{"flow.proto": testProtoContent, "money.proto": money})
+	second := createLocalSource(t, env, "conflict-b", map[string]string{
+		"other/flow.proto":   "syntax = \"proto3\";\npackage e2eflow;\nmessage FlowMessage { int64 id = 1; }\n",
+		"vendor/money.proto": money,
+	})
+
+	var conflicts []*protopb.SchemaConflict
+	require.Eventually(t, func() bool {
+		resp, err := env.registry.GetSchemaStatus(t.Context(), connect.NewRequest(&registrypb.GetSchemaStatusRequest{}))
+		require.NoError(t, err)
+		conflicts = resp.Msg.GetConflicts()
+		return len(conflicts) == 2
+	}, 5*time.Second, 50*time.Millisecond)
+
+	bySymbol := map[string]*protopb.SchemaConflict{}
+	for _, c := range conflicts {
+		bySymbol[c.GetSymbol()] = c
+	}
+	flow := bySymbol["e2eflow.FlowMessage"]
+	require.NotNil(t, flow)
+	assert.Equal(t, protopb.ConflictKind_CONFLICT_KIND_DIFFERENT_SHAPE, flow.GetKind())
+	assert.Equal(t, protopb.ConflictSeverity_CONFLICT_SEVERITY_ERROR, flow.GetSeverity())
+	assert.ElementsMatch(t, []string{first, second}, []string{flow.GetFirst().GetSourceId(), flow.GetSecond().GetSourceId()})
+
+	moneyConflict := bySymbol["fin.Money"]
+	require.NotNil(t, moneyConflict)
+	assert.Equal(t, protopb.ConflictKind_CONFLICT_KIND_SAME_SHAPE, moneyConflict.GetKind())
+	assert.Equal(t, protopb.ConflictSeverity_CONFLICT_SEVERITY_INFO, moneyConflict.GetSeverity())
+
+	_, err := env.sources.DeleteSource(t.Context(), connect.NewRequest(&sourcespb.DeleteSourceRequest{Id: second}))
+	require.NoError(t, err)
+	resp, err := env.registry.GetSchemaStatus(t.Context(), connect.NewRequest(&registrypb.GetSchemaStatusRequest{}))
+	require.NoError(t, err)
+	assert.Empty(t, resp.Msg.GetConflicts(), "one source left, nothing to clash with")
+}
+
 // TestProtoFlow drives the full proto pipeline end-to-end: create, compile,
 // mapping, and server-side decode — the path TestE2E's registry_codec_sources
 // subtest explicitly skips for lack of a real proto source.
@@ -76,10 +115,10 @@ func TestProtoFlow(t *testing.T) {
 	const fullName = "e2eflow.FlowMessage"
 
 	t.Run("registry sees the compiled source", func(t *testing.T) {
-		statusResp, err := env.registry.GetProtoStatus(ctx, connect.NewRequest(&registrypb.GetProtoStatusRequest{}))
+		statusResp, err := env.registry.GetSchemaStatus(ctx, connect.NewRequest(&registrypb.GetSchemaStatusRequest{}))
 		require.NoError(t, err)
-		assert.True(t, statusResp.Msg.GetLoaded())
-		assert.Greater(t, statusResp.Msg.GetMessageCount(), int32(0))
+		assert.Greater(t, statusResp.Msg.GetMessageTypes(), int32(0))
+		assert.Empty(t, statusResp.Msg.GetConflicts())
 
 		typesResp, err := env.registry.ListTypes(ctx, connect.NewRequest(&registrypb.ListTypesRequest{SourceId: &sourceID}))
 		require.NoError(t, err)

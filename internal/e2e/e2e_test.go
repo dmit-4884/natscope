@@ -658,10 +658,10 @@ func TestE2E(t *testing.T) {
 	t.Run("registry_codec_sources", func(t *testing.T) {
 		// No proto sources configured → registry is empty; assert the RPCs
 		// respond cleanly rather than driving a full decode here.
-		statusResp, err := env.registry.GetProtoStatus(ctx, connect.NewRequest(&registrypb.GetProtoStatusRequest{}))
+		statusResp, err := env.registry.GetSchemaStatus(ctx, connect.NewRequest(&registrypb.GetSchemaStatusRequest{}))
 		require.NoError(t, err)
-		assert.False(t, statusResp.Msg.GetLoaded(), "no proto sources → not loaded")
-		assert.Zero(t, statusResp.Msg.GetMessageCount())
+		assert.Zero(t, statusResp.Msg.GetMessageTypes(), "no proto sources → no types")
+		assert.Empty(t, statusResp.Msg.GetConflicts())
 
 		listResp, err := env.registry.ListTypes(ctx, connect.NewRequest(&registrypb.ListTypesRequest{}))
 		require.NoError(t, err)

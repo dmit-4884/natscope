@@ -8,7 +8,7 @@ import "time"
 // File-local named constants for proto-service magic numbers.
 const (
 	// minActiveSnapshotsForConflictReport is the smallest active set before
-	// MergeWithReport has anything cross-source to compare.
+	// FindConflicts has anything cross-source to compare.
 	minActiveSnapshotsForConflictReport = 2
 
 	// fileWatcherDebounceTimeout caps a local source's descriptor rebuild after a

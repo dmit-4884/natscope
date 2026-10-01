@@ -105,10 +105,10 @@ func (s *Service) notifyReload(ctx context.Context) {
 	if cb == nil {
 		return
 	}
-	cb(s.Stats(ctx).MessagesCount)
+	cb(s.messageTypeCount(ctx))
 }
 
-// recomputeConflicts runs MergeWithReport and overwrites conflicts storage;
+// recomputeConflicts runs FindConflicts and overwrites conflicts storage;
 // best-effort — errors are logged, not returned, so decode is never blocked.
 func (s *Service) recomputeConflicts(ctx context.Context) {
 	if s.conflictsStorage == nil {
@@ -133,12 +133,7 @@ func (s *Service) recomputeConflicts(ctx context.Context) {
 			Bytes:    snap.Descriptor.DescriptorSet,
 		})
 	}
-	report, err := protoutils.MergeWithReport(inputs)
-	if err != nil {
-		s.logger.WarnContext(ctx, "recompute conflicts: merge failed", slogx.Error(err))
-		return
-	}
-	if err := s.conflictsStorage.ReplaceAll(ctx, report.Conflicts); err != nil {
+	if err := s.conflictsStorage.ReplaceAll(ctx, protoutils.FindConflicts(inputs)); err != nil {
 		s.logger.WarnContext(ctx, "recompute conflicts: persist failed", slogx.Error(err))
 	}
 }
