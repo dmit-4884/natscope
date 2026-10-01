@@ -27,12 +27,14 @@ export function useCreateMapping() {
       messageType,
       sourceId,
       framing,
+      pinnedFingerprint,
     }: {
       pattern: string
       messageType: string
       sourceId: string
       framing?: Framing
-    }) => createMapping(pattern, messageType, sourceId, framing),
+      pinnedFingerprint?: string
+    }) => createMapping(pattern, messageType, sourceId, framing, pinnedFingerprint),
     onSuccess: () => invalidateMappings(queryClient),
   })
 }

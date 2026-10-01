@@ -55,6 +55,7 @@ export default function RequestPage() {
     messageType: mappedMessageType,
     sourceId: mappedSourceId,
     framing: mappedFraming,
+    pinnedFingerprint: mappedFingerprint,
   } = useSubjectMappingEntity(
     subject && !subjectError ? subject : null,
   )
@@ -109,6 +110,7 @@ export default function RequestPage() {
       headers,
       message_type: messageType,
       source_id: sourceId,
+      schema_fingerprint: messageType ? mappedFingerprint : undefined,
       framing: messageType ? mappedFraming : undefined,
       timeout_ms: draft.timeoutMs,
     })

@@ -80,6 +80,7 @@ export default function UnifiedMessageViewer({
   const [selectedProtoType, setSelectedProtoType] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState('')
   const [selectedFraming, setSelectedFraming] = useState<Framing | undefined>()
+  const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>()
   const [decodedData, setDecodedData] = useState<unknown>(null)
   const [decoding, setDecoding] = useState(false)
   const [decodeError, setDecodeError] = useState<string | null>(null)
@@ -294,6 +295,7 @@ export default function UnifiedMessageViewer({
       setSelectedProtoType('')
       setSelectedSourceId('')
       setSelectedFraming(undefined)
+      setSelectedFingerprint(undefined)
       setHasDecodedForType(null)
       setDecodeNotes(null)
     }
@@ -310,6 +312,7 @@ export default function UnifiedMessageViewer({
         setSelectedProtoType(match.messageType)
         setSelectedSourceId(match.sourceId)
         setSelectedFraming(match.framing)
+        setSelectedFingerprint(match.pinnedFingerprint)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -327,12 +330,12 @@ export default function UnifiedMessageViewer({
       !decoding &&
       hasDecodedForType !== selectedProtoType
     ) {
-      void runDecode(selectedProtoType, selectedSourceId, selectedFraming)
+      void runDecode(selectedProtoType, selectedSourceId, selectedFraming, selectedFingerprint)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProtoType, selectedSourceId, message?.data_base64, hasDecodedForType, selectedMessage?.isLive])
 
-  const runDecode = async (messageType: string, sourceId: string, framing: Framing | undefined) => {
+  const runDecode = async (messageType: string, sourceId: string, framing?: Framing, fingerprint?: string) => {
     if (!message?.data_base64) return
     const idAtCall = selectedMessage?.id
     setDecoding(true)
@@ -345,6 +348,7 @@ export default function UnifiedMessageViewer({
         data_base64: message.data_base64,
         message_type: messageType,
         source_id: sourceId,
+        schema_fingerprint: fingerprint,
         framing,
       })
       if (selectionIdRef.current !== idAtCall) return
@@ -378,8 +382,9 @@ export default function UnifiedMessageViewer({
     setSelectedProtoType(candidate.messageType)
     setSelectedSourceId(candidate.sourceId)
     setSelectedFraming(undefined)
+    setSelectedFingerprint(undefined)
     setHasDecodedForType(candidate.messageType)
-    void runDecode(candidate.messageType, candidate.sourceId, undefined)
+    void runDecode(candidate.messageType, candidate.sourceId)
   }
 
   const saveMapping = (messageType: string, sourceId: string, pattern: string) => {

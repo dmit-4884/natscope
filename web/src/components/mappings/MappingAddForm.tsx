@@ -6,6 +6,7 @@ import {
 } from '@/contexts/mappings/domain/value-objects/SubjectPattern'
 import { SourcePicker } from '../proto/SourcePicker'
 import { ProtoTypePicker } from '../proto/ProtoTypePicker'
+import { SchemaVersionPicker } from '../proto/SchemaVersionPicker'
 import { FramingFields } from './FramingFields'
 
 const PATTERN_ERROR_MESSAGE: Record<PatternValidationError, string> = {
@@ -26,6 +27,8 @@ interface Props {
   onSourceIdChange: (value: string) => void
   framing: Framing
   onFramingChange: (value: Framing) => void
+  pinnedFingerprint: string
+  onPinnedFingerprintChange: (value: string) => void
   unmappedPatterns: string[]
   onSubmit: () => void
   onCancel: () => void
@@ -48,6 +51,8 @@ export function MappingAddForm({
   onSourceIdChange,
   framing,
   onFramingChange,
+  pinnedFingerprint,
+  onPinnedFingerprintChange,
   unmappedPatterns,
   onSubmit,
   onCancel,
@@ -111,6 +116,21 @@ export function MappingAddForm({
       <div>
         <span className="block text-xs font-medium text-gray-700 mb-1">4. Framing</span>
         <FramingFields value={framing} onChange={onFramingChange} onValidityChange={setFramingValid} />
+      </div>
+
+      <div>
+        <label htmlFor="mapping-schema-version" className="block text-xs font-medium text-gray-700 mb-1">
+          5. Schema version
+        </label>
+        <SchemaVersionPicker
+          id="mapping-schema-version"
+          sourceId={sourceId}
+          value={pinnedFingerprint}
+          onChange={onPinnedFingerprintChange}
+        />
+        <p className="text-xs text-content-tertiary mt-1">
+          Pin a revision to keep decoding with it after the source moves on.
+        </p>
       </div>
 
       <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">

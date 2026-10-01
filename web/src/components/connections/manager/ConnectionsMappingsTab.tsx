@@ -30,6 +30,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
   const [newProtoType, setNewProtoType] = useState('')
   const [newSourceId, setNewSourceId] = useState('')
   const [newFraming, setNewFraming] = useState<Framing>(NO_FRAMING)
+  const [newPin, setNewPin] = useState('')
   const [searchFilter, setSearchFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -99,6 +100,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
     setNewProtoType('')
     setNewSourceId('')
     setNewFraming(NO_FRAMING)
+    setNewPin('')
     setShowAddForm(false)
     setEditingId(null)
   }
@@ -109,7 +111,13 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
       if (editingId) {
         await updateMappingMutation.mutateAsync({
           id: editingId,
-          patch: { pattern: newPattern, messageType: newProtoType, sourceId: newSourceId, framing: newFraming },
+          patch: {
+            pattern: newPattern,
+            messageType: newProtoType,
+            sourceId: newSourceId,
+            framing: newFraming,
+            pinnedFingerprint: newPin,
+          },
         })
         toast.success('Mapping updated')
       } else {
@@ -118,6 +126,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
           messageType: newProtoType,
           sourceId: newSourceId,
           framing: newFraming,
+          pinnedFingerprint: newPin || undefined,
         })
       }
       resetForm()
@@ -130,6 +139,7 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
     setNewProtoType(item.messageType)
     setNewSourceId(item.sourceId)
     setNewFraming(item.framing)
+    setNewPin(item.pinnedFingerprint ?? '')
     setShowAddForm(true)
   }
 
@@ -196,9 +206,14 @@ export function ConnectionsMappingsTab({ connectionId, initialSubjectPattern }: 
           protoType={newProtoType}
           onProtoTypeChange={setNewProtoType}
           sourceId={newSourceId}
-          onSourceIdChange={setNewSourceId}
+          onSourceIdChange={(id) => {
+            setNewSourceId(id)
+            setNewPin('')
+          }}
           framing={newFraming}
           onFramingChange={setNewFraming}
+          pinnedFingerprint={newPin}
+          onPinnedFingerprintChange={setNewPin}
           unmappedPatterns={unmappedPatterns}
           isSubmitting={createMappingMutation.isPending || updateMappingMutation.isPending}
           onSubmit={handleAdd}

@@ -95,11 +95,18 @@ export async function createMapping(
   messageType: string,
   sourceId: string,
   framing?: Framing,
+  pinnedFingerprint?: string,
 ): Promise<MappingItem> {
   if (!sourceId) {
     throw new Error('createMapping: sourceId is required')
   }
-  const response = await mappingsClient.createMapping({ pattern, messageType, sourceId, framing: framingToProto(framing) })
+  const response = await mappingsClient.createMapping({
+    pattern,
+    messageType,
+    sourceId,
+    framing: framingToProto(framing),
+    pinnedFingerprint,
+  })
   return toMappingItem(response.mapping!)
 }
 

@@ -98,10 +98,12 @@ export default function PublishContent({
     messageType: mappedMessageType,
     sourceId: mappedSourceId,
     framing: mappedFraming,
+    pinnedFingerprint: mappedFingerprint,
   } = useSubjectMappingEntity(subjectPattern || null)
   const isJsonMode = encodingMode === 'json' || (!mappedMessageType && encodingMode !== 'proto')
   const messageType = isJsonMode ? undefined : mappedMessageType
   const sourceId = isJsonMode ? undefined : mappedSourceId ?? undefined
+  const schemaFingerprint = isJsonMode ? undefined : mappedFingerprint
 
   const patternHasWildcards = useMemo(() => hasWildcards(subjectPattern), [subjectPattern])
   const patternSegments = useMemo(() => parsePattern(subjectPattern), [subjectPattern])
@@ -243,7 +245,12 @@ export default function PublishContent({
       try {
         const processedJson = processHelpers(messageJson)
         const data = JSON.parse(processedJson)
-        const result = await validateJSON({ message_type: messageType, source_id: sourceId, data })
+        const result = await validateJSON({
+          message_type: messageType,
+          source_id: sourceId,
+          schema_fingerprint: schemaFingerprint,
+          data,
+        })
         if (validateSeqRef.current === seq) setValidationResult(result)
       } catch {
         if (validateSeqRef.current === seq) setValidationResult(null)
@@ -252,7 +259,7 @@ export default function PublishContent({
       }
     }, AUTO_VALIDATE_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [messageJson, messageType, sourceId, jsonError])
+  }, [messageJson, messageType, sourceId, schemaFingerprint, jsonError])
 
   const validationState: ValidationState = !messageType
     ? 'none'
@@ -330,6 +337,7 @@ export default function PublishContent({
         subject_pattern: subjectPattern,
         message_type: incrementMode ? undefined : messageType || undefined,
         source_id: incrementMode ? undefined : sourceId || undefined,
+        schema_fingerprint: incrementMode ? undefined : schemaFingerprint,
         framing: incrementMode || !messageType ? undefined : mappedFraming,
         data,
         headers: Object.keys(headersMap).length > 0 ? headersMap : undefined,

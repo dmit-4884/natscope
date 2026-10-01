@@ -77,6 +77,17 @@ export function MappingTable({ items, healthById, sourceNamesById, onEdit, onDel
               {item.framing.kind === 'confluent' && ` #${item.framing.schemaId}`}
             </Badge>
           )}
+          {item.pinnedFingerprint && (
+            <Badge
+              size="sm"
+              variant="primary"
+              className="shrink-0"
+              title={`Decodes with schema ${item.pinnedFingerprint}, not the source's active one`}
+              data-testid="mapping-pin"
+            >
+              Pinned
+            </Badge>
+          )}
         </div>
       ),
     },
@@ -91,10 +102,10 @@ export function MappingTable({ items, healthById, sourceNamesById, onEdit, onDel
           <span
             className={`inline-flex items-center px-2 py-0.5 text-xs rounded border truncate max-w-full ${
               sourceName
-                ? 'bg-slate-50 text-slate-700 border-slate-200'
+                ? 'bg-surface-secondary text-content-secondary border-border'
                 : sourceDeleted
-                  ? 'bg-rose-50 text-rose-600 border-rose-200 italic'
-                  : 'bg-slate-50 text-slate-500 border-slate-200'
+                  ? 'bg-status-error-bg text-status-error-text border-status-error-border italic'
+                  : 'bg-surface-secondary text-content-tertiary border-border'
             }`}
             title={`Source ID: ${item.sourceId}${sourceDeleted ? ' (deleted)' : ''}`}
           >

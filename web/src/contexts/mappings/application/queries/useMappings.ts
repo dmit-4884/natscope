@@ -142,6 +142,7 @@ export function useSubjectMappingEntity(subject: string | null, sourceFilter?: s
     messageType: mapping?.messageType ?? null,
     sourceId: mapping?.sourceId ?? null,
     framing: mapping?.framing,
+    pinnedFingerprint: mapping?.pinnedFingerprint,
     isLoading,
   }
 }
