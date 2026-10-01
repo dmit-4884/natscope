@@ -8,15 +8,18 @@ export interface OverflowMenuItem {
   destructive?: boolean
   icon?: ReactNode
   disabled?: boolean
+  selected?: boolean
 }
 
 interface OverflowMenuProps {
   items: OverflowMenuItem[]
   label?: string
   className?: string
+  icon?: ReactNode
+  highlighted?: boolean
 }
 
-export function OverflowMenu({ items, label = 'More actions', className = '' }: OverflowMenuProps) {
+export function OverflowMenu({ items, label = 'More actions', className = '', icon, highlighted = false }: OverflowMenuProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -45,6 +48,7 @@ export function OverflowMenu({ items, label = 'More actions', className = '' }: 
       type="button"
       role="menuitem"
       disabled={item.disabled}
+      aria-current={item.selected ? 'page' : undefined}
       onClick={() => {
         setOpen(false)
         item.onSelect()
@@ -52,7 +56,9 @@ export function OverflowMenu({ items, label = 'More actions', className = '' }: 
       className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
         item.destructive
           ? 'text-status-error-text hover:bg-status-error-bg'
-          : 'text-content-primary hover:bg-surface-secondary'
+          : item.selected
+            ? 'text-accent font-medium hover:bg-surface-secondary'
+            : 'text-content-primary hover:bg-surface-secondary'
       }`}
     >
       {item.icon && <span className="w-4 h-4 shrink-0" aria-hidden="true">{item.icon}</span>}
@@ -69,9 +75,13 @@ export function OverflowMenu({ items, label = 'More actions', className = '' }: 
           aria-label={label}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="p-2 rounded-md text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary transition-colors"
+          className={`p-2 rounded-md transition-colors ${
+            highlighted
+              ? 'text-accent bg-accent-light hover:bg-accent-muted'
+              : 'text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary'
+          }`}
         >
-          <DotsHorizontalIcon className="w-4 h-4" />
+          {icon ?? <DotsHorizontalIcon className="w-4 h-4" />}
         </button>
       </Tooltip>
       {open && (

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { NavLink, Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { useStreamDetail } from '@/contexts/streams'
 import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
 import {
@@ -16,13 +16,13 @@ import {
   type HeaderDraft,
 } from '@/stores/streamTabState/publishDraftStore'
 import { useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
-import { RelationsIcon, UsersIcon } from '@/components/ui'
 import type { SelectedMessage } from '../messages/UnifiedMessageList'
 import { useMessageNavigation } from '../messages/unified/useMessageNavigation'
 import UnifiedMessageViewer from '../messages/UnifiedMessageViewer'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import PublishHistory from './PublishHistory'
 import StreamNotFoundState from './StreamNotFoundState'
+import StreamTabs from './StreamTabs'
 import { isStreamNotFound } from './streamErrors'
 import { subjectMatchesStream } from './publish/subjectPatternUtils'
 import type { StreamPublishFeatures } from './publish/publishOptions'
@@ -276,81 +276,7 @@ export default function StreamView() {
             <h2 className="text-sm font-semibold text-content-primary mb-3 truncate" title={decodeURIComponent(streamName)}>
               Stream: {decodeURIComponent(streamName)}
             </h2>
-            <div className="flex gap-1">
-              <NavLink
-                to={`${baseUrl}/messages`}
-                end
-                className={({ isActive }) =>
-                  `px-4 py-2 text-sm font-medium rounded-t transition-colors flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-surface-primary text-accent border-t border-x border-border'
-                      : 'text-content-secondary hover:text-content-primary hover:bg-surface-tertiary'
-                  }`
-                }
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                Messages
-              </NavLink>
-              <NavLink
-                to={`${baseUrl}/config`}
-                className={({ isActive }) =>
-                  `px-4 py-2 text-sm font-medium rounded-t transition-colors flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-surface-primary text-accent border-t border-x border-border'
-                      : 'text-content-secondary hover:text-content-primary hover:bg-surface-tertiary'
-                  }`
-                }
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Config
-              </NavLink>
-              <NavLink
-                to={`${baseUrl}/consumers`}
-                className={({ isActive }) =>
-                  `px-4 py-2 text-sm font-medium rounded-t transition-colors flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-surface-primary text-accent border-t border-x border-border'
-                      : 'text-content-secondary hover:text-content-primary hover:bg-surface-tertiary'
-                  }`
-                }
-              >
-                <UsersIcon className="w-4 h-4" />
-                Consumers
-              </NavLink>
-              <NavLink
-                to={`${baseUrl}/relations`}
-                className={({ isActive }) =>
-                  `px-4 py-2 text-sm font-medium rounded-t transition-colors flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-surface-primary text-accent border-t border-x border-border'
-                      : 'text-content-secondary hover:text-content-primary hover:bg-surface-tertiary'
-                  }`
-                }
-              >
-                <RelationsIcon className="w-4 h-4" />
-                Relations
-              </NavLink>
-              <NavLink
-                to={`${baseUrl}/publish`}
-                className={({ isActive }) =>
-                  `px-4 py-2 text-sm font-medium rounded-t transition-colors flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-surface-primary text-accent border-t border-x border-border'
-                      : 'text-content-secondary hover:text-content-primary hover:bg-surface-tertiary'
-                  }`
-                }
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-                Publish
-              </NavLink>
-            </div>
+            <StreamTabs baseUrl={baseUrl} />
           </div>
         </div>
 
