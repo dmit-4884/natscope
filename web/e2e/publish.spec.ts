@@ -49,7 +49,8 @@ test.describe('publish tab', () => {
 
     // Switch to Messages and back — headers must survive the unmount.
     await page.getByRole('link', { name: 'Messages', exact: true }).click()
-    await page.getByRole('link', { name: 'Publish', exact: true }).click()
+    await page.getByRole('button', { name: 'More tabs' }).click()
+    await page.getByRole('menuitem', { name: 'Publish' }).click()
     await expect(page.getByPlaceholder('Key')).toHaveValue('X-E2E')
 
     // Full reload — headers live in the localStorage draft.
