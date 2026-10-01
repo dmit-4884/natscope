@@ -8,6 +8,9 @@ import { defineConfig, devices } from '@playwright/test'
  * Workers = 1: tests share the backend (publish history, templates store)
  * and the browser's localStorage-backed draft store.
  */
+const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 5173)
+const WEB_URL = `http://localhost:${WEB_PORT}`
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -16,7 +19,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: WEB_URL,
     trace: 'retain-on-failure',
   },
   projects: [
@@ -26,8 +29,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --port 5173 --strictPort',
-    url: 'http://localhost:5173',
+    command: `npm run dev -- --port ${WEB_PORT} --strictPort`,
+    url: WEB_URL,
     reuseExistingServer: true,
     timeout: 60_000,
   },

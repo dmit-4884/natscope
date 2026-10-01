@@ -52,7 +52,7 @@ export default defineConfig({
     proxy: {
       // Proxy gRPC-web requests to the backend during development
       '/natscope.': {
-        target: 'http://localhost:4280',
+        target: process.env.NATSCOPE_BACKEND_URL ?? 'http://localhost:4280',
         changeOrigin: true,
       },
     },
