@@ -77,7 +77,7 @@ func (s *Service) computeOneHealth(ctx context.Context, id string) (entities.Sub
 		}
 		return res, nil
 	}
-	if _, ok := snap.Messages[m.MessageType]; !ok {
+	if _, ok := snap.Schema.Messages[m.MessageType]; !ok {
 		res.Health = entities.MappingHealthTypeMissing
 		res.Detail = fmt.Sprintf("type %q not present in source %q at %s", m.MessageType, src.Name, version)
 	}

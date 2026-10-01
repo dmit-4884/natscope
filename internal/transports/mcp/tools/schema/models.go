@@ -31,9 +31,9 @@ type typeInput struct {
 
 type describeOutput struct {
 	typeView
-	Package string         `json:"package"`
-	Fields  []fieldView    `json:"fields"`
-	Example map[string]any `json:"example,omitempty" jsonschema:"example JSON payload for this type"`
+	Package string      `json:"package"`
+	Fields  []fieldView `json:"fields"`
+	Example any         `json:"example,omitempty" jsonschema:"example JSON payload for this type"`
 }
 
 type fieldView struct {

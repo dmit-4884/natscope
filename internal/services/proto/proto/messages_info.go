@@ -23,7 +23,7 @@ func (s *Service) ListMessages(ctx context.Context) []entities.ProtoMessageInfo 
 
 	messages := make([]entities.ProtoMessageInfo, 0, estimatedMessagesPerSnapshot)
 	for _, snap := range snaps {
-		for _, md := range snap.Messages {
+		for _, md := range snap.Schema.Messages {
 			info := protoutils.Info(md)
 			info.SourceID = snap.SourceID
 			info.SourceTag = snap.Tag
@@ -50,7 +50,7 @@ func (s *Service) GetMessage(ctx context.Context, sourceID, messageType string) 
 	if err != nil {
 		return nil, err
 	}
-	md, ok := snap.Messages[messageType]
+	md, ok := snap.Schema.Message(messageType)
 	if !ok {
 		return nil, errs.ErrProtoMessageNotFound
 	}
@@ -62,7 +62,7 @@ func (s *Service) GetMessage(ctx context.Context, sourceID, messageType string) 
 
 // GenerateExample generates an example JSON object for a message type within a
 // source.
-func (s *Service) GenerateExample(ctx context.Context, sourceID, messageType string) (map[string]interface{}, error) {
+func (s *Service) GenerateExample(ctx context.Context, sourceID, messageType string) (any, error) {
 	if sourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
@@ -70,11 +70,11 @@ func (s *Service) GenerateExample(ctx context.Context, sourceID, messageType str
 	if err != nil {
 		return nil, err
 	}
-	md, ok := snap.Messages[messageType]
+	md, ok := snap.Schema.Message(messageType)
 	if !ok {
 		return nil, errs.ErrProtoMessageNotFound
 	}
-	return protoutils.Template(md, make(map[string]bool)), nil
+	return protoutils.Template(md), nil
 }
 
 // Stats returns aggregated statistics across all active source snapshots.
@@ -82,7 +82,7 @@ func (s *Service) Stats(ctx context.Context) *entities.ProtoStats {
 	snaps := s.activeSnapshots(ctx)
 	count := 0
 	for _, snap := range snaps {
-		count += len(snap.Messages)
+		count += len(snap.Schema.Messages)
 	}
 	return &entities.ProtoStats{MessagesCount: count}
 }

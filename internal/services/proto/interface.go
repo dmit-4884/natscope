@@ -38,7 +38,7 @@ type Registry interface {
 
 	// GenerateExample builds an example JSON object for a message type;
 	// ErrProtoMessageNotFound if absent.
-	GenerateExample(ctx context.Context, sourceID, messageType string) (map[string]interface{}, error)
+	GenerateExample(ctx context.Context, sourceID, messageType string) (any, error)
 
 	// Stats returns aggregated statistics about loaded proto descriptors across
 	// active selections.

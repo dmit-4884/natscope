@@ -10,78 +10,88 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// Template generates a template/stub with default values for a message.
-func Template(md protoreflect.MessageDescriptor, visited map[string]bool) map[string]any {
-	fullName := string(md.FullName())
+const floatZero = 0.0
 
-	// Guard against circular references.
-	if visited[fullName] {
+var wellKnownExamples = map[protoreflect.FullName]func() any{
+	"google.protobuf.Timestamp":   func() any { return "1970-01-01T00:00:00Z" },
+	"google.protobuf.Duration":    func() any { return "0s" },
+	"google.protobuf.FieldMask":   func() any { return "" },
+	"google.protobuf.Struct":      func() any { return map[string]any{} },
+	"google.protobuf.Value":       func() any { return nil },
+	"google.protobuf.ListValue":   func() any { return []any{} },
+	"google.protobuf.Any":         func() any { return map[string]any{} },
+	"google.protobuf.Empty":       func() any { return map[string]any{} },
+	"google.protobuf.BoolValue":   func() any { return false },
+	"google.protobuf.StringValue": func() any { return "" },
+	"google.protobuf.BytesValue":  func() any { return "" },
+	"google.protobuf.DoubleValue": func() any { return floatZero },
+	"google.protobuf.FloatValue":  func() any { return floatZero },
+	"google.protobuf.Int32Value":  func() any { return 0 },
+	"google.protobuf.UInt32Value": func() any { return 0 },
+	"google.protobuf.Int64Value":  func() any { return "0" },
+	"google.protobuf.UInt64Value": func() any { return "0" },
+}
+
+// Template builds an example JSON value for md that protojson accepts.
+func Template(md protoreflect.MessageDescriptor) any {
+	return messageTemplate(md, make(map[protoreflect.FullName]bool))
+}
+
+func messageTemplate(md protoreflect.MessageDescriptor, visited map[protoreflect.FullName]bool) any {
+	if wk, ok := wellKnownExamples[md.FullName()]; ok {
+		return wk()
+	}
+	if visited[md.FullName()] {
 		return map[string]any{}
 	}
-	visited[fullName] = true
-	defer delete(visited, fullName)
+	visited[md.FullName()] = true
+	defer delete(visited, md.FullName())
 
 	result := make(map[string]any)
-
 	fields := md.Fields()
 	for i := range fields.Len() {
 		fd := fields.Get(i)
-		fieldName := string(fd.Name())
-		value := fieldTemplate(fd, visited)
-
-		// Repeated fields (but not maps).
-		if fd.IsList() && !fd.IsMap() {
-			result[fieldName] = []any{value}
-		} else {
-			result[fieldName] = value
+		if oneof := fd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() && oneof.Fields().Get(0) != fd {
+			continue
 		}
+		value := fieldTemplate(fd, visited)
+		if fd.IsList() {
+			value = []any{value}
+		}
+		result[string(fd.Name())] = value
 	}
-
 	return result
 }
 
-// fieldTemplate generates a template value for a single field.
-func fieldTemplate(fd protoreflect.FieldDescriptor, visited map[string]bool) any {
-	// Map fields.
+func fieldTemplate(fd protoreflect.FieldDescriptor, visited map[protoreflect.FullName]bool) any {
 	if fd.IsMap() {
-		keyVal := fieldTemplate(fd.MapKey(), visited)
-		valueVal := fieldTemplate(fd.MapValue(), visited)
-		return map[string]any{
-			fmt.Sprintf("%v", keyVal): valueVal,
-		}
+		return map[string]any{fmt.Sprint(scalarTemplate(fd.MapKey())): fieldTemplate(fd.MapValue(), visited)}
 	}
-
-	// Message types.
-	if fd.Kind() == protoreflect.MessageKind {
-		return Template(fd.Message(), visited)
-	}
-
-	// Enum types.
-	if fd.Kind() == protoreflect.EnumKind {
-		values := fd.Enum().Values()
-		if values.Len() > 0 {
+	switch fd.Kind() {
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		return messageTemplate(fd.Message(), visited)
+	case protoreflect.EnumKind:
+		if values := fd.Enum().Values(); values.Len() > 0 {
 			return string(values.Get(0).Name())
 		}
-		return "UNKNOWN"
+		return 0
+	default:
+		return scalarTemplate(fd)
 	}
+}
 
-	// Handle scalar types
+func scalarTemplate(fd protoreflect.FieldDescriptor) any {
 	switch fd.Kind() {
-	case protoreflect.StringKind:
-		return ""
-	case protoreflect.BytesKind:
+	case protoreflect.StringKind, protoreflect.BytesKind:
 		return ""
 	case protoreflect.BoolKind:
 		return false
 	case protoreflect.DoubleKind, protoreflect.FloatKind:
-		return 0.0
-	case protoreflect.Int32Kind, protoreflect.Int64Kind,
-		protoreflect.Uint32Kind, protoreflect.Uint64Kind,
-		protoreflect.Sint32Kind, protoreflect.Sint64Kind,
-		protoreflect.Fixed32Kind, protoreflect.Fixed64Kind,
-		protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind:
-		return 0
+		return floatZero
+	case protoreflect.Int64Kind, protoreflect.Uint64Kind, protoreflect.Sint64Kind,
+		protoreflect.Fixed64Kind, protoreflect.Sfixed64Kind:
+		return "0"
 	default:
-		return nil
+		return 0
 	}
 }

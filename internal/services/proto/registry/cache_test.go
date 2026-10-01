@@ -55,7 +55,7 @@ func (s *stubDescriptors) FindByFingerprint(_ context.Context, fp string) (*enti
 }
 
 // descriptorSetBytes builds a valid serialized FileDescriptorSet with one
-// message pkg.msg so ParseDescriptorSet yields a real descriptor.
+// message pkg.msg so ParseSchema yields a real descriptor.
 func descriptorSetBytes(t *testing.T, pkg, msg string) []byte {
 	t.Helper()
 	file := &descriptorpb.FileDescriptorProto{
@@ -120,7 +120,7 @@ func TestGetOrBuild_MissThenHit(t *testing.T) {
 	assert.Equal(t, "src", snap.SourceID)
 	assert.Equal(t, "v1", snap.Tag)
 	assert.Equal(t, fingerprint(data), snap.Fingerprint)
-	assert.Contains(t, snap.Messages, "test.pkg.Thing")
+	assert.Contains(t, snap.Schema.Messages, "test.pkg.Thing")
 
 	// Second call is served from cache: same pointer, no extra lookup.
 	again, err := c.GetOrBuild(t.Context(), "src", "v1")

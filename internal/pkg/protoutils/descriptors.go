@@ -8,44 +8,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/altessa-s/go-atlas/core/errors"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protodesc"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
-
-// ParseDescriptorSet parses FileDescriptorSet bytes into a map of message
-// descriptors keyed by fully-qualified name.
-func ParseDescriptorSet(data []byte) (map[string]protoreflect.MessageDescriptor, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("empty descriptor set")
-	}
-
-	fds := &descriptorpb.FileDescriptorSet{}
-	if err := proto.Unmarshal(data, fds); err != nil {
-		return nil, errors.WrapOperation(err, "unmarshal descriptor set")
-	}
-
-	files, err := protodesc.NewFiles(fds)
-	if err != nil {
-		return nil, errors.WrapOperation(err, "create file registry")
-	}
-
-	result := make(map[string]protoreflect.MessageDescriptor)
-	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
-		msgs := fd.Messages()
-		for i := range msgs.Len() {
-			collectMessages(result, msgs.Get(i))
-		}
-		return true
-	})
-
-	return result, nil
-}
 
 // SchemaInput is one descriptor set fed to MergeWithReport, tagged with its
 // source snapshot so conflict reports can name winners and losers.
@@ -210,16 +177,4 @@ func qualifiedName(pkg, name string) string {
 		return name
 	}
 	return pkg + "." + name
-}
-
-// collectMessages recursively collects all message descriptors including nested.
-func collectMessages(result map[string]protoreflect.MessageDescriptor, md protoreflect.MessageDescriptor) {
-	fullName := string(md.FullName())
-	if _, exists := result[fullName]; !exists {
-		result[fullName] = md
-	}
-	nested := md.Messages()
-	for i := range nested.Len() {
-		collectMessages(result, nested.Get(i))
-	}
 }

@@ -89,7 +89,7 @@ func (c *Cache) GetOrBuild(ctx context.Context, sourceID, tag string) (*Snapshot
 			return nil, errs.ErrMappingDescriptorMissing
 		}
 
-		messages, err := protoutils.ParseDescriptorSet(d.DescriptorSet)
+		schema, err := protoutils.ParseSchema(d.DescriptorSet)
 		if err != nil {
 			return nil, coreerrs.Wrap(err, "registry: parse descriptor")
 		}
@@ -98,7 +98,7 @@ func (c *Cache) GetOrBuild(ctx context.Context, sourceID, tag string) (*Snapshot
 			SourceID:    sourceID,
 			Tag:         tag,
 			Descriptor:  d,
-			Messages:    messages,
+			Schema:      schema,
 			ParsedAt:    time.Now(),
 			Fingerprint: fingerprint(d.DescriptorSet),
 		}

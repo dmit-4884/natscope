@@ -39,7 +39,7 @@ func (m *mockProtoSvc) GetMessage(_ context.Context, _, _ string) (*entities.Pro
 	return m.getResult, m.getErr
 }
 
-func (m *mockProtoSvc) GenerateExample(_ context.Context, _, _ string) (map[string]interface{}, error) {
+func (m *mockProtoSvc) GenerateExample(_ context.Context, _, _ string) (any, error) {
 	return m.exampleResult, m.exampleErr
 }
 

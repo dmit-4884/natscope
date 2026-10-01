@@ -12,8 +12,7 @@ import (
 	"github.com/altessa-s/go-atlas/core/encoding/hash"
 
 	"github.com/dmit-4884/natscope/internal/entities"
-
-	"google.golang.org/protobuf/reflect/protoreflect"
+	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 )
 
 // Snapshot is an immutable parsed view of a single ProtoDescriptor. Equal
@@ -22,7 +21,7 @@ type Snapshot struct {
 	SourceID    string
 	Tag         string
 	Descriptor  *entities.ProtoDescriptor
-	Messages    map[string]protoreflect.MessageDescriptor
+	Schema      *protoutils.Schema
 	ParsedAt    time.Time
 	Fingerprint string
 }

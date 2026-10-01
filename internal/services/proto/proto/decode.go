@@ -19,8 +19,6 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 	"github.com/dmit-4884/natscope/internal/services/proto/registry"
 
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
@@ -88,21 +86,26 @@ func decodeWithSnapshot(snap *registry.Snapshot, data []byte, messageType string
 	if snap == nil {
 		return &entities.DecodeResult{Success: false, Error: "snapshot unavailable"}
 	}
-	md, ok := snap.Messages[messageType]
+	md, ok := snap.Schema.Message(messageType)
 	if !ok {
 		return &entities.DecodeResult{
 			Success: false,
 			Error:   fmt.Sprintf("Proto type '%s' not found in source '%s' (tag '%s').", messageType, snap.SourceID, snap.Tag),
 		}
 	}
-	return decodeWithDescriptor(md, data, messageType)
+	return decodeWithDescriptor(snap.Schema, md, data, messageType)
 }
 
 // decodeWithDescriptor decodes a single payload against a MessageDescriptor;
 // the underlying protobuf error is surfaced verbatim for diagnosis.
-func decodeWithDescriptor(md protoreflect.MessageDescriptor, data []byte, messageType string) *entities.DecodeResult {
+func decodeWithDescriptor(
+	schema *protoutils.Schema,
+	md protoreflect.MessageDescriptor,
+	data []byte,
+	messageType string,
+) *entities.DecodeResult {
 	msg := dynamicpb.NewMessage(md)
-	if unmarshalErr := proto.Unmarshal(data, msg); unmarshalErr != nil {
+	if unmarshalErr := schema.UnmarshalBinary(data, msg); unmarshalErr != nil {
 		return &entities.DecodeResult{
 			Success: false,
 			Error: fmt.Sprintf(
@@ -112,10 +115,7 @@ func decodeWithDescriptor(md protoreflect.MessageDescriptor, data []byte, messag
 		}
 	}
 
-	rawJSON, err := protojson.MarshalOptions{
-		UseProtoNames:   true, // snake_case as in proto file
-		EmitUnpopulated: true, // include zero-valued fields so UI debugger shows full structure
-	}.Marshal(msg)
+	rawJSON, err := schema.MarshalJSON(msg)
 	if err != nil {
 		return &entities.DecodeResult{
 			Success: false,

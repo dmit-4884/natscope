@@ -13,30 +13,20 @@ import (
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-// unmarshalOpts keeps DiscardUnknown off, so unknown JSON fields and enum names are errors.
-var unmarshalOpts = protojson.UnmarshalOptions{}
-
-// marshalOpts marshals deterministically, so the same JSON always encodes to the same bytes.
-var marshalOpts = proto.MarshalOptions{Deterministic: true}
-
-// decodeDynamic parses JSON into a fresh dynamic message for md.
-func decodeDynamic(md protoreflect.MessageDescriptor, data []byte) (*dynamicpb.Message, error) {
+func jsonToBinary(schema *protoutils.Schema, md protoreflect.MessageDescriptor, messageType string, data []byte) ([]byte, error) {
 	msg := dynamicpb.NewMessage(md)
-	if err := unmarshalOpts.Unmarshal(data, msg); err != nil {
-		return nil, err
+	if err := schema.UnmarshalJSON(data, msg); err != nil {
+		return nil, jsonConvertError(messageType, err)
 	}
-	return msg, nil
-}
-
-// encodeDynamic marshals msg to deterministic protobuf bytes.
-func encodeDynamic(msg *dynamicpb.Message) ([]byte, error) {
-	return marshalOpts.Marshal(msg)
+	out, err := protoutils.MarshalBinary(msg)
+	if err != nil {
+		return nil, &codecError{msg: fmt.Sprintf("Failed to encode '%s': %v", messageType, err), cause: err}
+	}
+	return out, nil
 }
 
 // codecError carries a user-facing message while keeping the cause for
@@ -87,22 +77,14 @@ func (s *Service) Encode(ctx context.Context, req entities.CodecRequest) (*entit
 		return &entities.EncodeResult{Success: false, Error: snapshotError(req.SourceID, err).Error()}, nil
 	}
 
-	md, ok := snap.Messages[req.MessageType]
+	md, ok := snap.Schema.Message(req.MessageType)
 	if !ok {
 		return &entities.EncodeResult{Success: false, Error: typeNotFoundError(req.MessageType, snap.SourceID).Error()}, nil
 	}
 
-	msg, unmarshalErr := decodeDynamic(md, req.JSON)
-	if unmarshalErr != nil {
-		return &entities.EncodeResult{Success: false, Error: jsonConvertError(req.MessageType, unmarshalErr).Error()}, nil
-	}
-
-	data, err := encodeDynamic(msg)
+	data, err := jsonToBinary(snap.Schema, md, req.MessageType, req.JSON)
 	if err != nil {
-		return &entities.EncodeResult{
-			Success: false,
-			Error:   fmt.Sprintf("Failed to encode: %v", err),
-		}, nil
+		return &entities.EncodeResult{Success: false, Error: err.Error()}, nil
 	}
 
 	return &entities.EncodeResult{
@@ -119,16 +101,11 @@ func (s *Service) EncodeRaw(ctx context.Context, req entities.CodecRequest) ([]b
 	if err != nil {
 		return nil, snapshotError(req.SourceID, err)
 	}
-	md, ok := snap.Messages[req.MessageType]
+	md, ok := snap.Schema.Message(req.MessageType)
 	if !ok {
 		return nil, typeNotFoundError(req.MessageType, snap.SourceID)
 	}
-
-	msg, err := decodeDynamic(md, req.JSON)
-	if err != nil {
-		return nil, jsonConvertError(req.MessageType, err)
-	}
-	return encodeDynamic(msg)
+	return jsonToBinary(snap.Schema, md, req.MessageType, req.JSON)
 }
 
 // Validate validates protobuf data against buf.validate rules within the
@@ -147,11 +124,11 @@ func (s *Service) Validate(
 	if err != nil {
 		return &entities.ValidationResult{Valid: false, Error: snapshotError(req.SourceID, err).Error()}, nil
 	}
-	md, ok := snap.Messages[req.MessageType]
+	md, ok := snap.Schema.Message(req.MessageType)
 	if !ok {
 		return &entities.ValidationResult{Valid: false, Error: typeNotFoundError(req.MessageType, snap.SourceID).Error()}, nil
 	}
-	return protoutils.Validate(md, data)
+	return snap.Schema.Validate(md, data), nil
 }
 
 // EncodeWithValidation encodes JSON to protobuf and validates the result.

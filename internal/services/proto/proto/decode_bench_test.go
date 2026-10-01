@@ -8,19 +8,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bufbuild/protocompile"
+	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
+	"github.com/dmit-4884/natscope/internal/pkg/protoutils/prototest"
 
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-// loadBenchMessageDescriptor compiles a synthetic .proto and returns the
-// "bench.Payload" descriptor via the production parse path.
-func loadBenchMessageDescriptor(tb testing.TB) protoreflect.MessageDescriptor {
+func loadBenchSchema(tb testing.TB) (*protoutils.Schema, protoreflect.MessageDescriptor) {
 	tb.Helper()
-	src := `
+	schema := prototest.Schema(tb, map[string]string{"bench.proto": `
 syntax = "proto3";
 package bench;
 message Payload {
@@ -28,31 +26,14 @@ message Payload {
   string subject      = 2;
   int64  timestamp_ms = 3;
   map<string, string> headers = 4;
-}`
-	compiler := protocompile.Compiler{
-		Resolver: &protocompile.SourceResolver{
-			Accessor: protocompile.SourceAccessorFromMap(map[string]string{
-				"bench.proto": src,
-			}),
-		},
-	}
-	files, err := compiler.Compile(tb.Context(), "bench.proto")
-	if err != nil {
-		tb.Fatalf("compile: %v", err)
-	}
-	fd, err := files.AsResolver().FindFileByPath("bench.proto")
-	if err != nil {
-		tb.Fatalf("find file: %v", err)
-	}
-	md := fd.Messages().ByName("Payload")
-	if md == nil {
+}`})
+	md, ok := schema.Message("bench.Payload")
+	if !ok {
 		tb.Fatalf("Payload not found")
 	}
-	return md
+	return schema, md
 }
 
-// buildPayloadBytes creates wire-format bytes for a Payload message of approx
-// `bodySize` payload size. Returns the serialized bytes.
 func buildPayloadBytes(tb testing.TB, md protoreflect.MessageDescriptor, bodySize int) []byte {
 	tb.Helper()
 	msg := dynamicpb.NewMessage(md)
@@ -79,72 +60,42 @@ func buildPayloadBytes(tb testing.TB, md protoreflect.MessageDescriptor, bodySiz
 	return data
 }
 
-// BenchmarkProtoDecode_1_6MB measures the production decode path on a 1.6 MB
-// protobuf: dynamicpb.New + proto.Unmarshal + protojson.Marshal.
-func BenchmarkProtoDecode_1_6MB(b *testing.B) {
-	md := loadBenchMessageDescriptor(b)
-	data := buildPayloadBytes(b, md, 1600*1024)
+func benchmarkDecode(b *testing.B, bodySize int) {
+	schema, md := loadBenchSchema(b)
+	data := buildPayloadBytes(b, md, bodySize)
 
-	b.ResetTimer()
 	b.SetBytes(int64(len(data)))
 	for b.Loop() {
-		_ = decodeWithDescriptor(md, data, "bench.Payload")
+		_ = decodeWithDescriptor(schema, md, data, "bench.Payload")
 	}
 }
 
-// BenchmarkProtoDecode_5MB measures the top of the user's payload range.
-func BenchmarkProtoDecode_5MB(b *testing.B) {
-	md := loadBenchMessageDescriptor(b)
-	data := buildPayloadBytes(b, md, 5*1024*1024)
+func BenchmarkProtoDecode_4KB(b *testing.B) { benchmarkDecode(b, 4*1024) }
 
-	b.ResetTimer()
-	b.SetBytes(int64(len(data)))
-	for b.Loop() {
-		_ = decodeWithDescriptor(md, data, "bench.Payload")
-	}
-}
+func BenchmarkProtoDecode_1_6MB(b *testing.B) { benchmarkDecode(b, 1600*1024) }
 
-// BenchmarkProtoDecode_4KB measures the small-message baseline.
-func BenchmarkProtoDecode_4KB(b *testing.B) {
-	md := loadBenchMessageDescriptor(b)
-	data := buildPayloadBytes(b, md, 4*1024)
+func BenchmarkProtoDecode_5MB(b *testing.B) { benchmarkDecode(b, 5*1024*1024) }
 
-	b.ResetTimer()
-	b.SetBytes(int64(len(data)))
-	for b.Loop() {
-		_ = decodeWithDescriptor(md, data, "bench.Payload")
-	}
-}
-
-// BenchmarkProtoUnmarshalOnly_1_6MB isolates proto.Unmarshal so we can separate
-// it from the protojson.Marshal half.
 func BenchmarkProtoUnmarshalOnly_1_6MB(b *testing.B) {
-	md := loadBenchMessageDescriptor(b)
+	schema, md := loadBenchSchema(b)
 	data := buildPayloadBytes(b, md, 1600*1024)
 
-	b.ResetTimer()
 	b.SetBytes(int64(len(data)))
 	for b.Loop() {
-		msg := dynamicpb.NewMessage(md)
-		_ = proto.Unmarshal(data, msg)
+		_ = schema.UnmarshalBinary(data, dynamicpb.NewMessage(md))
 	}
 }
 
-// BenchmarkProtoJSONMarshalOnly_1_6MB isolates the protojson.Marshal half.
 func BenchmarkProtoJSONMarshalOnly_1_6MB(b *testing.B) {
-	md := loadBenchMessageDescriptor(b)
+	schema, md := loadBenchSchema(b)
 	data := buildPayloadBytes(b, md, 1600*1024)
 	msg := dynamicpb.NewMessage(md)
-	if err := proto.Unmarshal(data, msg); err != nil {
+	if err := schema.UnmarshalBinary(data, msg); err != nil {
 		b.Fatal(err)
 	}
 
-	b.ResetTimer()
 	b.SetBytes(int64(len(data)))
 	for b.Loop() {
-		_, _ = protojson.MarshalOptions{
-			UseProtoNames:   true,
-			EmitUnpopulated: true,
-		}.Marshal(msg)
+		_, _ = schema.MarshalJSON(msg)
 	}
 }
