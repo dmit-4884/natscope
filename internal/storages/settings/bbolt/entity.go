@@ -24,6 +24,7 @@ type messagesDoc struct {
 	MaxPayloadBytesInList *int32  `json:"maxPayloadBytesInList,omitempty"`
 	DefaultExportFormat   *string `json:"defaultExportFormat,omitempty"`
 	ExportRangeLimit      *int32  `json:"exportRangeLimit,omitempty"`
+	DetectTypes           *bool   `json:"detectTypes,omitempty"`
 }
 
 type liveDoc struct {

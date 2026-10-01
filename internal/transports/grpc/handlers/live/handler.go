@@ -124,6 +124,8 @@ func toProtoLiveBatchMessage(m *entities.LiveMessage) *natspb.NatsMessage {
 	pb := toProtoLiveMessage(&m.NatsMessage)
 	pb.Decoded = m.Decoded
 	pb.DecodedType = m.DecodedType
+	pb.DecodedAuto = m.DecodedAuto
+	pb.DecodedSourceId = m.DecodedSourceID
 	pb.DecodeError = m.DecodeError
 	pb.Truncated = m.Truncated
 	// Use pre-truncate size so the UI badge shows the real size, not the preview

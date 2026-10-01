@@ -53,4 +53,10 @@ message NatsMessage {
 
   // Set when decoding failed but the first decoded_valid_bytes decoded into decoded.
   int32 decoded_valid_bytes = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The decoding type was auto-detected rather than mapped.
+  bool decoded_auto = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Source of an auto-detected type.
+  optional string decoded_source_id = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

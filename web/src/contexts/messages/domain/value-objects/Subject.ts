@@ -21,10 +21,9 @@ interface SubjectProps {
  * normalization, and hierarchy operations.
  */
 export class Subject extends ValueObject<SubjectProps> {
-  private static readonly UUID_PATTERN =
-    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
-
-  private static readonly NUMERIC_ID_PATTERN = /\.\d+$/g
+  private static readonly UUID_TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  private static readonly NUMERIC_TOKEN = /^\d+$/
+  private static readonly MIN_ID_TOKEN = 8
 
   /** NATS subject length limit. */
   private static readonly MAX_LENGTH = 256
@@ -71,12 +70,17 @@ export class Subject extends ValueObject<SubjectProps> {
     return this.props.value
   }
 
-  /** Subject to pattern: UUIDs and trailing numeric IDs become '*'. */
+  /** Subject to pattern: numeric, UUID and long digit-bearing tokens become '*'; the server learns detected types the same way. */
   toPattern(): string {
-    let pattern = this.props.value
-    pattern = pattern.replace(Subject.UUID_PATTERN, '*')
-    pattern = pattern.replace(Subject.NUMERIC_ID_PATTERN, '.*')
-    return pattern
+    return this.parts()
+      .map((t) =>
+        Subject.NUMERIC_TOKEN.test(t) ||
+        Subject.UUID_TOKEN.test(t) ||
+        (t.length >= Subject.MIN_ID_TOKEN && /\d/.test(t))
+          ? '*'
+          : t,
+      )
+      .join('.')
   }
 
   /** Whether this subject matches a NATS pattern (`*` one token, `>` one+). */

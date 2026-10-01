@@ -40,6 +40,9 @@ type LiveMessage struct {
 	Decoded     *string
 	DecodedType *string
 	DecodeError *string
+	// DecodedAuto marks a type found by auto-detection; DecodedSourceID names its source.
+	DecodedAuto     bool
+	DecodedSourceID *string
 	// Truncated is set when the server capped the payload for preview; UI loads
 	// the full payload via MessagesService.Get(sequence).
 	Truncated bool

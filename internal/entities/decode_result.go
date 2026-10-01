@@ -14,4 +14,17 @@ type DecodeResult struct {
 	MessageType   string
 	UnknownFields []UnknownField
 	ValidBytes    int
+	// SourceID and Auto are set when the type came from auto-detection rather than a mapping.
+	SourceID string
+	Auto     bool
+}
+
+// TypeCandidate is a message type a payload decodes as; Score runs from 0 to 100.
+type TypeCandidate struct {
+	SourceID       string
+	SourceRevision string
+	MessageType    string
+	Score          int
+	UnknownBytes   int
+	Decoded        json.RawMessage
 }

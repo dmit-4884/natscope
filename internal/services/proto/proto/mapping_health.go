@@ -104,7 +104,7 @@ func (s *Service) ListSchemaConflicts(ctx context.Context) (entities.SchemaConfl
 	return s.conflictsStorage.GetAll(ctx)
 }
 
-// NewLiveDecoder creates a stateful decoder for live streams.
-func (s *Service) NewLiveDecoder() protosvc.LiveDecoder {
-	return &liveDecoder{service: s}
+// NewLiveDecoder creates a stateful decoder for live streams; detect adds auto-detected types to unmapped payloads.
+func (s *Service) NewLiveDecoder(detect bool) protosvc.LiveDecoder {
+	return &liveDecoder{service: s, detect: detect}
 }

@@ -42,6 +42,10 @@ type Message struct {
 	DecodedUnknownFields int
 	DecodedValidBytes    int
 
+	// DecodedAuto marks a type found by auto-detection; DecodedSourceID names its source.
+	DecodedAuto     bool
+	DecodedSourceID string
+
 	// Truncated means DataBase64/Decoded were capped for preview; DataSize keeps
 	// the original size, full data via Get(sequence).
 	Truncated bool

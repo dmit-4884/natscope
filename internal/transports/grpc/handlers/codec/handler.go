@@ -92,6 +92,30 @@ func (h *Handler) DecodeWire(
 	return connect.NewResponse(resp), nil
 }
 
+// DetectMessageType ranks the message types a payload decodes as.
+func (h *Handler) DetectMessageType(
+	ctx context.Context,
+	req *connect.Request[codecpb.DetectMessageTypeRequest],
+) (*connect.Response[codecpb.DetectMessageTypeResponse], error) {
+	limit := int(req.Msg.Limit)
+	if limit == 0 {
+		limit = defaultDetectLimit
+	}
+	candidates, err := h.protoService.DetectTypes(ctx, req.Msg.Data, req.Msg.GetSourceId(), limit)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&codecpb.DetectMessageTypeResponse{
+		Candidates: slices.To(candidates, func(c entities.TypeCandidate) *protopb.TypeCandidate {
+			pb := converter.Convert(c, &protopb.TypeCandidate{}, converter.WithIgnoreFields("Decoded"))
+			pb.Decoded = string(c.Decoded)
+			return pb
+		}),
+	}), nil
+}
+
+const defaultDetectLimit = 5
+
 var wireTypes = map[entities.WireType]protopb.WireType{
 	entities.WireVarint:  protopb.WireType_WIRE_TYPE_VARINT,
 	entities.WireFixed64: protopb.WireType_WIRE_TYPE_FIXED64,

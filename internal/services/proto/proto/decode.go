@@ -168,8 +168,8 @@ func decodePrefix(schema *protoutils.Schema, md protoreflect.MessageDescriptor, 
 }
 
 // DecodeMessages decodes a slice of messages: resolve each mapping →
-// source/tag, group by snapshot, decode per-group.
-func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Message) {
+// source/tag, group by snapshot, decode per-group; with detect, unmapped payloads get auto-detected types.
+func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Message, detect bool) {
 	if len(messages) == 0 {
 		return
 	}
@@ -189,10 +189,14 @@ func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Messa
 		framings []entities.Framing
 	}
 	groups := make(map[string]*group)
+	var unmapped []int
 
 	for i, msg := range messages {
 		m := resolver.Resolve(msg.Subject)
 		if m == nil {
+			if detect && msg.ContentType == entities.ContentTypeBinary && !msg.Truncated {
+				unmapped = append(unmapped, i)
+			}
 			continue
 		}
 		snap, err := s.resolveDescriptorForMapping(ctx, m)
@@ -232,6 +236,17 @@ func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Messa
 				messages[idx].DecodedUnknownFields = len(r.UnknownFields)
 				messages[idx].DecodedValidBytes = r.ValidBytes
 			}
+		}
+	}
+
+	for _, idx := range unmapped {
+		data, err := base64.StdEncoding.DecodeString(messages[idx].DataBase64)
+		if err != nil {
+			continue
+		}
+		if r := s.autoDecode(ctx, messages[idx].Subject, data); r != nil {
+			messages[idx].Decoded, messages[idx].DecodedType = r.Decoded, r.MessageType
+			messages[idx].DecodedSourceID, messages[idx].DecodedAuto = r.SourceID, true
 		}
 	}
 

@@ -18,6 +18,8 @@ export interface MessageFetchPolicyProps {
   // Hard cap on messages fetched by a full-range export. Always positive —
   // 0 coerced to default. Default 50000.
   exportRangeLimit: number
+  /** Decode unmapped binary payloads as the message type they clearly match. Default true. */
+  detectTypes: boolean
 }
 
 // Loose input DTO for the adapter — proto-shape may be missing fields.
@@ -28,6 +30,7 @@ export interface MessageFetchPolicyInput {
   maxPayloadBytesInList?: number
   defaultExportFormat?: string
   exportRangeLimit?: number
+  detectTypes?: boolean
 }
 
 const VALID_METHODS: readonly FetchMethod[] = ['direct', 'consumer']
@@ -44,6 +47,7 @@ export const MESSAGE_FETCH_POLICY_DEFAULTS: MessageFetchPolicyProps = Object.fre
   maxPayloadBytesInList: 64 * 1024,
   defaultExportFormat: 'json',
   exportRangeLimit: DEFAULT_EXPORT_RANGE_LIMIT,
+  detectTypes: true,
 })
 
 export class MessageFetchPolicy extends ValueObject<MessageFetchPolicyProps> {
@@ -71,6 +75,9 @@ export class MessageFetchPolicy extends ValueObject<MessageFetchPolicyProps> {
   get exportRangeLimit(): number {
     return this.props.exportRangeLimit
   }
+  get detectTypes(): boolean {
+    return this.props.detectTypes
+  }
 
   toObject(): MessageFetchPolicyProps {
     return { ...this.props }
@@ -85,6 +92,7 @@ export class MessageFetchPolicy extends ValueObject<MessageFetchPolicyProps> {
       maxPayloadBytesInList: patch.maxPayloadBytesInList ?? this.props.maxPayloadBytesInList,
       defaultExportFormat: (patch.defaultExportFormat ?? this.props.defaultExportFormat) as ExportFormat,
       exportRangeLimit: patch.exportRangeLimit ?? this.props.exportRangeLimit,
+      detectTypes: patch.detectTypes ?? this.props.detectTypes,
     })
   }
 
@@ -158,6 +166,7 @@ export class MessageFetchPolicy extends ValueObject<MessageFetchPolicyProps> {
         Number.isInteger(rangeLimit) && rangeLimit >= 1 && rangeLimit <= 10_000_000
           ? rangeLimit
           : MESSAGE_FETCH_POLICY_DEFAULTS.exportRangeLimit,
+      detectTypes: input.detectTypes ?? MESSAGE_FETCH_POLICY_DEFAULTS.detectTypes,
     })
   }
 }

@@ -37,6 +37,8 @@ export interface LiveMessage {
   headers?: Record<string, string>
   decoded?: unknown
   decodedType?: string
+  decodedAuto?: boolean
+  decodedSourceId?: string
   decodeError?: string
 }
 
@@ -51,6 +53,8 @@ export function liveToMessage(m: LiveMessage): Message {
     headers: m.headers,
     decoded: m.decoded as Message['decoded'],
     decoded_type: m.decodedType,
+    decoded_auto: m.decodedAuto,
+    decoded_source_id: m.decodedSourceId,
     decode_error: m.decodeError,
   }
 }

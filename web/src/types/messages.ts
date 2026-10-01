@@ -13,6 +13,8 @@ export interface SelectedMessage {
   decodeError?: string
   decodedUnknownFields?: number
   decodedValidBytes?: number
+  decodedAuto?: boolean
+  decodedSourceId?: string
   isLive?: boolean
   /** Preview truncation flag; drives the "Load full payload" affordance. */
   truncated?: boolean

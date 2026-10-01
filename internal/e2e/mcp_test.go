@@ -105,7 +105,7 @@ type mcpMessagesPage struct {
 }
 
 var readOnlyTools = []string{
-	"decode_payload", "describe_message_type", "find_messages", "get_kv_entry", "get_kv_history", "get_message",
+	"decode_payload", "describe_message_type", "detect_message_type", "find_messages", "get_kv_entry", "get_kv_history", "get_message",
 	"get_schema_status", "get_server_info", "get_stream", "get_stream_relations", "list_connections", "list_consumers", "list_kv_buckets",
 	"list_kv_keys", "list_mappings", "list_message_types", "list_streams", "resolve_subject", "tail_subject", "validate_payload",
 }
@@ -520,6 +520,21 @@ func TestMCPProtoPublishAndDecode(t *testing.T) {
 		assert.Equal(t, "wire", dump.Wire[0].Text)
 		assert.Equal(t, "bytes", dump.Wire[0].WireType)
 		assert.Equal(t, uint64(7), dump.Wire[1].Varint)
+
+		guess := callTool[struct {
+			Candidates []struct {
+				SourceID    string          `json:"sourceId"`
+				MessageType string          `json:"messageType"`
+				Score       int             `json:"score"`
+				Decoded     json.RawMessage `json:"decoded"`
+			} `json:"candidates"`
+		}](t, cs, "detect_message_type", map[string]any{"base64": wire})
+		require.Len(t, guess.Candidates, 1)
+		assert.Equal(t, fullName, guess.Candidates[0].MessageType)
+		assert.Equal(t, sourceID, guess.Candidates[0].SourceID)
+		assert.GreaterOrEqual(t, guess.Candidates[0].Score, 85)
+		assert.JSONEq(t, `{"name":"wire","count":7,"tags":[]}`, string(guess.Candidates[0].Decoded))
+		assert.Contains(t, callToolError(t, cs, "detect_message_type", map[string]any{"base64": ""}), "empty payload")
 	})
 }
 

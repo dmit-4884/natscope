@@ -39,7 +39,7 @@ func TestSettings_AllGroupsRoundTrip(t *testing.T) {
 		u.Messages = &entities.MessageSettings{
 			FetchMethod: ptr.Wrap("batch"), DefaultPageSize: ptr.Wrap(int32(50)),
 			DefaultDirection: ptr.Wrap("forward"), MaxPayloadBytesInList: ptr.Wrap(int32(4096)),
-			DefaultExportFormat: ptr.Wrap("ndjson"), ExportRangeLimit: ptr.Wrap(int32(1000)),
+			DefaultExportFormat: ptr.Wrap("ndjson"), ExportRangeLimit: ptr.Wrap(int32(1000)), DetectTypes: ptr.Wrap(false),
 		}
 		u.Live = &entities.LiveSettings{SubscriptionMode: ptr.Wrap("ordered"), MaxDisplayRate: ptr.Wrap(int32(30))}
 		u.Display = &entities.DisplaySettings{
@@ -63,7 +63,7 @@ func TestSettings_AllGroupsRoundTrip(t *testing.T) {
 
 	m := got.Messages
 	if m == nil || *m.FetchMethod != "batch" || *m.DefaultPageSize != 50 || *m.DefaultDirection != "forward" ||
-		*m.MaxPayloadBytesInList != 4096 || *m.DefaultExportFormat != "ndjson" || *m.ExportRangeLimit != 1000 {
+		*m.MaxPayloadBytesInList != 4096 || *m.DefaultExportFormat != "ndjson" || *m.ExportRangeLimit != 1000 || m.DetectsTypes() {
 		t.Fatalf("messages mismatch: %+v", m)
 	}
 	if got.Live == nil || *got.Live.SubscriptionMode != "ordered" || *got.Live.MaxDisplayRate != 30 {

@@ -22,6 +22,23 @@ service CodecService {
 
   // Reads binary protobuf data without a schema.
   rpc DecodeWire(DecodeWireRequest) returns (DecodeWireResponse) {}
+
+  // Ranks the message types a payload decodes as, best first.
+  rpc DetectMessageType(DetectMessageTypeRequest) returns (DetectMessageTypeResponse) {}
+}
+
+// Request for DetectMessageType.
+message DetectMessageTypeRequest {
+  bytes data = 1 [(buf.validate.field).bytes.min_len = 1, (google.api.field_behavior) = REQUIRED];
+  // Source to search; every enabled source when unset.
+  optional string source_id = 2;
+  // Candidates to return; 5 when unset.
+  int32 limit = 3 [(buf.validate.field).int32 = {gte: 0, lte: 50}];
+}
+
+// Response for DetectMessageType.
+message DetectMessageTypeResponse {
+  repeated .natscope.types.proto.TypeCandidate candidates = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Request for DecodeWire.

@@ -63,7 +63,7 @@ func (s *Service) List(ctx context.Context, in *entities.MessageListRequest) (*e
 		toDecodeList = decodeableMessages(resp.Messages, opts.MaxPayloadBytes)
 	}
 
-	s.protoService.DecodeMessages(ctx, toDecodeList)
+	s.protoService.DecodeMessages(ctx, toDecodeList, s.detectsTypes(ctx))
 
 	if opts.ContentFilter != "" {
 		resp.Messages = filterByContent(resp.Messages, opts.ContentFilter)
@@ -96,8 +96,16 @@ func (s *Service) Get(ctx context.Context, in *entities.MessageGetRequest) (*ent
 	if err != nil {
 		return nil, err
 	}
-	s.protoService.DecodeMessages(ctx, []*entities.Message{msg})
+	s.protoService.DecodeMessages(ctx, []*entities.Message{msg}, s.detectsTypes(ctx))
 	return msg, nil
+}
+
+func (s *Service) detectsTypes(ctx context.Context) bool {
+	cfg, err := s.settingsService.Get(ctx)
+	if err != nil || cfg == nil {
+		return true
+	}
+	return cfg.Messages.DetectsTypes()
 }
 
 // buildOptions builds NATS-service options, applying user-settings

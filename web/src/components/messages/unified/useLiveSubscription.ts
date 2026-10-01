@@ -39,6 +39,8 @@ function toLiveMessage(msg: WSMessagePayload): LiveMessage {
     timestamp: msg.timestamp,
     decoded: msg.decoded ?? undefined,
     decodedType: msg.decoded_type ?? undefined,
+    decodedAuto: msg.decoded_auto,
+    decodedSourceId: msg.decoded_source_id,
     decodeError: msg.decode_error ?? undefined,
   }
 }

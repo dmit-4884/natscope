@@ -19,6 +19,19 @@ message DecodeResult {
   int32 valid_bytes = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
+// Message type a payload decodes as.
+message TypeCandidate {
+  string source_id = 1;
+  string source_revision = 2;
+  string message_type = 3;
+  // 0 to 100; 90 and above means every byte decoded and the type fits well.
+  int32 score = 4;
+  // Bytes of fields the type does not declare.
+  int32 unknown_bytes = 5;
+  // Payload decoded as this type, JSON.
+  string decoded = 6;
+}
+
 // How a payload wraps its protobuf message.
 enum FramingKind {
   FRAMING_KIND_UNSPECIFIED = 0;

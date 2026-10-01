@@ -12,20 +12,13 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
-	"github.com/dmit-4884/natscope/internal/services/proto/registry"
 )
 
 // ListTypes returns the messages, enums and services of one source, or of every enabled source when sourceID is empty.
 func (s *Service) ListTypes(ctx context.Context, sourceID string) ([]entities.SchemaType, error) {
-	var snaps []*registry.Snapshot
-	if sourceID == "" {
-		snaps = s.activeSnapshots(ctx)
-	} else {
-		snap, err := s.snapshotForSource(ctx, sourceID)
-		if err != nil {
-			return nil, err
-		}
-		snaps = []*registry.Snapshot{snap}
+	snaps, err := s.snapshotsFor(ctx, sourceID)
+	if err != nil {
+		return nil, err
 	}
 
 	var out []entities.SchemaType

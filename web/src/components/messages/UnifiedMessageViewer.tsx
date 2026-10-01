@@ -5,11 +5,11 @@ import { copyText } from '@/utils/clipboard'
 import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { useStreamDetail } from '@/contexts/streams'
-import { useMappingItems, type MappingItem } from '@/contexts/mappings'
+import { useCreateMapping, useMappingItems, type MappingItem } from '@/contexts/mappings'
 import ErrorAlert from '@/components/ui/ErrorAlert'
-import { RefreshIcon, TrashIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon, DocumentIcon } from '@/components/ui'
+import { Badge, Button, RefreshIcon, TrashIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon, DocumentIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
-import { decodeMessage } from '@/api/decode'
+import { decodeMessage, type TypeCandidate } from '@/api/decode'
 import type { Framing } from '@/api/framing'
 import { getMessage } from '@/api/messages'
 import { deleteMessage } from '@/api/management'
@@ -20,6 +20,7 @@ import { getErrorMessage } from '@/api/errors'
 import { useDisplayPreferences, useConfirmation, useBehaviorPolicy } from '@/contexts/settings'
 import PayloadViewer from './PayloadViewer'
 import { DecodeNotices, type DecodeNotes } from './DecodeNotices'
+import { DetectTypeDialog } from './DetectTypeDialog'
 import { BookmarkButton } from './Bookmarks'
 import { MessageDeleteDialog } from './MessageDeleteDialog'
 import { buildResendDraft, type ResendDraft } from './resend'
@@ -84,8 +85,12 @@ export default function UnifiedMessageViewer({
   const [decodeError, setDecodeError] = useState<string | null>(null)
   const [hasDecodedForType, setHasDecodedForType] = useState<string | null>(null)
   const [decodeNotes, setDecodeNotes] = useState<DecodeNotes | null>(null)
+  const [detectOpen, setDetectOpen] = useState(false)
+  const [picked, setPicked] = useState<TypeCandidate | null>(null)
+  const [savedMapping, setSavedMapping] = useState(false)
 
   const { data: mappings = [] } = useMappingItems()
+  const { mutate: createMapping, isPending: savingMapping } = useCreateMapping()
 
   // "Load full payload" override; reset on selection change so the button
   // reappears.
@@ -102,6 +107,9 @@ export default function UnifiedMessageViewer({
     setFullMessage(null)
     setLoadFullError(null)
     setLoadingFull(false)
+    setDetectOpen(false)
+    setPicked(null)
+    setSavedMapping(false)
   }, [selectedMessage?.id])
 
   // selectedMessage already carries all data; list endpoint returns identical
@@ -133,6 +141,8 @@ export default function UnifiedMessageViewer({
         decodeError: full.decode_error,
         decodedUnknownFields: full.decoded_unknown_fields,
         decodedValidBytes: full.decoded_valid_bytes,
+        decodedAuto: full.decoded_auto,
+        decodedSourceId: full.decoded_source_id,
       } as SelectedMessage)
       toast.success('Full payload loaded')
     } catch (err: unknown) {
@@ -205,6 +215,8 @@ export default function UnifiedMessageViewer({
           ...full,
           decodedType: full.decoded_type,
           decodeError: full.decode_error,
+          decodedAuto: full.decoded_auto,
+          decodedSourceId: full.decoded_source_id,
         } as SelectedMessage
         setFullMessage(normalized)
         resendMessage = normalized
@@ -315,51 +327,74 @@ export default function UnifiedMessageViewer({
       !decoding &&
       hasDecodedForType !== selectedProtoType
     ) {
-      const currentProtoType = selectedProtoType
-      const currentSourceId = selectedSourceId
-      const idAtCall = selectedMessage?.id
-
-      const performDecode = async () => {
-        setDecoding(true)
-        setDecodeError(null)
-        setDecodedData(null)
-        setDecodeNotes(null)
-
-        try {
-          const result = await decodeMessage({
-            data_base64: message.data_base64,
-            message_type: currentProtoType,
-            source_id: currentSourceId,
-            framing: selectedFraming,
-          })
-          if (selectionIdRef.current !== idAtCall) return
-
-          if (result.success && result.decoded) {
-            setDecodedData(result.decoded)
-            setHasDecodedForType(currentProtoType)
-            setDecodeNotes({ unknownCount: result.unknown_fields?.length ?? 0, unknownFields: result.unknown_fields })
-          } else if (result.decoded && result.valid_bytes) {
-            setDecodedData(result.decoded)
-            setHasDecodedForType(currentProtoType)
-            setDecodeError(result.error || null)
-            setDecodeNotes({ unknownCount: 0, validBytes: result.valid_bytes })
-          } else {
-            setDecodeError(result.error || 'Failed to decode message')
-            setHasDecodedForType(null)
-          }
-        } catch (err) {
-          if (selectionIdRef.current !== idAtCall) return
-          setDecodeError(`Decode failed: ${(err as Error).message}`)
-          setHasDecodedForType(null)
-        } finally {
-          if (selectionIdRef.current === idAtCall) setDecoding(false)
-        }
-      }
-
-      performDecode()
+      void runDecode(selectedProtoType, selectedSourceId, selectedFraming)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProtoType, selectedSourceId, message?.data_base64, hasDecodedForType, selectedMessage?.isLive])
+
+  const runDecode = async (messageType: string, sourceId: string, framing: Framing | undefined) => {
+    if (!message?.data_base64) return
+    const idAtCall = selectedMessage?.id
+    setDecoding(true)
+    setDecodeError(null)
+    setDecodedData(null)
+    setDecodeNotes(null)
+
+    try {
+      const result = await decodeMessage({
+        data_base64: message.data_base64,
+        message_type: messageType,
+        source_id: sourceId,
+        framing,
+      })
+      if (selectionIdRef.current !== idAtCall) return
+
+      if (result.success && result.decoded) {
+        setDecodedData(result.decoded)
+        setHasDecodedForType(messageType)
+        setDecodeNotes({ unknownCount: result.unknown_fields?.length ?? 0, unknownFields: result.unknown_fields })
+      } else if (result.decoded && result.valid_bytes) {
+        setDecodedData(result.decoded)
+        setHasDecodedForType(messageType)
+        setDecodeError(result.error || null)
+        setDecodeNotes({ unknownCount: 0, validBytes: result.valid_bytes })
+      } else {
+        setDecodeError(result.error || 'Failed to decode message')
+        setHasDecodedForType(null)
+      }
+    } catch (err) {
+      if (selectionIdRef.current !== idAtCall) return
+      setDecodeError(`Decode failed: ${(err as Error).message}`)
+      setHasDecodedForType(null)
+    } finally {
+      if (selectionIdRef.current === idAtCall) setDecoding(false)
+    }
+  }
+
+  const decodeAs = (candidate: TypeCandidate) => {
+    setDetectOpen(false)
+    setPicked(candidate)
+    setSavedMapping(false)
+    setSelectedProtoType(candidate.messageType)
+    setSelectedSourceId(candidate.sourceId)
+    setSelectedFraming(undefined)
+    setHasDecodedForType(candidate.messageType)
+    void runDecode(candidate.messageType, candidate.sourceId, undefined)
+  }
+
+  const saveMapping = (messageType: string, sourceId: string, pattern: string) => {
+    createMapping(
+      { pattern, messageType, sourceId },
+      {
+        onSuccess: () => {
+          setDetectOpen(false)
+          setSavedMapping(true)
+          toast.success(`Mapped ${pattern} to ${messageType}`)
+        },
+        onError: (err) => toast.error(`Failed to save the mapping: ${getErrorMessage(err)}`),
+      },
+    )
+  }
 
   const willAutoDecode = useMemo(() => {
     if (message?.decoded && message?.decodedType) return false
@@ -389,6 +424,13 @@ export default function UnifiedMessageViewer({
   }
 
   const displayMessage = message
+  const shownType = selectedProtoType || selectedMessage?.decodedType
+  const serverGuess =
+    message?.decodedAuto && message.decodedType && message.decodedSourceId && !picked
+      ? { messageType: message.decodedType, sourceId: message.decodedSourceId }
+      : null
+  const guess = savedMapping ? null : (picked ?? serverGuess)
+  const canDetect = message?.content_type === 'binary' && !savedMapping && (!shownType || !!guess)
 
   // Divider between the nav pair and the action icons — only when both sides render.
   const showActionSeparator =
@@ -544,13 +586,22 @@ export default function UnifiedMessageViewer({
       {/* Proto Type Info - hide for JSON messages without proto type */}
       {message?.content_type !== 'json' || selectedProtoType || selectedMessage?.decodedType ? (
         <div className="px-4 py-3 bg-surface-secondary border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <span className="text-xs font-medium text-content-tertiary">Proto Type:</span>
-              {selectedProtoType || selectedMessage?.decodedType ? (
-                <span className="text-sm font-mono text-accent bg-accent-light px-2 py-1 rounded">
-                  {selectedProtoType || selectedMessage?.decodedType}
-                </span>
+              {shownType ? (
+                <>
+                  <span className="text-sm font-mono text-accent bg-accent-light px-2 py-1 rounded truncate">
+                    {shownType}
+                  </span>
+                  {serverGuess && !savedMapping && (
+                    <Tooltip content="No mapping matches this subject. Natscope picked the only message type that fits every byte.">
+                      <Badge variant="primary" shape="pill" data-testid="decoded-auto">
+                        Auto-detected
+                      </Badge>
+                    </Tooltip>
+                  )}
+                </>
               ) : (
                 <>
                   <span className="text-sm text-content-muted">Not configured</span>
@@ -564,6 +615,32 @@ export default function UnifiedMessageViewer({
                     </button>
                   )}
                 </>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-none">
+              {guess && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={savingMapping && !detectOpen}
+                  onClick={() => saveMapping(guess.messageType, guess.sourceId, getPatternFromSubject(message!.subject))}
+                  data-testid="save-detected-mapping"
+                >
+                  Save as mapping
+                </Button>
+              )}
+              {canDetect && (
+                <Tooltip content={isTruncated ? 'Load the full payload first' : 'Rank every message type by how well this payload decodes as it'}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={isTruncated}
+                    onClick={() => setDetectOpen(true)}
+                    data-testid="detect-type"
+                  >
+                    Detect type
+                  </Button>
+                </Tooltip>
               )}
             </div>
           </div>
@@ -603,6 +680,20 @@ export default function UnifiedMessageViewer({
           />
         ) : null}
       </div>
+
+      {detectOpen && message && (
+        <DetectTypeDialog
+          dataBase64={message.data_base64}
+          subject={message.subject}
+          saving={savingMapping}
+          onClose={() => setDetectOpen(false)}
+          onUse={decodeAs}
+          onSave={(c, pattern) => {
+            decodeAs(c)
+            saveMapping(c.messageType, c.sourceId, pattern)
+          }}
+        />
+      )}
 
       {displayMessage?.sequence != null && (
         <MessageDeleteDialog

@@ -1,5 +1,5 @@
 import type { MessageFetchPolicyInput } from '@/contexts/settings'
-import { Dropdown, Input } from '@/components/ui'
+import { Dropdown, Input, Toggle } from '@/components/ui'
 import { Section, Field } from '../SettingsPrimitives'
 
 interface Props {
@@ -77,6 +77,22 @@ export function MessageFetchPolicySection({ value, onChange, isOpen, onToggle, o
             onChange({ maxPayloadBytesInList: Math.min(64, Math.max(0, Math.round(kb))) * 1024 })
           }}
         />
+      </Field>
+
+      <Field
+        label="Detect message types"
+        description="Decode binary payloads on subjects without a mapping as the Protobuf type they clearly match"
+        helpKey="messages.detectTypes"
+        onHelp={onHelp}
+      >
+        <div className="flex items-center justify-end h-8">
+          <Toggle
+            checked={value.detectTypes ?? true}
+            onChange={(next) => onChange({ detectTypes: next })}
+            label="Detect message types"
+            testId="detect-types"
+          />
+        </div>
       </Field>
     </Section>
   )

@@ -223,6 +223,11 @@ export async function updateBehavior(behavior: BehaviorSettings): Promise<void> 
   await call(SETTINGS_SERVICE, 'UpdateSettings', { behavior })
 }
 
+/** Partial-update the messages settings section. */
+export async function updateMessageSettings(messages: Record<string, unknown>): Promise<void> {
+  await call(SETTINGS_SERVICE, 'UpdateSettings', { messages })
+}
+
 /** Read the current user settings (behavior section included). */
 export async function getSettings(): Promise<{
   settings?: { behavior?: BehaviorSettings; messages?: Record<string, unknown> }

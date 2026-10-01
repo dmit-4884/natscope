@@ -21,6 +21,8 @@ export function toSelectedHistoryMessage(msg: Message): SelectedMessage {
     decodeError: msg.decode_error ?? undefined,
     decodedUnknownFields: msg.decoded_unknown_fields,
     decodedValidBytes: msg.decoded_valid_bytes,
+    decodedAuto: msg.decoded_auto,
+    decodedSourceId: msg.decoded_source_id,
     truncated: msg.truncated ?? undefined,
     isLive: false,
   }

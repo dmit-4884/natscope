@@ -5,7 +5,6 @@ package proto
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -20,6 +19,7 @@ import (
 type liveDecoder struct {
 	service  *Service
 	resolver *natsutil.MappingResolver
+	detect   bool
 
 	// Per-client snapshot cache keyed by mappingSnapshotKey; resolved lazily.
 	snapshotsByKey map[string]*registry.Snapshot
@@ -48,33 +48,26 @@ func (d *liveDecoder) Ready() bool {
 	return d.ready
 }
 
-func (d *liveDecoder) Decode(
-	ctx context.Context,
-	data []byte,
-	subject string,
-) (decoded json.RawMessage, decodedType string, decodeError string) {
+func (d *liveDecoder) Decode(ctx context.Context, data []byte, subject string) *entities.DecodeResult {
 	if !d.ready || d.resolver == nil {
-		return nil, "", ""
+		return nil
 	}
 
 	m := d.resolver.Resolve(subject)
 	if m == nil {
-		return nil, "", ""
+		if d.detect && entities.DetectContentType(data) == entities.ContentTypeBinary {
+			return d.service.autoDecode(ctx, subject, data)
+		}
+		return nil
 	}
 
 	snap, err := d.snapshotFor(ctx, m)
 	if err != nil {
-		return nil, "", err.Error()
+		return &entities.DecodeResult{Error: err.Error()}
 	}
-
 	result := decodeWithSnapshot(snap, data, m.MessageType, m.Framing)
-	if result.Success {
-		return result.Decoded, m.MessageType, ""
-	}
-	if result.Error != "" {
-		return nil, "", result.Error
-	}
-	return nil, "", ""
+	result.MessageType = m.MessageType
+	return result
 }
 
 // snapshotFor returns the snapshot the mapping resolves to (pin-aware),

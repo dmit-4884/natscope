@@ -64,6 +64,15 @@ Affects both the initial load and each "load more" request. Larger pages use mor
 
 You can always toggle direction in the toolbar — this setting only controls the default.`,
   },
+  'messages.detectTypes': {
+    title: 'Detect Message Types',
+    body: `Subject mappings always decide how a payload decodes. This setting covers binary payloads on subjects **no mapping matches**.
+
+**Enabled** (default) — Natscope tries every message type of your enabled proto sources and decodes the payload when one type fits every byte and clearly beats the rest. The viewer marks such messages **Auto-detected**; save the guess as a mapping to make it permanent.
+**Disabled** — unmapped binary payloads stay raw. Use **Detect type** in the viewer to guess one message at a time.
+
+Natscope remembers the guess per subject, treating numeric and UUID tokens as wildcards, and forgets it when a schema reloads.`,
+  },
   'live.subscriptionMode': {
     title: 'Subscription Mode',
     body: `How the live feed connects to NATS for real-time messages.

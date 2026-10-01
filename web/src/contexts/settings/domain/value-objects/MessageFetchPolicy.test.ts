@@ -77,4 +77,18 @@ describe('MessageFetchPolicy', () => {
       expect(r.error.field).toBe('exportRangeLimit')
     })
   })
+
+  describe('type detection', () => {
+    it('is on by default and when the server sends nothing', () => {
+      expect(MessageFetchPolicy.default().detectTypes).toBe(true)
+      expect(MessageFetchPolicy.fromPartial({}).detectTypes).toBe(true)
+    })
+
+    it('keeps an explicit off through fromPartial and merge', () => {
+      const off = MessageFetchPolicy.fromPartial({ detectTypes: false })
+      expect(off.detectTypes).toBe(false)
+      expect(off.merge({ defaultPageSize: 100 }).value.detectTypes).toBe(false)
+      expect(off.merge({ detectTypes: true }).value.detectTypes).toBe(true)
+    })
+  })
 })

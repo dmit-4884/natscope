@@ -112,6 +112,25 @@ type decodeOutput struct {
 	Wire          []wireFieldView    `json:"wire,omitempty" jsonschema:"schemaless dump of the payload, when neither type nor subject is given"`
 }
 
+type detectInput struct {
+	Base64   string `json:"base64" jsonschema:"payload bytes, base64-encoded"`
+	SourceID string `json:"sourceId,omitempty" jsonschema:"proto source id to search; every enabled source when omitted"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"candidates to return, 1 to 50; 5 when omitted"`
+}
+
+type detectOutput struct {
+	Candidates []candidateView `json:"candidates"`
+}
+
+type candidateView struct {
+	SourceID       string          `json:"sourceId"`
+	SourceRevision string          `json:"sourceRevision,omitempty"`
+	MessageType    string          `json:"messageType"`
+	Score          int             `json:"score" jsonschema:"0 to 100; 90 and above means every byte decoded and the type fits well"`
+	UnknownBytes   int             `json:"unknownBytes,omitempty" jsonschema:"bytes of fields the type does not declare"`
+	Decoded        json.RawMessage `json:"decoded"`
+}
+
 type unknownFieldView struct {
 	Path     string `json:"path,omitempty" jsonschema:"message holding the field, empty for the top level"`
 	Number   int32  `json:"number"`

@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/altessa-s/go-atlas/core/runtime/panics"
+	"github.com/altessa-s/go-atlas/data/cache/lru"
+
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/bsr"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
@@ -41,6 +44,7 @@ type Service struct {
 	mappingsService    mappingssvc.Service
 	fileWatcher        fwsvc.Service
 	registryCache      *registry.Cache
+	learned            *lru.Cache[string, learnedType]
 
 	// compileLocks serializes compile->persist per source; zero-value usable
 	// (lock() lazily inits) so intentionally NOT set in New().
@@ -72,6 +76,7 @@ func New(
 		mappingsService:    mappingsService,
 		fileWatcher:        fileWatcher,
 		registryCache:      registry.NewCache(descriptorsStorage),
+		learned:            panics.MustResult(lru.NewCache[string, learnedType](maxLearnedSubjects)),
 	}
 
 	if fileWatcher != nil {
@@ -92,6 +97,7 @@ func (s *Service) SetOnReloadCallback(cb ProtoReloadCallback) {
 // the current message count; called after every recompile/filewatcher reload.
 func (s *Service) notifyReload(ctx context.Context) {
 	s.recomputeConflicts(ctx)
+	s.learned.Purge()
 
 	s.reloadMu.RLock()
 	cb := s.onReload

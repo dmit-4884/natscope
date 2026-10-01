@@ -97,16 +97,22 @@ func emitWithDeadline(ctx context.Context, emit func(*entities.LiveEvent) error,
 	}
 }
 
+type loopLimits struct {
+	maxDisplayRate  int32
+	maxPayloadBytes int32
+	detect          bool
+}
+
 // runLoop is the core event loop; it rate-limits, decodes, and batches
 // messages. ctx cancellation triggers a final flush before returning.
 func (s *Service) runLoop(
 	ctx context.Context,
 	sess *sessionState,
 	msgChan <-chan *entities.NatsMessage,
-	maxDisplayRate int32,
-	maxPayloadBytes int32,
+	limits loopLimits,
 	emit func(*entities.LiveEvent) error,
 ) error {
+	maxDisplayRate, maxPayloadBytes := limits.maxDisplayRate, limits.maxPayloadBytes
 	batchTicker := time.NewTicker(batchInterval)
 	defer batchTicker.Stop()
 	statsTicker := time.NewTicker(statsInterval)
@@ -127,7 +133,7 @@ func (s *Service) runLoop(
 		lastRefill = time.Now()
 	}
 
-	decoder := s.protoService.NewLiveDecoder()
+	decoder := s.protoService.NewLiveDecoder(limits.detect)
 	subjectCounts := make(map[string]int64)
 
 	flush := func() error {
@@ -233,13 +239,16 @@ func (s *Service) runLoop(
 			}
 			// Decode runs on the full payload (protobuf can't be partial-decoded),
 			// then both the byte view and decoded JSON are truncated together.
-			decoded, decodedType, decodeErr := decoder.Decode(ctx, msg.Data, msg.Subject)
-			if len(decoded) > 0 {
-				ds := string(decoded)
-				lm.Decoded = &ds
-				lm.DecodedType = &decodedType
-			} else if decodeErr != "" {
-				lm.DecodeError = &decodeErr
+			switch r := decoder.Decode(ctx, msg.Data, msg.Subject); {
+			case r == nil:
+			case r.Success:
+				ds := string(r.Decoded)
+				lm.Decoded, lm.DecodedType, lm.DecodedAuto = &ds, &r.MessageType, r.Auto
+				if r.Auto {
+					lm.DecodedSourceID = &r.SourceID
+				}
+			case r.Error != "":
+				lm.DecodeError = &r.Error
 			}
 			truncateLiveMessage(lm, int(maxPayloadBytes))
 

@@ -94,10 +94,14 @@ func directionFromProto(d messagespb.Direction) string {
 // messageToProto converts a Message to proto; Decoded ([]byte → *string) is set
 // manually (no converter codec).
 func messageToProto(m *entities.Message) *natspb.NatsMessage {
-	pb := converter.Convert(m, &natspb.NatsMessage{}, grpchelpers.ProtoCodecs, converter.WithIgnoreFields("Decoded"))
+	pb := converter.Convert(m, &natspb.NatsMessage{}, grpchelpers.ProtoCodecs,
+		converter.WithIgnoreFields("Decoded", "DecodedSourceID"))
 	if m.Decoded != nil {
 		decoded := string(m.Decoded)
 		pb.Decoded = &decoded
+	}
+	if m.DecodedAuto {
+		pb.DecodedSourceId = &m.DecodedSourceID
 	}
 	return pb
 }

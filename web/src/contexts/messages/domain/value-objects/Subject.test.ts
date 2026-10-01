@@ -76,6 +76,12 @@ describe('Subject', () => {
       const subject = Subject.fromTrusted('orders.created')
       expect(subject.toPattern()).toBe('orders.created')
     })
+
+    it('replaces numeric and long id tokens anywhere, keeps short names with digits', () => {
+      expect(Subject.fromTrusted('orders.12345.created').toPattern()).toBe('orders.*.created')
+      expect(Subject.fromTrusted('device.a1b2c3d4e5.state').toPattern()).toBe('device.*.state')
+      expect(Subject.fromTrusted('v1.eu2.ipv4.orders').toPattern()).toBe('v1.eu2.ipv4.orders')
+    })
   })
 
   describe('matchesPattern', () => {

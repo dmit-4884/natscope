@@ -30,7 +30,7 @@ func (s *Service) Subscribe(
 	s.registerSession(sess)
 	defer s.unregisterSession(sess)
 
-	mode, maxDisplayRate, payloadCap := s.resolveSettings(ctx)
+	mode, maxDisplayRate, payloadCap, detect := s.resolveSettings(ctx)
 	// A request cap overrides the user setting; 0 means omitted, not unlimited.
 	if in.MaxPayloadBytes != nil && *in.MaxPayloadBytes > 0 {
 		payloadCap = *in.MaxPayloadBytes
@@ -58,7 +58,7 @@ func (s *Service) Subscribe(
 		}
 	}
 
-	return s.runLoop(ctx, sess, msgChan, maxDisplayRate, payloadCap, emit)
+	return s.runLoop(ctx, sess, msgChan, loopLimits{maxDisplayRate: maxDisplayRate, maxPayloadBytes: payloadCap, detect: detect}, emit)
 }
 
 // validateSubscriptionTargets rejects a malformed subject pattern before any NATS work happens.
@@ -134,14 +134,14 @@ func isLiteralSubject(subject string) bool {
 	return !strings.ContainsAny(subject, "*>")
 }
 
-// resolveSettings reads SubscriptionMode, MaxDisplayRate, and payload cap
+// resolveSettings reads SubscriptionMode, MaxDisplayRate, payload cap and type detection
 // from settings; unreadable settings fall through to server defaults.
-func (s *Service) resolveSettings(ctx context.Context) (mode string, maxDisplayRate, payloadCap int32) {
+func (s *Service) resolveSettings(ctx context.Context) (mode string, maxDisplayRate, payloadCap int32, detect bool) {
 	mode = subscriptionModeCoreNATS
 	payloadCap = entities.DefaultMaxPayloadBytesInList
 	cfg, err := s.settingsService.Get(ctx)
 	if err != nil || cfg == nil {
-		return mode, 0, payloadCap
+		return mode, 0, payloadCap, true
 	}
 	if cfg.Live != nil {
 		if cfg.Live.SubscriptionMode != nil {
@@ -154,7 +154,7 @@ func (s *Service) resolveSettings(ctx context.Context) (mode string, maxDisplayR
 	if cfg.Messages != nil && cfg.Messages.MaxPayloadBytesInList != nil {
 		payloadCap = *cfg.Messages.MaxPayloadBytesInList
 	}
-	return mode, maxDisplayRate, payloadCap
+	return mode, maxDisplayRate, payloadCap, cfg.Messages.DetectsTypes()
 }
 
 // startSubscriptions resolves every target into concrete NATS subscriptions;

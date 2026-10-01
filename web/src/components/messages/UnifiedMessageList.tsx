@@ -273,6 +273,8 @@ export default function UnifiedMessageList({
       headers: msg.headers,
       decoded: msg.decoded,
       decodedType: msg.decodedType,
+      decodedAuto: msg.decodedAuto,
+      decodedSourceId: msg.decodedSourceId,
       decodeError: msg.decodeError,
       truncated: (msg as Message).truncated ?? undefined,
       isLive: true,

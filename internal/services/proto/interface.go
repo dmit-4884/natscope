@@ -5,7 +5,6 @@ package proto
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 )
@@ -18,11 +17,8 @@ type LiveDecoder interface {
 	Reset()
 	Init(ctx context.Context)
 	Ready() bool
-	Decode(
-		ctx context.Context,
-		data []byte,
-		subject string,
-	) (decoded json.RawMessage, decodedType string, decodeError string)
+	// Decode decodes a payload by its subject; nil when nothing applies.
+	Decode(ctx context.Context, data []byte, subject string) *entities.DecodeResult
 }
 
 // Registry exposes read-only inspection of loaded proto message types,
@@ -65,12 +61,15 @@ type Codec interface {
 	// no manual source pick.
 	DecodeForMapping(ctx context.Context, data []byte, m *entities.SubjectMapping) (*entities.DecodeResult, error)
 
-	// DecodeMessages batch-decodes messages, grouping by resolved snapshot.
-	DecodeMessages(ctx context.Context, messages []*entities.Message)
+	// DecodeMessages batch-decodes messages, grouping by resolved snapshot; detect auto-detects unmapped types.
+	DecodeMessages(ctx context.Context, messages []*entities.Message, detect bool)
+
+	// DetectTypes ranks the message types of one source, or of every enabled source, by how well data decodes as each.
+	DetectTypes(ctx context.Context, data []byte, sourceID string, limit int) ([]entities.TypeCandidate, error)
 
 	// NewLiveDecoder creates a stateful decoder for live streams with lazy-init
-	// and reload.
-	NewLiveDecoder() LiveDecoder
+	// and reload; detect auto-detects unmapped types.
+	NewLiveDecoder(detect bool) LiveDecoder
 
 	// Encode converts JSON data to protobuf binary format using the resolved
 	// snapshot.

@@ -47,6 +47,8 @@ function toMessage(m: NatsMessage): Message {
     decode_error: m.decodeError,
     decoded_unknown_fields: m.decodedUnknownFields || undefined,
     decoded_valid_bytes: m.decodedValidBytes || undefined,
+    decoded_auto: m.decodedAuto || undefined,
+    decoded_source_id: m.decodedSourceId,
     truncated: m.truncated || undefined,
   }
 }

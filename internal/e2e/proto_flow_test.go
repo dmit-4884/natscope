@@ -25,8 +25,10 @@ import (
 	codecpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/codec"
 	registrypb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/registry"
 	sourcespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/sources"
+	settingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/settings/v1/settings"
 	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
+	settingstypes "github.com/dmit-4884/natscope/proto/gen/types/settings"
 )
 
 const testProtoContent = `syntax = "proto3";
@@ -298,6 +300,61 @@ func TestProtoFlow(t *testing.T) {
 		_, err = env.mappings.UpdateMapping(ctx, connect.NewRequest(&mappingspb.UpdateMappingRequest{
 			Id: mappingResp.Msg.GetMapping().GetId(), Framing: &protopb.Framing{},
 		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("type detection on an unmapped subject", func(t *testing.T) {
+		const autoStream = "PROTO_AUTO"
+		_, err := env.management.CreateStream(ctx, connect.NewRequest(&managementpb.CreateStreamRequest{
+			ConnectionId: connID, Name: autoStream, Subjects: []string{"auto.>"},
+		}))
+		require.NoError(t, err)
+
+		enc, err := env.codec.EncodeMessage(ctx, connect.NewRequest(&codecpb.EncodeMessageRequest{
+			MessageType: fullName, SourceId: sourceID, Data: `{"name":"guess","count":3}`,
+		}))
+		require.NoError(t, err)
+		payload := enc.Msg.GetResult().GetData()
+
+		detect, err := env.codec.DetectMessageType(ctx, connect.NewRequest(&codecpb.DetectMessageTypeRequest{Data: payload}))
+		require.NoError(t, err)
+		require.NotEmpty(t, detect.Msg.GetCandidates())
+		best := detect.Msg.GetCandidates()[0]
+		assert.Equal(t, fullName, best.GetMessageType())
+		assert.Equal(t, sourceID, best.GetSourceId())
+		assert.GreaterOrEqual(t, best.GetScore(), int32(85))
+		assert.JSONEq(t, `{"name":"guess","count":3,"tags":[]}`, best.GetDecoded())
+
+		nc, err := nats.Connect(env.natsURL)
+		require.NoError(t, err)
+		defer nc.Close()
+		js, err := nc.JetStream()
+		require.NoError(t, err)
+		ack, err := js.Publish("auto.1001.flow", payload)
+		require.NoError(t, err)
+
+		get := func() *natspb.NatsMessage {
+			resp, err := env.messages.GetMessage(ctx, connect.NewRequest(&messagespb.GetMessageRequest{
+				ConnectionId: connID, StreamName: autoStream, Sequence: ack.Sequence,
+			}))
+			require.NoError(t, err)
+			return resp.Msg.GetMessage()
+		}
+		got := get()
+		assert.True(t, got.GetDecodedAuto())
+		assert.Equal(t, fullName, got.GetDecodedType())
+		assert.Equal(t, sourceID, got.GetDecodedSourceId())
+		assert.Contains(t, got.GetDecoded(), "guess")
+
+		_, err = env.settings.UpdateSettings(ctx, connect.NewRequest(&settingspb.UpdateSettingsRequest{
+			Messages: &settingstypes.MessageSettings{DetectTypes: new(false)},
+		}))
+		require.NoError(t, err)
+		off := get()
+		assert.False(t, off.GetDecodedAuto())
+		assert.Empty(t, off.GetDecoded())
+
+		_, err = env.settings.ResetSettings(ctx, connect.NewRequest(&settingspb.ResetSettingsRequest{}))
 		require.NoError(t, err)
 	})
 }

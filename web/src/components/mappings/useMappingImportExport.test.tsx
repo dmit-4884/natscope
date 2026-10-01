@@ -33,7 +33,7 @@ describe('useMappingImportExport', () => {
     await waitFor(() => expect(result.current.items).toHaveLength(2))
 
     await result.current.exportToClipboard()
-    const exported = writeText.mock.calls.at(-1)?.[0] ?? ''
+    const exported = writeText.mock.lastCall?.[0] ?? ''
     expect(JSON.parse(exported).mappings).toEqual([
       { pattern: 'orders.>', messageType: 'shop.Order', framing: { kind: 'custom', prefixHex: 'cafe' } },
       { pattern: 'refunds.>', messageType: 'shop.Refund' },

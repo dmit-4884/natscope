@@ -135,6 +135,27 @@ func (t *Toolset) decode(ctx context.Context, _ *mcp.CallToolRequest, in decodeI
 	return nil, out, nil
 }
 
+func (t *Toolset) detect(ctx context.Context, _ *mcp.CallToolRequest, in detectInput) (*mcp.CallToolResult, detectOutput, error) {
+	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(in.Base64))
+	if err != nil {
+		return nil, detectOutput{}, mcptransport.Errorf("base64 is not valid standard base64: %v", err)
+	}
+	if len(data) == 0 {
+		return nil, detectOutput{}, mcptransport.Errorf("base64 decodes to an empty payload")
+	}
+	limit := in.Limit
+	if limit <= 0 {
+		limit = defaultDetectLimit
+	}
+	candidates, err := t.codec.DetectTypes(ctx, data, strings.TrimSpace(in.SourceID), min(limit, maxDetectLimit))
+	if err != nil {
+		return nil, detectOutput{}, err
+	}
+	return nil, detectOutput{Candidates: mcptransport.Items(slices.To(candidates, func(c entities.TypeCandidate) candidateView {
+		return *converter.Convert(&c, &candidateView{})
+	}))}, nil
+}
+
 func wireViews(fields []*entities.WireField) []wireFieldView {
 	return slices.To(fields, func(f *entities.WireField) wireFieldView {
 		v := *converter.Convert(f, &wireFieldView{}, converter.WithIgnoreFields("Message"))

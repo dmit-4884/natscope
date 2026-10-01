@@ -79,3 +79,17 @@ func TestToProtoLiveMessage_NoSequenceNoStreamNoHeaders(t *testing.T) {
 	assert.Nil(t, pb.Stream, "empty string src → nil *string dst")
 	assert.Empty(t, pb.Headers, "nil header map → empty/nil destination")
 }
+
+func TestToProtoLiveBatchMessage_AutoDetected(t *testing.T) {
+	t.Parallel()
+	decoded, messageType, sourceID := `{"id":"1"}`, "shop.Order", "src-1"
+	pb := toProtoLiveBatchMessage(&entities.LiveMessage{
+		NatsMessage: entities.NatsMessage{Subject: "orders.1", Data: []byte{0x0a, 0x01, '1'}},
+		Decoded:     &decoded, DecodedType: &messageType, DecodedAuto: true, DecodedSourceID: &sourceID,
+	})
+
+	assert.True(t, pb.GetDecodedAuto())
+	assert.Equal(t, "src-1", pb.GetDecodedSourceId())
+	assert.Equal(t, "shop.Order", pb.GetDecodedType())
+	assert.JSONEq(t, decoded, pb.GetDecoded())
+}

@@ -118,3 +118,26 @@ export async function decodeWire(dataBase64: string): Promise<WireDump> {
   const response = await codecClient.decodeWire({ data: decodeBase64ToBytes(dataBase64) })
   return { fields: response.fields.map(toWireField), validBytes: response.validBytes, error: response.error }
 }
+
+export interface TypeCandidate {
+  sourceId: string
+  sourceRevision: string
+  messageType: string
+  /** 0 to 100; 90 and above means every byte decoded and the type fits well. */
+  score: number
+  unknownBytes: number
+  decoded: unknown
+}
+
+/** Ranks the message types of every enabled source by how well the payload decodes as each, best first. */
+export async function detectMessageType(dataBase64: string, limit = 5): Promise<TypeCandidate[]> {
+  const response = await codecClient.detectMessageType({ data: decodeBase64ToBytes(dataBase64), limit })
+  return response.candidates.map((c) => ({
+    sourceId: c.sourceId,
+    sourceRevision: c.sourceRevision,
+    messageType: c.messageType,
+    score: c.score,
+    unknownBytes: c.unknownBytes,
+    decoded: JSON.parse(c.decoded) as unknown,
+  }))
+}

@@ -11,6 +11,7 @@ describe('toDomainSettings', () => {
         fetchMethod: 'consumer',
         defaultPageSize: 200,
         defaultDirection: 'forward',
+        detectTypes: false,
       },
       live: {
         subscriptionMode: 'jetstream_ordered',
@@ -30,6 +31,7 @@ describe('toDomainSettings', () => {
     expect(s.id).toBe('u1')
     expect(s.messages.fetchMethod).toBe('consumer')
     expect(s.messages.defaultPageSize).toBe(200)
+    expect(s.messages.detectTypes).toBe(false)
     expect(s.live.subscriptionMode).toBe('jetstream_ordered')
     expect(s.live.maxDisplayRate).toBe(1000)
     expect(s.display.jsonIndentSize).toBe(4)
@@ -41,6 +43,7 @@ describe('toDomainSettings', () => {
     const proto = create(UserSettingsSchema, { id: 'u1' })
     const s = toDomainSettings(proto)
     expect(s.messages.fetchMethod).toBe('consumer')
+    expect(s.messages.detectTypes).toBe(true)
     expect(s.live.subscriptionMode).toBe('core_nats')
     expect(s.display.density).toBe('comfortable')
     expect(s.publish.publishTimeoutSec).toBe(10)

@@ -14,6 +14,7 @@ export function toDomainSettings(proto: ProtoUserSettings): UserSettings {
           maxPayloadBytesInList: proto.messages.maxPayloadBytesInList,
           defaultExportFormat: proto.messages.defaultExportFormat,
           exportRangeLimit: proto.messages.exportRangeLimit,
+          detectTypes: proto.messages.detectTypes,
         }
       : null,
     live: proto.live

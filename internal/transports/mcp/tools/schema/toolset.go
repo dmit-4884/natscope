@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	defaultTypesLimit = 200
-	maxTypesLimit     = 2000
+	defaultTypesLimit  = 200
+	maxTypesLimit      = 2000
+	defaultDetectLimit = 5
+	maxDetectLimit     = 50
 )
 
 // Toolset serves the schema tools.
@@ -63,6 +65,13 @@ func (t *Toolset) Register(s *mcp.Server) {
 			"for a broken payload, how many leading bytes still decoded.",
 		Annotations: mcptransport.ReadOnly("Decode payload"),
 	}, t.decode)
+
+	mcptransport.AddTool(s, &mcp.Tool{
+		Name: "detect_message_type",
+		Description: "Guess which Protobuf message type a base64 payload is: every loaded type is tried and ranked by how well " +
+			"the bytes decode. Use it for payloads on subjects without a mapping, then save the winner with a subject mapping.",
+		Annotations: mcptransport.ReadOnly("Detect message type"),
+	}, t.detect)
 
 	mcptransport.AddTool(s, &mcp.Tool{
 		Name: "validate_payload",

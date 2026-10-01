@@ -23,6 +23,14 @@ type MessageSettings struct {
 	// ExportRangeLimit caps full-range export size; client owns the ceiling.
 	// Stored 0 normalizes to nil on Update since a range export needs a bound.
 	ExportRangeLimit *int32
+
+	// DetectTypes decodes unmapped binary payloads with the type they confidently match; nil means on.
+	DetectTypes *bool
+}
+
+// DetectsTypes reports whether unmapped payloads get auto-detected types.
+func (m *MessageSettings) DetectsTypes() bool {
+	return m == nil || m.DetectTypes == nil || *m.DetectTypes
 }
 
 // DefaultMaxPayloadBytesInList server-side fallback, tuned small (4 KB) to

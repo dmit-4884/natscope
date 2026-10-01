@@ -12,6 +12,8 @@ export interface LiveMessagePayload {
   headers?: Record<string, string>
   decoded?: unknown
   decoded_type?: string
+  decoded_auto?: boolean
+  decoded_source_id?: string
   decode_error?: string
   /** Server capped payload; data_size still holds the original byte count. */
   truncated?: boolean
@@ -30,6 +32,8 @@ export function toLiveMessagePayload(msg: NatsMessage, streamName: string): Live
     headers: Object.keys(msg.headers).length > 0 ? msg.headers : undefined,
     decoded: msg.decoded ? tryParse(msg.decoded, msg.truncated) : undefined,
     decoded_type: msg.decodedType,
+    decoded_auto: msg.decodedAuto || undefined,
+    decoded_source_id: msg.decodedSourceId,
     decode_error: msg.decodeError,
     truncated: msg.truncated || undefined,
   }

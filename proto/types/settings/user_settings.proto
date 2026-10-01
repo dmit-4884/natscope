@@ -64,6 +64,9 @@ message MessageSettings {
   // the server. nil = 50000. 0 is treated as the default (not "unlimited") —
   // range export always needs a ceiling to bound the cursor loop.
   optional int32 export_range_limit = 6 [(buf.validate.field).int32 = {gte: 0}];
+
+  // Decode unmapped binary payloads with the message type they confidently match. nil = on.
+  optional bool detect_types = 7;
 }
 
 // LiveSettings configures live message subscription behavior.
