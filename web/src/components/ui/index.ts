@@ -65,6 +65,7 @@ export {
   UploadIcon,
   InfoIcon,
   BoltIcon,
+  LogoIcon,
   LockClosedIcon,
   UsersIcon,
   EyeIcon,

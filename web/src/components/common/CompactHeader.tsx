@@ -4,7 +4,7 @@ import type { SavedConnection } from '@/api/connections'
 import { useConnections , useConnectionHealth, type ConnectionStatus } from '@/contexts/connection'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
-import { Badge, BoltIcon, ChevronDownIcon, PlusIcon, RefreshIcon } from '@/components/ui'
+import { Badge, ChevronDownIcon, LogoIcon, PlusIcon, RefreshIcon } from '@/components/ui'
 import type { ConnectionSummary } from './ConnectedLayout'
 import { SIDEBAR_PANEL_ID } from './Sidebar'
 import Tooltip from './Tooltip'
@@ -121,9 +121,7 @@ export default function CompactHeader({
 
         {/* App icon and title */}
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-            <BoltIcon className="w-5 h-5 text-content-inverse" />
-          </div>
+          <LogoIcon className="w-7 h-7 text-accent" />
           <span className="font-semibold text-content-primary">Natscope</span>
         </div>
 

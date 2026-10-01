@@ -174,6 +174,19 @@ export function BoltIcon({ className }: IconProps) {
   )
 }
 
+export function LogoIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 32 32" aria-hidden="true" strokeWidth={3} className={className ?? 'w-4 h-4'}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M5 11V7a2 2 0 0 1 2-2h4M21 5h4a2 2 0 0 1 2 2v4M27 21v4a2 2 0 0 1-2 2h-4M11 27H7a2 2 0 0 1-2-2v-4"
+      />
+      <circle cx="16" cy="16" r="4" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
 export function LockClosedIcon({ className }: IconProps) {
   return (
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>

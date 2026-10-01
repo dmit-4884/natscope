@@ -18,7 +18,7 @@ import {
   useTestConnection,
   type AuthMethod,
 } from '@/contexts/connection'
-import { Alert, BoltIcon, CloseIcon, EyeIcon, EyeOffIcon, Input, PlusIcon, QueryErrorState, Spinner } from '@/components/ui'
+import { Alert, CloseIcon, EyeIcon, EyeOffIcon, Input, LogoIcon, PlusIcon, QueryErrorState, Spinner } from '@/components/ui'
 import { AUTH_LABELS } from './manager/connectionFormData'
 
 type AuthMethodTab = AuthMethod
@@ -231,9 +231,7 @@ export default function ConnectionSelector() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg mb-4">
-            <BoltIcon className="w-10 h-10 text-content-inverse" />
-          </div>
+          <LogoIcon className="mx-auto w-16 h-16 text-accent mb-4" />
           <h1 className="text-2xl font-bold text-content-primary">Natscope</h1>
           <p className="mt-2 text-sm text-content-tertiary">Connect to your NATS server to get started</p>
         </div>
