@@ -11,8 +11,6 @@ browse its keys and edit values.
 Writes are revision-checked. Natscope sends the revision you loaded, so a stale edit gets rejected
 instead of silently overwriting someone else's change.
 
-<Video src="/media/kv.mp4" poster="/media/kv.jpg" caption="Browsing a KV bucket and its revision history." />
-
 ## Create a bucket
 
 Click the **+** next to **KV Stores**, or **New KV bucket** on the overview page. The form groups the
@@ -36,8 +34,6 @@ Select a bucket, then a key. The editor gives you:
 
 **History** lists every revision of a key with its operation badge: **put**, **delete** or **purge**.
 Walk back through them to see what a value looked like and when it changed.
-
-<Shot src="/media/kv-history.png" alt="KV revision history" />
 
 ## Confirmations
 

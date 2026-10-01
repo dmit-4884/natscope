@@ -10,8 +10,6 @@ counters. Selecting one opens the full config for editing.
 
 Natscope supports both pull and push consumers, durable and ephemeral.
 
-<Video src="/media/consumers.mp4" poster="/media/consumers.jpg" caption="Consumer list and detail view with live counters." />
-
 ## Create a consumer
 
 1. Open a stream, go to the **Consumers** tab.
@@ -28,8 +26,6 @@ The form covers the JetStream consumer surface:
 - **Flow control** for push consumers
 - **Deliver subject** and **deliver group** for push consumers
 - **Replicas**
-
-<Shot src="/media/consumers-detail.png" alt="Consumer detail" />
 
 ## Edit a consumer
 

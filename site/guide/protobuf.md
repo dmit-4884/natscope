@@ -11,8 +11,6 @@ tail and the publish preview. Two pieces make that work.
 1. A **proto source** gives Natscope your `.proto` files and compiles them into descriptors.
 2. A **subject mapping** binds a NATS subject pattern to a fully-qualified message type.
 
-<Video src="/media/proto.mp4" poster="/media/proto.jpg" caption="Attaching a proto source and mapping, then decoding a binary payload." />
-
 ## Add a proto source
 
 Go to **Settings → Proto Files** and click **Add source**. Three kinds:
@@ -23,8 +21,6 @@ Go to **Settings → Proto Files** and click **Add source**. Three kinds:
 
 Compilation resolves `buf.lock` dependencies from the buf module cache and ships the well-known types.
 When it fails, the diagnostics name the file, the line and the missing import.
-
-<Shot src="/media/proto-sources.png" alt="Proto sources" />
 
 ### Versions
 
@@ -47,8 +43,6 @@ Go to **Settings → Mappings** and add one. The form is three steps:
 
 Click **Add mapping**. Use **Import**, **Export** and **Copy** in the toolbar to move mappings in bulk
 between workspaces.
-
-<Shot src="/media/proto-mappings.png" alt="Subject mappings" />
 
 ### Health checks
 

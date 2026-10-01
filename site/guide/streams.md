@@ -11,8 +11,6 @@ five tabs: **Messages**, **Config**, **Consumers**, **Relations** and **Publish*
 You can create a stream, edit its config, purge it, seal it and delete it without dropping to the
 `nats` CLI.
 
-<Video src="/media/streams.mp4" poster="/media/streams.jpg" caption="Creating a stream and reviewing its config." />
-
 ## Find and arrange streams
 
 The sidebar loads only stream names, so it stays quick with thousands of streams. It shows the first 12;
@@ -55,15 +53,11 @@ Natscope reads the server's JetStream API level when it connects. An option the 
 stays visible but disabled, and its hint names the NATS version it needs. **Server information** in the
 header lists what the connected server supports.
 
-<Shot src="/media/stream-create.png" alt="Create stream" />
-
 ## Inspect and edit config
 
 The **Config** tab shows the current stream configuration and lets you edit it in place. Saving opens a
 diff first: **Confirm Stream Configuration Changes** lists exactly which fields change before anything
 reaches the server.
-
-<Shot src="/media/streams-info.png" alt="Stream config" />
 
 ## Relations
 

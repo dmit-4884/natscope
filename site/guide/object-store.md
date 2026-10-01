@@ -8,15 +8,11 @@ description: Browse JetStream Object Store buckets, upload and download objects,
 **Object Store** in the sidebar lists the JetStream Object Store buckets on the connected server. Open
 one to see its objects with their sizes and metadata.
 
-<Video src="/media/objects.mp4" poster="/media/objects.jpg" caption="Browsing an object bucket and uploading a file." />
-
 ## Create a bucket
 
 Click the **+** next to **Object Store**, or **New object bucket** on the overview page. The **Create
 New Object Store** form groups its config into **Basic Configuration**, **Limits** and **Storage
 Options** (storage type, replicas, compression). Click **Create Object Store**.
-
-<Shot src="/media/objects-list.png" alt="Object bucket list" />
 
 ## Upload and download
 

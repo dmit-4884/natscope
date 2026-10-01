@@ -19,8 +19,6 @@ description: Connections, proto files, mappings, templates, preferences and work
 Preferences save to the backend per user, so they follow you across browsers on the same Natscope
 instance.
 
-<Shot src="/media/settings.png" alt="Settings" />
-
 ## Preferences
 
 Five collapsible sections.

@@ -14,8 +14,6 @@ right event?" used to mean writing a throwaway decoder or pasting base64 into a 
 compiles your `.proto` files, maps subjects to message types, and renders those payloads as JSON in the
 message browser, in live tail, and in the publish preview.
 
-<Video src="/media/overview.mp4" poster="/media/overview.jpg" caption="Browsing a stream and opening a message." />
-
 ## What it does
 
 - **Connections** to any NATS server or cluster: user/password, token, NKey and credentials-file auth, plus full TLS and mTLS.

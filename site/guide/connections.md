@@ -30,12 +30,6 @@ Go to **Settings → Connections** (or click **New Connection** on the start scr
 5. Click **Test** to check round-trip time, server version and JetStream availability.
 6. Click **Connect**.
 
-<Shot src="/media/connections-list.png" alt="Connections list" />
-
-<Shot src="/media/connection-form.png" alt="Connection form" />
-
-<Video src="/media/connect.mp4" poster="/media/connect.jpg" caption="Creating and testing a cluster connection." />
-
 ## Manage saved connections
 
 Each connection row carries its own actions:

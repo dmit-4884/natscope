@@ -23,8 +23,6 @@ The first screen lists **Saved Connections**. Click **New Connection**, then:
 Credentials go to your OS keychain or an encrypted file vault, never into the database. See
 [Secrets](/reference/secrets).
 
-<Video src="/media/connect.mp4" poster="/media/connect.jpg" caption="Creating and testing a cluster connection." />
-
 ## 2. Pick a stream
 
 The sidebar lists **Streams**, **KV Stores** and **Object Store** for the connected server. Click a
@@ -40,8 +38,6 @@ the side panel: NATS headers, timing, and the payload as decoded JSON, raw text,
 
 Use **Filters** to narrow by subject (NATS wildcards `*` and `>` work), search the payload text, or jump
 to a sequence or timestamp.
-
-<Video src="/media/overview.mp4" poster="/media/overview.jpg" caption="Browsing a stream and opening a message." />
 
 ## Where to go next
 

@@ -52,22 +52,6 @@
   max-width: 830px !important;
 }
 
-@media (min-width: 1280px) {
-  .VPDoc .ns-video,
-  .VPDoc .ns-shot {
-    width: calc(100% + 96px);
-    margin-left: -48px;
-  }
-}
-
-@media (min-width: 1600px) {
-  .VPDoc .ns-video,
-  .VPDoc .ns-shot {
-    width: calc(100% + 220px);
-    margin-left: -110px;
-  }
-}
-
 .VPNavBarSearch.search {
   flex-grow: 1;
   padding-left: 24px;

@@ -12,14 +12,10 @@ machine, or hand a working configuration to a teammate.
 **Secrets never leave.** Passwords, tokens, NKey seeds, credentials files and TLS private keys stay in
 the vault. Imported connections are flagged so you know to re-enter their credentials.
 
-<Video src="/media/workspace.mp4" poster="/media/workspace.jpg" caption="Exporting a workspace and importing it back with a dry-run preview." />
-
 ## Export
 
 Go to **Settings → Workspace → Export workspace**. Tick the sections you want, each showing its item
 count, then click **Download workspace**.
-
-<Shot src="/media/workspace-export.png" alt="Workspace export" />
 
 ## Import
 

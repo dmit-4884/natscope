@@ -10,8 +10,6 @@ messages, newest first. Click a row and the side panel shows its NATS headers, t
 
 The same tab flips to **Realtime** for live tailing. See [Live tail](/guide/live-tail).
 
-<Video src="/media/messages.mp4" poster="/media/messages.jpg" caption="Filtering a stream by subject and inspecting a message." />
-
 ## Filter and search
 
 Click **Filters** in the toolbar to open the filter panel:
@@ -24,8 +22,6 @@ Click **Filters** in the toolbar to open the filter panel:
 
 **Apply** runs the filter, **Reset** clears it. Active filters show as chips above the list.
 
-<Shot src="/media/messages-filters.png" alt="Message filters" />
-
 ## Read a payload
 
 The payload viewer has several views of the same bytes:
@@ -36,10 +32,6 @@ The payload viewer has several views of the same bytes:
 - **Base64**
 
 NATS headers sit alongside the payload.
-
-<Shot src="/media/message-hex.png" alt="Hex payload view" />
-
-<Shot src="/media/message-decoded.png" alt="Decoded payload view" />
 
 ## Paging and direction
 

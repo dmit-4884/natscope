@@ -8,8 +8,6 @@ description: Save a subject, message type, payload and headers as a reusable pub
 A template is a saved publish draft: subject, message type, JSON body and headers in one preset. Use
 them for the messages you send over and over while testing a service.
 
-<Video src="/media/templates.mp4" poster="/media/templates.jpg" caption="Saving a publish draft as a template and loading it back." />
-
 ## Save a template
 
 From the **Publish** tab of any stream, fill in the form and click **Save as template**. Give it a name
@@ -32,7 +30,5 @@ The dropdown also links to **Manage all in Settings →**.
 - **Import** and **Export** move templates between workspaces as JSON
 - **Copy** puts the selection on the clipboard
 - Select several rows for **Delete selected**, or wipe the list with **Clear all**
-
-<Shot src="/media/templates-list.png" alt="Template list" />
 
 Templates travel in a [workspace export](/guide/workspace) as their own section.

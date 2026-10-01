@@ -13,8 +13,6 @@ records the subject, the encoding, the payload and the result, so you can prove 
 Open the **Publish** tab of any stream. The **Publish History** panel sits in the right-hand side panel,
 the same slot the message viewer uses on the other tabs.
 
-<Shot src="/media/publish-history.png" alt="Publish history" />
-
 ## Find an entry
 
 - Toggle between **Current Stream** and **All Streams** to widen or narrow the scope.

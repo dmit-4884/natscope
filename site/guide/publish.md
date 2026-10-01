@@ -9,8 +9,6 @@ The **Publish** tab of a stream sends a message. Write raw JSON or text for plai
 Natscope encode JSON into Protobuf binary when a [subject mapping](/guide/protobuf) resolves the message
 type.
 
-<Video src="/media/publish.mp4" poster="/media/publish.jpg" caption="Publishing a schema-validated Protobuf message." />
-
 ## Publish a message
 
 1. Open a stream and go to the **Publish** tab.
@@ -19,8 +17,6 @@ type.
 4. Write the payload. With a resolved Protobuf type you get field autocompletion and live validation.
 5. Add NATS headers if you need them.
 6. Click **Publish Message**, or press `Cmd+Enter` (`Ctrl+Enter` on Windows and Linux).
-
-<Shot src="/media/publish-form.png" alt="Publish form" />
 
 ## Schema validation
 

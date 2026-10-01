@@ -12,8 +12,6 @@ arrive.
 Payloads decode on the fly. When you change a `.proto` source while a live session runs, Natscope
 re-decodes with the new schema without a reconnect. See [Protobuf](/guide/protobuf).
 
-<Video src="/media/live.mp4" poster="/media/live.jpg" caption="Realtime tail of a work queue, throttled to a readable rate." />
-
 ## Start a tail
 
 1. Open a stream and go to the **Messages** tab.
