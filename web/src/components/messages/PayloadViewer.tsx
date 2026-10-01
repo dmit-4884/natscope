@@ -4,8 +4,9 @@ import { copyText } from '@/utils/clipboard'
 import { decodeBase64ToBytes } from '@/utils/base64'
 import { formatBytes } from '@/utils/formatters'
 import JsonTreeViewer from './JsonTreeViewer'
+import { WireView } from './WireView'
 
-type ViewMode = 'decoded' | 'json' | 'raw' | 'hex'
+type ViewMode = 'decoded' | 'json' | 'raw' | 'hex' | 'wire'
 
 interface PayloadViewerProps {
   rawData: string  // base64 encoded data
@@ -131,6 +132,7 @@ const PayloadViewer = memo(function PayloadViewer({
     { mode: 'json' as const, label: 'JSON', available: !!jsonData && !decodedData },
     { mode: 'raw' as const, label: 'Raw', available: true },
     { mode: 'hex' as const, label: 'Hex', available: !!bytes },
+    { mode: 'wire' as const, label: 'Wire', available: !!bytes && bytes.length > 0 && !jsonData },
   ]
   const availableModes = allModes.filter(m => m.available)
 
@@ -251,6 +253,8 @@ const PayloadViewer = memo(function PayloadViewer({
             </div>
           </div>
         )}
+
+        {viewMode === 'wire' && bytes && <WireView dataBase64={rawData} totalBytes={bytes.length} />}
 
         {/* Headers */}
         {headers && Object.keys(headers).length > 0 && (

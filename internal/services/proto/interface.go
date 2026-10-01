@@ -58,6 +58,9 @@ type Codec interface {
 	// Decode decodes via the schema picked by req.SourceID and req.Fingerprint.
 	Decode(ctx context.Context, req entities.CodecRequest) (*entities.DecodeResult, error)
 
+	// DecodeWire reads a payload without a schema.
+	DecodeWire(data []byte) *entities.WireDump
+
 	// DecodeForMapping decodes against the mapping's bound source — safest path,
 	// no manual source pick.
 	DecodeForMapping(ctx context.Context, data []byte, m *entities.SubjectMapping) (*entities.DecodeResult, error)

@@ -47,4 +47,10 @@ message NatsMessage {
   // data_size remains the original byte count. The full payload can be
   // retrieved via MessagesService.Get(sequence).
   bool truncated = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Fields the payload carries but the decoding schema does not declare.
+  int32 decoded_unknown_fields = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Set when decoding failed but the first decoded_valid_bytes decoded into decoded.
+  int32 decoded_valid_bytes = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

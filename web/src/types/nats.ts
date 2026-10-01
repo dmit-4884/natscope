@@ -212,6 +212,8 @@ export interface Message {
   decoded?: Record<string, unknown> | string
   decoded_type?: string
   decode_error?: string
+  decoded_unknown_fields?: number
+  decoded_valid_bytes?: number
   // When true, data_base64/decoded were capped per
   // settings.messages.maxPayloadBytesInList; use MessagesService.Get for full payload.
   truncated?: boolean

@@ -58,8 +58,9 @@ func (t *Toolset) Register(s *mcp.Server) {
 
 	mcptransport.AddTool(s, &mcp.Tool{
 		Name: "decode_payload",
-		Description: "Decode a base64 Protobuf payload to JSON, either as an explicit message type or through the mapping of a subject. " +
-			"Handy for payloads found in logs or tests.",
+		Description: "Decode a base64 Protobuf payload to JSON, either as an explicit message type or through the mapping of a subject; " +
+			"with neither, dump its wire fields without a schema. Reports fields the schema does not declare and, " +
+			"for a broken payload, how many leading bytes still decoded.",
 		Annotations: mcptransport.ReadOnly("Decode payload"),
 	}, t.decode)
 

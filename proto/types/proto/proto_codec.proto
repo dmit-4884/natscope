@@ -12,6 +12,48 @@ message DecodeResult {
   string message_type = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   // Optional. Error message if decoding failed.
   optional string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Fields the payload carries but the schema does not declare.
+  repeated UnknownField unknown_fields = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Set when decoding failed but the first valid_bytes decoded into data.
+  int32 valid_bytes = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// How a field is encoded on the wire.
+enum WireType {
+  WIRE_TYPE_UNSPECIFIED = 0;
+  WIRE_TYPE_VARINT = 1;
+  WIRE_TYPE_FIXED64 = 2;
+  WIRE_TYPE_BYTES = 3;
+  WIRE_TYPE_GROUP = 4;
+  WIRE_TYPE_FIXED32 = 5;
+}
+
+// Field the schema does not declare.
+message UnknownField {
+  // Path of the message holding it, e.g. "items[0].price"; empty for the top level.
+  string path = 1;
+  int32 number = 2;
+  WireType wire_type = 3;
+  // Bytes on the wire, tag included.
+  int32 size = 4;
+}
+
+// Payload field read without a schema.
+message WireField {
+  int32 number = 1;
+  WireType wire_type = 2;
+  // Byte offset of the tag in the payload.
+  int32 offset = 3;
+  // Bytes on the wire, tag included.
+  int32 length = 4;
+  uint64 varint = 5;
+  // Raw fixed32 or fixed64 value.
+  uint64 fixed = 6;
+  bytes bytes = 7;
+  // Bytes as text when they are printable UTF-8.
+  string text = 8;
+  // Fields of bytes, or a group, that parse as a message.
+  repeated WireField message = 9;
 }
 
 // Defines result of protobuf message encoding.

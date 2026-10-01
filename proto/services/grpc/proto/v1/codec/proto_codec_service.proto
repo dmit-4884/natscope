@@ -19,6 +19,22 @@ service CodecService {
 
   // Validates binary protobuf data against the specified message type schema.
   rpc ValidateMessage(ValidateMessageRequest) returns (ValidateMessageResponse) {}
+
+  // Reads binary protobuf data without a schema.
+  rpc DecodeWire(DecodeWireRequest) returns (DecodeWireResponse) {}
+}
+
+// Request for DecodeWire.
+message DecodeWireRequest {
+  bytes data = 1 [(buf.validate.field).bytes.min_len = 1, (google.api.field_behavior) = REQUIRED];
+}
+
+// Response for DecodeWire.
+message DecodeWireResponse {
+  repeated .natscope.types.proto.WireField fields = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Bytes that form whole fields; less than the payload when error is set.
+  int32 valid_bytes = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the request message for decoding binary protobuf data.

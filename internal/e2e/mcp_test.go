@@ -508,7 +508,18 @@ func TestMCPProtoPublishAndDecode(t *testing.T) {
 			assert.Equal(t, fullName, out.MessageType)
 			assert.JSONEq(t, `{"name":"wire","count":7,"tags":[]}`, string(out.Decoded))
 		}
-		assert.Contains(t, callToolError(t, cs, "decode_payload", map[string]any{"base64": wire}), "pass type or subject")
+		dump := callTool[struct {
+			Wire []struct {
+				Number   int32  `json:"number"`
+				WireType string `json:"wireType"`
+				Text     string `json:"text"`
+				Varint   uint64 `json:"varint"`
+			} `json:"wire"`
+		}](t, cs, "decode_payload", map[string]any{"base64": wire})
+		require.Len(t, dump.Wire, 2)
+		assert.Equal(t, "wire", dump.Wire[0].Text)
+		assert.Equal(t, "bytes", dump.Wire[0].WireType)
+		assert.Equal(t, uint64(7), dump.Wire[1].Varint)
 	})
 }
 

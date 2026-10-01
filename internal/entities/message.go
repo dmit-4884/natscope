@@ -39,6 +39,9 @@ type Message struct {
 	DecodedType string
 	DecodeError string
 
+	DecodedUnknownFields int
+	DecodedValidBytes    int
+
 	// Truncated means DataBase64/Decoded were capped for preview; DataSize keeps
 	// the original size, full data via Get(sequence).
 	Truncated bool

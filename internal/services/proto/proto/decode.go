@@ -66,6 +66,16 @@ func (s *Service) Decode(ctx context.Context, req entities.CodecRequest) (*entit
 	return result, nil
 }
 
+// DecodeWire reads a payload without a schema.
+func (s *Service) DecodeWire(data []byte) *entities.WireDump {
+	fields, valid, err := protoutils.DecodeWire(data)
+	dump := &entities.WireDump{Fields: fields, ValidBytes: valid}
+	if err != nil {
+		dump.Error = err.Error()
+	}
+	return dump
+}
+
 // DecodeForMapping decodes a payload for the source the mapping is bound to.
 func (s *Service) DecodeForMapping(
 	ctx context.Context,
@@ -105,13 +115,15 @@ func decodeWithDescriptor(
 ) *entities.DecodeResult {
 	msg := dynamicpb.NewMessage(md)
 	if unmarshalErr := schema.ParseBinary(data, msg); unmarshalErr != nil {
-		return &entities.DecodeResult{
+		result := &entities.DecodeResult{
 			Success: false,
 			Error: fmt.Sprintf(
 				"Cannot decode message as %q: %s%s",
 				messageType, unmarshalErr.Error(), protoutils.FramingHint(data),
 			),
 		}
+		result.Decoded, result.ValidBytes = decodePrefix(schema, md, data)
+		return result
 	}
 
 	rawJSON, err := schema.RenderJSON(msg)
@@ -123,9 +135,26 @@ func decodeWithDescriptor(
 	}
 
 	return &entities.DecodeResult{
-		Success: true,
-		Decoded: rawJSON,
+		Success:       true,
+		Decoded:       rawJSON,
+		UnknownFields: protoutils.UnknownFields(msg),
 	}
+}
+
+func decodePrefix(schema *protoutils.Schema, md protoreflect.MessageDescriptor, data []byte) (json.RawMessage, int) {
+	_, valid, _ := protoutils.DecodeWire(data) //nolint:errcheck // the error marks where the valid prefix ends
+	if valid == 0 || valid == len(data) {
+		return nil, 0
+	}
+	msg := dynamicpb.NewMessage(md)
+	if schema.ParseBinary(data[:valid], msg) != nil {
+		return nil, 0
+	}
+	rawJSON, err := schema.RenderJSON(msg)
+	if err != nil {
+		return nil, 0
+	}
+	return rawJSON, valid
 }
 
 // DecodeMessages decodes a slice of messages: resolve each mapping →
@@ -184,11 +213,12 @@ func (s *Service) DecodeMessages(ctx context.Context, messages []*entities.Messa
 			if r == nil {
 				continue
 			}
-			if r.Success {
+			messages[idx].DecodeError = r.Error
+			if r.Success || r.ValidBytes > 0 {
 				messages[idx].Decoded = r.Decoded
 				messages[idx].DecodedType = g.mts[j]
-			} else if r.Error != "" {
-				messages[idx].DecodeError = r.Error
+				messages[idx].DecodedUnknownFields = len(r.UnknownFields)
+				messages[idx].DecodedValidBytes = r.ValidBytes
 			}
 		}
 	}

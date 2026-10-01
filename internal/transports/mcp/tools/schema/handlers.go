@@ -117,13 +117,35 @@ func (t *Toolset) decode(ctx context.Context, _ *mcp.CallToolRequest, in decodeI
 		messageType = m.MessageType
 		res, err = t.codec.DecodeForMapping(ctx, data, m)
 	default:
-		return nil, decodeOutput{}, mcptransport.Errorf("pass type or subject")
+		dump := t.codec.DecodeWire(data)
+		return nil, decodeOutput{Wire: wireViews(dump.Fields), ValidBytes: dump.ValidBytes, Error: dump.Error}, nil
 	}
 	if err != nil {
 		return nil, decodeOutput{}, err
 	}
-	out := decodeOutput{MessageType: cmp.Or(res.MessageType, messageType), Decoded: res.Decoded, Error: res.Error}
+	out := decodeOutput{
+		MessageType: cmp.Or(res.MessageType, messageType),
+		Decoded:     res.Decoded,
+		Error:       res.Error,
+		ValidBytes:  res.ValidBytes,
+		UnknownFields: slices.To(res.UnknownFields, func(f entities.UnknownField) unknownFieldView {
+			return *converter.Convert(&f, &unknownFieldView{})
+		}),
+	}
 	return nil, out, nil
+}
+
+func wireViews(fields []*entities.WireField) []wireFieldView {
+	return slices.To(fields, func(f *entities.WireField) wireFieldView {
+		v := *converter.Convert(f, &wireFieldView{}, converter.WithIgnoreFields("Message"))
+		if len(f.Message) > 0 {
+			v.Message, _ = json.Marshal(wireViews(f.Message)) //nolint:errcheck // plain structs always marshal
+		}
+		if v.Text != "" || len(f.Message) > 0 {
+			v.Bytes = nil
+		}
+		return v
+	})
 }
 
 func (t *Toolset) validate(ctx context.Context, _ *mcp.CallToolRequest, in validateInput) (*mcp.CallToolResult, validateOutput, error) {

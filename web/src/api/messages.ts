@@ -45,6 +45,8 @@ function toMessage(m: NatsMessage): Message {
     decoded: parseDecodedSafe(m.decoded, m.truncated),
     decoded_type: m.decodedType,
     decode_error: m.decodeError,
+    decoded_unknown_fields: m.decodedUnknownFields || undefined,
+    decoded_valid_bytes: m.decodedValidBytes || undefined,
     truncated: m.truncated || undefined,
   }
 }

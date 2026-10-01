@@ -97,15 +97,35 @@ type listMappingsOutput struct {
 
 type decodeInput struct {
 	Base64   string `json:"base64" jsonschema:"payload bytes, base64-encoded"`
-	Type     string `json:"type,omitempty" jsonschema:"fully-qualified message type to decode as"`
+	Type     string `json:"type,omitempty" jsonschema:"fully-qualified message type to decode as; omit with subject to dump wire fields"`
 	SourceID string `json:"sourceId,omitempty" jsonschema:"proto source id; needed only when several sources define the type"`
 	Subject  string `json:"subject,omitempty" jsonschema:"decode through this subject's mapping instead of an explicit type"`
 }
 
 type decodeOutput struct {
-	MessageType string          `json:"messageType,omitempty"`
-	Decoded     json.RawMessage `json:"decoded,omitempty"`
-	Error       string          `json:"error,omitempty"`
+	MessageType   string             `json:"messageType,omitempty"`
+	Decoded       json.RawMessage    `json:"decoded,omitempty"`
+	Error         string             `json:"error,omitempty"`
+	ValidBytes    int                `json:"validBytes,omitempty" jsonschema:"set when decoding failed but the first validBytes decoded into decoded"`
+	UnknownFields []unknownFieldView `json:"unknownFields,omitempty" jsonschema:"fields the schema does not declare; the producer may use a newer schema"`
+	Wire          []wireFieldView    `json:"wire,omitempty" jsonschema:"schemaless dump of the payload, when neither type nor subject is given"`
+}
+
+type unknownFieldView struct {
+	Path     string `json:"path,omitempty" jsonschema:"message holding the field, empty for the top level"`
+	Number   int32  `json:"number"`
+	WireType string `json:"wireType"`
+	Size     int    `json:"size"`
+}
+
+type wireFieldView struct {
+	Number   int32           `json:"number"`
+	WireType string          `json:"wireType"`
+	Varint   uint64          `json:"varint,omitempty"`
+	Fixed    uint64          `json:"fixed,omitempty" jsonschema:"raw fixed32 or fixed64 bits"`
+	Text     string          `json:"text,omitempty"`
+	Bytes    []byte          `json:"bytes,omitempty" jsonschema:"base64, only when the bytes are neither text nor a message"`
+	Message  json.RawMessage `json:"message,omitempty" jsonschema:"fields of bytes that parse as a message, shaped like wire"`
 }
 
 type validateInput struct {

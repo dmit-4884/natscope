@@ -62,11 +62,50 @@ func (h *Handler) DecodeMessage(
 	pbResult := &protopb.DecodeResult{
 		Data:        string(result.Decoded),
 		MessageType: result.MessageType,
+		ValidBytes:  int32(result.ValidBytes), //nolint:gosec // bounded by the request size
+		UnknownFields: slices.To(result.UnknownFields, func(f entities.UnknownField) *protopb.UnknownField {
+			pb := converter.Convert(f, &protopb.UnknownField{}, converter.WithIgnoreFields("WireType"))
+			pb.WireType = wireTypes[f.WireType]
+			return pb
+		}),
 	}
 	if result.Error != "" {
 		pbResult.Error = &result.Error
 	}
 	return connect.NewResponse(&codecpb.DecodeMessageResponse{Result: pbResult}), nil
+}
+
+// DecodeWire reads protobuf binary data without a schema.
+func (h *Handler) DecodeWire(
+	_ context.Context,
+	req *connect.Request[codecpb.DecodeWireRequest],
+) (*connect.Response[codecpb.DecodeWireResponse], error) {
+	dump := h.protoService.DecodeWire(req.Msg.Data)
+	resp := &codecpb.DecodeWireResponse{
+		Fields:     wireFieldsToProto(dump.Fields),
+		ValidBytes: int32(dump.ValidBytes), //nolint:gosec // bounded by the request size
+	}
+	if dump.Error != "" {
+		resp.Error = &dump.Error
+	}
+	return connect.NewResponse(resp), nil
+}
+
+var wireTypes = map[entities.WireType]protopb.WireType{
+	entities.WireVarint:  protopb.WireType_WIRE_TYPE_VARINT,
+	entities.WireFixed64: protopb.WireType_WIRE_TYPE_FIXED64,
+	entities.WireBytes:   protopb.WireType_WIRE_TYPE_BYTES,
+	entities.WireGroup:   protopb.WireType_WIRE_TYPE_GROUP,
+	entities.WireFixed32: protopb.WireType_WIRE_TYPE_FIXED32,
+}
+
+func wireFieldsToProto(fields []*entities.WireField) []*protopb.WireField {
+	return slices.To(fields, func(f *entities.WireField) *protopb.WireField {
+		pb := converter.Convert(f, &protopb.WireField{}, converter.WithIgnoreFields("WireType", "Message"))
+		pb.WireType = wireTypes[f.WireType]
+		pb.Message = wireFieldsToProto(f.Message)
+		return pb
+	})
 }
 
 // EncodeMessage encodes JSON data to protobuf binary within the resolved

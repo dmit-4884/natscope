@@ -18,6 +18,7 @@ import { decodeBase64ToUtf8 } from '@/utils/base64'
 import { getErrorMessage } from '@/api/errors'
 import { useDisplayPreferences, useConfirmation, useBehaviorPolicy } from '@/contexts/settings'
 import PayloadViewer from './PayloadViewer'
+import { DecodeNotices, type DecodeNotes } from './DecodeNotices'
 import { BookmarkButton } from './Bookmarks'
 import { MessageDeleteDialog } from './MessageDeleteDialog'
 import { buildResendDraft, type ResendDraft } from './resend'
@@ -80,6 +81,7 @@ export default function UnifiedMessageViewer({
   const [decoding, setDecoding] = useState(false)
   const [decodeError, setDecodeError] = useState<string | null>(null)
   const [hasDecodedForType, setHasDecodedForType] = useState<string | null>(null)
+  const [decodeNotes, setDecodeNotes] = useState<DecodeNotes | null>(null)
 
   const { data: mappings = [] } = useMappingItems()
 
@@ -127,6 +129,8 @@ export default function UnifiedMessageViewer({
         ...full,
         decodedType: full.decoded_type,
         decodeError: full.decode_error,
+        decodedUnknownFields: full.decoded_unknown_fields,
+        decodedValidBytes: full.decoded_valid_bytes,
       } as SelectedMessage)
       toast.success('Full payload loaded')
     } catch (err: unknown) {
@@ -270,15 +274,17 @@ export default function UnifiedMessageViewer({
       setDecodedData(message.decoded)
       setSelectedProtoType(message.decodedType)
       setHasDecodedForType(message.decodedType)
+      setDecodeNotes({ unknownCount: message.decodedUnknownFields ?? 0, validBytes: message.decodedValidBytes })
     } else {
       setDecodedData(null)
       setSelectedProtoType('')
       setSelectedSourceId('')
       setHasDecodedForType(null)
+      setDecodeNotes(null)
     }
     setDecodeError(null)
     setDecoding(false)
-  }, [selectedMessage?.id, message?.decoded, message?.decodedType])
+  }, [selectedMessage?.id, message?.decoded, message?.decodedType, message?.decodedUnknownFields, message?.decodedValidBytes])
 
   // Auto-load saved proto type + source for this subject by pattern matching;
   // skip if server already decoded.
@@ -313,6 +319,7 @@ export default function UnifiedMessageViewer({
         setDecoding(true)
         setDecodeError(null)
         setDecodedData(null)
+        setDecodeNotes(null)
 
         try {
           const result = await decodeMessage({
@@ -325,6 +332,12 @@ export default function UnifiedMessageViewer({
           if (result.success && result.decoded) {
             setDecodedData(result.decoded)
             setHasDecodedForType(currentProtoType)
+            setDecodeNotes({ unknownCount: result.unknown_fields?.length ?? 0, unknownFields: result.unknown_fields })
+          } else if (result.decoded && result.valid_bytes) {
+            setDecodedData(result.decoded)
+            setHasDecodedForType(currentProtoType)
+            setDecodeError(result.error || null)
+            setDecodeNotes({ unknownCount: 0, validBytes: result.valid_bytes })
           } else {
             setDecodeError(result.error || 'Failed to decode message')
             setHasDecodedForType(null)
@@ -550,9 +563,18 @@ export default function UnifiedMessageViewer({
             </div>
           </div>
 
-          {(decodeError ||
-            (selectedMessage?.decodeError && !decodedData && !message?.decoded && !willAutoDecode && !decoding)) && (
-            <ErrorAlert message={decodeError || selectedMessage?.decodeError || ''} className="mt-2" />
+          {!decodeNotes?.validBytes &&
+            (decodeError ||
+              (selectedMessage?.decodeError && !decodedData && !message?.decoded && !willAutoDecode && !decoding)) && (
+              <ErrorAlert message={decodeError || selectedMessage?.decodeError || ''} className="mt-2" />
+            )}
+          {decodedData != null && !decoding && (
+            <DecodeNotices
+              notes={decodeNotes}
+              messageType={selectedProtoType || selectedMessage?.decodedType || ''}
+              totalBytes={displayMessage?.data_size ?? 0}
+              error={decodeError || message?.decodeError}
+            />
           )}
         </div>
       ) : null}

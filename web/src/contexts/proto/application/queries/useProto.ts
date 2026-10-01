@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { listSchemaTypes, describeSchemaType, getProtoMessageExample } from '@/api/proto'
+import { decodeWire } from '@/api/decode'
 
 export const protoKeys = {
   all: ['proto'] as const,
@@ -8,6 +9,7 @@ export const protoKeys = {
   description: (sourceId: string, fullName: string, reachable: boolean) =>
     [...protoKeys.all, 'description', sourceId, fullName, reachable] as const,
   example: (sourceId: string, fullName: string) => [...protoKeys.all, 'example', sourceId, fullName] as const,
+  wire: (dataBase64: string) => [...protoKeys.all, 'wire', dataBase64] as const,
 }
 
 export function useSchemaTypes(sourceId?: string) {
@@ -36,5 +38,14 @@ export function useMessageExample(sourceId: string | null, fullName: string | nu
     queryKey: protoKeys.example(sourceId ?? '', fullName ?? ''),
     queryFn: async () => (await getProtoMessageExample(sourceId!, fullName!)).example,
     enabled: !!sourceId && !!fullName,
+  })
+}
+
+export function useWireDump(dataBase64: string) {
+  return useQuery({
+    queryKey: protoKeys.wire(dataBase64),
+    queryFn: () => decodeWire(dataBase64),
+    enabled: dataBase64 !== '',
+    staleTime: Infinity,
   })
 }

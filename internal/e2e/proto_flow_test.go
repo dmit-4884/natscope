@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"google.golang.org/protobuf/encoding/protowire"
 
 	mappingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/mappings/v1/mappings"
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
@@ -21,6 +24,7 @@ import (
 	codecpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/codec"
 	registrypb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/registry"
 	sourcespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/proto/v1/sources"
+	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
 )
 
@@ -190,5 +194,63 @@ func TestProtoFlow(t *testing.T) {
 		require.NotEmpty(t, decoded, "message on a mapped subject must be server-side proto-decoded")
 		assert.Contains(t, decoded, "decoded")
 		assert.Equal(t, fullName, got.GetMessage().GetDecodedType())
+	})
+
+	t.Run("unknown fields, partial decode and the wire dump", func(t *testing.T) {
+		var known []byte
+		known = protowire.AppendTag(known, 1, protowire.BytesType)
+		known = protowire.AppendString(known, "newer")
+		withExtra := protowire.AppendTag(append([]byte{}, known...), 15, protowire.VarintType)
+		withExtra = protowire.AppendVarint(withExtra, 3)
+		broken := append(append([]byte{}, known...), 0x1a, 0x09, 'x')
+
+		nc, err := nats.Connect(env.natsURL)
+		require.NoError(t, err)
+		defer nc.Close()
+		require.NoError(t, nc.Publish(subject, withExtra))
+		require.NoError(t, nc.Publish(subject, broken))
+		require.NoError(t, nc.Flush())
+
+		var msgs []*natspb.NatsMessage
+		require.Eventually(t, func() bool {
+			resp, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
+				ConnectionId: connID, StreamName: stream, Limit: new(int64(10)),
+			}))
+			if err != nil {
+				return false
+			}
+			msgs = resp.Msg.GetMessages()
+			return len(msgs) >= 3
+		}, 5*time.Second, 100*time.Millisecond)
+
+		bySize := map[int32]*natspb.NatsMessage{}
+		for _, m := range msgs {
+			bySize[m.GetDataSize()] = m
+		}
+		extra := bySize[int32(len(withExtra))]
+		require.NotNil(t, extra)
+		assert.Empty(t, extra.GetDecodeError())
+		assert.Equal(t, int32(1), extra.GetDecodedUnknownFields())
+		assert.Contains(t, extra.GetDecoded(), "newer")
+
+		partial := bySize[int32(len(broken))]
+		require.NotNil(t, partial)
+		assert.NotEmpty(t, partial.GetDecodeError())
+		assert.Equal(t, int32(len(known)), partial.GetDecodedValidBytes())
+		assert.Contains(t, partial.GetDecoded(), "newer")
+
+		wire, err := env.codec.DecodeWire(ctx, connect.NewRequest(&codecpb.DecodeWireRequest{Data: withExtra}))
+		require.NoError(t, err)
+		require.Len(t, wire.Msg.GetFields(), 2)
+		assert.Equal(t, "newer", wire.Msg.GetFields()[0].GetText())
+		assert.Equal(t, int32(15), wire.Msg.GetFields()[1].GetNumber())
+		assert.Equal(t, protopb.WireType_WIRE_TYPE_VARINT, wire.Msg.GetFields()[1].GetWireType())
+
+		decResp, err := env.codec.DecodeMessage(ctx, connect.NewRequest(&codecpb.DecodeMessageRequest{
+			Data: withExtra, MessageType: fullName, SourceId: sourceID,
+		}))
+		require.NoError(t, err)
+		require.Len(t, decResp.Msg.GetResult().GetUnknownFields(), 1)
+		assert.Equal(t, int32(15), decResp.Msg.GetResult().GetUnknownFields()[0].GetNumber())
 	})
 }

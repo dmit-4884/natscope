@@ -3,6 +3,7 @@ export {
   useMessageTypes,
   useTypeDescription,
   useMessageExample,
+  useWireDump,
   protoKeys,
 } from './useProto'
 
