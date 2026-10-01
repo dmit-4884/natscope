@@ -1,7 +1,7 @@
 import DefaultTheme from 'vitepress/theme'
 import Video from './components/Video.vue'
 import Shot from './components/Shot.vue'
-import Tour from './components/Tour.vue'
+import Home from './components/Home.vue'
 import './custom.css'
 
 export default {
@@ -9,6 +9,6 @@ export default {
   enhanceApp({ app }) {
     app.component('Video', Video)
     app.component('Shot', Shot)
-    app.component('Tour', Tour)
+    app.component('Home', Home)
   }
 }
