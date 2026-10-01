@@ -68,12 +68,10 @@ export function useLiveSubscription({
   const subjectFilterRef = useRef(subjectFilter)
   const setGlobalStats = useLiveStatsStore((s) => s.setStats)
 
-  // Optional display-rate throttle: coalesce incoming messages and flush them
-  // to state at most `maxDisplayRate` times per second so a high-throughput
-  // stream doesn't thrash React. 0/undefined means flush every batch.
   const maxDisplayRateRef = useRef(maxDisplayRate)
-  const pendingRef = useRef<LiveMessage[]>([])
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const queueRef = useRef<LiveMessage[]>([])
+  const dripTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const resumingRef = useRef(false)
   useEffect(() => {
     maxDisplayRateRef.current = maxDisplayRate
   }, [maxDisplayRate])
@@ -128,6 +126,33 @@ export function useLiveSubscription({
     highlightTimersRef.current.add(timer)
   }, [])
 
+  const stopDrip = useCallback(() => {
+    clearTimeout(dripTimerRef.current)
+    dripTimerRef.current = undefined
+    queueRef.current = []
+  }, [])
+
+  const flushQueue = useCallback(() => {
+    const queued = queueRef.current
+    stopDrip()
+    flush(queued.reverse())
+  }, [flush, stopDrip])
+
+  const drip = useCallback(function next() {
+    const rate = maxDisplayRateRef.current
+    if (!rate || rate <= 0) {
+      flushQueue()
+      return
+    }
+    const message = queueRef.current.shift()
+    if (!message) {
+      dripTimerRef.current = undefined
+      return
+    }
+    flush([message])
+    dripTimerRef.current = setTimeout(next, 1000 / rate)
+  }, [flush, flushQueue])
+
   const processBatch = useCallback(
     (batch: WSBatchPayload) => {
       const pattern = subjectFilterRef.current
@@ -142,22 +167,16 @@ export function useLiveSubscription({
       const converted = relevant.map(toLiveMessage)
       const rate = maxDisplayRateRef.current
 
-      if (!rate || rate <= 0) {
+      if (!rate || rate <= 0 || resumingRef.current) {
         flush(converted)
         return
       }
 
-      // Buffer and flush at most `rate` times per second (newest-first).
-      pendingRef.current = [...converted, ...pendingRef.current].slice(0, liveLimitRef.current)
-      if (flushTimerRef.current) return
-      flushTimerRef.current = setTimeout(() => {
-        flushTimerRef.current = undefined
-        const buffered = pendingRef.current
-        pendingRef.current = []
-        flush(buffered)
-      }, 1000 / rate)
+      const queue = [...queueRef.current, ...converted]
+      queueRef.current = queue.slice(Math.max(0, queue.length - rate))
+      if (!dripTimerRef.current) drip()
     },
-    [flush],
+    [flush, drip],
   )
 
   useEffect(() => {
@@ -199,13 +218,11 @@ export function useLiveSubscription({
       socket.disconnect()
       setWs(null)
       setIsPaused(false)
-      clearTimeout(flushTimerRef.current)
-      flushTimerRef.current = undefined
-      pendingRef.current = []
+      stopDrip()
       clearHighlightTimers()
     }
 
-  }, [connectionId, enabled, processBatch, setGlobalStats, clearHighlightTimers])
+  }, [connectionId, enabled, processBatch, setGlobalStats, clearHighlightTimers, stopDrip])
 
   // Subscribe / unsubscribe when stream changes on an open connection.
   useEffect(() => {
@@ -216,8 +233,9 @@ export function useLiveSubscription({
 
   // Clear on stream change
   useEffect(() => {
+    stopDrip()
     setLiveMessages([])
-  }, [streamName])
+  }, [streamName, stopDrip])
 
   // Trim on limit change
   useEffect(() => {
@@ -227,15 +245,21 @@ export function useLiveSubscription({
   const togglePause = useCallback(() => {
     if (!ws) return
     if (isPaused) {
+      resumingRef.current = true
       ws.resume()
+      resumingRef.current = false
       setIsPaused(false)
     } else {
       ws.pause()
+      flushQueue()
       setIsPaused(true)
     }
-  }, [ws, isPaused])
+  }, [ws, isPaused, flushQueue])
 
-  const clearMessages = useCallback(() => setLiveMessages([]), [])
+  const clearMessages = useCallback(() => {
+    stopDrip()
+    setLiveMessages([])
+  }, [stopDrip])
 
   return {
     liveMessages,
