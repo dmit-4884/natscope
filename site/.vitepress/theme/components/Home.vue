@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { withBase } from 'vitepress'
 import { VPButton } from 'vitepress/theme'
 
@@ -12,18 +12,26 @@ const facts = [
   { title: 'MCP for agents', text: 'Claude Code or Cursor read your streams over MCP, with payloads decoded.' }
 ]
 
+const player = ref(null)
 const video = ref(null)
 const reducedMotion = ref(false)
 const copied = ref(false)
+const playing = ref(false)
+const current = ref(0)
+const duration = ref(0)
+let frame = 0
 
 onMounted(() => {
   reducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const el = video.value
   if (!el) return
   el.muted = true
+  if (el.readyState >= 1) duration.value = el.duration
   if (reducedMotion.value) el.pause()
   else el.play().catch(() => {})
 })
+
+onBeforeUnmount(() => cancelAnimationFrame(frame))
 
 const copy = async () => {
   try {
@@ -33,11 +41,54 @@ const copy = async () => {
   } catch {}
 }
 
-const fullscreen = () => {
+const tick = () => {
+  current.value = video.value?.currentTime ?? 0
+  frame = requestAnimationFrame(tick)
+}
+
+const onPlay = () => {
+  playing.value = true
+  cancelAnimationFrame(frame)
+  frame = requestAnimationFrame(tick)
+}
+
+const onPause = () => {
+  playing.value = false
+  cancelAnimationFrame(frame)
+  current.value = video.value?.currentTime ?? 0
+}
+
+const onMetadata = () => {
+  duration.value = video.value?.duration ?? 0
+}
+
+const toggle = () => {
   const el = video.value
   if (!el) return
-  if (el.requestFullscreen) el.requestFullscreen()
-  else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen()
+  if (el.paused) el.play().catch(() => {})
+  else el.pause()
+}
+
+const seek = (event) => {
+  const el = video.value
+  if (!el) return
+  el.currentTime = Number(event.target.value)
+  current.value = el.currentTime
+}
+
+const clock = (seconds) => {
+  const s = Math.max(0, Math.floor(seconds || 0))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+const progress = computed(() => (duration.value ? (current.value / duration.value) * 100 : 0))
+
+const fullscreen = () => {
+  const box = player.value
+  const el = video.value
+  if (document.fullscreenElement) document.exitFullscreen()
+  else if (box?.requestFullscreen) box.requestFullscreen()
+  else if (el?.webkitEnterFullscreen) el.webkitEnterFullscreen()
 }
 </script>
 
@@ -59,22 +110,50 @@ const fullscreen = () => {
       </div>
     </section>
 
-    <video
-      ref="video"
-      class="ns-demo"
-      :src="withBase('/media/demo.mp4')"
-      :poster="withBase('/media/demo.jpg')"
-      :autoplay="!reducedMotion"
-      :controls="reducedMotion"
-      aria-label="Natscope walkthrough: live tail, stream relations, consumers, Protobuf decoding, publishing and Key/Value history."
-      muted
-      loop
-      playsinline
-      preload="auto"
-      width="1920"
-      height="1080"
-      @click="fullscreen"
-    />
+    <div ref="player" class="ns-player" :class="{ 'is-paused': !playing }">
+      <video
+        ref="video"
+        class="ns-demo"
+        :src="withBase('/media/demo.mp4')"
+        :poster="withBase('/media/demo.jpg')"
+        :autoplay="!reducedMotion"
+        aria-label="Natscope walkthrough: live tail, stream relations, a Protobuf message in wire and decoded views, and publishing with schema completion."
+        muted
+        loop
+        playsinline
+        preload="auto"
+        width="1920"
+        height="1080"
+        @click="toggle"
+        @play="onPlay"
+        @pause="onPause"
+        @loadedmetadata="onMetadata"
+      />
+      <div class="ns-controls">
+        <button type="button" class="ns-control" :aria-label="playing ? 'Pause' : 'Play'" @click="toggle">
+          <svg v-if="playing" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5a.8.8 0 0 0-1.2.7z" /></svg>
+        </button>
+        <input
+          class="ns-seek"
+          type="range"
+          min="0"
+          :max="duration || 0"
+          step="0.01"
+          :value="current"
+          :style="{ '--progress': `${progress}%` }"
+          aria-label="Seek"
+          :aria-valuetext="`${clock(current)} of ${clock(duration)}`"
+          @input="seek"
+        />
+        <span class="ns-time">{{ clock(current) }} / {{ clock(duration) }}</span>
+        <button type="button" class="ns-control" aria-label="Full screen" @click="fullscreen">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+    </div>
 
     <ul class="ns-facts">
       <li v-for="f in facts" :key="f.title">
@@ -169,17 +248,133 @@ const fullscreen = () => {
   color: var(--vp-c-brand-1);
 }
 
-.ns-demo {
-  display: block;
-  width: 100%;
+.ns-player {
+  position: relative;
   max-width: 1440px;
-  height: auto;
   margin: 0 auto;
+  overflow: hidden;
   border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
   background: var(--vp-c-bg-alt);
   box-shadow: 0 24px 64px -24px rgba(17, 24, 39, 0.25);
-  cursor: zoom-in;
+}
+
+.ns-demo {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: pointer;
+}
+
+.ns-player:fullscreen {
+  display: flex;
+  align-items: center;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+}
+
+.ns-player:fullscreen .ns-demo {
+  max-height: 100%;
+}
+
+.ns-controls {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 16px 12px;
+  background: linear-gradient(to top, rgba(17, 24, 39, 0.72), rgba(17, 24, 39, 0));
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.ns-player:hover .ns-controls,
+.ns-player:focus-within .ns-controls,
+.ns-player.is-paused .ns-controls {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .ns-controls {
+    opacity: 1;
+  }
+}
+
+.ns-control {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: #fff;
+  transition: background-color 0.2s;
+}
+
+.ns-control:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.ns-control:focus-visible,
+.ns-seek:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+.ns-control svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.ns-seek {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  margin: 0;
+  border-radius: 9999px;
+  background: linear-gradient(to right, var(--vp-c-brand-1) var(--progress), rgba(255, 255, 255, 0.35) var(--progress));
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.ns-seek::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  -webkit-appearance: none;
+}
+
+.ns-seek::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.ns-seek::-moz-range-track {
+  background: transparent;
+}
+
+.ns-time {
+  flex-shrink: 0;
+  font-family: var(--vp-font-family-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .ns-facts {
@@ -226,6 +421,15 @@ const fullscreen = () => {
 
   .ns-sub {
     font-size: 15px;
+  }
+
+  .ns-controls {
+    gap: 8px;
+    padding: 20px 8px 6px;
+  }
+
+  .ns-time {
+    display: none;
   }
 
   .ns-facts {
