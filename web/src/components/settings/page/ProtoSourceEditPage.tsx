@@ -474,11 +474,10 @@ export default function ProtoSourceEditPage({ mode }: Props) {
               disabled={isLoading}
             />
             <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
-              Folders to skip during compilation, written as path prefixes relative to the source
-              root — one per line, or comma-separated. Use this to drop generated or vendored copies
-              that duplicate real <code>.proto</code> files and break the build. For example, typing{' '}
-              <code>pb</code> ignores everything under <code>pb/</code>. Leave empty to compile the
-              whole tree.
+              Path prefixes the compiler skips, relative to the source root, one per line or
+              comma-separated. Use them to drop generated or vendored copies that duplicate your{' '}
+              <code>.proto</code> files and break the build: <code>pb</code> skips everything under{' '}
+              <code>pb/</code>. Leave it empty to compile the whole tree.
             </p>
           </div>
           <div>
@@ -497,11 +496,9 @@ export default function ProtoSourceEditPage({ mode }: Props) {
               disabled={isLoading}
             />
             <p className="mt-1.5 text-xs text-content-tertiary leading-relaxed">
-              Advanced — usually leave this empty. These are the base directories that your{' '}
-              <code>import &quot;...&quot;</code> paths are written relative to. When empty, they are
-              detected automatically from the import graph (and any <code>buf.yaml</code>). Fill this
-              in only to override detection when the wrong root is picked — doing so turns
-              auto-detection off completely.
+              Directories your <code>import &quot;...&quot;</code> paths start from. Natscope finds them in
+              the import graph and any <code>buf.yaml</code>, so leave this empty unless it picks the wrong
+              one. Anything you enter turns detection off.
             </p>
           </div>
         </div>
