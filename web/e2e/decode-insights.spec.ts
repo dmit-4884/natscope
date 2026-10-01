@@ -44,6 +44,9 @@ test.describe('Decode insights', () => {
     await expect(viewer.getByTestId('decode-partial')).toContainText('Decoded the first 7 B of 10 B')
     await expect(viewer.getByText('"newer"').first()).toBeVisible()
 
+    await viewer.getByTestId('resend-message').click()
+    await expect(page.locator('[data-sonner-toast]').getByText(/Only part of this payload decoded/)).toBeVisible()
+
     await viewer.getByRole('tab', { name: 'Wire' }).click()
     await expect(viewer.getByTestId('wire-view')).toContainText('Stopped after 7 B of 10 B')
   })

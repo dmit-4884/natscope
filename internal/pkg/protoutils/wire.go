@@ -73,9 +73,6 @@ func decodeWireField(data []byte, offset, depth int) (*entities.WireField, error
 	if n < 0 {
 		return nil, fmt.Errorf("field %d at byte %d: %w", num, offset, protowire.ParseError(n))
 	}
-	if num < protowire.MinValidNumber {
-		return nil, fmt.Errorf("invalid field number %d at byte %d", num, offset)
-	}
 	f.Length = tagLen + n
 	return f, nil
 }

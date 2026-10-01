@@ -126,7 +126,10 @@ func decodeWithSnapshot(snap *registry.Snapshot, data []byte, messageType string
 		return &entities.DecodeResult{Success: false, Error: fmt.Sprintf("Cannot unwrap the %s framing: %v", framing.Kind, err)}
 	}
 	result := decodeWithDescriptor(snap.Schema, md, msg, messageType, framing.Kind == entities.FramingNone)
-	if result.ValidBytes > 0 {
+	switch {
+	case offset < 0:
+		result.ValidBytes = 0
+	case result.ValidBytes > 0:
 		result.ValidBytes += offset
 	}
 	return result

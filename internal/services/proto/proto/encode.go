@@ -49,7 +49,7 @@ func snapshotError(sourceID string, err error) error {
 	case errors.Is(err, errs.ErrMappingSourceDisabled):
 		msg = fmt.Sprintf("Proto source '%s' is disabled.", sourceID)
 	case errors.Is(err, errs.ErrMappingSelectionMissing):
-		msg = fmt.Sprintf("Proto source '%s' has no selected git ref.", sourceID)
+		msg = fmt.Sprintf("Proto source '%s' has no active schema yet.", sourceID)
 	default:
 		msg = fmt.Sprintf("Failed to resolve proto source '%s': %v", sourceID, err)
 	}

@@ -6,6 +6,7 @@ package proto
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
+
+	"golang.org/x/time/rate"
 
 	"google.golang.org/protobuf/encoding/protowire"
 
@@ -28,9 +31,12 @@ message Note { string text = 1; }
 type fakeMappings struct {
 	mappingssvc.Service
 	resolver *natsutil.MappingResolver
+	all      entities.SubjectMappings
 }
 
 func (f *fakeMappings) Resolver(context.Context) *natsutil.MappingResolver { return f.resolver }
+
+func (f *fakeMappings) GetAll(context.Context) (entities.SubjectMappings, error) { return f.all, nil }
 
 func userWire(name string) []byte {
 	var b []byte
@@ -118,6 +124,16 @@ func TestAutoDecode(t *testing.T) {
 		assert.Equal(t, "det.User", r.MessageType)
 	})
 
+	t.Run("an exhausted scan budget skips detection without counting a miss", func(t *testing.T) {
+		t.Parallel()
+		env, _ := newDetectEnv(t, nil)
+		env.svc.detectBudget = rate.NewLimiter(0, 0)
+
+		assert.Nil(t, env.svc.autoDecode(t.Context(), "busy", userWire("ann")))
+		_, seen := env.svc.learned.Get("busy")
+		assert.False(t, seen)
+	})
+
 	t.Run("schema reload forgets", func(t *testing.T) {
 		t.Parallel()
 		env, _ := newDetectEnv(t, nil)
@@ -127,6 +143,30 @@ func TestAutoDecode(t *testing.T) {
 		_, ok := env.svc.learned.Get("users")
 		assert.False(t, ok)
 	})
+}
+
+func TestAutoDecode_TieBehindDuplicateSources(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+	env.svc.mappingsService = &fakeMappings{resolver: natsutil.NewMappingResolver(nil)}
+	for i, content := range []string{
+		"syntax = \"proto3\";\npackage dup;\nmessage Alpha { string name = 1; }\n",
+		"syntax = \"proto3\";\npackage dup;\nmessage Alpha { string name = 1; }\n",
+		"syntax = \"proto3\";\npackage dup;\nmessage Beta { string title = 1; }\n",
+	} {
+		dir := t.TempDir()
+		writeTree(t, dir, map[string]string{"dup.proto": content})
+		src, err := env.svc.CreateSource(t.Context(), &entities.ProtoSourceCreate{
+			Name: fmt.Sprintf("dup-%d", i), SourceType: entities.SourceTypeLocal, LocalPath: &dir,
+		})
+		require.NoError(t, err)
+		_, outcome, err := env.svc.RefreshSource(t.Context(), src.Id)
+		require.NoError(t, err)
+		require.True(t, outcome.Valid, "diagnostics: %v", outcome.Diagnostics)
+	}
+	payload := protowire.AppendString(protowire.AppendTag(nil, 1, protowire.BytesType), "x")
+
+	assert.Nil(t, env.svc.autoDecode(t.Context(), "dup.one", payload))
 }
 
 func TestDecodeMessages_Detect(t *testing.T) {
@@ -242,6 +282,13 @@ func TestConfident(t *testing.T) {
 		{name: "low score", candidates: []entities.TypeCandidate{{MessageType: "det.User", Score: autoDetectMinScore - 1}}, want: false},
 		{name: "tie with another type", candidates: []entities.TypeCandidate{user, {MessageType: "det.Twin", Score: 93}}, want: false},
 		{name: "same type in two sources", candidates: []entities.TypeCandidate{user, {SourceID: "b", MessageType: "det.User", Score: 93}}, want: true},
+		{
+			name: "tie behind a duplicate",
+			candidates: []entities.TypeCandidate{
+				user, {SourceID: "b", MessageType: "det.User", Score: 93}, {SourceID: "c", MessageType: "det.Twin", Score: 93},
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

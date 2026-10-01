@@ -4,10 +4,15 @@
 package proto
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/bufbuild/protocompile"
@@ -83,14 +88,13 @@ func (s *Service) compile(
 		bufDeps = protoutils.ResolveBufDeps(diskRoot)
 	}
 
-	memResolver := &protocompile.SourceResolver{
-		Accessor: protocompile.SourceAccessorFromMap(layout.Srcs),
+	resolvers := protocompile.CompositeResolver{
+		&protocompile.SourceResolver{Accessor: protocompile.SourceAccessorFromMap(layout.Srcs)},
 	}
-	diskResolver := &protocompile.SourceResolver{ImportPaths: bufDeps}
-	resolver := protocompile.WithStandardImports(protocompile.CompositeResolver{
-		memResolver,
-		diskResolver,
-	})
+	if len(bufDeps) > 0 {
+		resolvers = append(resolvers, &protocompile.SourceResolver{ImportPaths: bufDeps, Accessor: confinedAccessor(bufDeps)})
+	}
+	resolver := protocompile.WithStandardImports(resolvers)
 
 	rep := &collectingReporter{}
 	compiler := protocompile.Compiler{
@@ -131,6 +135,33 @@ func (s *Service) compile(
 	}
 	out.FDS = slices.To(compiled, func(f linker.File) protoreflect.FileDescriptor { return f })
 	return out, nil
+}
+
+var errImportTooLarge = errors.New("imported file too large")
+
+func confinedAccessor(roots []string) func(string) (io.ReadCloser, error) {
+	return func(path string) (io.ReadCloser, error) {
+		for _, root := range roots {
+			rel, err := filepath.Rel(root, path)
+			if err != nil || !filepath.IsLocal(rel) {
+				continue
+			}
+			f, err := os.OpenInRoot(root, rel)
+			if err != nil {
+				return nil, err
+			}
+			data, err := io.ReadAll(io.LimitReader(f, maxUploadFileBytes+1))
+			_ = f.Close() //nolint:errcheck // read-only file
+			if err != nil {
+				return nil, err
+			}
+			if len(data) > maxUploadFileBytes {
+				return nil, errImportTooLarge
+			}
+			return io.NopCloser(bytes.NewReader(data)), nil
+		}
+		return nil, fs.ErrNotExist
+	}
 }
 
 // enrichHint swaps in the auto-walk-aware hint for missing-import diagnostics.

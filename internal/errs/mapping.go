@@ -21,11 +21,11 @@ var (
 	// ErrMappingSourceDisabled is returned when the source referenced by a mapping is disabled.
 	ErrMappingSourceDisabled = errors.New("mapping: source is disabled")
 
-	// ErrMappingSelectionMissing is returned when no selection exists for a git source mapping points to.
+	// ErrMappingSelectionMissing is returned when the mapping's source has no active schema yet.
 	ErrMappingSelectionMissing = errors.New("mapping: selection missing for source")
 
-	// ErrMappingDescriptorMissing is returned when no compiled descriptor exists for the resolved (source, tag).
-	ErrMappingDescriptorMissing = errors.New("mapping: descriptor missing for source/tag")
+	// ErrMappingDescriptorMissing is returned when the schema a mapping resolves to is not stored.
+	ErrMappingDescriptorMissing = errors.New("mapping: compiled schema missing")
 
 	// ErrMessageTypeNotInSource is returned when a message type is not present in the active snapshot of the mapping's source.
 	ErrMessageTypeNotInSource = errors.New("mapping: message type not in source snapshot")

@@ -15,4 +15,6 @@ type descriptorDoc struct {
 	MessageTypes  []string `json:"messageTypes,omitempty"`
 	TargetFiles   []string `json:"targetFiles,omitempty"`
 	CompiledAt    int64    `json:"compiledAt,omitempty"`
+
+	CompileSettings string `json:"compileSettings,omitempty"`
 }

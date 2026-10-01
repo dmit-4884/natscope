@@ -50,6 +50,9 @@ test.describe.serial('Type detection', () => {
     await expect(viewer.getByTestId('decoded-auto')).toBeVisible()
     await expect(viewer.getByText('"guessed"').first()).toBeVisible()
 
+    await viewer.getByTestId('resend-message').click()
+    await expect(page.locator('[data-sonner-toast]').getByText(/Save the detected type as a mapping first/)).toBeVisible()
+
     await viewer.getByTestId('save-detected-mapping').click()
     await expect(page.locator('[data-sonner-toast]').getByText(`Mapped ${PREFIX}.* to ${PROTO_MESSAGE_TYPE}`)).toBeVisible()
     await expect(viewer.getByTestId('decoded-auto')).toBeHidden()

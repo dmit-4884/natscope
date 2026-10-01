@@ -36,12 +36,16 @@ func (s *Service) ListTypes(ctx context.Context, sourceID string) ([]entities.Sc
 	return out, nil
 }
 
-// DescribeType describes a message, enum or service of a source; reachable adds every type it leads to.
-func (s *Service) DescribeType(ctx context.Context, sourceID, fullName string, reachable bool) (*entities.TypeDescription, error) {
+// DescribeType describes a message, enum or service of a source schema; reachable adds every type it leads to.
+func (s *Service) DescribeType(
+	ctx context.Context,
+	sourceID, fingerprint, fullName string,
+	reachable bool,
+) (*entities.TypeDescription, error) {
 	if sourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
-	snap, err := s.snapshotForSource(ctx, sourceID)
+	snap, err := s.snapshotAt(ctx, sourceID, fingerprint)
 	if err != nil {
 		return nil, err
 	}
@@ -52,13 +56,12 @@ func (s *Service) DescribeType(ctx context.Context, sourceID, fullName string, r
 	return desc, nil
 }
 
-// GenerateExample generates an example JSON object for a message type within a
-// source.
-func (s *Service) GenerateExample(ctx context.Context, sourceID, messageType string) (any, error) {
+// GenerateExample generates an example JSON object for a message type of a source schema.
+func (s *Service) GenerateExample(ctx context.Context, sourceID, fingerprint, messageType string) (any, error) {
 	if sourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
-	snap, err := s.snapshotForSource(ctx, sourceID)
+	snap, err := s.snapshotAt(ctx, sourceID, fingerprint)
 	if err != nil {
 		return nil, err
 	}

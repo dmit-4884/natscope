@@ -62,7 +62,7 @@ export default function RequestPage() {
   const isJsonMode = encodingMode === 'json' || (!mappedMessageType && encodingMode !== 'proto')
   const messageType = isJsonMode ? undefined : mappedMessageType ?? undefined
   const sourceId = isJsonMode ? undefined : mappedSourceId ?? undefined
-  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null, true)
+  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null, true, messageType ? mappedFingerprint : undefined)
   const protoMessage = protoDescription?.messages[0]
   const { messages: protoTypes } = useMessageTypes()
 
@@ -127,7 +127,7 @@ export default function RequestPage() {
     if (!mappedMessageType || !mappedSourceId) return
     setExampleLoading(true)
     try {
-      const response = await getProtoMessageExample(mappedSourceId, mappedMessageType)
+      const response = await getProtoMessageExample(mappedSourceId, mappedMessageType, mappedFingerprint)
       updateDraft({ payload: JSON.stringify(response.example, null, 2) })
     } catch (error) {
       toast.error(`Failed to generate example: ${getErrorMessage(error)}`)

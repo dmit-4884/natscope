@@ -69,7 +69,7 @@ func (s *Service) compileLocal(ctx context.Context, source *entities.ProtoSource
 		return &entities.CompileOutcome{Diagnostics: diags}, nil
 	}
 
-	d, err := s.storeSchema(ctx, source.Id, LocalRevision, out.FDS)
+	d, err := s.storeSchema(ctx, source, LocalRevision, out.FDS)
 	if err != nil {
 		s.recordCompile(ctx, source.Id, false, err.Error(), 0, len(out.FDS), diags, out.Roots, string(out.Origin), nil)
 		return nil, err

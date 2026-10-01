@@ -28,7 +28,7 @@ message TypeCandidate {
   string source_id = 1;
   string source_revision = 2;
   string message_type = 3;
-  // 0 to 100; 90 and above means every byte decoded and the type fits well.
+  // 0 to 100: mostly the share of bytes that decode as declared fields, plus how many of the fields are set.
   int32 score = 4;
   // Bytes of fields the type does not declare.
   int32 unknown_bytes = 5;

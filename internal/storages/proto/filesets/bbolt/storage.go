@@ -62,6 +62,15 @@ func (s *Storage) GetBySourceRevision(ctx context.Context, sourceID, revision st
 	return converter.Convert(d, &entities.ProtoFileSet{}, bbstore.Opts()...), nil
 }
 
+// DeleteBySourceRevision deletes one file set; a missing one is not an error.
+func (s *Storage) DeleteBySourceRevision(ctx context.Context, sourceID, revision string) error {
+	d, err := s.find(ctx, sourceID, revision)
+	if err != nil || d == nil {
+		return err
+	}
+	return s.store.Delete(ctx, d.ID)
+}
+
 // DeleteBySource deletes every file set of a source.
 func (s *Storage) DeleteBySource(ctx context.Context, sourceID string) (int64, error) {
 	return s.store.DeleteBy(ctx, "$.sourceId", sourceID)

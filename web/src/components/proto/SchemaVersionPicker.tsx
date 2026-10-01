@@ -1,4 +1,4 @@
-import { useSourceRevisions } from '@/contexts/proto'
+import { useProtoSources, useSourceRevisions } from '@/contexts/proto'
 import { Dropdown } from '@/components/ui'
 import { formatDateTime } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
@@ -13,7 +13,9 @@ interface Props {
 
 /** Picks the schema revision a mapping decodes with, or the source's active one. */
 export function SchemaVersionPicker({ id, sourceId, value, onChange }: Props) {
-  const { data: revisions = [], isLoading } = useSourceRevisions(sourceId || null)
+  const { data: sources = [] } = useProtoSources()
+  const local = sources.find((s) => s.id === sourceId)?.sourceType === 'local'
+  const { data: revisions = [], isLoading } = useSourceRevisions(sourceId && !local ? sourceId : null)
   const pinnedGone = !!value && !isLoading && !revisions.some((r) => r.fingerprint === value)
 
   return (
@@ -22,7 +24,7 @@ export function SchemaVersionPicker({ id, sourceId, value, onChange }: Props) {
         value={value}
         onChange={onChange}
         id={id}
-        disabled={!sourceId}
+        disabled={!sourceId || (local && !value)}
         options={[
           { value: '', label: 'Active schema (follows every refresh)' },
           ...revisions.map((r) => ({
@@ -32,6 +34,11 @@ export function SchemaVersionPicker({ id, sourceId, value, onChange }: Props) {
           ...(pinnedGone ? [{ value, label: `${value.slice(0, 12)} · no longer stored` }] : []),
         ]}
       />
+      {local && !value && (
+        <p className="text-xs text-content-tertiary mt-1">
+          A local directory keeps only its latest compile, so there is no revision to pin.
+        </p>
+      )}
       {pinnedGone && (
         <p className="text-xs text-status-error-text mt-1">
           The pinned schema is gone, so this mapping cannot decode. Pick another revision or the active schema.

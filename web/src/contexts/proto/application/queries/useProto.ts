@@ -6,8 +6,8 @@ import { decodeWire, detectMessageType } from '@/api/decode'
 export const protoKeys = {
   all: ['proto'] as const,
   types: (sourceId?: string) => [...protoKeys.all, 'types', sourceId ?? ''] as const,
-  description: (sourceId: string, fullName: string, reachable: boolean) =>
-    [...protoKeys.all, 'description', sourceId, fullName, reachable] as const,
+  description: (sourceId: string, fullName: string, reachable: boolean, fingerprint = '') =>
+    [...protoKeys.all, 'description', sourceId, fullName, reachable, fingerprint] as const,
   example: (sourceId: string, fullName: string) => [...protoKeys.all, 'example', sourceId, fullName] as const,
   wire: (dataBase64: string) => [...protoKeys.all, 'wire', dataBase64] as const,
   candidates: (dataBase64: string) => [...protoKeys.all, 'candidates', dataBase64] as const,
@@ -27,10 +27,15 @@ export function useMessageTypes() {
   return { messages, isLoading: query.isLoading }
 }
 
-export function useTypeDescription(sourceId: string | null, fullName: string | null, includeReachable = false) {
+export function useTypeDescription(
+  sourceId: string | null,
+  fullName: string | null,
+  includeReachable = false,
+  fingerprint?: string,
+) {
   return useQuery({
-    queryKey: protoKeys.description(sourceId ?? '', fullName ?? '', includeReachable),
-    queryFn: () => describeSchemaType(sourceId!, fullName!, includeReachable),
+    queryKey: protoKeys.description(sourceId ?? '', fullName ?? '', includeReachable, fingerprint),
+    queryFn: () => describeSchemaType(sourceId!, fullName!, includeReachable, fingerprint),
     enabled: !!sourceId && !!fullName,
   })
 }

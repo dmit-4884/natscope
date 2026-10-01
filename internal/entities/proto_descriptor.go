@@ -15,6 +15,8 @@ type ProtoDescriptor struct {
 	MessageTypes []string
 	TargetFiles  []string
 	CompiledAt   int64
+	// CompileSettings records the import roots and exclude prefixes the schema compiled with.
+	CompileSettings string
 }
 
 // ProtoDescriptorNew creates a new ProtoDescriptor with generated Id and

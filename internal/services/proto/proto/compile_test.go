@@ -4,6 +4,10 @@
 package proto
 
 import (
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -132,4 +136,30 @@ func TestCompileResolved(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, protoutils.RootsOriginManual, out.Origin)
 	})
+}
+
+func TestConfinedAccessor(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	outside := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "dep.proto"), []byte("syntax"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "big.proto"), make([]byte, maxUploadFileBytes+1), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(outside, "secret.proto"), []byte("x"), 0o600))
+	require.NoError(t, os.Symlink(filepath.Join(outside, "secret.proto"), filepath.Join(root, "link.proto")))
+	open := confinedAccessor([]string{root})
+
+	rc, err := open(filepath.Join(root, "dep.proto"))
+	require.NoError(t, err)
+	data, err := io.ReadAll(rc)
+	require.NoError(t, err)
+	assert.Equal(t, "syntax", string(data))
+
+	_, err = open(filepath.Join(root, "..", filepath.Base(outside), "secret.proto"))
+	require.ErrorIs(t, err, fs.ErrNotExist)
+	_, err = open("/dev/zero")
+	require.ErrorIs(t, err, fs.ErrNotExist)
+	_, err = open(filepath.Join(root, "link.proto"))
+	require.Error(t, err)
+	_, err = open(filepath.Join(root, "big.proto"))
+	require.ErrorIs(t, err, errImportTooLarge)
 }

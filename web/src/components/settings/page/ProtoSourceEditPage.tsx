@@ -255,7 +255,7 @@ export default function ProtoSourceEditPage({ mode }: Props) {
     try {
       const sourceId = await persist()
       if (!sourceId) return
-      if (sourceType !== 'git') {
+      if (sourceType !== 'git' || existing?.selectedRef) {
         setCompileOut((await refreshMutation.mutateAsync({ sourceId })).outcome)
       }
     } catch (err) {

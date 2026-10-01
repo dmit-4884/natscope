@@ -232,11 +232,17 @@ describe('putKVKey', () => {
       sourceId: 'src-1',
       json: '{"max":3}',
       framing: { kind: 'grpc', schemaId: 0, prefix: new Uint8Array(), suffix: new Uint8Array() },
+      fingerprint: 'fp-1',
     })
 
     const payload = putKVKeyCall.mock.calls[0][0].payload
     expect(payload.case).toBe('proto')
-    expect(payload.value).toMatchObject({ messageType: 'shop.Limits', sourceId: 'src-1', json: '{"max":3}' })
+    expect(payload.value).toMatchObject({
+      messageType: 'shop.Limits',
+      sourceId: 'src-1',
+      json: '{"max":3}',
+      fingerprint: 'fp-1',
+    })
     expect(payload.value.framing.kind).toBe(1)
   })
 })

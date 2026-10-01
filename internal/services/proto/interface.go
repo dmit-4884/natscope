@@ -29,11 +29,11 @@ type Registry interface {
 
 	// DescribeType describes a type of a source, with every type it reaches when reachable is set;
 	// ErrProtoTypeNotFound if absent.
-	DescribeType(ctx context.Context, sourceID, fullName string, reachable bool) (*entities.TypeDescription, error)
+	DescribeType(ctx context.Context, sourceID, fingerprint, fullName string, reachable bool) (*entities.TypeDescription, error)
 
 	// GenerateExample builds an example JSON object for a message type;
 	// ErrProtoMessageNotFound if absent.
-	GenerateExample(ctx context.Context, sourceID, messageType string) (any, error)
+	GenerateExample(ctx context.Context, sourceID, fingerprint, messageType string) (any, error)
 
 	// MappingHealth returns resolvability state for the given mapping ids, in
 	// input order.

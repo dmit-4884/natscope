@@ -122,7 +122,7 @@ func (s *Service) storeUploadedSet(
 	messageTypes := schema.MessagesIn(own)
 
 	fingerprint := hash.SHA256HexBytes(set)
-	d, err := s.saveSchema(ctx, src.Id, fingerprint[:uploadRevisionChars], set, messageTypes, own)
+	d, err := s.saveSchema(ctx, src.Id, fingerprint[:uploadRevisionChars], set, messageTypes, own, "")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -170,7 +170,7 @@ func (s *Service) compileFileSet(
 	if saveErr := s.fileSetsStorage.Save(ctx, fileSet); saveErr != nil {
 		return nil, nil, coreerrs.WrapOperation(saveErr, "save proto files")
 	}
-	d, err := s.storeSchema(ctx, src.Id, fileSet.Revision, out.FDS)
+	d, err := s.storeSchema(ctx, src, fileSet.Revision, out.FDS)
 	if err != nil {
 		return nil, nil, err
 	}

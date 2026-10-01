@@ -18,6 +18,9 @@ type Storage interface {
 	// GetBySourceRevision returns errs.ErrProtoFileSetNotFound when absent.
 	GetBySourceRevision(ctx context.Context, sourceID, revision string) (*entities.ProtoFileSet, error)
 
+	// DeleteBySourceRevision deletes one file set; a missing one is not an error.
+	DeleteBySourceRevision(ctx context.Context, sourceID, revision string) error
+
 	// DeleteBySource deletes every file set of a source.
 	DeleteBySource(ctx context.Context, sourceID string) (int64, error)
 }

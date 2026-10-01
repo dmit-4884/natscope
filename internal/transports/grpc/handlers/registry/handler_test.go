@@ -41,12 +41,12 @@ func (m *mockProtoSvc) ListTypes(_ context.Context, sourceID string) ([]entities
 	return m.types, nil
 }
 
-func (m *mockProtoSvc) DescribeType(_ context.Context, _, _ string, reachable bool) (*entities.TypeDescription, error) {
+func (m *mockProtoSvc) DescribeType(_ context.Context, _, _, _ string, reachable bool) (*entities.TypeDescription, error) {
 	m.gotReachable = reachable
 	return m.description, m.describeErr
 }
 
-func (m *mockProtoSvc) GenerateExample(_ context.Context, _, _ string) (any, error) {
+func (m *mockProtoSvc) GenerateExample(_ context.Context, _, _, _ string) (any, error) {
 	return m.exampleResult, m.exampleErr
 }
 

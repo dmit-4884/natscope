@@ -297,6 +297,50 @@ func TestRefreshSource_FollowsMovedBranch(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, pinned.Success, "the pinned old schema has no Refund")
 	assert.Contains(t, pinned.Error, "not found")
+
+	_, err = env.svc.DescribeType(t.Context(), src.Id, oldFingerprint, "shop.Refund", false)
+	require.ErrorIs(t, err, errs.ErrProtoTypeNotFound, "describing follows the pin too")
+	_, err = env.svc.DescribeType(t.Context(), src.Id, "", "shop.Refund", false)
+	require.NoError(t, err)
+	_, err = env.svc.GenerateExample(t.Context(), src.Id, oldFingerprint, "shop.Refund")
+	require.ErrorIs(t, err, errs.ErrProtoMessageNotFound)
+}
+
+func TestRefreshSource_RecompilesGitAfterSettingsChange(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+	env.git.commit("aaa", orderV1)
+	env.git.point("main", entities.RefKindBranch, "aaa")
+	src := env.createGit(t)
+	_, _, err := env.svc.SelectRef(t.Context(), src.Id, "main")
+	require.NoError(t, err)
+
+	_, err = env.svc.UpdateSource(t.Context(), &entities.ProtoSourceUpdate{Id: src.Id, ExcludePrefixes: []string{"shop.proto"}})
+	require.NoError(t, err)
+	_, outcome, err := env.svc.RefreshSource(t.Context(), src.Id)
+	require.NoError(t, err)
+	assert.False(t, outcome.Valid, "the excluded file leaves nothing to compile")
+	assert.Equal(t, 1, env.git.fetchCount(), "the stored files are recompiled, not fetched again")
+}
+
+func TestRefreshSource_SkipsWhenTheRefChanged(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+	env.git.commit("aaa", orderV1)
+	env.git.commit("bbb", orderV2)
+	env.git.point("main", entities.RefKindBranch, "aaa")
+	env.git.point("v2", entities.RefKindTag, "bbb")
+	src := env.createGit(t)
+	_, _, err := env.svc.SelectRef(t.Context(), src.Id, "main")
+	require.NoError(t, err)
+	stale, err := env.sources.Get(t.Context(), src.Id)
+	require.NoError(t, err)
+	_, _, err = env.svc.SelectRef(t.Context(), src.Id, "v2")
+	require.NoError(t, err)
+
+	got, _, err := env.svc.refreshRef(t.Context(), stale, *stale.SelectedRef)
+	require.NoError(t, err)
+	assert.Equal(t, "v2", got.SelectedRef.Name, "a refresh that started before the switch does not undo it")
 }
 
 func TestSelectRef_CompileErrorKeepsPreviousSchema(t *testing.T) {
@@ -648,13 +692,30 @@ message Order {
 	assert.Equal(t, LocalRevision, byName["shop.Order"].SourceRevision)
 	assert.True(t, byName["google.protobuf.Timestamp"].Dependency)
 
-	desc, err := env.svc.DescribeType(t.Context(), src.Id, "shop.Order", true)
+	desc, err := env.svc.DescribeType(t.Context(), src.Id, "", "shop.Order", true)
 	require.NoError(t, err)
 	assert.Equal(t, "When it was placed.", desc.Messages[0].Fields[0].Comment)
 	assert.Equal(t, "google.protobuf.Timestamp", desc.Messages[1].FullName)
 
-	_, err = env.svc.DescribeType(t.Context(), src.Id, "shop.Missing", false)
+	_, err = env.svc.DescribeType(t.Context(), src.Id, "", "shop.Missing", false)
 	require.ErrorIs(t, err, errs.ErrProtoTypeNotFound)
 	_, err = env.svc.ListTypes(t.Context(), "missing")
 	require.ErrorIs(t, err, errs.ErrMappingSourceNotFound)
+}
+
+func TestResolveDescriptorForMapping_PinnedSourceDisabled(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+	src, _ := env.createLocal(t, map[string]string{"shop.proto": orderV1})
+	got, _, err := env.svc.RefreshSource(t.Context(), src.Id)
+	require.NoError(t, err)
+	pin := got.ActiveSchema.Fingerprint
+	m := &entities.SubjectMapping{SourceID: src.Id, MessageType: "shop.Order", PinnedFingerprint: &pin}
+
+	_, err = env.svc.resolveDescriptorForMapping(t.Context(), m)
+	require.NoError(t, err)
+	_, err = env.svc.SetEnabled(t.Context(), src.Id, false)
+	require.NoError(t, err)
+	_, err = env.svc.resolveDescriptorForMapping(t.Context(), m)
+	require.ErrorIs(t, err, errs.ErrMappingSourceDisabled, "a pin does not bypass a disabled source")
 }

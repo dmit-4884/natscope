@@ -447,6 +447,15 @@ func TestProtoFlow(t *testing.T) {
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 		assert.Equal(t, "PROTO_ENCODE_FAILED", errorReason(t, err))
 
+		_, err = env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+			ConnectionId: connID, Bucket: "PROTO_CFG", Key: "pinned",
+			Payload: &managementpb.PutKVKeyRequest_Proto{Proto: &managementpb.KVProtoValue{
+				MessageType: fullName, SourceId: sourceID, Json: `{"name":"kv"}`, Fingerprint: new("no-such-schema"),
+			}},
+		}))
+		require.Error(t, err, "the pinned schema decides the encoding")
+		assert.Equal(t, "PROTO_ENCODE_FAILED", errorReason(t, err))
+
 		require.NoError(t, put("PROTO_RAW", "guess", `{"name":"raw","count":2,"tags":["a"]}`))
 		auto, err := env.management.GetKVKey(ctx, connect.NewRequest(&managementpb.GetKVKeyRequest{
 			ConnectionId: connID, Bucket: "PROTO_RAW", Key: "guess",

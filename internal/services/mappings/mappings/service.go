@@ -6,6 +6,7 @@ package mappings
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync/atomic"
@@ -54,7 +55,7 @@ func (s *Service) Create(
 	if in.SourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
-	if err := validatePatternAndType(in.Pattern, in.MessageType); err != nil {
+	if err := validateMapping(in.Pattern, in.MessageType, in.Framing); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +105,7 @@ func (s *Service) Update(
 	if existing.SourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
-	if err := validatePatternAndType(existing.Pattern, existing.MessageType); err != nil {
+	if err := validateMapping(existing.Pattern, existing.MessageType, existing.Framing); err != nil {
 		return nil, err
 	}
 
@@ -168,7 +169,7 @@ func (s *Service) BulkSave(
 		if cp.SourceID == "" {
 			return nil, errs.ErrMappingSourceIDRequired
 		}
-		if err := validatePatternAndType(cp.Pattern, cp.MessageType); err != nil {
+		if err := validateMapping(cp.Pattern, cp.MessageType, cp.Framing); err != nil {
 			return nil, err
 		}
 
@@ -239,13 +240,17 @@ func (s *Service) rebuildResolver(ctx context.Context) {
 	s.resolver.Store(natsutil.NewMappingResolver(all))
 }
 
-// validatePatternAndType rejects an empty pattern or messageType and a pattern that isn't a valid NATS subject pattern.
-func validatePatternAndType(pattern, messageType string) error {
+// validateMapping rejects an empty pattern or messageType, a pattern that isn't a valid NATS subject pattern
+// and an unknown framing.
+func validateMapping(pattern, messageType string, framing entities.Framing) error {
 	if pattern == "" {
 		return errs.ErrMappingPatternRequired
 	}
 	if messageType == "" {
 		return errs.ErrMappingMessageTypeRequired
+	}
+	if !framing.Valid() {
+		return fmt.Errorf("%w: unknown framing %q", errs.ErrInvalidRequest, framing.Kind)
 	}
 	return natsutil.ValidateSubjectPattern(pattern)
 }

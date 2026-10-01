@@ -38,7 +38,7 @@ export function KVProtoBar({ bucket, target, decoded, showRaw, onToggleRaw }: Pr
         {target.pattern ? (
           <span className="truncate">via {target.pattern}</span>
         ) : (
-          <Tooltip content="No mapping matches this key. Natscope picked the only message type that fits every byte.">
+          <Tooltip content="No mapping matches this key. This type decodes every byte and scores higher than any other.">
             <Badge variant="primary" shape="pill" data-testid="kv-decoded-auto">
               Auto-detected
             </Badge>

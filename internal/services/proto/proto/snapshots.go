@@ -24,9 +24,19 @@ func (s *Service) mappingSource(ctx context.Context, sourceID string) (*entities
 }
 
 func (s *Service) snapshotForSource(ctx context.Context, sourceID string) (*registry.Snapshot, error) {
+	return s.snapshotAt(ctx, sourceID, "")
+}
+
+func (s *Service) snapshotAt(ctx context.Context, sourceID, fingerprint string) (*registry.Snapshot, error) {
 	src, err := s.mappingSource(ctx, sourceID)
 	if err != nil {
 		return nil, err
+	}
+	if !src.Enabled {
+		return nil, errs.ErrMappingSourceDisabled
+	}
+	if fingerprint != "" {
+		return s.registryCache.GetByFingerprint(ctx, sourceID, fingerprint)
 	}
 	revision, err := activeRevision(src)
 	if err != nil {
@@ -39,10 +49,7 @@ func (s *Service) snapshotForRequest(ctx context.Context, req entities.CodecRequ
 	if req.SourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
-	if req.Fingerprint != "" {
-		return s.registryCache.GetByFingerprint(ctx, req.SourceID, req.Fingerprint)
-	}
-	return s.snapshotForSource(ctx, req.SourceID)
+	return s.snapshotAt(ctx, req.SourceID, req.Fingerprint)
 }
 
 func (s *Service) resolveDescriptorForMapping(
@@ -55,10 +62,11 @@ func (s *Service) resolveDescriptorForMapping(
 	if m.SourceID == "" {
 		return nil, errs.ErrMappingSourceIDRequired
 	}
-	if m.PinnedFingerprint != nil && *m.PinnedFingerprint != "" {
-		return s.registryCache.GetByFingerprint(ctx, m.SourceID, *m.PinnedFingerprint)
+	pin := ""
+	if m.PinnedFingerprint != nil {
+		pin = *m.PinnedFingerprint
 	}
-	return s.snapshotForSource(ctx, m.SourceID)
+	return s.snapshotAt(ctx, m.SourceID, pin)
 }
 
 func (s *Service) activeSnapshots(ctx context.Context) []*registry.Snapshot {

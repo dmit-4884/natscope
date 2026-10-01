@@ -17,6 +17,8 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
 	"github.com/dmit-4884/natscope/internal/services/proto/registry"
 
+	"golang.org/x/time/rate"
+
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	fwsvc "github.com/dmit-4884/natscope/internal/services/filewatcher"
 	gitfetchersvc "github.com/dmit-4884/natscope/internal/services/gitfetcher"
@@ -45,6 +47,7 @@ type Service struct {
 	fileWatcher        fwsvc.Service
 	registryCache      *registry.Cache
 	learned            *lru.Cache[string, learnedType]
+	detectBudget       *rate.Limiter
 
 	// compileLocks serializes compile->persist per source; zero-value usable
 	// (lock() lazily inits) so intentionally NOT set in New().
@@ -77,6 +80,7 @@ func New(
 		fileWatcher:        fileWatcher,
 		registryCache:      registry.NewCache(descriptorsStorage),
 		learned:            panics.MustResult(lru.NewCache[string, learnedType](maxLearnedSubjects)),
+		detectBudget:       rate.NewLimiter(detectScansPerSec, detectScansPerSec),
 	}
 
 	if fileWatcher != nil {

@@ -930,6 +930,9 @@ message KVProtoValue {
 
   // Optional. Wrapper around the encoded message.
   .natscope.types.proto.Framing framing = 4;
+
+  // Optional. Schema fingerprint; empty uses the source's active schema.
+  optional string fingerprint = 5;
 }
 
 // Defines the response message for creating or updating a key-value entry.

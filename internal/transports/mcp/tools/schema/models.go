@@ -126,7 +126,7 @@ type candidateView struct {
 	SourceID       string          `json:"sourceId"`
 	SourceRevision string          `json:"sourceRevision,omitempty"`
 	MessageType    string          `json:"messageType"`
-	Score          int             `json:"score" jsonschema:"0 to 100; 90 and above means every byte decoded and the type fits well"`
+	Score          int             `json:"score" jsonschema:"0 to 100: mostly the share of bytes that decode as declared fields"`
 	UnknownBytes   int             `json:"unknownBytes,omitempty" jsonschema:"bytes of fields the type does not declare"`
 	Decoded        json.RawMessage `json:"decoded"`
 }

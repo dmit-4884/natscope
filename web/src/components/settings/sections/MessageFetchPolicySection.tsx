@@ -81,7 +81,7 @@ export function MessageFetchPolicySection({ value, onChange, isOpen, onToggle, o
 
       <Field
         label="Detect message types"
-        description="Decode binary payloads on subjects without a mapping as the Protobuf type they clearly match"
+        description="Decode binary payloads on subjects without a mapping as the Protobuf type that fits them best"
         helpKey="messages.detectTypes"
         onHelp={onHelp}
       >

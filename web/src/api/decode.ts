@@ -123,7 +123,7 @@ export interface TypeCandidate {
   sourceId: string
   sourceRevision: string
   messageType: string
-  /** 0 to 100; 90 and above means every byte decoded and the type fits well. */
+  /** 0 to 100: mostly the share of bytes that decode as declared fields, plus how many of the fields are set. */
   score: number
   unknownBytes: number
   decoded: unknown

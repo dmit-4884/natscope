@@ -214,7 +214,6 @@ export interface Message {
   decode_error?: string
   decoded_unknown_fields?: number
   decoded_valid_bytes?: number
-  // Set when no mapping matched and the server guessed decoded_type.
   decoded_auto?: boolean
   decoded_source_id?: string
   // When true, data_base64/decoded were capped per

@@ -24,7 +24,7 @@ const (
 	gRPCFrameCompressedFlag   byte = 0x01
 	confluentMagic            byte = 0x00
 	confluentHeaderSize            = 5
-	maxInflatedBytes               = 64 << 20
+	maxInflatedBytes               = 16 << 20
 
 	protobufWireTypeMask byte = 0x07
 	wireTypeStartGroup   byte = 3
@@ -33,7 +33,8 @@ const (
 	wireTypeReserved7    byte = 7
 )
 
-// Unframe strips the framing around a protobuf message; offset is where the message starts in data.
+// Unframe strips the framing around a protobuf message; offset is where the message starts in data,
+// -1 when the message was decompressed and its bytes don't map onto data.
 func Unframe(data []byte, f entities.Framing) (msg []byte, offset int, err error) {
 	switch f.Kind {
 	case entities.FramingNone:
@@ -81,11 +82,14 @@ func unframeGRPC(data []byte) ([]byte, int, error) {
 		if err != nil {
 			return nil, 0, fmt.Errorf("compressed gRPC frame is not gzip: %w", err)
 		}
-		inflated, err := io.ReadAll(io.LimitReader(zr, maxInflatedBytes))
+		inflated, err := io.ReadAll(io.LimitReader(zr, maxInflatedBytes+1))
 		if err != nil {
 			return nil, 0, fmt.Errorf("inflate gRPC frame: %w", err)
 		}
-		return inflated, 0, nil
+		if len(inflated) > maxInflatedBytes {
+			return nil, 0, fmt.Errorf("compressed gRPC frame inflates past %d bytes", maxInflatedBytes)
+		}
+		return inflated, -1, nil
 	default:
 		return nil, 0, fmt.Errorf("gRPC compression flag must be 0 or 1, got %d", data[0])
 	}

@@ -31,7 +31,13 @@ function editableValue(entry: KVEntry, asProto: boolean): string {
 
 function storedValue(target: KVProtoTarget | null, text: string): string | KVProtoValue {
   return target
-    ? { messageType: target.messageType, sourceId: target.sourceId, framing: target.framing, json: text }
+    ? {
+        messageType: target.messageType,
+        sourceId: target.sourceId,
+        framing: target.framing,
+        fingerprint: target.pinnedFingerprint,
+        json: text,
+      }
     : text
 }
 
@@ -114,6 +120,11 @@ export default function KVStorePage() {
     setEditingValue('')
     setShowRaw(false)
   }, [selectedKey])
+
+  const undecodable = !!keyEntry?.decoded?.error && keyEntry.decoded.data === undefined
+  useEffect(() => {
+    if (undecodable) setShowRaw(true)
+  }, [undecodable, keyEntry?.revision])
 
   // Reset selection AND search on bucket change — a stale search filter
   // would hide all keys in the new bucket, looking like it's empty.
@@ -451,10 +462,10 @@ export default function KVStorePage() {
               )}
 
               <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-                {target && keyEntry?.decoded?.error && !showRaw && (
+                {target && keyEntry?.decoded?.error && (
                   <Alert variant="warning">
-                    The stored value does not decode as {target.messageType}: {keyEntry.decoded.error}. Saving encodes the
-                    JSON below as {target.messageType}.
+                    The stored value does not decode as {target.messageType}: {keyEntry.decoded.error}.
+                    {!showRaw && ` Saving encodes the JSON below as ${target.messageType}.`}
                   </Alert>
                 )}
                 {keyLoading ? (

@@ -44,7 +44,7 @@ func (t *Toolset) describeType(ctx context.Context, _ *mcp.CallToolRequest, in t
 	if err != nil {
 		return nil, describeOutput{}, err
 	}
-	desc, err := t.registry.DescribeType(ctx, info.SourceID, info.FullName, true)
+	desc, err := t.registry.DescribeType(ctx, info.SourceID, "", info.FullName, true)
 	if err != nil {
 		return nil, describeOutput{}, err
 	}
@@ -57,7 +57,7 @@ func (t *Toolset) describeType(ctx context.Context, _ *mcp.CallToolRequest, in t
 		Enums:    slices.To(desc.Enums, func(e *entities.SchemaEnum) enumView { return *converter.Convert(e, &enumView{}) }),
 	}
 	out.Comment = root.Comment
-	if example, exErr := t.registry.GenerateExample(ctx, info.SourceID, info.FullName); exErr == nil {
+	if example, exErr := t.registry.GenerateExample(ctx, info.SourceID, "", info.FullName); exErr == nil {
 		out.Example = example
 	}
 	return nil, out, nil

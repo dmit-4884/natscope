@@ -4,6 +4,7 @@
 package proto
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -138,6 +139,9 @@ func TestUploadSchema_Rejects(t *testing.T) {
 		{name: "no proto files", upload: uploadFiles(map[string]string{"notes.txt": "x"}), want: "no .proto files uploaded"},
 		{name: "compile error", upload: uploadFiles(map[string]string{"shop.proto": brokenProto}), want: ""},
 		{name: "garbage descriptor set", upload: entities.SchemaUpload{DescriptorSet: []byte("not protobuf")}, want: ""},
+		{name: "import from the server disk", upload: uploadFiles(map[string]string{
+			"shop.proto": "syntax = \"proto3\";\nimport \"/dev/zero\";\nimport \"../../../../etc/hosts\";\n",
+		}), want: ""},
 	}
 	for _, tc := range cases {
 		_, outcome, err := env.svc.UploadSchema(t.Context(), src.Id, tc.upload)
@@ -229,4 +233,35 @@ func TestEncode_Framing(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, decoded.Success, decoded.Error)
 	assert.JSONEq(t, `{"order_id":"o1"}`, string(decoded.Decoded))
+}
+
+func TestUploadSchema_PrunesOldRevisions(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+	mappings := &fakeMappings{}
+	env.svc.mappingsService = mappings
+	src := env.createUpload(t)
+
+	var fingerprints, revisions []string
+	for i := range maxStoredRevisions + 2 {
+		got, outcome, err := env.svc.UploadSchema(t.Context(), src.Id, uploadFiles(map[string]string{
+			"shop.proto": fmt.Sprintf("syntax = \"proto3\";\npackage shop;\nmessage V%d {}\n", i),
+		}))
+		require.NoError(t, err)
+		require.True(t, outcome.Valid, "diagnostics: %v", outcome.Diagnostics)
+		fingerprints = append(fingerprints, got.ActiveSchema.Fingerprint)
+		revisions = append(revisions, got.ActiveSchema.Revision)
+		if i == 0 {
+			mappings.all = entities.SubjectMappings{{SourceID: src.Id, PinnedFingerprint: &fingerprints[0]}}
+		}
+	}
+
+	stored, err := env.svc.ListRevisions(t.Context(), src.Id)
+	require.NoError(t, err)
+	assert.Len(t, stored, maxStoredRevisions+1)
+	_, err = env.descriptors.GetByFingerprint(t.Context(), src.Id, fingerprints[0])
+	require.NoError(t, err, "a pinned revision stays")
+	_, err = env.descriptors.GetBySourceRevision(t.Context(), src.Id, revisions[1])
+	require.ErrorIs(t, err, errs.ErrProtoDescriptorNotFound)
+	assert.True(t, stored[0].Active)
 }

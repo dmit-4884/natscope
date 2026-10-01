@@ -216,6 +216,8 @@ export default function UnifiedMessageViewer({
           ...full,
           decodedType: full.decoded_type,
           decodeError: full.decode_error,
+          decodedUnknownFields: full.decoded_unknown_fields,
+          decodedValidBytes: full.decoded_valid_bytes,
           decodedAuto: full.decoded_auto,
           decodedSourceId: full.decoded_source_id,
         } as SelectedMessage
@@ -227,6 +229,15 @@ export default function UnifiedMessageViewer({
         toast.error(`Failed to load full payload: ${getErrorMessage(err)}`)
         return
       }
+    }
+
+    if (!savedMapping && (picked || resendMessage.decodedAuto)) {
+      toast.error('Save the detected type as a mapping first, so the publish form encodes your edit as Protobuf')
+      return
+    }
+    if (decodeNotes?.validBytes || resendMessage.decodedValidBytes) {
+      toast.error('Only part of this payload decoded, so resending it would drop the rest')
+      return
     }
 
     const subjects = streamDetail?.subjects ?? []
@@ -265,6 +276,9 @@ export default function UnifiedMessageViewer({
     connectionId,
     streamName,
     selectedMessage?.sequence,
+    picked,
+    savedMapping,
+    decodeNotes?.validBytes,
   ])
 
   // Subject pattern from stream config, else inferred.
@@ -600,7 +614,7 @@ export default function UnifiedMessageViewer({
                     {shownType}
                   </span>
                   {serverGuess && !savedMapping && (
-                    <Tooltip content="No mapping matches this subject. Natscope picked the only message type that fits every byte.">
+                    <Tooltip content="No mapping matches this subject. This type decodes every byte and scores higher than any other.">
                       <Badge variant="primary" shape="pill" data-testid="decoded-auto">
                         Auto-detected
                       </Badge>

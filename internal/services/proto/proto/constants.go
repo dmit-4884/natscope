@@ -11,6 +11,9 @@ const (
 	// FindConflicts has anything cross-source to compare.
 	minActiveSnapshotsForConflictReport = 2
 
+	// maxStoredRevisions bounds the schemas kept per source, besides the active and pinned ones.
+	maxStoredRevisions = 20
+
 	// fileWatcherDebounceTimeout caps a local source's descriptor rebuild after a
 	// filesystem nudge; safety net for pathological disks.
 	fileWatcherDebounceTimeout = 60 * time.Second

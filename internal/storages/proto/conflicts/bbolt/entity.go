@@ -5,7 +5,6 @@ package bbolt
 
 import "github.com/dmit-4884/natscope/internal/pkg/bbstore"
 
-// conflictDoc is the persistence model for one schema conflict.
 type conflictDoc struct {
 	bbstore.Base
 

@@ -22,3 +22,13 @@ type Framing struct {
 	Prefix   []byte
 	Suffix   []byte
 }
+
+// Valid reports whether Kind is a known framing.
+func (f Framing) Valid() bool {
+	switch f.Kind {
+	case FramingNone, FramingGRPC, FramingConfluent, FramingDelimited, FramingCustom:
+		return true
+	default:
+		return false
+	}
+}

@@ -2,22 +2,26 @@ import { useRef } from 'react'
 import { downloadBlob } from '@/utils/download'
 import { toast } from '@/utils/toast'
 import type { SavedConnection, CreateConnectionRequest } from '@/api/connections'
+import type { Framing } from '@/api/framing'
 import { AuthConfig, toApiAuthConfig } from '@/contexts/connection'
 import type { MappingItem } from '@/contexts/mappings'
+import { exportFraming, importFraming } from '@/components/mappings/framingExport'
+
+interface MappingRow {
+  pattern: string
+  messageType: string
+  sourceId: string
+  framing?: Framing
+}
 
 interface Options {
   connections: SavedConnection[]
   mappings: MappingItem[]
   createConnection: (req: CreateConnectionRequest) => Promise<unknown>
-  bulkSaveMappings: (
-    next: Array<{ pattern: string; messageType: string; sourceId: string }>,
-  ) => Promise<unknown>
+  bulkSaveMappings: (next: MappingRow[]) => Promise<unknown>
 }
 
-/**
- * v2 export format; import is strict about `sourceId` — items missing it are
- * dropped. Pre-redesign exports (keyed by pattern) need manual re-export.
- */
+/** v2 export format; import drops mappings without a `sourceId` or with malformed framing. */
 export function useConnectionImportExport({
   connections,
   mappings,
@@ -45,6 +49,7 @@ export function useConnectionImportExport({
         pattern: m.pattern,
         messageType: m.messageType,
         sourceId: m.sourceId,
+        framing: exportFraming(m.framing),
       })),
       exported_at: new Date().toISOString(),
     }
@@ -103,25 +108,22 @@ export function useConnectionImportExport({
           }
         }
 
-        // Mappings (v2: array of {pattern, messageType, sourceId}).
         if (Array.isArray(config.mappings)) {
           const incoming = config.mappings as Array<{
             pattern?: string
             messageType?: string
             sourceId?: string
+            framing?: unknown
           }>
-          const valid: Array<{ pattern: string; messageType: string; sourceId: string }> = []
+          const valid: MappingRow[] = []
           for (const m of incoming) {
-            if (!m.pattern || !m.messageType || !m.sourceId) continue
-            valid.push({ pattern: m.pattern, messageType: m.messageType, sourceId: m.sourceId })
+            const framing = importFraming(m.framing)
+            if (!m.pattern || !m.messageType || !m.sourceId || framing === null) continue
+            valid.push({ pattern: m.pattern, messageType: m.messageType, sourceId: m.sourceId, framing })
           }
           if (valid.length > 0) {
             await bulkSaveMappings(valid)
           }
-        } else if (config.subject_mappings) {
-          toast.error(
-            'Legacy mapping format detected (pre-redesign). Re-export against the current backend.',
-          )
         }
 
         const summary = [

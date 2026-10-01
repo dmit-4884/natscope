@@ -18,7 +18,7 @@ export interface MessageFetchPolicyProps {
   // Hard cap on messages fetched by a full-range export. Always positive —
   // 0 coerced to default. Default 50000.
   exportRangeLimit: number
-  /** Decode unmapped binary payloads as the message type they clearly match. Default true. */
+  /** Decode unmapped binary payloads as the message type that fits them best. Default true. */
   detectTypes: boolean
 }
 

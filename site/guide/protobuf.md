@@ -11,7 +11,7 @@ browser, live tail, Key/Value values, request replies and the publish preview. T
 1. A **proto source** gives Natscope your `.proto` files and compiles them into a schema.
 2. A **subject mapping** binds a NATS subject pattern to a fully-qualified message type.
 
-Payloads on subjects without a mapping still decode when one message type clearly fits them. See
+Payloads on subjects without a mapping still decode when one message type fits them better than any other. See
 [Type detection](#type-detection).
 
 ## Add a proto source
@@ -32,9 +32,12 @@ keeps decoding.
 
 ### Versions
 
-Every compile is stored as a revision of the source. Switch the active revision on the source card:
-another branch, tag or commit of a Git source, another label or commit of a BSR module, or an earlier
-upload. Mappings decode with the active revision unless you pin them. See [Pin a schema version](#pin-a-schema-version).
+Git and BSR sources store a revision for every branch, tag, label or commit they compile. Switch the
+active one on the source card. An upload stores each version you upload and makes the latest active. A
+local directory keeps only its latest compile. Natscope keeps the 20 newest revisions of a source, plus
+the active one and any revision a mapping pins.
+
+Mappings decode with the active revision unless you pin them. See [Pin a schema version](#pin-a-schema-version).
 
 ### Live reload
 
@@ -72,7 +75,8 @@ When a payload fails to decode and looks framed, the error tells you which frami
 
 A pinned mapping keeps decoding with one revision after its source moves on, so messages written under
 an older schema still read correctly. Pick the revision under **Schema version**. The mapping table marks
-pinned rows, and publishing on a pinned subject encodes with the same revision.
+pinned rows. Publishing, requests, Key/Value saves and editor completion on a pinned subject use the same
+revision. A local directory keeps a single revision, so its mappings cannot be pinned.
 
 ### Health checks
 
@@ -82,7 +86,7 @@ schema no longer has. A broken mapping shows up in the list instead of failing q
 ## Type detection
 
 A binary payload on a subject without a mapping still decodes when exactly one message type of your
-enabled sources fits every byte and clearly beats the rest. The message viewer marks it
+enabled sources decodes every byte and scores higher than every other type. The message viewer marks it
 **Auto-detected**. Click **Save as mapping** to keep the type for that subject, with numeric and UUID
 tokens turned into `*`.
 

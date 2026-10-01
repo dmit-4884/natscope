@@ -70,7 +70,7 @@ export class Subject extends ValueObject<SubjectProps> {
     return this.props.value
   }
 
-  /** Subject to pattern: numeric, UUID and long digit-bearing tokens become '*'; the server learns detected types the same way. */
+  /** Subject to pattern: numeric, UUID and long digit-bearing tokens become '*'. */
   toPattern(): string {
     return this.parts()
       .map((t) =>

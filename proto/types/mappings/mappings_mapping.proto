@@ -22,8 +22,8 @@ message SubjectMapping {
   // Required. Identifier of the proto source this mapping is bound to.
   // Decode resolution loads the descriptor only from this source's active selection.
   string source_id = 6 [(google.api.field_behavior) = REQUIRED];
-  // Optional. Pin resolution to a specific descriptor by content hash (sha256).
-  // Survives recompiles. Takes precedence over pinnedTag.
+  // Optional. Pin resolution to a specific schema by its fingerprint (sha256).
+  // Survives recompiles; empty follows the source's active schema.
   optional string pinned_fingerprint = 8;
   // Wrapper around the protobuf message of every payload on the pattern.
   .natscope.types.proto.Framing framing = 9;

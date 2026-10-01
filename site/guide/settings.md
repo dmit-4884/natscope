@@ -30,8 +30,8 @@ Five collapsible sections.
 - **Default direction** — Backward or Forward
 - **Preview payload cap (KB)** — how much of a large payload the list preview renders before you ask for
   the whole thing
-- **Detect message types** — decode binary payloads on unmapped subjects as the Protobuf type they clearly
-  match. See [Type detection](/guide/protobuf#type-detection).
+- **Detect message types** — decode binary payloads on unmapped subjects as the Protobuf type that fits
+  them best. See [Type detection](/guide/protobuf#type-detection).
 
 ### Live
 

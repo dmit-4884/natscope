@@ -208,7 +208,6 @@ func TestGetByFingerprint_StorageLookup(t *testing.T) {
 	stub.put("src", "v1", data)
 	c := NewCache(stub)
 
-	// Cold cache: resolves via GetByFingerprint then builds.
 	got, err := c.GetByFingerprint(t.Context(), "src", fingerprint(data))
 	require.NoError(t, err)
 	assert.Equal(t, "src", got.SourceID)

@@ -76,7 +76,7 @@ func (s *Service) storeBSRRevision(
 		return nil, &entities.CompileOutcome{Diagnostics: diags}, nil
 	}
 	messageTypes := parsed.MessagesIn(schema.OwnFiles)
-	d, err := s.saveSchema(ctx, src.Id, ref.Revision, set, messageTypes, schema.OwnFiles)
+	d, err := s.saveSchema(ctx, src.Id, ref.Revision, set, messageTypes, schema.OwnFiles, "")
 	if err != nil {
 		return nil, nil, err
 	}

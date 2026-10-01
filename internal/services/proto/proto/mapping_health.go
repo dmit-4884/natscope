@@ -64,7 +64,7 @@ func (s *Service) computeOneHealth(ctx context.Context, id string) (entities.Sub
 		switch {
 		case errors.Is(err, errs.ErrMappingSelectionMissing):
 			res.Health = entities.MappingHealthSelectionMissing
-			res.Detail = fmt.Sprintf("source %q has no selected git ref", src.Name)
+			res.Detail = fmt.Sprintf("source %q has no active schema yet", src.Name)
 		case errors.Is(err, errs.ErrMappingSourceDisabled):
 			res.Health = entities.MappingHealthSourceDisabled
 			res.Detail = fmt.Sprintf("source %q is disabled", src.Name)
@@ -84,8 +84,7 @@ func (s *Service) computeOneHealth(ctx context.Context, id string) (entities.Sub
 	return res, nil
 }
 
-// mappingVersionLabel describes the version a mapping decodes with, matching
-// resolveDescriptorForMapping's fingerprint -> tag -> active order.
+// mappingVersionLabel describes the schema a mapping decodes with: its pin, else the active one.
 func mappingVersionLabel(m *entities.SubjectMapping) string {
 	switch {
 	case m.PinnedFingerprint != nil && *m.PinnedFingerprint != "":

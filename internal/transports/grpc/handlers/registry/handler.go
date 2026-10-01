@@ -59,7 +59,7 @@ func (h *Handler) DescribeType(
 	ctx context.Context,
 	req *connect.Request[registrypb.DescribeTypeRequest],
 ) (*connect.Response[registrypb.DescribeTypeResponse], error) {
-	desc, err := h.protoService.DescribeType(ctx, req.Msg.SourceId, req.Msg.FullName, req.Msg.IncludeReachable)
+	desc, err := h.protoService.DescribeType(ctx, req.Msg.SourceId, req.Msg.GetFingerprint(), req.Msg.FullName, req.Msg.IncludeReachable)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (h *Handler) GenerateExample(
 	ctx context.Context,
 	req *connect.Request[registrypb.GenerateExampleRequest],
 ) (*connect.Response[registrypb.GenerateExampleResponse], error) {
-	example, err := h.protoService.GenerateExample(ctx, req.Msg.SourceId, req.Msg.FullName)
+	example, err := h.protoService.GenerateExample(ctx, req.Msg.SourceId, req.Msg.GetFingerprint(), req.Msg.FullName)
 	if err != nil {
 		return nil, err
 	}

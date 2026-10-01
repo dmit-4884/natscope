@@ -487,6 +487,8 @@ export interface KVProtoValue {
   sourceId: string
   json: string
   framing?: Framing
+  /** Empty uses the source's active schema. */
+  fingerprint?: string
 }
 
 /** Stores text, bytes, or JSON the server encodes as a Protobuf message. */
@@ -510,6 +512,7 @@ export async function putKVKey(
             sourceId: value.sourceId,
             json: value.json,
             framing: framingToProto(value.framing),
+            fingerprint: value.fingerprint || undefined,
           },
         }
 

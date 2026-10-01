@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { getErrorMessage } from '@/api/errors'
-import type { Framing, FramingKindName } from '@/api/framing'
-import { bytesToHex, hexToBytes } from '@/utils/hex'
+import type { Framing } from '@/api/framing'
 import { downloadBlob } from '@/utils/download'
 import { useMappingItems, useBulkSaveMappings } from '@/contexts/mappings'
+import { exportFraming, importFraming, type ExportedFraming } from './framingExport'
 
 interface Options {
   onImportSuccess?: () => void
@@ -21,35 +21,6 @@ export interface MappingsExportV3 {
     messageType: string
     framing?: ExportedFraming
   }>
-}
-
-interface ExportedFraming {
-  kind: Exclude<FramingKindName, 'none'>
-  schemaId?: number
-  prefixHex?: string
-  suffixHex?: string
-}
-
-const FRAMING_KINDS: FramingKindName[] = ['grpc', 'confluent', 'varint_delimited', 'custom']
-
-function exportFraming(f: Framing): ExportedFraming | undefined {
-  if (f.kind === 'none') return undefined
-  return {
-    kind: f.kind,
-    schemaId: f.schemaId || undefined,
-    prefixHex: f.prefix.length ? bytesToHex(f.prefix) : undefined,
-    suffixHex: f.suffix.length ? bytesToHex(f.suffix) : undefined,
-  }
-}
-
-function importFraming(raw: unknown): Framing | undefined | null {
-  if (raw === undefined) return undefined
-  const f = raw as Partial<ExportedFraming> | null
-  if (!f || typeof f !== 'object' || !FRAMING_KINDS.includes(f.kind as FramingKindName)) return null
-  const prefix = hexToBytes(f.prefixHex ?? '')
-  const suffix = hexToBytes(f.suffixHex ?? '')
-  if (!prefix || !suffix) return null
-  return { kind: f.kind as FramingKindName, schemaId: Number(f.schemaId) || 0, prefix, suffix }
 }
 
 /** Parsed import row, ready to be reviewed and assigned a sourceId in the UI. */

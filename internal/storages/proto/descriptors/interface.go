@@ -24,6 +24,9 @@ type Storage interface {
 	// ListBySource returns every stored schema of a source.
 	ListBySource(ctx context.Context, sourceID string) (entities.ProtoDescriptors, error)
 
+	// DeleteBySourceRevision deletes one stored schema; a missing one is not an error.
+	DeleteBySourceRevision(ctx context.Context, sourceID, revision string) error
+
 	// DeleteBySource deletes every stored schema of a source.
 	DeleteBySource(ctx context.Context, sourceID string) (int64, error)
 }

@@ -63,7 +63,25 @@ func (s *Storage) GetByFingerprint(ctx context.Context, sourceID, fingerprint st
 	if fingerprint == "" {
 		return nil, errs.ErrProtoDescriptorNotFound
 	}
-	return s.get(ctx, sourceID, func(d *descriptorDoc) bool { return d.Fingerprint == fingerprint })
+	docs, err := s.store.ListBy(ctx, "$.fingerprint", fingerprint)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range docs {
+		if d.SourceID == sourceID {
+			return bbstore.ToEntity[entities.ProtoDescriptor](d), nil
+		}
+	}
+	return nil, errs.ErrProtoDescriptorNotFound
+}
+
+// DeleteBySourceRevision deletes one stored schema; a missing one is not an error.
+func (s *Storage) DeleteBySourceRevision(ctx context.Context, sourceID, revision string) error {
+	d, err := s.find(ctx, sourceID, func(d *descriptorDoc) bool { return d.Revision == revision })
+	if err != nil || d == nil {
+		return err
+	}
+	return s.store.Delete(ctx, d.ID)
 }
 
 // ListBySource returns every stored schema of a source.

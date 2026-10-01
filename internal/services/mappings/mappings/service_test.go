@@ -118,6 +118,21 @@ func TestService_Create(t *testing.T) {
 		assert.ErrorIs(t, err, errs.ErrMappingSourceIDRequired)
 	})
 
+	t.Run("UnknownFraming", func(t *testing.T) {
+		t.Parallel()
+		store := &mockStorage{}
+		svc := New(store)
+
+		_, err := svc.Create(t.Context(), &entities.SubjectMappingCreate{
+			Pattern:     "orders.*",
+			MessageType: "api.v1.Order",
+			SourceID:    "src-1",
+			Framing:     entities.Framing{Kind: "zstd"},
+		})
+		assert.ErrorIs(t, err, errs.ErrInvalidRequest)
+		assert.False(t, store.saveCalled)
+	})
+
 	t.Run("WhitespaceOnlyPattern", func(t *testing.T) {
 		t.Parallel()
 		store := &mockStorage{}

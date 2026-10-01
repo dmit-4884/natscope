@@ -192,6 +192,7 @@ func (h *Handler) kvValue(ctx context.Context, in *managementpb.PutKVKeyRequest)
 		JSON:        []byte(pv.GetJson()),
 		SourceID:    pv.GetSourceId(),
 		MessageType: pv.GetMessageType(),
+		Fingerprint: pv.GetFingerprint(),
 		Framing:     grpchelpers.FramingFromProto(pv.GetFraming()),
 	})
 	if err != nil {

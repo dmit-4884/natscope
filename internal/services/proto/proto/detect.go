@@ -19,6 +19,7 @@ const (
 	maxLearnedSubjects = 1000
 	detectCandidates   = 2
 	maxDetectMisses    = 3
+	detectScansPerSec  = 50
 	minVariableToken   = 8
 )
 
@@ -29,13 +30,21 @@ var (
 
 // DetectTypes ranks the message types of one source, or of every enabled source, by how well data decodes as each.
 func (s *Service) DetectTypes(ctx context.Context, data []byte, sourceID string, limit int) ([]entities.TypeCandidate, error) {
+	out, err := s.rankTypes(ctx, data, sourceID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return out[:min(len(out), limit)], nil
+}
+
+func (s *Service) rankTypes(ctx context.Context, data []byte, sourceID string, perSource int) ([]entities.TypeCandidate, error) {
 	snaps, err := s.snapshotsFor(ctx, sourceID)
 	if err != nil {
 		return nil, err
 	}
 	var out []entities.TypeCandidate
 	for _, snap := range snaps {
-		for _, c := range snap.Schema.DetectTypes(data, snap.Descriptor.MessageTypes, limit) {
+		for _, c := range snap.Schema.DetectTypes(data, snap.Descriptor.MessageTypes, perSource) {
 			decoded, renderErr := snap.Schema.RenderJSON(c.Message)
 			if renderErr != nil {
 				continue
@@ -53,7 +62,7 @@ func (s *Service) DetectTypes(ctx context.Context, data []byte, sourceID string,
 	slices.SortStableFunc(out, func(a, b entities.TypeCandidate) int {
 		return cmp.Or(cmp.Compare(b.Score, a.Score), cmp.Compare(a.MessageType, b.MessageType), cmp.Compare(a.SourceID, b.SourceID))
 	})
-	return out[:min(len(out), limit)], nil
+	return out, nil
 }
 
 func (s *Service) snapshotsFor(ctx context.Context, sourceID string) ([]*registry.Snapshot, error) {
@@ -76,10 +85,10 @@ func (s *Service) autoDecode(ctx context.Context, subject string, data []byte) *
 		}
 		e = learnedType{}
 	}
-	if e.misses >= maxDetectMisses {
+	if e.misses >= maxDetectMisses || !s.detectBudget.Allow() {
 		return nil
 	}
-	candidates, err := s.DetectTypes(ctx, data, "", detectCandidates)
+	candidates, err := s.rankTypes(ctx, data, "", detectCandidates)
 	if err != nil {
 		return nil
 	}
@@ -96,10 +105,13 @@ func confident(candidates []entities.TypeCandidate) (entities.TypeCandidate, boo
 	if len(candidates) == 0 || candidates[0].UnknownBytes > 0 || candidates[0].Score < autoDetectMinScore {
 		return entities.TypeCandidate{}, false
 	}
-	if len(candidates) > 1 && candidates[1].Score == candidates[0].Score && candidates[1].MessageType != candidates[0].MessageType {
-		return entities.TypeCandidate{}, false
+	top := candidates[0]
+	for _, c := range candidates[1:] {
+		if c.MessageType != top.MessageType {
+			return top, c.Score < top.Score
+		}
 	}
-	return candidates[0], true
+	return top, true
 }
 
 func (s *Service) decodeLearned(ctx context.Context, e learnedType, data []byte) *entities.DecodeResult {

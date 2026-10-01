@@ -175,8 +175,14 @@ export async function describeSchemaType(
   sourceId: string,
   fullName: string,
   includeReachable = false,
+  fingerprint?: string,
 ): Promise<TypeDescription> {
-  const response = await registryClient.describeType({ sourceId, fullName, includeReachable })
+  const response = await registryClient.describeType({
+    sourceId,
+    fullName,
+    includeReachable,
+    fingerprint: fingerprint || undefined,
+  })
   return {
     messages: response.messages.map(toMessage),
     enums: response.enums.map(toEnum),
@@ -187,11 +193,16 @@ export async function describeSchemaType(
 export async function getProtoMessageExample(
   sourceId: string,
   messageName: string,
+  fingerprint?: string,
 ): Promise<ProtoExampleResponse> {
   if (!sourceId) {
     throw new Error('getProtoMessageExample: sourceId is required')
   }
-  const response = await registryClient.generateExample({ fullName: messageName, sourceId })
+  const response = await registryClient.generateExample({
+    fullName: messageName,
+    sourceId,
+    fingerprint: fingerprint || undefined,
+  })
   return {
     message_type: messageName,
     example: JSON.parse(response.json || '{}'),

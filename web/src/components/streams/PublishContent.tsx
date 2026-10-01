@@ -126,7 +126,7 @@ export default function PublishContent({
     onWildcardValuesChange(newValues)
   }
 
-  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null, true)
+  const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null, true, schemaFingerprint)
   const protoMessage = protoDescription?.messages[0]
 
   const publishMutation = useMutation({
@@ -178,7 +178,7 @@ export default function PublishContent({
     if (!mappedMessageType || !mappedSourceId) return
     setExampleLoading(true)
     try {
-      const response = await getProtoMessageExample(mappedSourceId, mappedMessageType)
+      const response = await getProtoMessageExample(mappedSourceId, mappedMessageType, mappedFingerprint)
       onMessageJsonChange(JSON.stringify(response.example, null, 2))
     } catch (error) {
       toast.error(`Failed to generate example: ${getErrorMessage(error)}`)

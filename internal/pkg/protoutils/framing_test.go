@@ -6,6 +6,7 @@ package protoutils_test
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,9 +101,24 @@ func TestUnframe_CompressedGRPC(t *testing.T) {
 	require.NoError(t, zw.Close())
 	framed := append([]byte{1, 0, 0, 0, byte(buf.Len())}, buf.Bytes()...)
 
-	got, _, err := protoutils.Unframe(framed, entities.Framing{Kind: entities.FramingGRPC})
+	got, offset, err := protoutils.Unframe(framed, entities.Framing{Kind: entities.FramingGRPC})
 	require.NoError(t, err)
 	assert.Equal(t, framedMsg, got)
+	assert.Equal(t, -1, offset, "inflated bytes don't map onto the payload")
+}
+
+func TestUnframe_RejectsGzipBomb(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	_, err := zw.Write(make([]byte, 17<<20))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	header := []byte{1, 0, 0, 0, 0}
+	binary.BigEndian.PutUint32(header[1:], uint32(buf.Len()))
+
+	_, _, err = protoutils.Unframe(append(header, buf.Bytes()...), entities.Framing{Kind: entities.FramingGRPC})
+	require.ErrorContains(t, err, "inflates past")
 }
 
 func TestUnframe_Rejects(t *testing.T) {

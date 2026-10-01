@@ -60,7 +60,7 @@ func (s *Service) RefreshSource(ctx context.Context, sourceID string) (*entities
 		if resolveErr != nil {
 			return nil, nil, resolveErr
 		}
-		return s.activateRef(ctx, src.Id, resolved)
+		return s.refreshRef(ctx, src, resolved)
 	case entities.SourceTypeLocal:
 		outcome, err = s.compileLocal(ctx, src)
 	case entities.SourceTypeUpload:
@@ -117,6 +117,24 @@ func (s *Service) activateRef(
 	sourceID string,
 	ref entities.ProtoRef,
 ) (*entities.ProtoSource, *entities.CompileOutcome, error) {
+	return s.switchRef(ctx, sourceID, ref, "", false)
+}
+
+func (s *Service) refreshRef(
+	ctx context.Context,
+	src *entities.ProtoSource,
+	ref entities.ProtoRef,
+) (*entities.ProtoSource, *entities.CompileOutcome, error) {
+	return s.switchRef(ctx, src.Id, ref, src.SelectedRef.Name, src.SourceType == entities.SourceTypeGit)
+}
+
+func (s *Service) switchRef(
+	ctx context.Context,
+	sourceID string,
+	ref entities.ProtoRef,
+	expectedRef string,
+	rebuild bool,
+) (*entities.ProtoSource, *entities.CompileOutcome, error) {
 	unlock := s.compileLocks.lock(sourceID)
 	defer unlock()
 
@@ -124,8 +142,15 @@ func (s *Service) activateRef(
 	if err != nil {
 		return nil, nil, err
 	}
+	if expectedRef != "" && (src.SelectedRef == nil || src.SelectedRef.Name != expectedRef) {
+		current, getErr := s.GetSource(ctx, sourceID)
+		return current, &entities.CompileOutcome{Valid: true}, getErr
+	}
 
 	d, err := s.descriptorsStorage.GetBySourceRevision(ctx, sourceID, ref.Revision)
+	if rebuild && err == nil && d.CompileSettings != compileSettings(src) {
+		err = errs.ErrProtoDescriptorNotFound
+	}
 	outcome := &entities.CompileOutcome{Valid: true}
 	switch {
 	case err == nil:
@@ -205,7 +230,7 @@ func (s *Service) compileGitRevision(
 			return nil, nil, coreerrs.WrapOperation(saveErr, "save proto files")
 		}
 	}
-	d, err := s.storeSchema(ctx, src.Id, fileSet.Revision, out.FDS)
+	d, err := s.storeSchema(ctx, src, fileSet.Revision, out.FDS)
 	if err != nil {
 		s.recordCompile(ctx, src.Id, false, err.Error(), 0, len(out.FDS), out.Diags, out.Roots, string(out.Origin), nil)
 		return nil, nil, err
