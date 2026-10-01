@@ -14,9 +14,9 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
-	mappingssvc "github.com/dmit-4884/natscope/internal/services/mappings"
-
 	"google.golang.org/protobuf/encoding/protowire"
+
+	mappingssvc "github.com/dmit-4884/natscope/internal/services/mappings"
 )
 
 const detectProto = `syntax = "proto3";

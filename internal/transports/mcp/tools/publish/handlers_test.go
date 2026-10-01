@@ -30,7 +30,9 @@ type fakeRegistry struct {
 	types []entities.SchemaType
 }
 
-func (f fakeRegistry) ListTypes(context.Context, string) ([]entities.SchemaType, error) { return f.types, nil }
+func (f fakeRegistry) ListTypes(context.Context, string) ([]entities.SchemaType, error) {
+	return f.types, nil
+}
 
 func newToolset() *Toolset {
 	pinned := "fp-2"

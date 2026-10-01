@@ -26,34 +26,34 @@ import (
 // the sources handler calls.
 type mockProtoService struct {
 	protosvc.SourceManager
-	createResult   *entities.ProtoSource
-	createErr      error
-	getResult      *entities.ProtoSource
-	getErr         error
-	listResult     *entities.List[entities.ProtoSources]
-	listErr        error
-	updateResult   *entities.ProtoSource
-	updateErr      error
-	deleteErr      error
-	repoResult     *entities.RepositoryValidation
-	repoErr        error
-	localResult    *entities.LocalPathValidation
-	localErr       error
-	refsResult     []entities.ProtoRef
-	refsErr        error
-	refSource      *entities.ProtoSource
-	refOutcome     *entities.CompileOutcome
-	refErr         error
-	revisions      []entities.SchemaRevision
-	revisionsErr   error
-	enabledResult  *entities.ProtoSource
-	enabledErr     error
-	watcherResult  *entities.ProtoSource
-	watcherErr     error
-	gotUpload      entities.SchemaUpload
-	gotSourceType  entities.SourceType
-	uploadOutcome  *entities.CompileOutcome
-	uploadErr      error
+	createResult  *entities.ProtoSource
+	createErr     error
+	getResult     *entities.ProtoSource
+	getErr        error
+	listResult    *entities.List[entities.ProtoSources]
+	listErr       error
+	updateResult  *entities.ProtoSource
+	updateErr     error
+	deleteErr     error
+	repoResult    *entities.RepositoryValidation
+	repoErr       error
+	localResult   *entities.LocalPathValidation
+	localErr      error
+	refsResult    []entities.ProtoRef
+	refsErr       error
+	refSource     *entities.ProtoSource
+	refOutcome    *entities.CompileOutcome
+	refErr        error
+	revisions     []entities.SchemaRevision
+	revisionsErr  error
+	enabledResult *entities.ProtoSource
+	enabledErr    error
+	watcherResult *entities.ProtoSource
+	watcherErr    error
+	gotUpload     entities.SchemaUpload
+	gotSourceType entities.SourceType
+	uploadOutcome *entities.CompileOutcome
+	uploadErr     error
 }
 
 func (m *mockProtoService) CreateSource(_ context.Context, _ *entities.ProtoSourceCreate) (*entities.ProtoSource, error) {

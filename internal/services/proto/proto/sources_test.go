@@ -585,10 +585,10 @@ func TestValidateLocalPath(t *testing.T) {
 
 	valid := t.TempDir()
 	writeTree(t, valid, map[string]string{
-		"test.proto":            `syntax = "proto3";`,
-		"sub/nested.proto":      `syntax = "proto3";`,
-		"readme.md":             "# readme",
-		".git/hidden.proto":     "x",
+		"test.proto":             `syntax = "proto3";`,
+		"sub/nested.proto":       `syntax = "proto3";`,
+		"readme.md":              "# readme",
+		".git/hidden.proto":      "x",
 		"node_modules/d/x.proto": "x",
 	})
 	got, err := svc.ValidateLocalPath(t.Context(), valid)
