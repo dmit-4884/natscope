@@ -53,7 +53,7 @@ function EntryDetails({
   }
 
   return (
-    <div className="bg-slate-50 border-l-2 border-l-blue-500 p-2 space-y-2">
+    <div className="bg-slate-50 border-l-2 border-l-blue-500 px-4 py-2 space-y-2">
       {!entry.success && entry.error && (
         <div
           className="px-2 py-1.5 bg-status-error-bg border border-red-200 rounded text-xs text-red-700 break-words"
@@ -256,7 +256,7 @@ export default function PublishHistory({ streamName, connectionId, connectionUrl
                   type="button"
                   aria-expanded={selectedEntry?.id === entry.id}
                   onClick={() => setSelectedEntry(selectedEntry?.id === entry.id ? null : entry)}
-                  className={`w-full text-left p-3 cursor-pointer hover:bg-surface-secondary transition-colors ${
+                  className={`w-full text-left px-4 py-3 cursor-pointer hover:bg-surface-secondary transition-colors ${
                     selectedEntry?.id === entry.id ? 'bg-accent-light border-l-2 border-l-blue-500' : ''
                   }`}
                 >
