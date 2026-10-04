@@ -5,6 +5,7 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
+import "types/nats/nats_access.proto";
 import "types/proto/proto_codec.proto";
 
 // Provides operations for publishing messages to NATS, encoding payloads to protobuf, and validating JSON against protobuf schemas.
@@ -84,6 +85,9 @@ message PublishMessageResponse {
 
   // Optional. New counter total after a Nats-Incr publish to a counter stream (NATS 2.12+).
   optional string counter_value = 5;
+
+  // Optional. The refused permission when the server denied the publish; error is set too.
+  optional .natscope.types.nats.AccessCheck access = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the request message for a core NATS request-reply exchange.

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@/test/utils'
+import { AccessDeniedError } from '@/shared/domain/access'
 import { CorePublishDialog } from './CorePublishDialog'
 
 const publishCoreMessage = vi.hoisted(() => vi.fn())
@@ -15,8 +16,18 @@ vi.mock('@/contexts/mappings', () => ({
 }))
 
 vi.mock('@/components/common/TemplateJsonEditor', () => ({
-  default: ({ value, onChange, title }: { value: string; onChange: (v: string) => void; title?: string }) => (
-    <textarea aria-label={title} value={value} onChange={(e) => onChange(e.target.value)} />
+  default: ({ value, onChange, title, onSubmit }: { value: string; onChange: (v: string) => void; title?: string; onSubmit?: () => void }) => (
+    <textarea
+      aria-label={title}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && onSubmit) {
+          e.preventDefault()
+          onSubmit()
+        }
+      }}
+    />
   ),
 }))
 
@@ -47,8 +58,26 @@ describe('CorePublishDialog', () => {
     )
   })
 
+  it('names a refused permission calmly instead of as an error', async () => {
+    publishCoreMessage.mockRejectedValue(
+      new AccessDeniedError('Failed to publish message: no permission to publish to "$SRV.STATS"', {
+        status: 'denied',
+        operation: 'publish',
+        subject: '$SRV.STATS',
+      }),
+    )
+    render(
+      <CorePublishDialog connectionId="conn-1" mode="resend" initial={{ subject: '$SRV.STATS', payload: '', headers: [] }} onClose={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    const notice = await screen.findByTestId('access-denied-notice')
+    expect(notice).toHaveTextContent('publish to $SRV.STATS')
+    expect(screen.queryByText(/Failed to publish message/)).not.toBeInTheDocument()
+  })
+
   it('keeps the reply subject fixed and shows a failure inline', async () => {
-    publishCoreMessage.mockRejectedValue(new Error('Failed to publish message: no permission to publish to "_INBOX.x"'))
+    publishCoreMessage.mockRejectedValue(new Error('Failed to publish message: nats: connection closed'))
     const onClose = vi.fn()
     render(
       <CorePublishDialog connectionId="conn-1" mode="reply" initial={{ subject: '_INBOX.x', payload: '', headers: [] }} onClose={onClose} />,
@@ -58,7 +87,7 @@ describe('CorePublishDialog', () => {
     expect(screen.getByLabelText('Reply subject')).toHaveAttribute('readonly')
     fireEvent.click(screen.getByRole('button', { name: 'Send reply' }))
 
-    expect(await screen.findByText(/no permission to publish to "_INBOX.x"/)).toBeInTheDocument()
+    expect(await screen.findByText(/connection closed/)).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
   })
 

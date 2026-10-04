@@ -40,4 +40,6 @@ type PublishResult struct {
 	Error     *string
 	// CounterValue is the new counter total after a Nats-Incr publish.
 	CounterValue *string
+	// Access names the refused permission when the server denied the publish.
+	Access *AccessCheck
 }

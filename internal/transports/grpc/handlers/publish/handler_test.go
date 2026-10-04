@@ -21,6 +21,7 @@ import (
 
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	publishpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/publish"
+	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
 // --- Mocks ---
@@ -101,6 +102,25 @@ func TestHandler_PublishMessage(t *testing.T) {
 		}))
 		require.NoError(t, err)
 		assert.Equal(t, "12", resp.Msg.GetCounterValue())
+	})
+
+	t.Run("RefusedNamesThePermission", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockPublishService{result: &entities.PublishResult{
+			Error:  new(`Failed to publish message: no permission to publish to "secret.op"`),
+			Access: &entities.AccessCheck{Status: entities.AccessDenied, Operation: errs.PermissionOperationPublish, Subject: "secret.op"},
+		}}
+		handler := New(svc, &stubProtoService{})
+
+		resp, err := handler.PublishMessage(t.Context(), connect.NewRequest(&publishpb.PublishMessageRequest{
+			ConnectionId: "conn-1",
+			Subject:      "secret.op",
+			Core:         true,
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, natspb.AccessStatus_ACCESS_STATUS_DENIED, resp.Msg.GetAccess().GetStatus())
+		assert.Equal(t, "publish", resp.Msg.GetAccess().GetOperation())
+		assert.Equal(t, "secret.op", resp.Msg.GetAccess().GetSubject())
 	})
 
 	t.Run("ServiceError", func(t *testing.T) {

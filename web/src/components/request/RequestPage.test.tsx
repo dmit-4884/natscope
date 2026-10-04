@@ -127,6 +127,27 @@ describe('RequestPage', () => {
     expect(await screen.findByTestId('reply-no-responders')).toHaveTextContent('svc.nobody')
   })
 
+  it('names a refused permission calmly', async () => {
+    const err = new ConnectError('no permission to publish to "calc.div"', Code.PermissionDenied)
+    err.details = [
+      {
+        type: ErrorInfoSchema.typeName,
+        value: toBinary(
+          ErrorInfoSchema,
+          create(ErrorInfoSchema, { reason: 'NATS_PERMISSION_VIOLATION', metadata: { operation: 'publish', subject: 'calc.div' } }),
+        ),
+      },
+    ]
+    mockedRequest.mockRejectedValue(err)
+    await renderPage()
+
+    fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'calc.div' } })
+    fireEvent.click(sendButton())
+
+    expect(await screen.findByTestId('access-denied-notice')).toHaveTextContent('publish to calc.div')
+    expect(screen.queryByTestId('reply-error')).not.toBeInTheDocument()
+  })
+
   it('reports a timeout with the configured wait', async () => {
     mockedRequest.mockRejectedValue(reasonError(Code.DeadlineExceeded, 'NATS_TIMEOUT'))
     await renderPage()

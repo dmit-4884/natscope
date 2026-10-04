@@ -38,7 +38,8 @@ When no reply arrives, the panel tells you why:
 - **No responders**: nothing is subscribed to the subject. NATS reports it at once instead of letting the
   request wait for the timeout.
 - **No reply within the timeout**: something is subscribed but did not answer in time.
-- A permissions error when your user may not publish to the subject or subscribe to its reply inbox.
+- **No permission**: your user may not publish to the subject or subscribe to its reply inbox; the
+  panel names the missing permission.
 
 ## Protobuf
 

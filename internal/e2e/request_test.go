@@ -135,6 +135,30 @@ func TestRequestReply(t *testing.T) {
 		assert.Less(t, time.Since(start), 5*time.Second, "a denied publish must fail fast, not wait for the timeout")
 	})
 
+	t.Run("a denied reply inbox names the inbox namespace", func(t *testing.T) {
+		srv := startNATSWithOptions(t, func(o *server.Options) {
+			o.Users = []*server.User{{
+				Username:    "req",
+				Password:    "pw",
+				Permissions: &server.Permissions{Subscribe: &server.SubjectPermission{Deny: []string{"_INBOX.>"}}},
+			}}
+		})
+		restricted := createTestConnection(t, env, "request-no-inbox", srv.ClientURL(), &natstypes.AuthConfig{
+			Method:   natstypes.AuthMethod_AUTH_METHOD_USER_PASSWORD,
+			Username: new("req"),
+			Password: new("pw"),
+		})
+
+		_, err := env.publish.RequestMessage(ctx, connect.NewRequest(&publishpb.RequestMessageRequest{
+			ConnectionId: restricted,
+			Subject:      "svc.echo",
+			Timeout:      durationpb.New(10 * time.Second),
+		}))
+		require.Error(t, err)
+		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "%v", err)
+		assert.Equal(t, map[string]string{"operation": "subscribe", "subject": "_INBOX.>"}, errorMetadata(t, err))
+	})
+
 	t.Run("proto type without source", func(t *testing.T) {
 		_, err := env.publish.RequestMessage(ctx, connect.NewRequest(&publishpb.RequestMessageRequest{
 			ConnectionId: connID,

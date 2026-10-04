@@ -229,6 +229,9 @@ func TestNATSPermissionErrorMessage(t *testing.T) {
 	st, ok := status.FromError(result)
 	require.True(t, ok)
 	assert.Equal(t, `no permission to publish to "secret.op"`, st.Message())
+	info, ok := st.Details()[0].(*errdetails.ErrorInfo)
+	require.True(t, ok)
+	assert.Equal(t, map[string]string{"operation": "publish", "subject": "secret.op"}, info.Metadata, "the UI names the missing permission")
 }
 
 func TestProtoEncodeErrorMessage(t *testing.T) {

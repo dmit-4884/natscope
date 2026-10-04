@@ -79,7 +79,9 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 
 	data, encErr := s.resolvePayload(ctx, in)
 	if encErr != nil {
-		s.recordHistory(ctx, in, nil, len(data), encErr)
+		if !in.Core {
+			s.recordHistory(ctx, in, nil, len(data), encErr)
+		}
 		return softFailure(*encErr), nil
 	}
 
@@ -95,9 +97,9 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
 			return nil, err
 		}
-		errMsg := "Failed to publish message: " + err.Error()
-		s.recordHistory(ctx, in, nil, len(data), &errMsg)
-		return softFailure(errMsg), nil
+		failure := publishFailure(err)
+		s.recordHistory(ctx, in, nil, len(data), failure.Error)
+		return failure, nil
 	}
 
 	s.recordHistory(ctx, in, ack, len(data), nil)
@@ -117,9 +119,17 @@ func (s *Service) publishCore(ctx context.Context, in *entities.PublishRequest, 
 		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
 			return nil, err
 		}
-		return softFailure("Failed to publish message: " + err.Error()), nil
+		return publishFailure(err), nil
 	}
 	return &entities.PublishResult{}, nil
+}
+
+func publishFailure(err error) *entities.PublishResult {
+	result := softFailure("Failed to publish message: " + err.Error())
+	if permErr, ok := errors.AsType[*errs.NATSPermissionError](err); ok {
+		result.Access = &entities.AccessCheck{Status: entities.AccessDenied, Operation: permErr.Operation, Subject: permErr.Subject}
+	}
+	return result
 }
 
 // resolvePayload returns the bytes to publish: Data proto-encoded when

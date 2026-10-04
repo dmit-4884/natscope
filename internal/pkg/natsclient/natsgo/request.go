@@ -61,7 +61,7 @@ func (c *Client) Request(
 	case errors.Is(err, nats.ErrNoResponders):
 		return nil, errors.Join(errs.ErrNATSNoResponders, err)
 	case err != nil:
-		return nil, wrapErr(err)
+		return nil, widenInboxDenial(wrapErr(err), c.inboxPrefix())
 	}
 
 	result := converter.Convert(reply, &entities.Reply{}, replyOpts...)

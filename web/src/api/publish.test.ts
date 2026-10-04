@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { AccessDeniedError } from '@/shared/domain/access'
+import { AccessStatus } from '../gen/types/nats/nats_access_pb'
 
 const publishMessageCall = vi.fn()
 
@@ -59,10 +61,19 @@ describe('publishCoreMessage', () => {
   })
 
   it('fails with the reason the server gave', async () => {
-    publishMessageCall.mockResolvedValue({ error: 'Failed to publish message: no permission to publish to "secret.op"' })
+    publishMessageCall.mockResolvedValue({ error: 'Failed to publish message: stream full' })
 
-    await expect(publishCoreMessage({ connection_id: 'conn-1', subject: 'secret.op', data: '' })).rejects.toThrow(
-      'no permission to publish to "secret.op"',
-    )
+    await expect(publishCoreMessage({ connection_id: 'conn-1', subject: 'orders.x', data: '' })).rejects.toThrow('stream full')
+  })
+
+  it('fails with the refused permission when the server denies the publish', async () => {
+    publishMessageCall.mockResolvedValue({
+      error: 'Failed to publish message: no permission to publish to "secret.op"',
+      access: { status: AccessStatus.DENIED, operation: 'publish', subject: 'secret.op' },
+    })
+
+    const failure = await publishCoreMessage({ connection_id: 'conn-1', subject: 'secret.op', data: '' }).catch((e: unknown) => e)
+    expect(failure).toBeInstanceOf(AccessDeniedError)
+    expect((failure as AccessDeniedError).access).toEqual({ status: 'denied', operation: 'publish', subject: 'secret.op' })
   })
 })

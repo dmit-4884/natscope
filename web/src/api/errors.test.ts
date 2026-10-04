@@ -3,10 +3,12 @@ import { Code, ConnectError } from '@connectrpc/connect'
 import { create, toBinary, type DescMessage, type MessageInitShape } from '@bufbuild/protobuf'
 
 import { DomainError } from '@/shared'
+import { AccessDeniedError } from '@/shared/domain/access'
 import { ErrorInfoSchema } from '../gen/google/rpc/error_details_pb'
 import { BadRequestSchema } from '../gen/io/altessa/badrequest/v1/badrequest_pb'
 import {
   describeViolation,
+  getAccessDenial,
   getErrorMessage,
   getErrorReason,
   getFieldErrors,
@@ -272,5 +274,26 @@ describe('isErrorCode', () => {
     expect(isErrorCode(new ConnectError('x', Code.NotFound), Code.NotFound)).toBe(true)
     expect(isErrorCode(new ConnectError('x', Code.NotFound), Code.Internal)).toBe(false)
     expect(isErrorCode(new Error('x'), Code.NotFound)).toBe(false)
+  })
+})
+
+describe('getAccessDenial', () => {
+  it('reads the refused permission from a NATS permission violation', () => {
+    const err = wireError(Code.PermissionDenied, 'no permission to publish to "calc.div"', ErrorInfoSchema, {
+      reason: 'NATS_PERMISSION_VIOLATION',
+      metadata: { operation: 'publish', subject: 'calc.div' },
+    })
+    expect(getAccessDenial(err)).toEqual({ status: 'denied', operation: 'publish', subject: 'calc.div' })
+  })
+
+  it('reads it from a refused publish reported in the response', () => {
+    const access = { status: 'denied', operation: 'subscribe', subject: '_INBOX.>' } as const
+    expect(getAccessDenial(new AccessDeniedError('refused', access))).toEqual(access)
+  })
+
+  it('is null for other errors and for a violation without a subject', () => {
+    expect(getAccessDenial(domainError(Code.PermissionDenied, 'x', 'NATS_PERMISSION_VIOLATION'))).toBeNull()
+    expect(getAccessDenial(domainError(Code.NotFound, 'x', 'NATS_STREAM_NOT_FOUND'))).toBeNull()
+    expect(getAccessDenial(new Error('x'))).toBeNull()
   })
 })

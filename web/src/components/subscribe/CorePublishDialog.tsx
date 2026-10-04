@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { getErrorMessage } from '@/api/errors'
+import { getAccessDenial, getErrorMessage } from '@/api/errors'
 import { useSubjectMappingEntity } from '@/contexts/mappings'
 import { useCorePublish } from '@/contexts/messages'
 import TemplateJsonEditor from '@/components/common/TemplateJsonEditor'
@@ -7,6 +7,7 @@ import { Button, Input, Modal } from '@/components/ui'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { jsonSyntaxError, processHelpers } from '@/utils/helpers'
 import { toast } from '@/utils/toast'
+import { AccessDeniedNotice } from '../common/access/AccessDeniedNotice'
 import { HeadersEditor, type HeaderEntry, type KnownHeaders } from '../streams/publish/HeadersEditor'
 import { isValidHeaderName } from '../streams/publish/headerValidation'
 import { publishSubjectError } from './subscribeUtils'
@@ -32,6 +33,7 @@ export function CorePublishDialog({ connectionId, mode, initial, onClose }: Prop
   const [payload, setPayload] = useState(initial.payload)
   const [headers, setHeaders] = useState<HeaderEntry[]>(initial.headers)
   const publish = useCorePublish()
+  const denial = getAccessDenial(publish.error)
   const isReply = mode === 'reply'
 
   const trimmed = subject.trim()
@@ -147,7 +149,8 @@ export function CorePublishDialog({ connectionId, mode, initial, onClose }: Prop
           knownHeaders={NO_KNOWN_HEADERS}
         />
 
-        {publish.error && <ErrorAlert message={getErrorMessage(publish.error)} />}
+        {publish.error &&
+          (denial ? <AccessDeniedNotice check={denial} /> : <ErrorAlert message={getErrorMessage(publish.error)} />)}
       </div>
     </Modal>
   )

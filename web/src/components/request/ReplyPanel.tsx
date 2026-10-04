@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { decodeMessage } from '@/api/decode'
-import { getErrorMessage } from '@/api/errors'
+import { getAccessDenial, getErrorMessage } from '@/api/errors'
 import type { RequestMessageRequest, RequestReply } from '@/contexts/messages'
 import { useMessageTypes } from '@/contexts/proto'
 import { Alert, Badge, EmptyState, SearchableSelect, Spinner, SwitchHorizontalIcon } from '@/components/ui'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
 import { formatBytes, formatNanoseconds } from '@/utils/formatters'
+import { AccessDeniedNotice } from '../common/access/AccessDeniedNotice'
 import PayloadViewer from '../messages/PayloadViewer'
 import { formatTimeout, requestFailureKind } from './requestUtils'
 
@@ -40,6 +41,8 @@ function parseJson(reply: RequestReply): unknown {
 
 function RequestFailure({ error, request }: { error: unknown; request: RequestMessageRequest | undefined }) {
   const subject = request?.subject ?? ''
+  const denial = getAccessDenial(error)
+  if (denial) return <AccessDeniedNotice check={denial} />
   switch (requestFailureKind(error)) {
     case 'no-responders':
       return (

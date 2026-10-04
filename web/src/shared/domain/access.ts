@@ -8,6 +8,17 @@ export interface AccessCheck {
   subject: string
 }
 
+export class AccessDeniedError extends Error {
+  readonly access: AccessCheck
+
+  constructor(message: string, access: AccessCheck) {
+    super(message)
+    this.name = 'AccessDeniedError'
+    this.access = access
+    Object.setPrototypeOf(this, AccessDeniedError.prototype)
+  }
+}
+
 export function isDenied(check: AccessCheck | null | undefined): boolean {
   return check?.status === 'denied'
 }

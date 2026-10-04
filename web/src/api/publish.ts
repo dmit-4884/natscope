@@ -1,5 +1,7 @@
+import { AccessDeniedError, isDenied } from '@/shared/domain/access'
 import { encodeBytesToBase64 } from '@/utils/base64'
 import { durToMillis, millisToDur } from '@/utils/timestamp'
+import { toAccessCheck } from './access'
 import { framingToProto, type Framing } from './framing'
 import { publishClient } from './grpc/clients'
 
@@ -89,9 +91,10 @@ export async function publishCoreMessage(request: CorePublishRequest): Promise<v
     framing: framingToProto(request.framing),
     core: true,
   })
-  if (response.error) {
-    throw new Error(response.error)
-  }
+  if (!response.error) return
+  const access = toAccessCheck(response.access)
+  if (access && isDenied(access)) throw new AccessDeniedError(response.error, access)
+  throw new Error(response.error)
 }
 
 export interface RequestMessageRequest {

@@ -265,6 +265,9 @@ func TestSubscribePermissionDenied(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Msg.Error)
 		assert.Equal(t, `Failed to publish message: no permission to publish to "secret.op"`, resp.Msg.GetError())
+		assert.Equal(t, natstypes.AccessStatus_ACCESS_STATUS_DENIED, resp.Msg.GetAccess().GetStatus())
+		assert.Equal(t, "publish", resp.Msg.GetAccess().GetOperation())
+		assert.Equal(t, "secret.op", resp.Msg.GetAccess().GetSubject())
 		assert.Less(t, time.Since(start), 5*time.Second)
 	})
 }

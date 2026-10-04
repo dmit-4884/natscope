@@ -11,7 +11,25 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dmit-4884/natscope/internal/errs"
 )
+
+func TestWidenInboxDenial(t *testing.T) {
+	t.Parallel()
+
+	inbox := &errs.NATSPermissionError{Operation: errs.PermissionOperationSubscribe, Subject: "_INBOX.k3J9x.Qp2"}
+	got, ok := errors.AsType[*errs.NATSPermissionError](widenInboxDenial(inbox, "_INBOX."))
+	require.True(t, ok)
+	assert.Equal(t, "_INBOX.>", got.Subject, "the missing permission is the inbox namespace, not one random inbox")
+	assert.Equal(t, errs.PermissionOperationSubscribe, got.Operation)
+
+	publish := &errs.NATSPermissionError{Operation: errs.PermissionOperationPublish, Subject: "$SRV.INFO"}
+	assert.Same(t, publish, widenInboxDenial(publish, "_INBOX."))
+
+	other := errors.New("boom")
+	assert.Same(t, other, widenInboxDenial(other, "_INBOX."))
+}
 
 func TestParsePermissionViolation(t *testing.T) {
 	t.Parallel()

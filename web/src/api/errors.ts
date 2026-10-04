@@ -15,6 +15,7 @@
 import { ConnectError, Code } from '@connectrpc/connect'
 
 import { DomainError } from '@/shared'
+import { AccessDeniedError, type AccessCheck } from '@/shared/domain/access'
 import { ErrorInfoSchema } from '../gen/google/rpc/error_details_pb'
 import { BadRequestSchema } from '../gen/io/altessa/badrequest/v1/badrequest_pb'
 
@@ -115,6 +116,10 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   CANCELED: 'Request canceled',
   INTERNAL: 'Internal error',
 }
+
+const NATS_PERMISSION_REASON = 'NATS_PERMISSION_VIOLATION'
+const ACCESS_OPERATION_KEY = 'operation'
+const ACCESS_SUBJECT_KEY = 'subject'
 
 const NATS_API_ERROR_REASON = 'NATS_API_ERROR'
 const NATS_API_ERROR_CODE_KEY = 'err_code'
@@ -256,6 +261,24 @@ export function getErrorMessage(error: unknown): string {
 /** Drops the `[code]` prefix Connect prepends to a status message. */
 export function stripErrorCodePrefix(message: string): string {
   return message.replace(/^\[\w+]\s*/, '')
+}
+
+/**
+ * The permission the NATS server refused, from a refused publish (AccessDeniedError) or a
+ * NATS_PERMISSION_VIOLATION status; null for any other error.
+ */
+export function getAccessDenial(error: unknown): AccessCheck | null {
+  if (error instanceof AccessDeniedError) return error.access
+  if (!(error instanceof ConnectError)) return null
+
+  for (const info of error.findDetails(ErrorInfoSchema)) {
+    if (info.reason !== NATS_PERMISSION_REASON) continue
+    const subject = info.metadata?.[ACCESS_SUBJECT_KEY]
+    if (!subject) return null
+    const operation = info.metadata[ACCESS_OPERATION_KEY] === 'subscribe' ? 'subscribe' : 'publish'
+    return { status: 'denied', operation, subject }
+  }
+  return null
 }
 
 /** True if error is a specific gRPC code. */

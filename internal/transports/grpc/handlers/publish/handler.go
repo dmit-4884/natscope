@@ -19,6 +19,7 @@ import (
 	publishsvc "github.com/dmit-4884/natscope/internal/services/publish"
 	publishpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/publish"
 	publishconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/publish/grpc_nats_publishconnect"
+	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
 )
 
@@ -58,13 +59,17 @@ func (h *Handler) PublishMessage(
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&publishpb.PublishMessageResponse{
+	resp := &publishpb.PublishMessageResponse{
 		Stream:       result.Stream,
 		Sequence:     result.Sequence,
 		Duplicate:    result.Duplicate,
 		Error:        result.Error,
 		CounterValue: result.CounterValue,
-	}), nil
+	}
+	if result.Access != nil {
+		resp.Access = converter.Convert(result.Access, &natspb.AccessCheck{}, grpchelpers.ProtoCodecs)
+	}
+	return connect.NewResponse(resp), nil
 }
 
 // RequestMessage sends a core NATS request and returns the first reply; no

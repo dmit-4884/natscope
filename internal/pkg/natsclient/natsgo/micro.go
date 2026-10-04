@@ -46,7 +46,7 @@ func (c *Client) gatherMicro(
 	}
 	replies, err := c.gather(ctx, subject)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, widenInboxDenial(wrapErr(err), c.inboxPrefix())
 	}
 	reports := make([]entities.MicroReport, 0, len(replies))
 	for _, data := range replies {

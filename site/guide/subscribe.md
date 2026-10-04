@@ -48,7 +48,8 @@ the reply soon.
 
 ## Permissions
 
-If your NATS user may not subscribe to a subject, its chip turns red with **no permission**, and the
-other subjects keep working. When every subject is refused, the feed names the missing permission.
-Publishing from **Resend** or **Reply** to a subject you may not publish to shows the refusal in the
-dialog.
+If your NATS user may not subscribe to a subject, its chip shows a lock and **no permission**, and the
+other subjects keep working. A subject you may subscribe to still arrives when a wildcard covering it,
+such as `orders.>` over `orders.created`, is refused. When every subject is refused, the feed names the
+missing permission. Publishing from **Resend** or **Reply** to a subject you may not publish to names
+the missing permission in the dialog.

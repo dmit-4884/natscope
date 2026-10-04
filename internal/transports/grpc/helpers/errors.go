@@ -127,7 +127,7 @@ func StatusErrorConvert(_ context.Context, err error) error {
 		return NewStatus(codes.FailedPrecondition, featErr.Error(), "NATS_FEATURE_UNSUPPORTED")
 	}
 	if permErr, ok := errors.AsType[*errs.NATSPermissionError](err); ok && permErr != nil {
-		return NewStatus(codes.PermissionDenied, permErr.Error(), "NATS_PERMISSION_VIOLATION")
+		return statusFromPermissionError(permErr)
 	}
 
 	// Per-handler errors are matched upstream; here we handle only the common set.
@@ -156,6 +156,19 @@ func StatusErrorConvert(_ context.Context, err error) error {
 	slog.Default().With(slogx.Module("transport:grpc")).Error("unmapped internal error", slogx.Error(err))
 
 	return statusFromMapping(errorMapping{codes.Internal, "internal error", "INTERNAL"})
+}
+
+// statusFromPermissionError names the refused operation and subject in the ErrorInfo metadata for the UI.
+func statusFromPermissionError(permErr *errs.NATSPermissionError) error {
+	st := status.New(codes.PermissionDenied, permErr.Error())
+	info := &errdetails.ErrorInfo{
+		Reason:   "NATS_PERMISSION_VIOLATION",
+		Metadata: map[string]string{"operation": permErr.Operation, "subject": permErr.Subject},
+	}
+	if updated, withErr := st.WithDetails(info); withErr == nil {
+		return updated.Err()
+	}
+	return st.Err()
 }
 
 // statusFromAPIError keeps the server Description as the message and exposes

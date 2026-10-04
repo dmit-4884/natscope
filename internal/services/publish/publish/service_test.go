@@ -179,6 +179,11 @@ func TestPublish_CoreDeniedIsASoftFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp.Error)
 	assert.Equal(t, `Failed to publish message: no permission to publish to "secret.op"`, *resp.Error)
+	assert.Equal(t, &entities.AccessCheck{
+		Status:    entities.AccessDenied,
+		Operation: errs.PermissionOperationPublish,
+		Subject:   "secret.op",
+	}, resp.Access, "a refused publish names the missing permission")
 }
 
 func TestPublish_CounterIncrement(t *testing.T) {
@@ -297,6 +302,28 @@ func TestPublish_EncodeError(t *testing.T) {
 	assert.False(t, hist.last.Success)
 	require.NotNil(t, hist.last.Error)
 	assert.Contains(t, *hist.last.Error, "bad json")
+}
+
+func TestPublish_CoreEncodeErrorKeepsNoHistory(t *testing.T) {
+	t.Parallel()
+
+	hist := &recordedHistory{}
+	proto := &mockProtoService{
+		encodeRawFn: func(_ context.Context, _ entities.CodecRequest) ([]byte, error) { return nil, errors.New("bad json") },
+	}
+	s := New(&mockNATSService{}, &mockNATSService{}, &mockNATSService{}, proto, &mockHistoryService{rec: hist}, &mockSettingsService{})
+
+	msgType := "api.v1.Bad"
+	sourceID := "src-1"
+	resp, err := s.Publish(t.Context(), &entities.PublishRequest{
+		ConnectionID: "c1", Subject: "x", Data: "not json", MessageType: &msgType, SourceID: &sourceID, Core: true,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp.Error)
+	hist.mu.Lock()
+	defer hist.mu.Unlock()
+	assert.Zero(t, hist.called, "a core publish stays out of the stream publish history, failed or not")
 }
 
 func TestPublish_PublishError_RecordedAsFailure(t *testing.T) {

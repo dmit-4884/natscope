@@ -112,6 +112,7 @@ func TestDiscoveryAccess(t *testing.T) {
 		got := listServices(t, env, connID)
 		assert.Equal(t, natstypes.AccessStatus_ACCESS_STATUS_DENIED, got.GetInfoAccess().GetStatus())
 		assert.Equal(t, "subscribe", got.GetInfoAccess().GetOperation())
+		assert.Equal(t, "_INBOX.>", got.GetInfoAccess().GetSubject())
 	})
 
 	t.Run("an automatic refresh leaves denied statistics unasked", func(t *testing.T) {

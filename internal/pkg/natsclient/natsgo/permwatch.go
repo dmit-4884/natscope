@@ -5,6 +5,7 @@ package natsgo
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 	"sync"
@@ -45,6 +46,15 @@ func (v PermissionViolation) asError(cause error) *errs.NATSPermissionError {
 		operation = errs.PermissionOperationSubscribe
 	}
 	return &errs.NATSPermissionError{Operation: operation, Subject: v.Subject, Cause: cause}
+}
+
+// widenInboxDenial reports a refused reply inbox as the whole inbox namespace, the permission the user lacks.
+func widenInboxDenial(err error, inboxPrefix string) error {
+	permErr, ok := errors.AsType[*errs.NATSPermissionError](err)
+	if !ok || permErr.Operation != errs.PermissionOperationSubscribe || !strings.HasPrefix(permErr.Subject, inboxPrefix) {
+		return err
+	}
+	return &errs.NATSPermissionError{Operation: permErr.Operation, Subject: inboxPrefix + ">", Cause: permErr.Cause}
 }
 
 // PermissionWatcher correlates out-of-band NATS permissions violations with

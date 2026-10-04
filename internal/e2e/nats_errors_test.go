@@ -262,6 +262,23 @@ func errorReason(t *testing.T, err error) string {
 	return ""
 }
 
+func errorMetadata(t *testing.T, err error) map[string]string {
+	t.Helper()
+
+	connectErr, ok := errors.AsType[*connect.Error](err)
+	require.True(t, ok, "expected a connect error, got %v", err)
+	for _, d := range connectErr.Details() {
+		v, valErr := d.Value()
+		if valErr != nil {
+			continue
+		}
+		if info, ok := v.(*errdetails.ErrorInfo); ok {
+			return info.GetMetadata()
+		}
+	}
+	return nil
+}
+
 func TestNATSErrors_PublishRequestErrors(t *testing.T) {
 	env := setupE2E(t)
 	ctx := t.Context()
