@@ -97,7 +97,7 @@ export function SubjectBar({
                 data-denied={denied || undefined}
                 className={`inline-flex items-center gap-1 rounded-md border pl-2 pr-1 py-0.5 text-xs ${
                   denied
-                    ? 'border-status-error-border bg-status-error-bg text-status-error-text'
+                    ? 'border-status-warning-border bg-status-warning-bg text-status-warning-text'
                     : 'border-border bg-surface-tertiary text-content-primary'
                 }`}
               >

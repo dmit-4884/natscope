@@ -98,7 +98,7 @@ describe('ServicesPage', () => {
 
     const banner = await screen.findByTestId('stats-denied')
     expect(banner).toHaveTextContent('publish to $SRV.STATS')
-    expect(screen.getAllByLabelText('No access to statistics').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('No access to statistics').length).toBeGreaterThan(0)
     expect(screen.getByTestId('service-detail')).toBeInTheDocument()
   })
 

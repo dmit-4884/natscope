@@ -26,7 +26,7 @@ describe('NoAccessValue', () => {
   it('renders a dash with an accessible reason', () => {
     render(<NoAccessValue reason="No access to statistics" />)
 
-    expect(screen.getByText('—')).toBeInTheDocument()
-    expect(screen.getByLabelText('No access to statistics')).toBeInTheDocument()
+    expect(screen.getByText('—')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByText('No access to statistics')).toHaveClass('sr-only')
   })
 })

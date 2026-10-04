@@ -6,7 +6,7 @@ import { useDisplayPreferences, useLivePolicy, useUpdateSettings } from '@/conte
 import { useResizablePanel } from '@/hooks/useResizablePanel'
 import { useSubscribeDraft, withRecentSubjects } from '@/stores/subscribeDraftStore'
 import type { SelectedMessage } from '@/types/messages'
-import { EmptyState, SignalIcon } from '@/components/ui'
+import { EmptyState, LockClosedIcon, SignalIcon } from '@/components/ui'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { AccessDeniedState } from '../common/access/AccessDeniedState'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
@@ -33,7 +33,7 @@ interface PillProps {
 
 function pillState({ running, status, paused, denied }: PillProps) {
   if (!running) return { label: 'Stopped', dot: 'bg-gray-400', text: 'text-content-tertiary', pulse: false }
-  if (denied) return { label: 'No permission', dot: 'bg-red-500', text: 'text-status-error-text', pulse: false }
+  if (denied) return { label: 'No permission', dot: null, text: 'text-content-secondary', pulse: false }
   if (status !== 'connected') return { label: 'Connecting…', dot: 'bg-amber-500', text: 'text-status-warning-text', pulse: true }
   if (paused) return { label: 'Paused', dot: 'bg-amber-500', text: 'text-status-warning-text', pulse: false }
   return { label: 'Live', dot: 'bg-green-500', text: 'text-status-success-text', pulse: true }
@@ -46,7 +46,11 @@ function StatusPill(props: PillProps) {
       className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-primary px-2.5 py-1 text-xs font-medium ${state.text}`}
       data-testid="subscribe-status"
     >
-      <span aria-hidden="true" className={`w-2 h-2 rounded-full ${state.dot} ${state.pulse ? 'animate-pulse' : ''}`} />
+      {state.dot ? (
+        <span aria-hidden="true" className={`w-2 h-2 rounded-full ${state.dot} ${state.pulse ? 'animate-pulse' : ''}`} />
+      ) : (
+        <LockClosedIcon className="w-3 h-3" />
+      )}
       {state.label}
     </span>
   )
