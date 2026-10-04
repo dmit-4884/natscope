@@ -14,8 +14,10 @@ vi.mock('@/contexts/live', () => ({
   useLiveStatsStore: (pick: (s: { stats: null }) => unknown) => pick({ stats: null }),
 }))
 
+const mappingItems = vi.hoisted(() => ({ data: [] as { pattern: string }[] }))
+
 vi.mock('@/contexts/mappings', () => ({
-  useMappingItems: () => ({ data: [] }),
+  useMappingItems: () => mappingItems,
 }))
 
 vi.mock('@/contexts/settings', () => ({
@@ -76,8 +78,32 @@ function addSubject(subject: string) {
 describe('SubscribePage', () => {
   beforeEach(() => {
     clearAllSubscribeDrafts()
+    mappingItems.data = []
     mockedLive.mockReset()
     mockedLive.mockReturnValue(liveState())
+  })
+
+  it('starts on Cmd/Ctrl+Enter while suggestions are open', () => {
+    mappingItems.data = [{ pattern: 'audit.>' }]
+    render(<SubscribePage />)
+    addSubject('orders.>')
+    fireEvent.focus(input())
+    fireEvent.keyDown(input(), { key: 'Enter', metaKey: true })
+
+    expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ subjects: ['orders.>'], enabled: true }))
+    expect(input()).toHaveValue('')
+  })
+
+  it('does not pick a suggestion on Enter in the empty field', () => {
+    mappingItems.data = [{ pattern: 'audit.>' }]
+    render(<SubscribePage />)
+    fireEvent.focus(input())
+    fireEvent.keyDown(input(), { key: 'Enter' })
+
+    expect(input()).toHaveValue('')
+    fireEvent.keyDown(input(), { key: 'ArrowDown' })
+    fireEvent.keyDown(input(), { key: 'Enter' })
+    expect(input()).toHaveValue('audit.>')
   })
 
   it('explains core NATS before the first subscription', () => {

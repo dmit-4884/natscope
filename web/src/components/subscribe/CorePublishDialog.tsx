@@ -93,7 +93,7 @@ export function CorePublishDialog({ connectionId, mode, initial, onClose }: Prop
       <div
         className="px-6 py-4 space-y-4 overflow-y-auto"
         onKeyDown={(e) => {
-          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !e.defaultPrevented) {
             e.preventDefault()
             handleSend()
           }

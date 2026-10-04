@@ -91,6 +91,19 @@ describe('CorePublishDialog', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
+  it('sends once on Cmd/Ctrl+Enter in the payload editor', async () => {
+    publishCoreMessage.mockResolvedValue(undefined)
+    const onClose = vi.fn()
+    render(
+      <CorePublishDialog connectionId="conn-1" mode="reply" initial={{ subject: '_INBOX.x', payload: 'pong', headers: [] }} onClose={onClose} />,
+    )
+
+    fireEvent.keyDown(screen.getByLabelText('Payload'), { key: 'Enter', ctrlKey: true })
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(publishCoreMessage).toHaveBeenCalledTimes(1)
+  })
+
   it('blocks a wildcard subject with a reason', () => {
     render(
       <CorePublishDialog connectionId="conn-1" mode="resend" initial={{ subject: 'orders.*', payload: '', headers: [] }} onClose={vi.fn()} />,

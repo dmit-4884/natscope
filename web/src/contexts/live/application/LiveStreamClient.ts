@@ -128,6 +128,7 @@ export class LiveStreamClient {
   }
 
   private subscribeTarget(target: LiveTarget): void {
+    if (!this.connected) return
     const key = targetKey(target)
     if (this.currentSubscription === key) {
       logger.debug(`Already subscribed: ${key}`)

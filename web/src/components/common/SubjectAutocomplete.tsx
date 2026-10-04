@@ -60,10 +60,12 @@ export function SubjectAutocomplete({
     return [...prefix, ...substr].slice(0, maxOptions)
   }, [value, options, maxOptions])
 
+  const firstHighlight = value.trim() ? 0 : -1
+
   // Reset highlight when options change.
   useEffect(() => {
-    setHighlight(0)
-  }, [filtered])
+    setHighlight(firstHighlight)
+  }, [filtered, firstHighlight])
 
   const showDropdown = open && filtered.length > 0
 
@@ -84,8 +86,8 @@ export function SubjectAutocomplete({
       setHighlight((h) => (h + 1) % filtered.length)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setHighlight((h) => (h - 1 + filtered.length) % filtered.length)
-    } else if (e.key === 'Enter') {
+      setHighlight((h) => (h <= 0 ? filtered.length - 1 : h - 1))
+    } else if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && highlight >= 0) {
       e.preventDefault()
       choose(filtered[highlight])
     } else if (e.key === 'Escape') {
