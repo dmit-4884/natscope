@@ -66,6 +66,8 @@ export default defineConfig({
           { text: 'Consumers', link: '/guide/consumers' },
           { text: 'Publishing', link: '/guide/publish' },
           { text: 'Request / Reply', link: '/guide/request-reply' },
+          { text: 'Subscribe', link: '/guide/subscribe' },
+          { text: 'Services', link: '/guide/services' },
           { text: 'Protobuf', link: '/guide/protobuf' },
           { text: 'Key/Value', link: '/guide/kv' },
           { text: 'Object Store', link: '/guide/object-store' },

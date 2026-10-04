@@ -98,7 +98,7 @@ const KIND_NAMES: Record<PbKind, SchemaTypeKind> = {
   [PbKind.SERVICE]: 'service',
 }
 
-function schemaTypeId(sourceId: string, fullName: string): string {
+export function schemaTypeId(sourceId: string, fullName: string): string {
   return `${sourceId}|${fullName}`
 }
 

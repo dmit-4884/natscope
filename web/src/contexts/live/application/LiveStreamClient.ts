@@ -1,6 +1,8 @@
 import { Code, ConnectError } from '@connectrpc/connect'
-import type { LiveEvent } from '@/gen/services/grpc/nats/v1/live/nats_live_service_pb'
+import type { LiveEvent, LiveSubscription } from '@/gen/services/grpc/nats/v1/live/nats_live_service_pb'
+import { toAccessCheck } from '@/api/access'
 import { liveClient } from '@/api/grpc/clients'
+import type { AccessCheck } from '@/shared/domain/access'
 import { logger } from '@/utils/logger'
 import {
   toLiveMessagePayload,
@@ -23,6 +25,19 @@ export interface WSStatsPayload {
 export interface WSErrorPayload {
   message: string
   code?: string
+  access?: AccessCheck
+}
+
+type LiveTarget = { stream: string } | { subjects: string[] }
+
+function targetKey(target: LiveTarget): string {
+  return 'stream' in target ? `stream:${target.stream}` : `subjects:${target.subjects.join('\n')}`
+}
+
+function targetSubscriptions(target: LiveTarget): Pick<LiveSubscription, 'subject' | 'streamName'>[] {
+  return 'stream' in target
+    ? [{ subject: '>', streamName: target.stream }]
+    : target.subjects.map((subject) => ({ subject }))
 }
 
 export interface WSSubscribedPayload {
@@ -105,16 +120,25 @@ export class LiveStreamClient {
   }
 
   subscribe(stream: string): void {
-    if (this.currentSubscription === stream) {
-      logger.debug(`Already subscribed to stream: ${stream}`)
+    this.subscribeTarget({ stream })
+  }
+
+  subscribeSubjects(subjects: string[]): void {
+    this.subscribeTarget({ subjects })
+  }
+
+  private subscribeTarget(target: LiveTarget): void {
+    const key = targetKey(target)
+    if (this.currentSubscription === key) {
+      logger.debug(`Already subscribed: ${key}`)
       return
     }
     this.clearReconnectTimeout()
-    logger.debug(`Subscribing to stream: ${stream}`)
-    this.currentSubscription = stream
+    logger.debug(`Subscribing: ${key}`)
+    this.currentSubscription = key
     this.reconnectAttempts = 0
     this.cancelStream()
-    this.startStream(stream)
+    this.startStream(target)
   }
 
   unsubscribe(): void {
@@ -140,14 +164,16 @@ export class LiveStreamClient {
     }
   }
 
-  private async startStream(streamName: string): Promise<void> {
+  private async startStream(target: LiveTarget): Promise<void> {
     this.abortController = new AbortController()
+    const key = targetKey(target)
+    const streamName = 'stream' in target ? target.stream : ''
 
     try {
       const stream = liveClient.subscribe(
         {
           connectionId: this.connectionId,
-          subscriptions: [{ subject: '>', streamName }],
+          subscriptions: targetSubscriptions(target),
         },
         { signal: this.abortController.signal },
       )
@@ -162,8 +188,8 @@ export class LiveStreamClient {
         this.handleEvent(event, streamName)
       }
 
-      if (!this.intentionalClose && this.currentSubscription === streamName) {
-        this.scheduleReconnect(streamName)
+      if (!this.intentionalClose && this.currentSubscription === key) {
+        this.scheduleReconnect(target)
       }
     } catch (err: unknown) {
       const connectErr = ConnectError.from(err)
@@ -192,8 +218,8 @@ export class LiveStreamClient {
         return
       }
 
-      if (!this.intentionalClose && this.currentSubscription === streamName) {
-        this.scheduleReconnect(streamName)
+      if (!this.intentionalClose && this.currentSubscription === key) {
+        this.scheduleReconnect(target)
       }
     }
   }
@@ -224,7 +250,7 @@ export class LiveStreamClient {
       }
       case 'error': {
         const err = event.event.value
-        this.onError?.({ message: err.message, code: err.code || undefined })
+        this.onError?.({ message: err.message, code: err.code || undefined, access: toAccessCheck(err.access) })
         break
       }
       case 'protoReload': {
@@ -238,7 +264,7 @@ export class LiveStreamClient {
     }
   }
 
-  private scheduleReconnect(streamName: string): void {
+  private scheduleReconnect(target: LiveTarget): void {
     if (this.intentionalClose) return
     if (this.reconnectAttempts >= this.reconnectConfig.maxRetries) {
       logger.warn('Max reconnection attempts reached')
@@ -259,7 +285,7 @@ export class LiveStreamClient {
     logger.debug(`Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts}/${this.reconnectConfig.maxRetries})`)
 
     this.reconnectTimeout = setTimeout(() => {
-      this.startStream(streamName)
+      this.startStream(target)
     }, delay)
   }
 

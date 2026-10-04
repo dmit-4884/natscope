@@ -391,3 +391,23 @@ export async function putKVProto(
 export async function createMapping(pattern: string, messageType: string, sourceId: string): Promise<void> {
   await call('natscope.mappings.v1.MappingsService', 'CreateMapping', { pattern, messageType, sourceId })
 }
+
+export async function publishCore(connectionId: string, subject: string, data: string): Promise<void> {
+  const res = await call<{ error?: string }>('natscope.nats.publish.v1.PublishService', 'PublishMessage', {
+    connectionId,
+    subject,
+    data,
+    core: true,
+  })
+  if (res.error) throw new Error(res.error)
+}
+
+export async function requestReply(connectionId: string, subject: string, data: string, timeoutSeconds: number): Promise<string> {
+  const res = await call<{ data?: string }>('natscope.nats.publish.v1.PublishService', 'RequestMessage', {
+    connectionId,
+    subject,
+    data,
+    timeout: `${timeoutSeconds}s`,
+  })
+  return atob(res.data ?? '')
+}

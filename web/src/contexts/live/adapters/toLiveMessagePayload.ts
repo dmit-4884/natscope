@@ -17,6 +17,7 @@ export interface LiveMessagePayload {
   decode_error?: string
   /** Server capped payload; data_size still holds the original byte count. */
   truncated?: boolean
+  reply?: string
 }
 
 /** Proto NatsMessage → LiveMessagePayload. */
@@ -36,6 +37,7 @@ export function toLiveMessagePayload(msg: NatsMessage, streamName: string): Live
     decoded_source_id: msg.decodedSourceId,
     decode_error: msg.decodeError,
     truncated: msg.truncated || undefined,
+    reply: msg.reply || undefined,
   }
 }
 

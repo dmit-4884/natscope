@@ -79,4 +79,9 @@ export {
   FitViewIcon,
   RelationsIcon,
   GlobeIcon,
+  SignalIcon,
+  ServicesIcon,
+  ReplyIcon,
+  PlayIcon,
+  StopIcon,
 } from './icons'

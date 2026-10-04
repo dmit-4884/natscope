@@ -59,9 +59,12 @@ export default function RequestPage() {
   } = useSubjectMappingEntity(
     subject && !subjectError ? subject : null,
   )
-  const isJsonMode = encodingMode === 'json' || (!mappedMessageType && encodingMode !== 'proto')
-  const messageType = isJsonMode ? undefined : mappedMessageType ?? undefined
-  const sourceId = isJsonMode ? undefined : mappedSourceId ?? undefined
+  const serviceType = mappedMessageType ? undefined : draft.requestTypes[subject]
+  const subjectType = mappedMessageType ?? serviceType?.messageType ?? null
+  const subjectSource = mappedMessageType ? mappedSourceId : (serviceType?.sourceId ?? null)
+  const isJsonMode = encodingMode === 'json' || (!subjectType && encodingMode !== 'proto')
+  const messageType = isJsonMode ? undefined : subjectType ?? undefined
+  const sourceId = isJsonMode ? undefined : subjectSource ?? undefined
   const { data: protoDescription, isLoading: protoLoading } = useTypeDescription(sourceId ?? null, messageType ?? null, true, messageType ? mappedFingerprint : undefined)
   const protoMessage = protoDescription?.messages[0]
   const { messages: protoTypes } = useMessageTypes()
@@ -124,10 +127,10 @@ export default function RequestPage() {
   }
 
   const handleUseExample = async () => {
-    if (!mappedMessageType || !mappedSourceId) return
+    if (!subjectType || !subjectSource) return
     setExampleLoading(true)
     try {
-      const response = await getProtoMessageExample(mappedSourceId, mappedMessageType, mappedFingerprint)
+      const response = await getProtoMessageExample(subjectSource, subjectType, mappedFingerprint)
       updateDraft({ payload: JSON.stringify(response.example, null, 2) })
     } catch (error) {
       toast.error(`Failed to generate example: ${getErrorMessage(error)}`)
@@ -239,11 +242,20 @@ export default function RequestPage() {
               encodingMode={encodingMode}
               isJsonMode={isJsonMode}
               messageType={messageType}
-              mappedMessageType={mappedMessageType}
+              mappedMessageType={subjectType}
               protoFieldCount={protoMessage?.fields.length}
               onModeChange={setEncodingMode}
               onAddMapping={() => handleOpenMappings(subject)}
             />
+          )}
+          {serviceType && !isJsonMode && (
+            <p className="-mt-2 text-xs text-content-tertiary" data-testid="request-type-from-service">
+              Type picked from the service endpoint.{' '}
+              <button type="button" onClick={() => handleOpenMappings(subject)} className="text-accent hover:underline">
+                Save it as a subject mapping
+              </button>{' '}
+              to keep it everywhere.
+            </p>
           )}
 
           <div>
@@ -253,7 +265,7 @@ export default function RequestPage() {
               onChange={(payload) => updateDraft({ payload })}
               error={payloadError}
               placeholder={messageType ? '{"field": "value"}' : '{"field": "value"} or plain text — may be empty'}
-              onUseExample={mappedMessageType ? handleUseExample : undefined}
+              onUseExample={subjectType ? handleUseExample : undefined}
               exampleLoading={exampleLoading}
               exampleDisabled={protoLoading}
               sizeBytes={payloadBytes}

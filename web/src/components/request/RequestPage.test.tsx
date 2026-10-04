@@ -4,7 +4,7 @@ import { create, toBinary } from '@bufbuild/protobuf'
 import { ErrorInfoSchema } from '@/gen/google/rpc/error_details_pb'
 import { render, screen, fireEvent, waitFor } from '@/test/utils'
 import { requestMessage, type RequestReply } from '@/api/publish'
-import { clearAllRequestDrafts } from '@/stores/requestDraftStore'
+import { clearAllRequestDrafts, patchRequestDraft } from '@/stores/requestDraftStore'
 import { encodeBytesToBase64 } from '@/utils/base64'
 import RequestPage from './RequestPage'
 
@@ -166,5 +166,23 @@ describe('RequestPage', () => {
 
     expect(sendButton()).toBeDisabled()
     expect(screen.getByTestId('publish-disabled-reason')).toHaveTextContent('Enter a subject')
+  })
+
+  it('encodes with the request type a service endpoint picked when no mapping exists', async () => {
+    mockedRequest.mockResolvedValue(reply(''))
+    patchRequestDraft('conn-1', {
+      subject: 'orders.create',
+      payload: '{"id":1}',
+      requestTypes: { 'orders.create': { messageType: 'shop.CreateOrderRequest', sourceId: 'src-1' } },
+    })
+    await renderPage()
+
+    expect(screen.getByTestId('request-type-from-service')).toBeInTheDocument()
+    fireEvent.click(sendButton())
+
+    await waitFor(() => expect(mockedRequest).toHaveBeenCalled())
+    expect(mockedRequest.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ subject: 'orders.create', message_type: 'shop.CreateOrderRequest', source_id: 'src-1' }),
+    )
   })
 })

@@ -6,7 +6,7 @@ vi.mock('./grpc/clients', () => ({
   publishClient: { publishMessage: publishMessageCall },
 }))
 
-const { publishMessage } = await import('./publish')
+const { publishMessage, publishCoreMessage } = await import('./publish')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -44,5 +44,25 @@ describe('publishMessage', () => {
     const res = await publishMessage({ connection_id: 'conn-1', subject: 'orders.new', data: {} })
 
     expect(res.counter_value).toBeUndefined()
+  })
+})
+
+describe('publishCoreMessage', () => {
+  it('sends the body as typed over core NATS', async () => {
+    publishMessageCall.mockResolvedValue({ stream: '', sequence: 0n, duplicate: false })
+
+    await publishCoreMessage({ connection_id: 'conn-1', subject: '_INBOX.x', data: 'pong', headers: { 'X-Trace': 't' } })
+
+    expect(publishMessageCall.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ connectionId: 'conn-1', subject: '_INBOX.x', data: 'pong', headers: { 'X-Trace': 't' }, core: true }),
+    )
+  })
+
+  it('fails with the reason the server gave', async () => {
+    publishMessageCall.mockResolvedValue({ error: 'Failed to publish message: no permission to publish to "secret.op"' })
+
+    await expect(publishCoreMessage({ connection_id: 'conn-1', subject: 'secret.op', data: '' })).rejects.toThrow(
+      'no permission to publish to "secret.op"',
+    )
   })
 })

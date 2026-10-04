@@ -320,3 +320,45 @@ export function GlobeIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+export function SignalIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" />
+    </svg>
+  )
+}
+
+export function ServicesIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>
+      <rect x="3" y="4" width="18" height="6" rx="1.5" />
+      <rect x="3" y="14" width="18" height="6" rx="1.5" />
+      <path strokeLinecap="round" d="M7 7h.01M7 17h.01M11 7h6M11 17h6" />
+    </svg>
+  )
+}
+
+export function ReplyIcon({ className }: IconProps) {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" strokeWidth={1.75} className={className ?? 'w-4 h-4'}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+    </svg>
+  )
+}
+
+export function PlayIcon({ className }: IconProps) {
+  return (
+    <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" className={className ?? 'w-4 h-4'}>
+      <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86A1 1 0 008 5.14z" />
+    </svg>
+  )
+}
+
+export function StopIcon({ className }: IconProps) {
+  return (
+    <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" className={className ?? 'w-4 h-4'}>
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+    </svg>
+  )
+}

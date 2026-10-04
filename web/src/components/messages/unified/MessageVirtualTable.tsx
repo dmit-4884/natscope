@@ -23,6 +23,7 @@ interface RowProps {
   streamName: string
   connectionId: string | null
   timestampFormat: 'relative' | 'absolute' | 'iso'
+  showSequence: boolean
   translateY: number
   /**
    * Roving tabindex: exactly one row has tabIndex=0 (Tab enters grid; arrows
@@ -49,6 +50,7 @@ const MessageRow = memo(function MessageRow({
   streamName,
   connectionId,
   timestampFormat,
+  showSequence,
   translateY,
   isFocused,
   canPullFocus,
@@ -148,7 +150,7 @@ const MessageRow = memo(function MessageRow({
           />
         ) : null}
       </div>
-      {(isHistory || msg.sequence) && (
+      {showSequence && (isHistory || msg.sequence) && (
         <div className={`${cellPadding} text-sm font-mono text-content-primary w-20`} role="gridcell">
           {msg.sequence}
         </div>
@@ -180,6 +182,7 @@ interface Props {
   streamName: string
   connectionId: string | null
   timestampFormat: 'relative' | 'absolute' | 'iso'
+  showSequence?: boolean
   autoScrollRef: React.MutableRefObject<boolean>
   onSelectHistory: (msg: Message) => void
   onSelectLive: (msg: LiveMessage) => void
@@ -198,6 +201,7 @@ export function MessageVirtualTable({
   streamName,
   connectionId,
   timestampFormat,
+  showSequence = true,
   autoScrollRef,
   onSelectHistory,
   onSelectLive,
@@ -347,7 +351,7 @@ export function MessageVirtualTable({
     <>
       <div className="bg-surface-secondary flex border-b text-xs font-medium text-content-secondary uppercase" role="row">
         <div className="w-8" />
-        <div className="px-3 py-2 w-20" role="columnheader">Seq</div>
+        {showSequence && <div className="px-3 py-2 w-20" role="columnheader">Seq</div>}
         <div className="px-3 py-2 flex-1" role="columnheader">Subject</div>
         <div className="px-3 py-2 w-28" role="columnheader">Received</div>
         <div className="px-3 py-2 w-24 text-right" role="columnheader">Size</div>
@@ -357,7 +361,7 @@ export function MessageVirtualTable({
         ref={parentRef}
         className="flex-1 min-h-0 overflow-auto relative focus:outline-none"
         role="grid"
-        aria-label={`Messages in ${streamName || 'stream'}`}
+        aria-label={streamName ? `Messages in ${streamName}` : 'Received messages'}
         aria-rowcount={messages.length}
         onKeyDown={handleGridKeyDown}
       >
@@ -385,6 +389,7 @@ export function MessageVirtualTable({
                 streamName={streamName}
                 connectionId={connectionId}
                 timestampFormat={timestampFormat}
+                showSequence={showSequence}
                 translateY={virtualItem.start}
                 isFocused={isFocused}
                 canPullFocus={canPullFocus}

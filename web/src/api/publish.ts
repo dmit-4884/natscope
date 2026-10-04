@@ -66,6 +66,34 @@ export async function publishMessage(request: PublishRequest): Promise<PublishRe
   }
 }
 
+export interface CorePublishRequest {
+  connection_id: string
+  subject: string
+  data: string
+  headers?: Record<string, string>
+  message_type?: string
+  source_id?: string
+  schema_fingerprint?: string
+  framing?: Framing
+}
+
+export async function publishCoreMessage(request: CorePublishRequest): Promise<void> {
+  const response = await publishClient.publishMessage({
+    connectionId: request.connection_id,
+    subject: request.subject,
+    data: request.data,
+    headers: request.headers ?? {},
+    messageType: request.message_type || undefined,
+    sourceId: request.source_id || undefined,
+    schemaFingerprint: request.schema_fingerprint || undefined,
+    framing: framingToProto(request.framing),
+    core: true,
+  })
+  if (response.error) {
+    throw new Error(response.error)
+  }
+}
+
 export interface RequestMessageRequest {
   connection_id: string
   subject: string

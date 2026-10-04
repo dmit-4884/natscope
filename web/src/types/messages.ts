@@ -18,4 +18,5 @@ export interface SelectedMessage {
   isLive?: boolean
   /** Preview truncation flag; drives the "Load full payload" affordance. */
   truncated?: boolean
+  reply?: string
 }

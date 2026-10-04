@@ -15,6 +15,7 @@ const requestDraftSchema = z.object({
   timeoutMs: z.number().int().positive(),
   recentSubjects: z.array(z.string()),
   replyTypes: z.record(z.string(), z.string()),
+  requestTypes: z.record(z.string(), z.object({ messageType: z.string(), sourceId: z.string() })),
 })
 
 export type RequestDraft = z.infer<typeof requestDraftSchema>
@@ -26,6 +27,7 @@ const DEFAULT_DRAFT: RequestDraft = {
   timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
   recentSubjects: [],
   replyTypes: {},
+  requestTypes: {},
 }
 
 interface RequestDraftState {
@@ -71,6 +73,14 @@ export function useRequestDraft(connectionId: string) {
   const update = useRequestDraftStore((s) => s.update)
   const patch = useCallback((p: Partial<RequestDraft>) => update(connectionId, p), [update, connectionId])
   return [draft, patch] as const
+}
+
+export function getRequestDraft(connectionId: string): RequestDraft {
+  return useRequestDraftStore.getState().drafts[connectionId] ?? DEFAULT_DRAFT
+}
+
+export function patchRequestDraft(connectionId: string, patch: Partial<RequestDraft>): void {
+  useRequestDraftStore.getState().update(connectionId, patch)
 }
 
 export function withRecentSubject(recent: string[], subject: string): string[] {

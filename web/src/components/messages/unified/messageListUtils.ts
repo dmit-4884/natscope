@@ -40,6 +40,7 @@ export interface LiveMessage {
   decodedAuto?: boolean
   decodedSourceId?: string
   decodeError?: string
+  reply?: string
 }
 
 export function liveToMessage(m: LiveMessage): Message {

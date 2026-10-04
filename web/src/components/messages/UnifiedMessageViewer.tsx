@@ -7,7 +7,7 @@ import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { useStreamDetail } from '@/contexts/streams'
 import { useCreateMapping, useMappingItems, type MappingItem } from '@/contexts/mappings'
 import ErrorAlert from '@/components/ui/ErrorAlert'
-import { Badge, Button, RefreshIcon, TrashIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon, DocumentIcon } from '@/components/ui'
+import { Badge, Button, RefreshIcon, ReplyIcon, TrashIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon, DocumentIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import { decodeMessage, type TypeCandidate } from '@/api/decode'
 import type { Framing } from '@/api/framing'
@@ -41,6 +41,7 @@ interface UnifiedMessageViewerProps {
    * tab.
    */
   onResend?: (draft: ResendDraft) => void
+  onReply?: (message: SelectedMessage) => void
   /** Prev/next stepping controls; buttons render only when provided. */
   navigation?: MessageNavigation
 }
@@ -69,6 +70,7 @@ export default function UnifiedMessageViewer({
   onOpenMappings,
   onDeleted,
   onResend,
+  onReply,
   navigation,
 }: UnifiedMessageViewerProps) {
   const display = useDisplayPreferences()
@@ -537,6 +539,19 @@ export default function UnifiedMessageViewer({
                   className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent-light transition-colors"
                 >
                   <RefreshIcon className="w-4 h-4" />
+                </button>
+              </Tooltip>
+            )}
+            {onReply && displayMessage?.reply && (
+              <Tooltip content={`Reply to the waiting request on ${displayMessage.reply}`}>
+                <button
+                  type="button"
+                  onClick={() => onReply(displayMessage)}
+                  aria-label="Reply to message"
+                  data-testid="reply-message"
+                  className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent-light transition-colors"
+                >
+                  <ReplyIcon className="w-4 h-4" />
                 </button>
               </Tooltip>
             )}

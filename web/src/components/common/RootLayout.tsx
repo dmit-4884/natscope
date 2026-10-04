@@ -41,6 +41,10 @@ function titleForPath(pathname: string): string {
       return `${capitalize(name ?? 'Settings')} · Settings — Natscope`
     case 'request':
       return 'Request / Reply — Natscope'
+    case 'subscribe':
+      return 'Subscribe — Natscope'
+    case 'services':
+      return 'Services — Natscope'
     default:
       return 'Natscope'
   }

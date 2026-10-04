@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
-import { PlusIcon, SwitchHorizontalIcon } from '@/components/ui'
+import { PlusIcon, ServicesIcon, SignalIcon, SwitchHorizontalIcon } from '@/components/ui'
 import StreamList from '../streams/StreamList'
 import KVList from '../kv/KVList'
 import ObjectList from '../objects/ObjectList'
@@ -26,6 +26,51 @@ function CreateLink({ to, label }: { to: string; label: string }) {
 
 interface SidebarProps {
   connectionId: string
+}
+
+interface PageEntry {
+  to: string
+  label: string
+  icon: React.ReactNode
+}
+
+const PAGE_ENTRIES: PageEntry[] = [
+  { to: '/request', label: 'Request / Reply', icon: <SwitchHorizontalIcon /> },
+  { to: '/subscribe', label: 'Subscribe', icon: <SignalIcon /> },
+  { to: '/services', label: 'Services', icon: <ServicesIcon /> },
+]
+
+function RailButton({ entry, active, onClick }: { entry: PageEntry; active: boolean; onClick: () => void }) {
+  return (
+    <Tooltip content={entry.label}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`p-1.5 rounded transition-colors ${
+          active ? 'text-accent bg-accent-muted/70' : 'text-content-tertiary hover:text-content-primary hover:bg-surface-hover/60'
+        }`}
+        aria-label={entry.label}
+        aria-current={active ? 'page' : undefined}
+      >
+        {entry.icon}
+      </button>
+    </Tooltip>
+  )
+}
+
+function PageLink({ entry, active }: { entry: PageEntry; active: boolean }) {
+  return (
+    <Link
+      to={entry.to}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center gap-2 px-3 py-2 border-b border-border transition-colors ${
+        active ? 'bg-accent-light text-accent-text' : 'bg-surface-secondary text-gray-700 hover:bg-surface-tertiary'
+      }`}
+    >
+      {entry.icon}
+      <span className="text-xs font-semibold uppercase tracking-wide">{entry.label}</span>
+    </Link>
+  )
 }
 
 export const SIDEBAR_PANEL_ID = 'main-sidebar'
@@ -72,7 +117,7 @@ export default function Sidebar({ connectionId }: SidebarProps) {
   const isStreams = location.pathname.includes('/streams/') && !!streamName
   const isKV = location.pathname.includes('/kv')
   const isObjects = location.pathname.includes('/objects')
-  const isRequest = location.pathname.startsWith('/request')
+  const isPage = (entry: PageEntry) => location.pathname.startsWith(entry.to)
 
   // Mini-rail mode: narrow strip of section icons that navigate on click.
   if (collapsed) {
@@ -124,21 +169,9 @@ export default function Sidebar({ connectionId }: SidebarProps) {
             {OBJECTS_ICON}
           </button>
         </Tooltip>
-        <Tooltip content="Request / Reply">
-          <button
-            type="button"
-            onClick={() => navigate('/request')}
-            className={`p-1.5 rounded transition-colors ${
-              isRequest
-                ? 'text-accent bg-accent-muted/70'
-                : 'text-content-tertiary hover:text-content-primary hover:bg-surface-hover/60'
-            }`}
-            aria-label="Request / Reply"
-            aria-current={isRequest ? 'page' : undefined}
-          >
-            <SwitchHorizontalIcon />
-          </button>
-        </Tooltip>
+        {PAGE_ENTRIES.map((entry) => (
+          <RailButton key={entry.to} entry={entry} active={isPage(entry)} onClick={() => navigate(entry.to)} />
+        ))}
       </nav>
     )
   }
@@ -183,16 +216,9 @@ export default function Sidebar({ connectionId }: SidebarProps) {
           <ObjectList connectionId={connectionId} />
         </CollapsibleSection>
 
-        <Link
-          to="/request"
-          aria-current={isRequest ? 'page' : undefined}
-          className={`flex items-center gap-2 px-3 py-2 border-b border-border transition-colors ${
-            isRequest ? 'bg-accent-light text-accent-text' : 'bg-surface-secondary text-gray-700 hover:bg-surface-tertiary'
-          }`}
-        >
-          <SwitchHorizontalIcon />
-          <span className="text-xs font-semibold uppercase tracking-wide">Request / Reply</span>
-        </Link>
+        {PAGE_ENTRIES.map((entry) => (
+          <PageLink key={entry.to} entry={entry} active={isPage(entry)} />
+        ))}
       </div>
     </nav>
   )

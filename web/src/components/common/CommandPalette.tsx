@@ -115,6 +115,18 @@ export default function CommandPalette() {
       action: () => navigate('/request'),
     },
     {
+      id: 'go-subscribe',
+      label: 'Go to Subscribe',
+      group: 'Navigation',
+      action: () => navigate('/subscribe'),
+    },
+    {
+      id: 'go-services',
+      label: 'Go to Services',
+      group: 'Navigation',
+      action: () => navigate('/services'),
+    },
+    {
       id: 'toggle-density',
       label: 'Toggle Density',
       group: 'Preferences',

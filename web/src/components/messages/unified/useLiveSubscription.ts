@@ -13,6 +13,7 @@ import type { LiveMessage, LiveMessageLimit, WsStatus } from './messageListUtils
 interface Options {
   connectionId: string | null
   streamName: string | null
+  subjects?: string[]
   enabled: boolean
   maxDisplayRate?: number
   initialLimit: LiveMessageLimit
@@ -29,7 +30,11 @@ interface Result {
   togglePause: () => void
   newMessageIds: Set<string>
   clearMessages: () => void
+  subjectCounts: Record<string, number>
+  deniedSubjects: string[]
 }
+
+const MAX_COUNTED_SUBJECTS = 1000
 
 function toLiveMessage(msg: WSMessagePayload): LiveMessage {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
@@ -52,6 +57,7 @@ function toLiveMessage(msg: WSMessagePayload): LiveMessage {
 export function useLiveSubscription({
   connectionId,
   streamName,
+  subjects,
   enabled,
   maxDisplayRate,
   initialLimit,
@@ -63,10 +69,14 @@ export function useLiveSubscription({
   const [wsError, setWsError] = useState<string | null>(null)
   const [isPaused, setIsPaused] = useState(false)
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set())
+  const [subjectCounts, setSubjectCounts] = useState<Record<string, number>>({})
+  const [deniedSubjects, setDeniedSubjects] = useState<string[]>([])
 
   const [ws, setWs] = useState<LiveStreamClient | null>(null)
   const liveLimitRef = useRef(liveLimit)
   const streamNameRef = useRef(streamName)
+  const subjectsKey = subjects && subjects.length > 0 ? subjects.join('\n') : null
+  const subjectsKeyRef = useRef(subjectsKey)
   const subjectFilterRef = useRef(subjectFilter)
   const setGlobalStats = useLiveStatsStore((s) => s.setStats)
 
@@ -88,6 +98,10 @@ export function useLiveSubscription({
   useEffect(() => {
     streamNameRef.current = streamName
   }, [streamName])
+  useEffect(() => {
+    subjectsKeyRef.current = subjectsKey
+    setDeniedSubjects([])
+  }, [subjectsKey])
   useEffect(() => {
     subjectFilterRef.current = subjectFilter
   }, [subjectFilter])
@@ -158,13 +172,24 @@ export function useLiveSubscription({
   const processBatch = useCallback(
     (batch: WSBatchPayload) => {
       const pattern = subjectFilterRef.current
+      const subjectMode = subjectsKeyRef.current !== null
       const relevant = batch.messages.filter((msg) => {
-        if (msg.stream_name !== streamNameRef.current) return false
+        if (!subjectMode && msg.stream_name !== streamNameRef.current) return false
         if (!pattern) return true
         if (pattern.includes('*') || pattern.includes('>')) return matchesPattern(msg.subject, pattern)
         return msg.subject.toLowerCase().includes(pattern.toLowerCase())
       })
       if (relevant.length === 0) return
+
+      setSubjectCounts((prev) => {
+        const next = { ...prev }
+        for (const msg of relevant) {
+          if (msg.subject in next || Object.keys(next).length < MAX_COUNTED_SUBJECTS) {
+            next[msg.subject] = (next[msg.subject] ?? 0) + 1
+          }
+        }
+        return next
+      })
 
       const converted = relevant.map(toLiveMessage)
       const rate = maxDisplayRateRef.current
@@ -191,7 +216,8 @@ export function useLiveSubscription({
     socket.onConnected = () => {
       setWsStatus('connected')
       setWsError(null)
-      if (streamNameRef.current) socket.subscribe(streamNameRef.current)
+      if (subjectsKeyRef.current) socket.subscribeSubjects(subjectsKeyRef.current.split('\n'))
+      else if (streamNameRef.current) socket.subscribe(streamNameRef.current)
     }
     socket.onSubscribed = () => {
       setWsStatus('connected')
@@ -206,7 +232,14 @@ export function useLiveSubscription({
         isConnected: true,
       })
     }
-    socket.onError = (payload) => setWsError(payload.message)
+    socket.onError = (payload) => {
+      const denied = payload.access?.status === 'denied' ? payload.access.subject : null
+      if (denied) {
+        setDeniedSubjects((prev) => (prev.includes(denied) ? prev : [...prev, denied]))
+        if (subjectsKeyRef.current) return
+      }
+      setWsError(payload.message)
+    }
     socket.onDisconnect = () => {
       setWsStatus('disconnected')
       setGlobalStats(null)
@@ -229,9 +262,10 @@ export function useLiveSubscription({
   // Subscribe / unsubscribe when stream changes on an open connection.
   useEffect(() => {
     if (!ws || wsStatus !== 'connected') return
-    if (streamName) ws.subscribe(streamName)
+    if (subjectsKey) ws.subscribeSubjects(subjectsKey.split('\n'))
+    else if (streamName) ws.subscribe(streamName)
     else ws.unsubscribe()
-  }, [ws, streamName, wsStatus])
+  }, [ws, streamName, subjectsKey, wsStatus])
 
   // Clear on stream change
   useEffect(() => {
@@ -261,6 +295,7 @@ export function useLiveSubscription({
   const clearMessages = useCallback(() => {
     stopDrip()
     setLiveMessages([])
+    setSubjectCounts({})
   }, [stopDrip])
 
   return {
@@ -273,5 +308,7 @@ export function useLiveSubscription({
     togglePause,
     newMessageIds,
     clearMessages,
+    subjectCounts,
+    deniedSubjects,
   }
 }

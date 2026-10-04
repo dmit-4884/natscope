@@ -7,6 +7,7 @@ import { clearAllPublishDrafts } from './streamTabState/publishDraftStore'
 import { clearAllConsumerEditor } from './streamTabState/consumerEditorStore'
 import { clearAllConfigEditor } from './streamTabState/configEditorStore'
 import { clearAllRequestDrafts } from './requestDraftStore'
+import { clearAllSubscribeDrafts } from './subscribeDraftStore'
 
 /** Reset all stores on logout. Templates live on the backend, not wiped. */
 export function resetAllStores(): void {
@@ -18,6 +19,7 @@ export function resetAllStores(): void {
   clearAllConsumerEditor()
   clearAllConfigEditor()
   clearAllRequestDrafts()
+  clearAllSubscribeDrafts()
   // Prune live message localStorage keys
   clearLiveMessagesStorage()
 }

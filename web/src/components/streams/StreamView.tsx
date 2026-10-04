@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { useStreamDetail } from '@/contexts/streams'
-import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
+import { useResizablePanel } from '@/hooks/useResizablePanel'
 import {
   type StreamScope,
   isScopeReady,
@@ -27,12 +27,7 @@ import { isStreamNotFound } from './streamErrors'
 import { subjectMatchesStream } from './publish/subjectPatternUtils'
 import type { StreamPublishFeatures } from './publish/publishOptions'
 
-const RIGHT_PANEL_WIDTH_KEY = 'nats_right_panel_width'
 const EMPTY_HEADERS: HeaderDraft[] = []
-const DEFAULT_RIGHT_PANEL_PCT = 50
-const MIN_PANEL_PCT = 20
-const MAX_PANEL_PCT = 80
-const RESIZE_STEP_PCT = 2
 
 export interface StreamViewOutletContext {
   /** Stream-scoped storage key (connection URL + stream name). */
@@ -130,58 +125,7 @@ export default function StreamView() {
     [scope],
   )
 
-  // Resizable right panel
-  const [rightPanelPct, setRightPanelPct] = useState(() => {
-    const saved = safeGetItem(RIGHT_PANEL_WIDTH_KEY)
-    return saved ? Number(saved) : DEFAULT_RIGHT_PANEL_PCT
-  })
-  const isDragging = useRef(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const latestPctRef = useRef(rightPanelPct)
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const pct = ((rect.right - e.clientX) / rect.width) * 100
-      const clamped = Math.min(Math.max(pct, MIN_PANEL_PCT), MAX_PANEL_PCT)
-      latestPctRef.current = clamped
-      setRightPanelPct(clamped)
-    }
-    const handleMouseUp = () => {
-      if (isDragging.current) {
-        isDragging.current = false
-        document.body.style.cursor = ''
-        document.body.style.userSelect = ''
-        safeSetItem(RIGHT_PANEL_WIDTH_KEY, String(Math.round(latestPctRef.current)))
-      }
-    }
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [])
-
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    isDragging.current = true
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-  }, [])
-
-  const handleResizeKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const step = e.key === 'ArrowLeft' ? RESIZE_STEP_PCT : e.key === 'ArrowRight' ? -RESIZE_STEP_PCT : 0
-    if (step === 0) return
-    e.preventDefault()
-    setRightPanelPct((prev) => {
-      const next = Math.min(Math.max(prev + step, MIN_PANEL_PCT), MAX_PANEL_PCT)
-      latestPctRef.current = next
-      safeSetItem(RIGHT_PANEL_WIDTH_KEY, String(Math.round(next)))
-      return next
-    })
-  }, [])
+  const { rightPanelPct, containerRef, separatorProps } = useResizablePanel()
 
   const { data: streamDetail, error: streamError } = useStreamDetail(streamName ?? null, connectionId)
 
@@ -313,16 +257,8 @@ export default function StreamView() {
         <>
           {/* Resize handle */}
           <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize details panel"
-            aria-valuenow={Math.round(rightPanelPct)}
-            aria-valuemin={MIN_PANEL_PCT}
-            aria-valuemax={MAX_PANEL_PCT}
-            tabIndex={0}
+            {...separatorProps}
             className="flex-shrink-0 cursor-col-resize group flex items-stretch focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-            onMouseDown={handleDragStart}
-            onKeyDown={handleResizeKeyDown}
             style={{ padding: '0 2px' }}
           >
             <div className="w-px bg-surface-hover group-hover:bg-blue-400 group-active:bg-blue-500 group-focus-visible:bg-blue-500 transition-colors" />

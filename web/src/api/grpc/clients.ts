@@ -8,6 +8,7 @@ import { PublishService } from "../../gen/services/grpc/nats/v1/publish/nats_pub
 import { ManagementService } from "../../gen/services/grpc/nats/v1/management/nats_management_service_pb"
 import { StatsService } from "../../gen/services/grpc/nats/v1/stats/nats_stats_service_pb"
 import { LiveService } from "../../gen/services/grpc/nats/v1/live/nats_live_service_pb"
+import { DiscoveryService } from "../../gen/services/grpc/nats/v1/discovery/nats_discovery_service_pb"
 import { RegistryService } from "../../gen/services/grpc/proto/v1/registry/proto_registry_service_pb"
 import { CodecService } from "../../gen/services/grpc/proto/v1/codec/proto_codec_service_pb"
 import { SourcesService } from "../../gen/services/grpc/proto/v1/sources/proto_sources_service_pb"
@@ -26,6 +27,7 @@ export const publishClient = createClient(PublishService, transport)
 export const managementClient = createClient(ManagementService, transport)
 export const statsClient = createClient(StatsService, transport)
 export const liveClient = createClient(LiveService, transport)
+export const discoveryClient = createClient(DiscoveryService, transport)
 
 // Proto services
 export const registryClient = createClient(RegistryService, transport)

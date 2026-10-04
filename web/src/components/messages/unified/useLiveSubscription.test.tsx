@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { WSBatchPayload, WSMessagePayload } from '@/contexts/live'
+import type { WSBatchPayload, WSErrorPayload, WSMessagePayload } from '@/contexts/live'
 import { useLiveSubscription } from './useLiveSubscription'
 
 const { clients } = vi.hoisted(() => ({ clients: [] as FakeClient[] }))
 
 interface FakeClient {
   deliver: (payload: WSBatchPayload) => void
+  onError?: (payload: WSErrorPayload) => void
+  subscribe: ReturnType<typeof vi.fn>
+  subscribeSubjects: ReturnType<typeof vi.fn>
 }
 
 vi.mock('@/contexts/live', () => {
@@ -15,11 +18,12 @@ vi.mock('@/contexts/live', () => {
     onSubscribed?: () => void
     onBatch?: (payload: WSBatchPayload) => void
     onStats?: () => void
-    onError?: () => void
+    onError?: (payload: WSErrorPayload) => void
     onDisconnect?: () => void
     onReconnecting?: () => void
     paused: WSBatchPayload[] | null = null
     subscribe = vi.fn()
+    subscribeSubjects = vi.fn()
     unsubscribe = vi.fn()
     disconnect = vi.fn()
     constructor() {
@@ -136,5 +140,68 @@ describe('useLiveSubscription display rate', () => {
     deliver(1, 2, 3)
 
     expect(sequences(result)).toEqual([1, 2, 3])
+  })
+})
+
+describe('useLiveSubscription subjects', () => {
+  beforeEach(() => {
+    clients.length = 0
+  })
+
+  function renderSubjects(subjects: string[]) {
+    return renderHook(
+      ({ list }) =>
+        useLiveSubscription({ connectionId: 'conn-1', streamName: null, subjects: list, enabled: true, initialLimit: 100 }),
+      { initialProps: { list: subjects } },
+    )
+  }
+
+  const core = (subject: string): WSMessagePayload => ({
+    stream_name: '',
+    subject,
+    timestamp: 1,
+    data_base64: '',
+    data_size: 0,
+    reply: '_INBOX.1',
+  })
+
+  it('subscribes to the subjects and keeps messages from no stream', () => {
+    const { result } = renderSubjects(['orders.>', 'audit.*'])
+    const client = clients[clients.length - 1]
+
+    expect(client.subscribeSubjects).toHaveBeenCalledWith(['orders.>', 'audit.*'])
+    expect(client.subscribe).not.toHaveBeenCalled()
+
+    act(() => client.deliver({ messages: [core('orders.new')], count: 1 }))
+    expect(result.current.liveMessages.map((m) => m.subject)).toEqual(['orders.new'])
+    expect(result.current.liveMessages[0].reply).toBe('_INBOX.1')
+  })
+
+  it('counts every received message per subject', () => {
+    const { result } = renderSubjects(['>'])
+    const client = clients[clients.length - 1]
+
+    act(() => client.deliver({ messages: [core('a'), core('b'), core('a')], count: 3 }))
+
+    expect(result.current.subjectCounts).toEqual({ a: 2, b: 1 })
+  })
+
+  it('collects denied subjects instead of raising an error, and forgets them on a new subscription', () => {
+    const { result, rerender } = renderSubjects(['open.>', 'secret.>'])
+    const client = clients[clients.length - 1]
+
+    act(() =>
+      client.onError?.({
+        message: 'no permission to subscribe to "secret.>"',
+        code: 'SUBSCRIBE_PERMISSION_DENIED',
+        access: { status: 'denied', operation: 'subscribe', subject: 'secret.>' },
+      }),
+    )
+    expect(result.current.deniedSubjects).toEqual(['secret.>'])
+    expect(result.current.wsError).toBeNull()
+
+    rerender({ list: ['open.>'] })
+    expect(client.subscribeSubjects).toHaveBeenLastCalledWith(['open.>'])
+    expect(result.current.deniedSubjects).toEqual([])
   })
 })
