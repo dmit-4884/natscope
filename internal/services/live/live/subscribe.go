@@ -25,7 +25,7 @@ func (s *Service) Subscribe(
 	if err := validateSubscriptionTargets(in.Subscriptions); err != nil {
 		return err
 	}
-	targets := dedupeSubscriptionTargets(in.Subscriptions)
+	targets, shadows := dedupeSubscriptionTargets(in.Subscriptions)
 
 	sess := newSessionState(in.ConnectionId)
 	s.registerSession(sess)
@@ -39,7 +39,7 @@ func (s *Service) Subscribe(
 
 	msgChan := make(chan *entities.NatsMessage, messageBufferSize)
 
-	subscriptions, partialErrs, setupErr := s.startSubscriptions(ctx, in.ConnectionId, targets, mode, msgChan, sess)
+	subscriptions, partialErrs, setupErr := s.startSubscriptions(ctx, in.ConnectionId, targets, shadows, mode, msgChan, sess)
 	defer func() {
 		for _, sub := range subscriptions {
 			if sub != nil {
@@ -73,8 +73,12 @@ func validateSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) err
 	return nil
 }
 
-// dedupeSubscriptionTargets drops exact duplicates and literal subjects covered by a wildcard in the same stream grouping.
-func dedupeSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) []*entities.LiveSubscriptionTarget {
+// dedupeSubscriptionTargets drops exact duplicates and literal stream subjects covered by a wildcard of the same
+// stream. A covered core subject stays, keyed to the wildcards covering it, so it can deliver once the server
+// refuses all of them.
+func dedupeSubscriptionTargets(
+	targets []*entities.LiveSubscriptionTarget,
+) ([]*entities.LiveSubscriptionTarget, map[*entities.LiveSubscriptionTarget][]string) {
 	type targetKey struct {
 		subject    string
 		streamName string
@@ -94,31 +98,34 @@ func dedupeSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) []*en
 		out = append(out, t)
 	}
 
-	covered := make([]bool, len(out))
-	for i, a := range out {
+	coverers := make(map[*entities.LiveSubscriptionTarget][]string)
+	for _, a := range out {
 		if isLiteralSubject(a.Subject) {
 			continue // only a wildcard pattern can cover another target
 		}
-		for j, b := range out {
-			if i == j || covered[j] || !isLiteralSubject(b.Subject) {
-				continue
-			}
-			if streamNameOf(a) != streamNameOf(b) {
+		for _, b := range out {
+			if a == b || !isLiteralSubject(b.Subject) || streamNameOf(a) != streamNameOf(b) {
 				continue
 			}
 			if natsutil.MatchSubject(a.Subject, b.Subject) {
-				covered[j] = true
+				coverers[b] = append(coverers[b], a.Subject)
 			}
 		}
 	}
 
 	result := make([]*entities.LiveSubscriptionTarget, 0, len(out))
-	for i, t := range out {
-		if !covered[i] {
+	shadows := make(map[*entities.LiveSubscriptionTarget][]string)
+	for _, t := range out {
+		subjects, isCovered := coverers[t]
+		switch {
+		case !isCovered:
 			result = append(result, t)
+		case streamNameOf(t) == "":
+			result = append(result, t)
+			shadows[t] = subjects
 		}
 	}
-	return result
+	return result, shadows
 }
 
 func streamNameOf(t *entities.LiveSubscriptionTarget) string {
@@ -177,11 +184,13 @@ func liveErrorFor(subject string, err error) *entities.LiveError {
 }
 
 // startSubscriptions resolves every target into concrete NATS subscriptions;
-// it returns per-target failures as long as at least one target succeeds.
+// it returns per-target failures as long as at least one target succeeds. A
+// shadowed target delivers only after the server refused every wildcard covering it.
 func (s *Service) startSubscriptions(
 	ctx context.Context,
 	connectionID string,
 	targets []*entities.LiveSubscriptionTarget,
+	shadows map[*entities.LiveSubscriptionTarget][]string,
 	mode string,
 	msgChan chan<- *entities.NatsMessage,
 	sess *sessionState,
@@ -191,8 +200,17 @@ func (s *Service) startSubscriptions(
 	var lastErr error
 	for _, target := range targets {
 		handler := s.buildMessageHandler(target.Subject, msgChan, sess)
+		if coverers := shadows[target]; len(coverers) > 0 {
+			deliver := handler
+			handler = func(msg *entities.NatsMessage) {
+				if sess.allSilent(coverers) {
+					deliver(msg)
+				}
+			}
+		}
 		targetSubs, err := s.subscribeTarget(ctx, connectionID, target, mode, handler, sess)
 		if err != nil {
+			sess.markSilent(target.Subject)
 			partialErrs = append(partialErrs, liveErrorFor(target.Subject, err))
 			lastErr = fmt.Errorf("subject %q: %w", target.Subject, err)
 			continue

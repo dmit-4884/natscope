@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -201,6 +202,11 @@ func TestSubscribePermissionDenied(t *testing.T) {
 					Subscribe: &server.SubjectPermission{Deny: []string{"secret.>"}},
 				},
 			},
+			{
+				Username:    "narrow",
+				Password:    "pw",
+				Permissions: &server.Permissions{Subscribe: &server.SubjectPermission{Allow: []string{"shared.ok", "_INBOX.>"}}},
+			},
 			{Username: "admin", Password: "pw"},
 		}
 	})
@@ -230,6 +236,25 @@ func TestSubscribePermissionDenied(t *testing.T) {
 		var msg *natstypes.NatsMessage
 		waitLive(t, events, 10*time.Second, batchMessage("open.news", &msg))
 		assert.Equal(t, "open.news", msg.GetSubject())
+	})
+
+	t.Run("an allowed subject covered by a refused wildcard still flows", func(t *testing.T) {
+		narrowID := createTestConnection(t, env, "subscribe-narrow", srv.ClientURL(), &natstypes.AuthConfig{
+			Method:   natstypes.AuthMethod_AUTH_METHOD_USER_PASSWORD,
+			Username: new("narrow"),
+			Password: new("pw"),
+		})
+		events := openLive(t, env, narrowID, "shared.>", "shared.ok")
+
+		denied := waitLive(t, events, 10*time.Second, func(ev *livepb.LiveEvent) bool { return ev.GetError() != nil })
+		assert.Equal(t, "shared.>", denied.GetError().GetAccess().GetSubject())
+
+		stop := make(chan struct{})
+		defer close(stop)
+		publishUntil(t, stop, func() { _ = admin.Publish("shared.ok", []byte("visible")) })
+		var msg *natstypes.NatsMessage
+		waitLive(t, events, 10*time.Second, batchMessage("shared.ok", &msg))
+		assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("visible")), msg.GetDataBase64())
 	})
 
 	t.Run("a denied core publish fails fast with the reason", func(t *testing.T) {

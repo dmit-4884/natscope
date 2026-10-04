@@ -140,6 +140,49 @@ func TestSubscribe_ReportsADeniedSubjectAndKeepsTheOthers(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
+func TestSubscribe_ACoveredSubjectTakesOverWhenItsWildcardIsDenied(t *testing.T) {
+	t.Parallel()
+
+	sub := &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}
+	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	events := make(chan *entities.LiveEvent, 16)
+	done := make(chan error, 1)
+	go func() {
+		done <- svc.Subscribe(ctx, &entities.LiveSubscribeRequest{
+			ConnectionId: "conn",
+			Subscriptions: []*entities.LiveSubscriptionTarget{
+				{Subject: "orders.>"},
+				{Subject: "orders.created"},
+			},
+		}, func(ev *entities.LiveEvent) error {
+			events <- ev
+			return nil
+		})
+	}()
+
+	require.Eventually(t, func() bool {
+		sub.mu.Lock()
+		defer sub.mu.Unlock()
+		return len(sub.handlers) == 2
+	}, 5*time.Second, 10*time.Millisecond, "a literal subject covered by a wildcard is subscribed too")
+
+	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: []byte("early")})
+	sub.deny(t, "orders.>")
+	nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Error != nil })
+	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: []byte("late")})
+
+	batch := nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Batch != nil })
+	require.Len(t, batch.Batch.Messages, 1, "while the wildcard is live it delivers, so the covered copy is dropped")
+	assert.Equal(t, "late", string(batch.Batch.Messages[0].NatsMessage.Data))
+
+	cancel()
+	require.NoError(t, <-done)
+}
+
 func nextEvent(t *testing.T, events <-chan *entities.LiveEvent, match func(*entities.LiveEvent) bool) *entities.LiveEvent {
 	t.Helper()
 	deadline := time.After(5 * time.Second)

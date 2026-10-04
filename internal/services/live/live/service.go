@@ -81,8 +81,8 @@ type sessionState struct {
 	lostOnce     sync.Once
 
 	denials        chan *entities.LiveError
-	deniedMu       sync.Mutex
-	deniedSubjects map[string]struct{}
+	silentMu       sync.Mutex
+	silentSubjects map[string]struct{}
 }
 
 func newSessionState(connectionID string) *sessionState {
@@ -90,23 +90,40 @@ func newSessionState(connectionID string) *sessionState {
 		connectionID:   connectionID,
 		lost:           make(chan struct{}),
 		denials:        make(chan *entities.LiveError, maxSubscriptionTargets),
-		deniedSubjects: make(map[string]struct{}),
+		silentSubjects: make(map[string]struct{}),
 	}
 }
 
 func (sess *sessionState) reportDenied(subject string, err error) {
-	sess.deniedMu.Lock()
-	if _, seen := sess.deniedSubjects[subject]; seen {
-		sess.deniedMu.Unlock()
+	if !sess.markSilent(subject) {
 		return
 	}
-	sess.deniedSubjects[subject] = struct{}{}
-	sess.deniedMu.Unlock()
-
 	select {
 	case sess.denials <- liveErrorFor(subject, err):
 	default:
 	}
+}
+
+// markSilent records that subject delivers nothing; false when it was recorded before.
+func (sess *sessionState) markSilent(subject string) bool {
+	sess.silentMu.Lock()
+	defer sess.silentMu.Unlock()
+	if _, seen := sess.silentSubjects[subject]; seen {
+		return false
+	}
+	sess.silentSubjects[subject] = struct{}{}
+	return true
+}
+
+func (sess *sessionState) allSilent(subjects []string) bool {
+	sess.silentMu.Lock()
+	defer sess.silentMu.Unlock()
+	for _, subject := range subjects {
+		if _, silent := sess.silentSubjects[subject]; !silent {
+			return false
+		}
+	}
+	return true
 }
 
 func (sess *sessionState) markLost() {
