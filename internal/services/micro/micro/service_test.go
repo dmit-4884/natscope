@@ -81,7 +81,7 @@ func TestListServices_GroupsInstancesAndSumsStats(t *testing.T) {
 	}
 	svc := New(nats, &fakeRegistry{})
 
-	got, err := svc.ListServices(t.Context(), "conn")
+	got, err := svc.ListServices(t.Context(), "conn", false)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.AccessCheck{Status: entities.AccessAllowed, Operation: "publish", Subject: "$SRV.INFO"}, got.InfoAccess)
@@ -112,7 +112,7 @@ func TestListServices_NoInfoAccessSkipsStats(t *testing.T) {
 	t.Parallel()
 
 	nats := &fakeDiscoverer{infoErr: denied("$SRV.INFO")}
-	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn")
+	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.AccessCheck{Status: entities.AccessDenied, Operation: "publish", Subject: "$SRV.INFO"}, got.InfoAccess)
@@ -125,7 +125,7 @@ func TestListServices_DeniedReplyInboxReadsAsNoAccess(t *testing.T) {
 	t.Parallel()
 
 	nats := &fakeDiscoverer{infoErr: &errs.NATSPermissionError{Operation: errs.PermissionOperationSubscribe, Subject: "_INBOX.x.y"}}
-	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn")
+	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.AccessCheck{Status: entities.AccessDenied, Operation: "subscribe", Subject: "_INBOX.x.y"}, got.InfoAccess)
@@ -138,7 +138,7 @@ func TestListServices_StatsDeniedKeepsServicesWithoutStats(t *testing.T) {
 		infos:    []entities.MicroReport{{Name: "orders", ID: "a", Endpoints: []entities.MicroEndpoint{{Name: "Create", Subject: "orders.create"}}}},
 		statsErr: denied("$SRV.STATS"),
 	}
-	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn")
+	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.AccessAllowed, got.InfoAccess.Status)
@@ -148,14 +148,30 @@ func TestListServices_StatsDeniedKeepsServicesWithoutStats(t *testing.T) {
 	assert.Nil(t, got.Services[0].Endpoints[0].Stats)
 }
 
+func TestListServices_SkipStatsAsksOnlyForInfo(t *testing.T) {
+	t.Parallel()
+
+	nats := &fakeDiscoverer{
+		infos: []entities.MicroReport{{Name: "orders", ID: "a", Endpoints: []entities.MicroEndpoint{{Name: "Create", Subject: "orders.create"}}}},
+		stats: []entities.MicroReport{{Name: "orders", ID: "a", Started: started}},
+	}
+	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", true)
+	require.NoError(t, err)
+
+	assert.Zero(t, nats.statsCalls, "a refresh after STATS was denied does not ask again")
+	assert.Nil(t, got.StatsAccess)
+	require.Len(t, got.Services, 1)
+	assert.Nil(t, got.Services[0].Instances[0].Started)
+}
+
 func TestListServices_OtherFailuresAreErrors(t *testing.T) {
 	t.Parallel()
 
-	_, err := New(&fakeDiscoverer{infoErr: errs.ErrNATSConnectionClosed}, &fakeRegistry{}).ListServices(t.Context(), "conn")
+	_, err := New(&fakeDiscoverer{infoErr: errs.ErrNATSConnectionClosed}, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
 	require.ErrorIs(t, err, errs.ErrNATSConnectionClosed)
 
 	nats := &fakeDiscoverer{infos: []entities.MicroReport{{Name: "orders", ID: "a"}}, statsErr: errors.New("boom")}
-	_, err = New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn")
+	_, err = New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
 	require.Error(t, err)
 }
 
@@ -185,7 +201,7 @@ func TestListServices_MatchesEndpointsToProtoMethods(t *testing.T) {
 		{Name: "Unknown", Subject: "orders.unknown"},
 	}}}}
 
-	got, err := New(nats, registry).ListServices(t.Context(), "conn")
+	got, err := New(nats, registry).ListServices(t.Context(), "conn", false)
 	require.NoError(t, err)
 
 	endpoints := got.Services[0].Endpoints

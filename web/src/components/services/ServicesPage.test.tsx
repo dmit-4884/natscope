@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@/test/utils'
+import { act, render, screen, fireEvent, waitFor, within } from '@/test/utils'
 import { listServices, type MicroDiscovery, type MicroEndpoint, type MicroService } from '@/api/discovery'
 import { clearAllRequestDrafts, getRequestDraft } from '@/stores/requestDraftStore'
 import ServicesPage from './ServicesPage'
@@ -100,6 +100,31 @@ describe('ServicesPage', () => {
     expect(banner).toHaveTextContent('publish to $SRV.STATS')
     expect(screen.getAllByLabelText('No access to statistics').length).toBeGreaterThan(0)
     expect(screen.getByTestId('service-detail')).toBeInTheDocument()
+  })
+
+  it('skips the denied statistics on auto-refresh and asks again on Refresh', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const statsDenied = { status: 'denied', operation: 'publish', subject: '$SRV.STATS' } as const
+      const services = [service({ endpoints: [endpoint({ stats: undefined })] })]
+      mockedList.mockResolvedValue(discovery({ stats_access: statsDenied, services }))
+      render(<ServicesPage />)
+
+      await screen.findByTestId('stats-denied')
+      expect(mockedList).toHaveBeenLastCalledWith('conn-1', { skipStats: false }, expect.anything())
+
+      mockedList.mockResolvedValue(discovery({ stats_access: undefined, services }))
+      await act(() => vi.advanceTimersByTimeAsync(5_000))
+      await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+      expect(mockedList).toHaveBeenLastCalledWith('conn-1', { skipStats: true }, expect.anything())
+      expect(screen.getByTestId('stats-denied')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+      await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(3))
+      expect(mockedList).toHaveBeenLastCalledWith('conn-1', { skipStats: false }, expect.anything())
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('filters services by name, description or subject', async () => {

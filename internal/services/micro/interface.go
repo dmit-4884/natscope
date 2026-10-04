@@ -11,6 +11,7 @@ import (
 
 // Service discovers NATS Micro services.
 type Service interface {
-	// ListServices lists the running services with the user's access to their info and stats.
-	ListServices(ctx context.Context, connectionID string) (*entities.MicroDiscovery, error)
+	// ListServices lists the running services with the user's access to their info and stats;
+	// skipStats leaves the stats unasked, e.g. on an automatic refresh after $SRV.STATS was denied.
+	ListServices(ctx context.Context, connectionID string, skipStats bool) (*entities.MicroDiscovery, error)
 }

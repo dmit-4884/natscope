@@ -39,4 +39,5 @@ page tells you what is missing instead of failing:
 - **No access to services**: the page names the missing permission and stops refreshing. **Check
   again** retries once the permission has been granted.
 - **Statistics are hidden**: services and endpoints are listed, and the statistics columns show `—`.
+  Auto-refresh stops asking for statistics; **Refresh** checks the permission again.
 - **No services found**: you have access, but nothing answered.

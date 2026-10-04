@@ -42,7 +42,7 @@ func New(nats natssvc.ServiceDiscoverer, registry protosvc.Registry) *Service {
 }
 
 // ListServices lists the running services with the user's access to their info and stats.
-func (s *Service) ListServices(ctx context.Context, connectionID string) (*entities.MicroDiscovery, error) {
+func (s *Service) ListServices(ctx context.Context, connectionID string, skipStats bool) (*entities.MicroDiscovery, error) {
 	infos, err := s.nats.MicroInfo(ctx, connectionID)
 	infoAccess, err := accessOf(infoSubject, err)
 	if err != nil {
@@ -53,12 +53,15 @@ func (s *Service) ListServices(ctx context.Context, connectionID string) (*entit
 		return result, nil
 	}
 
-	stats, err := s.nats.MicroStats(ctx, connectionID)
-	statsAccess, err := accessOf(statsSubject, err)
-	if err != nil {
-		return nil, coreerrs.WrapOperation(err, "read service statistics")
+	var stats []entities.MicroReport
+	if !skipStats {
+		stats, err = s.nats.MicroStats(ctx, connectionID)
+		statsAccess, accessErr := accessOf(statsSubject, err)
+		if accessErr != nil {
+			return nil, coreerrs.WrapOperation(accessErr, "read service statistics")
+		}
+		result.StatsAccess = &statsAccess
 	}
-	result.StatsAccess = &statsAccess
 	result.Services = groupServices(infos, stats)
 	if len(result.Services) > 0 {
 		s.loadMethodIndex(ctx).annotate(result.Services)

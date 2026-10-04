@@ -17,6 +17,9 @@ service DiscoveryService {
 message ListServicesRequest {
   // Required. Identifier of the NATS connection to discover services through.
   string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Optional. Leave $SRV.STATS unasked, e.g. on an automatic refresh after it was denied; stats_access stays unset.
+  bool skip_stats = 2;
 }
 
 // Defines the response message for listing NATS Micro services.
@@ -24,7 +27,7 @@ message ListServicesResponse {
   // Required. Whether the user may ask services for their info ($SRV.INFO); services stay empty when denied.
   .natscope.types.nats.AccessCheck info_access = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Optional. Whether the user may read service statistics ($SRV.STATS); unset when info access was denied.
+  // Optional. Whether the user may read service statistics ($SRV.STATS); unset when info access was denied or stats were skipped.
   optional .natscope.types.nats.AccessCheck stats_access = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Required. Discovered services, sorted by name.

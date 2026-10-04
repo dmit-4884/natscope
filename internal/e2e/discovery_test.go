@@ -114,6 +114,19 @@ func TestDiscoveryAccess(t *testing.T) {
 		assert.Equal(t, "subscribe", got.GetInfoAccess().GetOperation())
 	})
 
+	t.Run("an automatic refresh leaves denied statistics unasked", func(t *testing.T) {
+		connID := restrictedConnection(t, env, "discovery-skip-stats", &server.Permissions{
+			Publish: &server.SubjectPermission{Deny: []string{"$SRV.STATS", "$SRV.STATS.>"}},
+		})
+		resp, err := env.discovery.ListServices(t.Context(), connect.NewRequest(&discoverypb.ListServicesRequest{
+			ConnectionId: connID,
+			SkipStats:    true,
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, natstypes.AccessStatus_ACCESS_STATUS_ALLOWED, resp.Msg.GetInfoAccess().GetStatus())
+		assert.Nil(t, resp.Msg.StatsAccess)
+	})
+
 	t.Run("statistics alone can be denied", func(t *testing.T) {
 		connID := restrictedConnection(t, env, "discovery-no-stats", &server.Permissions{
 			Publish: &server.SubjectPermission{Deny: []string{"$SRV.STATS", "$SRV.STATS.>"}},

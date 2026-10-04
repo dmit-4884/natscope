@@ -49,9 +49,9 @@ describe('listServices', () => {
       }),
     )
 
-    const got = await listServices('conn-1')
+    const got = await listServices('conn-1', { skipStats: false })
 
-    expect(listServicesMock).toHaveBeenCalledWith({ connectionId: 'conn-1' }, { signal: undefined })
+    expect(listServicesMock).toHaveBeenCalledWith({ connectionId: 'conn-1', skipStats: false }, { signal: undefined })
     expect(got.info_access).toEqual({ status: 'allowed', operation: 'publish', subject: '$SRV.INFO' })
     expect(got.stats_access).toEqual({ status: 'denied', operation: 'publish', subject: '$SRV.STATS' })
     expect(got.services).toHaveLength(1)
@@ -82,7 +82,7 @@ describe('listServices', () => {
       }),
     )
 
-    const got = await listServices('conn-1')
+    const got = await listServices('conn-1', { skipStats: false })
 
     expect(got.info_access).toEqual({ status: 'denied', operation: 'subscribe', subject: '_INBOX.x' })
     expect(got.stats_access).toBeUndefined()

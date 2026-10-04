@@ -32,7 +32,10 @@ export default function ServicesPage() {
   const [query, setQuery] = useState('')
   const [selectedName, setSelectedName] = useState<string | null>(null)
 
-  const { data, error, isLoading, isFetching, refetch, dataUpdatedAt } = useMicroServices(connectionId, { autoRefresh })
+  const {
+    query: { data, error, isLoading, isFetching, dataUpdatedAt },
+    recheck,
+  } = useMicroServices(connectionId, { autoRefresh })
   const infoDenied = isDenied(data?.info_access)
 
   const services = useMemo(() => filterServices(data?.services ?? [], query), [data?.services, query])
@@ -98,7 +101,7 @@ export default function ServicesPage() {
 
   const body = () => {
     if (isLoading) return <SkeletonRows count={4} rowClassName="h-10" className="p-6" />
-    if (error) return <QueryErrorState error={error} onRetry={() => void refetch()} />
+    if (error) return <QueryErrorState error={error} onRetry={() => void recheck()} />
     if (!data) return null
     if (infoDenied) {
       return (
@@ -106,7 +109,7 @@ export default function ServicesPage() {
           check={data.info_access}
           title="No access to services"
           description="Finding NATS Micro services needs permission to ask them on the $SRV subjects and to receive their answers on a reply inbox."
-          onRetry={() => void refetch()}
+          onRetry={() => void recheck()}
           retrying={isFetching}
         />
       )
@@ -120,7 +123,7 @@ export default function ServicesPage() {
             title="No services found"
             description="Nothing answered on $SRV.INFO. Services built with NATS Micro (Go, JavaScript, Python, Rust, …) appear here while they run."
             action={
-              <Button variant="secondary" size="sm" onClick={() => void refetch()} loading={isFetching}>
+              <Button variant="secondary" size="sm" onClick={() => void recheck()} loading={isFetching}>
                 Look again
               </Button>
             }
@@ -188,7 +191,7 @@ export default function ServicesPage() {
               size="sm"
               variant="secondary"
               icon={<RefreshIcon className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />}
-              onClick={() => void refetch()}
+              onClick={() => void recheck()}
               disabled={isFetching}
             >
               Refresh

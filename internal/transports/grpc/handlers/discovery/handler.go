@@ -42,7 +42,7 @@ func (h *Handler) ListServices(
 	ctx context.Context,
 	req *connect.Request[discoverypb.ListServicesRequest],
 ) (*connect.Response[discoverypb.ListServicesResponse], error) {
-	discovery, err := h.micro.ListServices(ctx, req.Msg.ConnectionId)
+	discovery, err := h.micro.ListServices(ctx, req.Msg.GetConnectionId(), req.Msg.GetSkipStats())
 	if err != nil {
 		return nil, err
 	}

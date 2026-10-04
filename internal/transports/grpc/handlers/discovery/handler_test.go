@@ -19,12 +19,14 @@ import (
 )
 
 type fakeMicro struct {
-	result *entities.MicroDiscovery
-	connID string
+	result    *entities.MicroDiscovery
+	connID    string
+	skipStats bool
 }
 
-func (f *fakeMicro) ListServices(_ context.Context, connectionID string) (*entities.MicroDiscovery, error) {
+func (f *fakeMicro) ListServices(_ context.Context, connectionID string, skipStats bool) (*entities.MicroDiscovery, error) {
 	f.connID = connectionID
+	f.skipStats = skipStats
 	return f.result, nil
 }
 
@@ -94,4 +96,14 @@ func TestListServices_DeniedInfoLeavesStatsUnset(t *testing.T) {
 	assert.Equal(t, "subscribe", resp.Msg.GetInfoAccess().GetOperation())
 	assert.Nil(t, resp.Msg.StatsAccess)
 	assert.Empty(t, resp.Msg.GetServices())
+}
+
+func TestListServices_PassesSkipStats(t *testing.T) {
+	t.Parallel()
+
+	micro := &fakeMicro{result: &entities.MicroDiscovery{InfoAccess: entities.AccessCheck{Status: entities.AccessAllowed}}}
+	_, err := New(micro).ListServices(t.Context(), connect.NewRequest(&discoverypb.ListServicesRequest{ConnectionId: "c", SkipStats: true}))
+	require.NoError(t, err)
+
+	assert.True(t, micro.skipStats)
 }

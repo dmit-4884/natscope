@@ -97,8 +97,12 @@ function toService(s: ProtoMicroService): MicroService {
   }
 }
 
-export async function listServices(connectionId: string, signal?: AbortSignal): Promise<MicroDiscovery> {
-  const response = await discoveryClient.listServices({ connectionId }, { signal })
+export async function listServices(
+  connectionId: string,
+  { skipStats }: { skipStats: boolean },
+  signal?: AbortSignal,
+): Promise<MicroDiscovery> {
+  const response = await discoveryClient.listServices({ connectionId, skipStats }, { signal })
   return {
     info_access: toAccessCheck(response.infoAccess) ?? { status: 'unknown', operation: 'publish', subject: '$SRV.INFO' },
     stats_access: toAccessCheck(response.statsAccess),
