@@ -1,0 +1,29 @@
+syntax = "proto3";
+package natscope.types.nats;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
+
+import "google/api/field_behavior.proto";
+
+// Defines whether the connection's NATS user may perform an operation.
+enum AccessStatus {
+  // Not checked.
+  ACCESS_STATUS_UNSPECIFIED = 0;
+
+  // The server accepted the operation.
+  ACCESS_STATUS_ALLOWED = 1;
+
+  // The server rejected the operation with a permissions violation.
+  ACCESS_STATUS_DENIED = 2;
+}
+
+// Defines the outcome of an access-sensitive NATS operation, so the UI can tell "no permission" from "nothing there".
+message AccessCheck {
+  // Required. Whether the server allowed the operation.
+  AccessStatus status = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. The operation: "publish" or "subscribe".
+  string operation = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. The subject the operation targeted, or the one the server denied.
+  string subject = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

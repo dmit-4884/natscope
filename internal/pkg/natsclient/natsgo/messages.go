@@ -11,6 +11,8 @@ import (
 	"github.com/altessa-s/go-atlas/core/errors"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+
+	corecontext "github.com/altessa-s/go-atlas/core/context"
 )
 
 // GetMessages picks a fetch strategy: "consumer" → ephemeral consumer
@@ -83,6 +85,41 @@ func (c *Client) GetMessage(ctx context.Context, streamName string, sequence uin
 	}
 
 	return toMessageWithHex(msg), nil
+}
+
+// Publish sends a core NATS message and flushes it.
+func (c *Client) Publish(ctx context.Context, subject string, data []byte, headers map[string]string) error {
+	if err := validateNATSSubjectLength("subject", subject); err != nil {
+		return wrapErr(err)
+	}
+
+	msg := &nats.Msg{Subject: subject, Data: data}
+	if len(headers) > 0 {
+		msg.Header = make(nats.Header, len(headers))
+		for k, v := range headers {
+			msg.Header.Set(k, v)
+		}
+	}
+
+	ctx, cancel := corecontext.ApplyTimeout(ctx, c.defaultTimeout)
+	defer cancel()
+
+	before := c.conn.LastError()
+	err := c.permWatch.Watch(ctx, []string{subject}, func(ctx context.Context) error {
+		if err := c.conn.PublishMsg(msg); err != nil {
+			return err
+		}
+		if err := c.conn.FlushWithContext(ctx); err != nil {
+			return err
+		}
+		if last := c.conn.LastError(); last != nil && last != before { //nolint:errorlint // identity check
+			if v, ok := ParsePermissionViolation(last); ok && v.Operation == "publish" && v.Subject == subject {
+				return last
+			}
+		}
+		return nil
+	})
+	return wrapErr(err)
 }
 
 // PublishToStream publishes a message to a JetStream stream after checking that a stream captures subject.

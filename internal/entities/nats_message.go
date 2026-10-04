@@ -13,6 +13,8 @@ type NatsMessage struct {
 
 	Header map[string][]string
 
+	Reply string
+
 	// JetStream metadata (only present for JetStream subscriptions).
 	Sequence  *uint64
 	Stream    string

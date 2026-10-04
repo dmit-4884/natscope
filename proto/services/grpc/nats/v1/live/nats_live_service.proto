@@ -4,6 +4,7 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/
 
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
+import "types/nats/nats_access.proto";
 import "types/nats/nats_message.proto";
 
 // Provides server-streaming subscription for real-time NATS message delivery.
@@ -86,6 +87,9 @@ message LiveError {
 
   // Required. Human-readable error description.
   string message = 2;
+
+  // Optional. The denied operation when the server refused a subscription.
+  optional .natscope.types.nats.AccessCheck access = 3;
 }
 
 // Defines a notification that protobuf descriptors have been reloaded on the server.

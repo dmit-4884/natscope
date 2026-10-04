@@ -5,6 +5,7 @@ package live
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -51,9 +52,7 @@ func (s *Service) Subscribe(
 	}
 
 	for _, pe := range partialErrs {
-		if err := emit(&entities.LiveEvent{
-			Error: &entities.LiveError{Code: "SUBSCRIBE_TARGET_FAILED", Message: pe.Error()},
-		}); err != nil {
+		if err := emit(&entities.LiveEvent{Error: pe}); err != nil {
 			return err
 		}
 	}
@@ -157,6 +156,26 @@ func (s *Service) resolveSettings(ctx context.Context) (mode string, maxDisplayR
 	return mode, maxDisplayRate, payloadCap, cfg.Messages.DetectsTypes()
 }
 
+const (
+	liveErrSubscribeTargetFailed     = "SUBSCRIBE_TARGET_FAILED"
+	liveErrSubscribePermissionDenied = "SUBSCRIBE_PERMISSION_DENIED"
+)
+
+func liveErrorFor(subject string, err error) *entities.LiveError {
+	if permErr, ok := errors.AsType[*errs.NATSPermissionError](err); ok {
+		return &entities.LiveError{
+			Code:    liveErrSubscribePermissionDenied,
+			Message: permErr.Error(),
+			Access: &entities.AccessCheck{
+				Status:    entities.AccessDenied,
+				Operation: permErr.Operation,
+				Subject:   permErr.Subject,
+			},
+		}
+	}
+	return &entities.LiveError{Code: liveErrSubscribeTargetFailed, Message: fmt.Sprintf("subject %q: %v", subject, err)}
+}
+
 // startSubscriptions resolves every target into concrete NATS subscriptions;
 // it returns per-target failures as long as at least one target succeeds.
 func (s *Service) startSubscriptions(
@@ -166,22 +185,24 @@ func (s *Service) startSubscriptions(
 	mode string,
 	msgChan chan<- *entities.NatsMessage,
 	sess *sessionState,
-) ([]entities.Subscription, []error, error) {
+) ([]entities.Subscription, []*entities.LiveError, error) {
 	var subs []entities.Subscription
-	var partialErrs []error
+	var partialErrs []*entities.LiveError
+	var lastErr error
 	for _, target := range targets {
 		handler := s.buildMessageHandler(target.Subject, msgChan, sess)
-		targetSubs, err := s.subscribeTarget(ctx, connectionID, target, mode, handler)
+		targetSubs, err := s.subscribeTarget(ctx, connectionID, target, mode, handler, sess)
 		if err != nil {
-			partialErrs = append(partialErrs, fmt.Errorf("subject %q: %w", target.Subject, err))
+			partialErrs = append(partialErrs, liveErrorFor(target.Subject, err))
+			lastErr = fmt.Errorf("subject %q: %w", target.Subject, err)
 			continue
 		}
 		subs = append(subs, targetSubs...)
 	}
 
 	if len(subs) == 0 {
-		if len(partialErrs) > 0 {
-			return nil, nil, partialErrs[len(partialErrs)-1]
+		if lastErr != nil {
+			return nil, nil, lastErr
 		}
 		return nil, nil, errs.ErrLiveNoSubscriptions
 	}
@@ -224,6 +245,7 @@ func (s *Service) subscribeTarget(
 	target *entities.LiveSubscriptionTarget,
 	mode string,
 	handler entities.MessageHandler,
+	sess *sessionState,
 ) ([]entities.Subscription, error) {
 	streamName := streamNameOf(target)
 
@@ -258,7 +280,8 @@ func (s *Service) subscribeTarget(
 	out := make([]entities.Subscription, 0, len(subjects))
 	var lastErr error
 	for _, subject := range subjects {
-		sub, err := s.natsService.Subscribe(ctx, connectionID, subject, handler)
+		onDenied := func(err error) { sess.reportDenied(subject, err) }
+		sub, err := s.natsService.Subscribe(ctx, connectionID, subject, handler, onDenied)
 		if err != nil {
 			s.logger.Error("failed to subscribe",
 				slog.String("subject", subject),

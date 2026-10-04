@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dmit-4884/natscope/internal/errs"
 )
 
 // permissionViolationRe extracts the denied operation and subject from the
@@ -37,6 +39,14 @@ func ParsePermissionViolation(err error) (PermissionViolation, bool) {
 	return PermissionViolation{Operation: strings.ToLower(m[1]), Subject: m[2]}, true
 }
 
+func (v PermissionViolation) asError(cause error) *errs.NATSPermissionError {
+	operation := errs.PermissionOperationPublish
+	if v.Operation == "subscription" {
+		operation = errs.PermissionOperationSubscribe
+	}
+	return &errs.NATSPermissionError{Operation: operation, Subject: v.Subject, Cause: cause}
+}
+
 // PermissionWatcher correlates out-of-band NATS permissions violations with
 // in-flight requests. The server reports a violation asynchronously and never
 // answers the offending request, so an uncorrelated caller blocks until its
@@ -45,15 +55,37 @@ func ParsePermissionViolation(err error) (PermissionViolation, bool) {
 // Violations that match no watched subject, and non-violation async errors,
 // are retained for TakeRecent as the time-window fallback.
 type PermissionWatcher struct {
-	mu      sync.Mutex
-	waiters map[*permissionWaiter]struct{}
-	lastErr error
-	lastAt  time.Time
+	mu        sync.Mutex
+	waiters   map[*permissionWaiter]struct{}
+	observers map[*permissionObserver]struct{}
+	lastErr   error
+	lastAt    time.Time
 }
 
 // NewPermissionWatcher returns a watcher ready to receive async errors.
 func NewPermissionWatcher() *PermissionWatcher {
-	return &PermissionWatcher{waiters: make(map[*permissionWaiter]struct{})}
+	return &PermissionWatcher{
+		waiters:   make(map[*permissionWaiter]struct{}),
+		observers: make(map[*permissionObserver]struct{}),
+	}
+}
+
+type permissionObserver struct {
+	match PermissionViolation
+	fn    func(error)
+}
+
+// Observe calls fn with *errs.NATSPermissionError for every violation equal to match until stop is called.
+func (pw *PermissionWatcher) Observe(match PermissionViolation, fn func(error)) (stop func()) {
+	observer := &permissionObserver{match: match, fn: fn}
+	pw.mu.Lock()
+	pw.observers[observer] = struct{}{}
+	pw.mu.Unlock()
+	return func() {
+		pw.mu.Lock()
+		delete(pw.observers, observer)
+		pw.mu.Unlock()
+	}
 }
 
 // permissionWaiter is one Watch call: the subjects it listens for and the
@@ -87,9 +119,10 @@ func (pw *PermissionWatcher) HandleAsyncError(err error) {
 		return
 	}
 
-	pw.mu.Lock()
-	defer pw.mu.Unlock()
+	var notify []func(error)
+	var permErr error
 
+	pw.mu.Lock()
 	if v, ok := ParsePermissionViolation(err); ok {
 		delivered := false
 		for waiter := range pw.waiters {
@@ -99,13 +132,26 @@ func (pw *PermissionWatcher) HandleAsyncError(err error) {
 				delivered = true
 			}
 		}
-		if delivered {
-			return
+		for observer := range pw.observers {
+			if observer.match == v {
+				notify = append(notify, observer.fn)
+			}
 		}
+		if len(notify) > 0 {
+			permErr = v.asError(err)
+		}
+		delivered = delivered || len(notify) > 0
+		if !delivered {
+			pw.lastErr, pw.lastAt = err, time.Now()
+		}
+	} else {
+		pw.lastErr, pw.lastAt = err, time.Now()
 	}
+	pw.mu.Unlock()
 
-	pw.lastErr = err
-	pw.lastAt = time.Now()
+	for _, fn := range notify {
+		fn(permErr)
+	}
 }
 
 // Watch runs fn under a context that is canceled as soon as a permissions

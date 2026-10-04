@@ -25,6 +25,7 @@ type PublishRequest struct {
 	SchemaFingerprint *string `normalize:"trim,nil_on_empty"`
 	// Framing wraps the encoded message.
 	Framing Framing
+	Core    bool
 	// SubjectPattern is the UI subject template, for history bookkeeping; not used
 	// during publish.
 	SubjectPattern *string `normalize:"trim,nil_on_empty"`

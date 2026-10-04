@@ -64,6 +64,7 @@ type LiveStats struct {
 type LiveError struct {
 	Code    string
 	Message string
+	Access  *AccessCheck
 }
 
 // LiveProtoReload signals server-side descriptor reload; the service resets its

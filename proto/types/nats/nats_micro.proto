@@ -1,0 +1,100 @@
+syntax = "proto3";
+package natscope.types.nats;
+option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines a NATS Micro service discovered over $SRV, grouped across its running instances.
+message MicroService {
+  // Required. Service name shared by its instances.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Optional. Service description reported by the instances.
+  string description = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Distinct versions of the running instances, sorted.
+  repeated string versions = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Running instances, sorted by ID.
+  repeated MicroInstance instances = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Endpoints merged across instances by name and subject; stats are summed.
+  repeated MicroEndpoint endpoints = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines one running instance of a NATS Micro service.
+message MicroInstance {
+  // Required. Instance ID.
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. Service version of this instance.
+  string version = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Service metadata of this instance.
+  map<string, string> metadata = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. When the instance started; unset when its stats are unavailable.
+  google.protobuf.Timestamp started = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Endpoints of this instance.
+  repeated MicroEndpoint endpoints = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines an endpoint of a NATS Micro service.
+message MicroEndpoint {
+  // Required. Endpoint name.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Subject the endpoint listens on.
+  string subject = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Queue group the endpoint subscribes with.
+  string queue_group = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Endpoint metadata.
+  map<string, string> metadata = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Request statistics; unset when the stats are unavailable.
+  optional MicroEndpointStats stats = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. The .proto service method this endpoint appears to implement.
+  optional ProtoMethodMatch proto_method = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the request statistics of a NATS Micro endpoint.
+message MicroEndpointStats {
+  // Required. Requests handled.
+  int64 num_requests = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Requests that ended in an error.
+  int64 num_errors = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Text of the last error.
+  string last_error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Total time spent handling requests.
+  google.protobuf.Duration processing_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Average time spent per request.
+  google.protobuf.Duration average_processing_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines a .proto service method matched to a NATS Micro endpoint by name.
+message ProtoMethodMatch {
+  // Required. Proto source that declares the service.
+  string source_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Fully qualified service name.
+  string service = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Method name.
+  string method = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Fully qualified request message type.
+  string input_type = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Fully qualified response message type.
+  string output_type = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

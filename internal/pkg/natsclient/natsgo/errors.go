@@ -92,6 +92,10 @@ func wrapErr(err error) error {
 		return err
 	}
 
+	if v, ok := ParsePermissionViolation(err); ok {
+		return v.asError(err)
+	}
+
 	for _, m := range natsSentinelMap {
 		if errors.Is(err, m.src) {
 			// Preserve original chain for debug logs; callers use errors.Is for the

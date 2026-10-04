@@ -218,6 +218,19 @@ func TestFeatureUnsupportedErrorMessage(t *testing.T) {
 	assert.ErrorIs(t, featErr, errs.ErrFeatureUnsupported)
 }
 
+func TestNATSPermissionErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	permErr := fmt.Errorf("publish: %w", &errs.NATSPermissionError{
+		Operation: errs.PermissionOperationPublish, Subject: "secret.op",
+	})
+	result := StatusErrorConvert(t.Context(), permErr)
+	assertGRPCError(t, result, codes.PermissionDenied, "NATS_PERMISSION_VIOLATION")
+	st, ok := status.FromError(result)
+	require.True(t, ok)
+	assert.Equal(t, `no permission to publish to "secret.op"`, st.Message())
+}
+
 func TestProtoEncodeErrorMessage(t *testing.T) {
 	t.Parallel()
 

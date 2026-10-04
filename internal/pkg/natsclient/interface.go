@@ -135,8 +135,11 @@ type ConsumerManager interface {
 	UnpinConsumer(ctx context.Context, streamName, consumerName, group string) error
 }
 
-// Publisher publishes messages to JetStream streams.
+// Publisher publishes messages over core NATS and to JetStream streams.
 type Publisher interface {
+	// Publish sends a core NATS message and flushes it.
+	Publish(ctx context.Context, subject string, data []byte, headers map[string]string) error
+
 	// PublishToStream publishes to a JetStream stream, returning the ack.
 	PublishToStream(ctx context.Context, subject string, data []byte, headers map[string]string) (*entities.PubAck, error)
 }
@@ -151,7 +154,7 @@ type Requester interface {
 // Subscriber creates live subscriptions over core NATS and JetStream.
 type Subscriber interface {
 	// Subscribe creates a Core NATS subscription for live streaming.
-	Subscribe(ctx context.Context, subject string, handler entities.MessageHandler) (entities.Subscription, error)
+	Subscribe(ctx context.Context, subject string, handler entities.MessageHandler, onDenied func(error)) (entities.Subscription, error)
 
 	// SubscribeJetStream creates a JetStream ordered-consumer subscription for
 	// live messages.
@@ -160,6 +163,15 @@ type Subscriber interface {
 		streamName, subject, deliverPolicy string,
 		handler entities.MessageHandler,
 	) (entities.Subscription, error)
+}
+
+// ServiceDiscoverer asks NATS Micro services about themselves over $SRV.
+type ServiceDiscoverer interface {
+	// MicroInfo collects every instance's answer to $SRV.INFO.
+	MicroInfo(ctx context.Context) ([]entities.MicroReport, error)
+
+	// MicroStats collects every instance's answer to $SRV.STATS.
+	MicroStats(ctx context.Context) ([]entities.MicroReport, error)
 }
 
 // StatsReader reports aggregated stream/consumer statistics and server info.
@@ -256,6 +268,7 @@ type Client interface {
 	Publisher
 	Requester
 	Subscriber
+	ServiceDiscoverer
 	StatsReader
 	KVStore
 	ObjectStore

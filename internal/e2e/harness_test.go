@@ -33,6 +33,7 @@ import (
 	historyconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/history/v1/history/grpc_historyconnect"
 	mappingsconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/mappings/v1/mappings/grpc_mappingsconnect"
 	connectionsconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections/grpc_nats_connectionsconnect"
+	discoveryconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/discovery/grpc_nats_discoveryconnect"
 	liveconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/live/grpc_nats_liveconnect"
 	managementconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management/grpc_nats_managementconnect"
 	messagesconnect "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/messages/grpc_nats_messagesconnect"
@@ -63,6 +64,7 @@ type e2eEnv struct {
 	management  managementconnect.ManagementServiceClient
 	stats       statsconnect.StatsServiceClient
 	live        liveconnect.LiveServiceClient
+	discovery   discoveryconnect.DiscoveryServiceClient
 	mappings    mappingsconnect.MappingsServiceClient
 	templates   templatesconnect.TemplatesServiceClient
 	settings    settingsconnect.SettingsServiceClient
@@ -156,6 +158,7 @@ func setupE2EWith(t *testing.T, configure func(*appconfig.Config)) *e2eEnv {
 		management:  managementconnect.NewManagementServiceClient(hc, baseURL),
 		stats:       statsconnect.NewStatsServiceClient(hc, baseURL),
 		live:        liveconnect.NewLiveServiceClient(hc, baseURL),
+		discovery:   discoveryconnect.NewDiscoveryServiceClient(hc, baseURL),
 		mappings:    mappingsconnect.NewMappingsServiceClient(hc, baseURL),
 		templates:   templatesconnect.NewTemplatesServiceClient(hc, baseURL),
 		settings:    settingsconnect.NewSettingsServiceClient(hc, baseURL),

@@ -59,4 +59,7 @@ message NatsMessage {
 
   // Source of an auto-detected type.
   optional string decoded_source_id = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Reply subject of a core NATS message, e.g. the inbox of a waiting request; unset for JetStream messages.
+  optional string reply = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

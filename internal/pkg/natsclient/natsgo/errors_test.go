@@ -143,6 +143,44 @@ func TestWrapErr_PermissionViolationString(t *testing.T) {
 	assert.ErrorIs(t, got, errs.ErrNATSPermissionViolation)
 }
 
+func TestWrapErr_PermissionViolationNamesOperationAndSubject(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		src           error
+		wantOperation string
+		wantSubject   string
+	}{
+		{
+			name:          "publish",
+			src:           fmt.Errorf("%w: %s", nats.ErrPermissionViolation, `Permissions Violation for Publish to "$SRV.INFO"`),
+			wantOperation: errs.PermissionOperationPublish,
+			wantSubject:   "$SRV.INFO",
+		},
+		{
+			name:          "subscription",
+			src:           errors.New(`nats: Permissions Violation for Subscription to "secret.>"`),
+			wantOperation: errs.PermissionOperationSubscribe,
+			wantSubject:   "secret.>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := wrapErr(tt.src)
+			require.ErrorIs(t, got, errs.ErrNATSPermissionViolation)
+			permErr, ok := errors.AsType[*errs.NATSPermissionError](got)
+			require.True(t, ok, "got %T", got)
+			assert.Equal(t, tt.wantOperation, permErr.Operation)
+			assert.Equal(t, tt.wantSubject, permErr.Subject)
+			assert.Same(t, permErr, wrapErr(got), "wrapping a typed permission error again is a no-op")
+		})
+	}
+}
+
 // TestWrapErr_Idempotent ensures wrapping an already-wrapped error doesn't
 // stack, since services may wrap at multiple call sites.
 func TestWrapErr_Idempotent(t *testing.T) {

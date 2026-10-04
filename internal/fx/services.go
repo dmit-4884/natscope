@@ -30,6 +30,8 @@ import (
 	mappingsService "github.com/dmit-4884/natscope/internal/services/mappings/mappings"
 	messagessvc "github.com/dmit-4884/natscope/internal/services/messages"
 	messagesService "github.com/dmit-4884/natscope/internal/services/messages/messages"
+	microsvc "github.com/dmit-4884/natscope/internal/services/micro"
+	microService "github.com/dmit-4884/natscope/internal/services/micro/micro"
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	protoService "github.com/dmit-4884/natscope/internal/services/proto/proto"
 	publishsvc "github.com/dmit-4884/natscope/internal/services/publish"
@@ -75,6 +77,7 @@ func ServicesModule() fx.Option {
 		fx.Provide(fx.Annotate(liveService.New, fx.As(new(livesvc.Service)))),
 		fx.Provide(fx.Annotate(publishService.New, fx.As(new(publishsvc.Service)))),
 		fx.Provide(fx.Annotate(messagesService.New, fx.As(new(messagessvc.Service)))),
+		fx.Provide(fx.Annotate(microService.New, fx.As(new(microsvc.Service)))),
 
 		// Mapping changes re-initialize live decoders like a proto reload does.
 		fx.Invoke(func(mappingsSvc mappingssvc.Service, liveSvc livesvc.Service) error {

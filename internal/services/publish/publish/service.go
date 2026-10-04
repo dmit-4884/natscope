@@ -86,6 +86,10 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 	pubCtx, cancel := corecontext.ApplyTimeout(ctx, s.publishTimeout(ctx))
 	defer cancel()
 
+	if in.Core {
+		return s.publishCore(pubCtx, in, data)
+	}
+
 	ack, err := s.natsService.PublishToStream(pubCtx, in.ConnectionID, in.Subject, data, in.Headers)
 	if err != nil {
 		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
@@ -106,6 +110,16 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 		result.CounterValue = &ack.Value
 	}
 	return result, nil
+}
+
+func (s *Service) publishCore(ctx context.Context, in *entities.PublishRequest, data []byte) (*entities.PublishResult, error) {
+	if err := s.natsService.Publish(ctx, in.ConnectionID, in.Subject, data, in.Headers); err != nil {
+		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
+			return nil, err
+		}
+		return softFailure("Failed to publish message: " + err.Error()), nil
+	}
+	return &entities.PublishResult{}, nil
 }
 
 // resolvePayload returns the bytes to publish: Data proto-encoded when

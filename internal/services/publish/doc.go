@@ -5,8 +5,7 @@
 // payload, publish via NATS, record history.
 //
 // Soft-failure semantics: encode/input/publish errors surface via
-// PublishResult.Error (never transport errors); history is written for both
-// success and failure.
+// PublishResult.Error (never transport errors).
 //
 // Request reuses the payload encoding for a core NATS request-reply exchange;
 // its failures are plain errors and it keeps no history.

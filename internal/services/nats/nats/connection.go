@@ -46,12 +46,31 @@ func (s *Service) Subscribe(
 	connectionID string,
 	subject string,
 	handler entities.MessageHandler,
+	onDenied func(error),
 ) (entities.Subscription, error) {
 	c, err := s.client(ctx, connectionID)
 	if err != nil {
 		return nil, err
 	}
-	return c.Subscribe(ctx, subject, handler)
+	return c.Subscribe(ctx, subject, handler, onDenied)
+}
+
+// MicroInfo collects every NATS Micro service instance's answer to $SRV.INFO.
+func (s *Service) MicroInfo(ctx context.Context, connectionID string) ([]entities.MicroReport, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.MicroInfo(ctx)
+}
+
+// MicroStats collects every NATS Micro service instance's answer to $SRV.STATS.
+func (s *Service) MicroStats(ctx context.Context, connectionID string) ([]entities.MicroReport, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.MicroStats(ctx)
 }
 
 // SubscribeJetStream creates a JetStream ordered consumer subscription for live

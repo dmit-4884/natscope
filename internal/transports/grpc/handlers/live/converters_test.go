@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+
+	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
 func TestToProtoLiveMessage_AllFields(t *testing.T) {
@@ -77,7 +79,34 @@ func TestToProtoLiveMessage_NoSequenceNoStreamNoHeaders(t *testing.T) {
 	assert.Equal(t, "x", pb.Subject)
 	assert.Equal(t, uint64(0), pb.Sequence, "nil *uint64 src → zero uint64 dst")
 	assert.Nil(t, pb.Stream, "empty string src → nil *string dst")
+	assert.Nil(t, pb.Reply, "no reply subject → unset")
 	assert.Empty(t, pb.Headers, "nil header map → empty/nil destination")
+}
+
+func TestToProtoLiveMessage_ReplySubject(t *testing.T) {
+	t.Parallel()
+
+	pb := toProtoLiveMessage(&entities.NatsMessage{Subject: "svc.echo", Data: []byte("hi"), Reply: "_INBOX.abc"})
+	require.NotNil(t, pb.Reply)
+	assert.Equal(t, "_INBOX.abc", *pb.Reply)
+}
+
+func TestToProtoLiveEvent_DeniedSubscription(t *testing.T) {
+	t.Parallel()
+
+	pb := toProtoLiveEvent(&entities.LiveEvent{Error: &entities.LiveError{
+		Code:    "SUBSCRIBE_PERMISSION_DENIED",
+		Message: `no permission to subscribe to "secret.>"`,
+		Access:  &entities.AccessCheck{Status: entities.AccessDenied, Operation: "subscribe", Subject: "secret.>"},
+	}})
+
+	liveErr := pb.GetError()
+	require.NotNil(t, liveErr)
+	assert.Equal(t, "SUBSCRIBE_PERMISSION_DENIED", liveErr.GetCode())
+	assert.Equal(t, natspb.AccessStatus_ACCESS_STATUS_DENIED, liveErr.GetAccess().GetStatus())
+	assert.Equal(t, "subscribe", liveErr.GetAccess().GetOperation())
+	assert.Equal(t, "secret.>", liveErr.GetAccess().GetSubject())
+	assert.Nil(t, toProtoLiveEvent(&entities.LiveEvent{Error: &entities.LiveError{Code: "X"}}).GetError().Access)
 }
 
 func TestToProtoLiveBatchMessage_AutoDetected(t *testing.T) {

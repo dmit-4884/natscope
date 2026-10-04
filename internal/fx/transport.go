@@ -18,6 +18,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/codec"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/connections"
+	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/discovery"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/history"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/live"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/handlers/management"
@@ -71,6 +72,7 @@ func TransportsModule() fx.Option {
 		fx.Provide(AsConnectHandler(publish.New)),
 		fx.Provide(AsConnectHandler(management.New)),
 		fx.Provide(AsConnectHandler(stats.New)),
+		fx.Provide(AsConnectHandler(discovery.New)),
 		fx.Provide(AsConnectHandler(live.New)),
 		fx.Provide(AsConnectHandler(registry.New)),
 		fx.Provide(AsConnectHandler(codec.New)),

@@ -55,6 +55,33 @@ func TestParsePermissionViolation(t *testing.T) {
 	}
 }
 
+func TestPermissionWatcher_ObserveReportsMatchingSubscriptionViolations(t *testing.T) {
+	t.Parallel()
+
+	pw := NewPermissionWatcher()
+	var got []error
+	stop := pw.Observe(PermissionViolation{Operation: "subscription", Subject: "secret.>"}, func(err error) {
+		got = append(got, err)
+	})
+
+	pw.HandleAsyncError(errors.New(`nats: Permissions Violation for Publish to "secret.>"`))
+	other := errors.New(`nats: Permissions Violation for Subscription to "other.>"`)
+	pw.HandleAsyncError(other)
+	assert.Empty(t, got)
+	assert.ErrorIs(t, pw.TakeRecent(time.Minute), other, "an unobserved violation stays for the fallback")
+
+	denied := errors.New(`nats: Permissions Violation for Subscription to "secret.>"`)
+	pw.HandleAsyncError(denied)
+	require.Len(t, got, 1)
+	assert.ErrorIs(t, got[0], denied)
+	assert.NoError(t, pw.TakeRecent(time.Minute), "an observed violation is not left for the fallback")
+
+	stop()
+	pw.HandleAsyncError(denied)
+	assert.Len(t, got, 1, "a stopped observer hears nothing")
+	assert.ErrorIs(t, pw.TakeRecent(time.Minute), denied)
+}
+
 func TestPermissionWatcher_WatchCancelsOnMatchingViolation(t *testing.T) {
 	t.Parallel()
 

@@ -126,6 +126,9 @@ func StatusErrorConvert(_ context.Context, err error) error {
 	if featErr, ok := errors.AsType[*errs.FeatureUnsupportedError](err); ok && featErr != nil {
 		return NewStatus(codes.FailedPrecondition, featErr.Error(), "NATS_FEATURE_UNSUPPORTED")
 	}
+	if permErr, ok := errors.AsType[*errs.NATSPermissionError](err); ok && permErr != nil {
+		return NewStatus(codes.PermissionDenied, permErr.Error(), "NATS_PERMISSION_VIOLATION")
+	}
 
 	// Per-handler errors are matched upstream; here we handle only the common set.
 	for _, m := range commonDomainErrors {

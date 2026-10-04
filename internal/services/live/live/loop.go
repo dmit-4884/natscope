@@ -165,6 +165,11 @@ func (s *Service) runLoop(
 			_ = flush() //nolint:errcheck // best-effort flush
 			return errs.ErrLiveConnectionLost
 
+		case denied := <-sess.denials:
+			if err := emitWithDeadline(ctx, emit, &entities.LiveEvent{Error: denied}); err != nil {
+				return err
+			}
+
 		case <-statsTicker.C:
 			if err := resetDecoderIfDirty(); err != nil {
 				return err

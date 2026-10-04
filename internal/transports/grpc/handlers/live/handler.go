@@ -91,12 +91,14 @@ func toProtoLiveEvent(ev *entities.LiveEvent) *livepb.LiveEvent {
 			},
 		}
 	case ev.Error != nil:
-		out.Event = &livepb.LiveEvent_Error{
-			Error: &livepb.LiveError{
-				Code:    ev.Error.Code,
-				Message: ev.Error.Message,
-			},
+		liveErr := &livepb.LiveError{
+			Code:    ev.Error.Code,
+			Message: ev.Error.Message,
 		}
+		if ev.Error.Access != nil {
+			liveErr.Access = converter.Convert(ev.Error.Access, &natspb.AccessCheck{}, grpchelpers.ProtoCodecs)
+		}
+		out.Event = &livepb.LiveEvent_Error{Error: liveErr}
 	case ev.ProtoReload != nil:
 		out.Event = &livepb.LiveEvent_ProtoReload{
 			ProtoReload: &livepb.LiveProtoReload{

@@ -37,6 +37,21 @@ func (s *Service) GetMessage(
 	return c.GetMessage(ctx, streamName, sequence)
 }
 
+// Publish sends a core NATS message and flushes it.
+func (s *Service) Publish(
+	ctx context.Context,
+	connectionID string,
+	subject string,
+	data []byte,
+	headers map[string]string,
+) error {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return err
+	}
+	return c.Publish(ctx, subject, data, headers)
+}
+
 // PublishToStream publishes a message to a JetStream stream.
 func (s *Service) PublishToStream(
 	ctx context.Context,

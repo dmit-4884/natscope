@@ -111,6 +111,34 @@ func (e *FeatureUnsupportedError) Is(target error) bool {
 	return target == ErrFeatureUnsupported
 }
 
+// Operations a NATS permissions violation can name.
+const (
+	PermissionOperationPublish   = "publish"
+	PermissionOperationSubscribe = "subscribe"
+)
+
+// NATSPermissionError is a permissions violation for one operation on one subject.
+type NATSPermissionError struct {
+	Operation string
+	Subject   string
+	Cause     error
+}
+
+// Error implements the error interface.
+func (e *NATSPermissionError) Error() string {
+	return fmt.Sprintf("no permission to %s to %q", e.Operation, e.Subject)
+}
+
+// Is reports whether target is ErrNATSPermissionViolation.
+func (e *NATSPermissionError) Is(target error) bool {
+	return target == ErrNATSPermissionViolation
+}
+
+// Unwrap returns the reported error.
+func (e *NATSPermissionError) Unwrap() error {
+	return e.Cause
+}
+
 // NATSValidationError is the domain form of a client-side NATS validation failure.
 type NATSValidationError struct {
 	Description string

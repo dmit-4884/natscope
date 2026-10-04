@@ -181,8 +181,17 @@ type ConsumerManager interface {
 	) error
 }
 
-// Publisher publishes messages to JetStream streams.
+// Publisher publishes messages over core NATS and to JetStream streams.
 type Publisher interface {
+	// Publish sends a core NATS message and flushes it.
+	Publish(
+		ctx context.Context,
+		connectionID string,
+		subject string,
+		data []byte,
+		headers map[string]string,
+	) error
+
 	// PublishToStream publishes to a JetStream stream, returning the ack.
 	PublishToStream(
 		ctx context.Context,
@@ -214,6 +223,7 @@ type Subscriber interface {
 		connectionID string,
 		subject string,
 		handler entities.MessageHandler,
+		onDenied func(error),
 	) (entities.Subscription, error)
 
 	// SubscribeJetStream creates a JetStream ordered-consumer subscription for
@@ -226,6 +236,15 @@ type Subscriber interface {
 
 	// OnDisconnect registers fn to run whenever a pooled connection is closed or replaced.
 	OnDisconnect(fn func(connectionID string))
+}
+
+// ServiceDiscoverer asks NATS Micro services about themselves over $SRV.
+type ServiceDiscoverer interface {
+	// MicroInfo collects every instance's answer to $SRV.INFO.
+	MicroInfo(ctx context.Context, connectionID string) ([]entities.MicroReport, error)
+
+	// MicroStats collects every instance's answer to $SRV.STATS.
+	MicroStats(ctx context.Context, connectionID string) ([]entities.MicroReport, error)
 }
 
 // StatsReader reports aggregated stream/consumer statistics and server info.

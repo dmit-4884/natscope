@@ -32,8 +32,8 @@ message PublishMessageRequest {
   };
   option (buf.validate.message).cel = {
     id: "natscope.nats.publish.data_required_without_incr"
-    message: "data is required unless the Nats-Incr header is set"
-    expression: "this.data != '' || 'Nats-Incr' in this.headers"
+    message: "data is required unless the Nats-Incr header is set or the message goes over core NATS"
+    expression: "this.core || this.data != '' || 'Nats-Incr' in this.headers"
   };
 
   // Required. Identifier of the NATS connection to publish through.
@@ -63,6 +63,9 @@ message PublishMessageRequest {
 
   // Optional. Wrapper around the encoded protobuf message.
   .natscope.types.proto.Framing framing = 9;
+
+  // Optional. Publish over core NATS instead of JetStream: no stream, no ack, and the body may be empty.
+  bool core = 10;
 }
 
 // Defines the response message for publishing a message to NATS.

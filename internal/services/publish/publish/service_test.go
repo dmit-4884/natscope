@@ -38,9 +38,14 @@ type mockNATSService struct {
 	natssvc.ConnectionManager
 	natssvc.Publisher
 	natssvc.Requester
-	publishFn func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.PubAck, error)
-	requestFn func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.Reply, error)
-	urlFn     func(connID string) (string, error)
+	publishFn     func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.PubAck, error)
+	corePublishFn func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) error
+	requestFn     func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.Reply, error)
+	urlFn         func(connID string) (string, error)
+}
+
+func (m *mockNATSService) Publish(ctx context.Context, connID, subject string, data []byte, headers map[string]string) error {
+	return m.corePublishFn(ctx, connID, subject, data, headers)
 }
 
 func (m *mockNATSService) PublishToStream(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.PubAck, error) {
@@ -124,6 +129,56 @@ func TestPublish_RawJSON(t *testing.T) {
 	assert.True(t, hist.last.Success)
 	require.NotNil(t, hist.last.Sequence)
 	assert.Equal(t, uint64(42), *hist.last.Sequence)
+}
+
+func TestPublish_CoreGoesOverCoreNATSWithoutHistory(t *testing.T) {
+	t.Parallel()
+
+	hist := &recordedHistory{}
+	var gotSubject string
+	var gotData []byte
+	var gotHeaders map[string]string
+	natsm := &mockNATSService{
+		corePublishFn: func(_ context.Context, _, subject string, data []byte, headers map[string]string) error {
+			gotSubject, gotData, gotHeaders = subject, data, headers
+			return nil
+		},
+	}
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: hist}, &mockSettingsService{})
+
+	resp, err := s.Publish(t.Context(), &entities.PublishRequest{
+		ConnectionID: "conn-1",
+		Subject:      "_INBOX.reply",
+		Headers:      map[string]string{"X-Trace": "t"},
+		Core:         true,
+	})
+
+	require.NoError(t, err)
+	require.Nil(t, resp.Error)
+	assert.Empty(t, resp.Stream)
+	assert.Equal(t, "_INBOX.reply", gotSubject)
+	assert.Empty(t, gotData, "a core publish may carry no body")
+	assert.Equal(t, map[string]string{"X-Trace": "t"}, gotHeaders)
+	hist.mu.Lock()
+	defer hist.mu.Unlock()
+	assert.Zero(t, hist.called, "ad hoc core publishes stay out of the stream publish history")
+}
+
+func TestPublish_CoreDeniedIsASoftFailure(t *testing.T) {
+	t.Parallel()
+
+	natsm := &mockNATSService{
+		corePublishFn: func(context.Context, string, string, []byte, map[string]string) error {
+			return &errs.NATSPermissionError{Operation: errs.PermissionOperationPublish, Subject: "secret.op"}
+		},
+	}
+	s := New(natsm, natsm, natsm, &mockProtoService{}, &mockHistoryService{rec: &recordedHistory{}}, &mockSettingsService{})
+
+	resp, err := s.Publish(t.Context(), &entities.PublishRequest{ConnectionID: "conn-1", Subject: "secret.op", Data: "x", Core: true})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp.Error)
+	assert.Equal(t, `Failed to publish message: no permission to publish to "secret.op"`, *resp.Error)
 }
 
 func TestPublish_CounterIncrement(t *testing.T) {

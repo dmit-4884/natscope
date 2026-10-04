@@ -23,10 +23,14 @@ import (
 // subscriptionWrapper wraps nats.Subscription to implement
 // entities.Subscription.
 type subscriptionWrapper struct {
-	sub *nats.Subscription
+	sub           *nats.Subscription
+	stopObserving func()
 }
 
 func (w *subscriptionWrapper) Unsubscribe() error {
+	if w.stopObserving != nil {
+		w.stopObserving()
+	}
 	return w.sub.Unsubscribe()
 }
 
@@ -35,6 +39,7 @@ func (c *Client) Subscribe(
 	_ context.Context,
 	subject string,
 	handler entities.MessageHandler,
+	onDenied func(error),
 ) (entities.Subscription, error) {
 	if err := validateNATSSubjectLength("subject", subject); err != nil {
 		return nil, wrapErr(err)
@@ -46,16 +51,24 @@ func (c *Client) Subscribe(
 			Subject:   msg.Subject,
 			Data:      msg.Data,
 			Header:    maps.Clone(msg.Header),
+			Reply:     msg.Reply,
 			Timestamp: time.Now(),
 		})
 	}
 
+	var stop func()
+	if onDenied != nil {
+		stop = c.permWatch.Observe(PermissionViolation{Operation: "subscription", Subject: subject}, onDenied)
+	}
 	sub, err := c.conn.Subscribe(subject, natsHandler)
 	if err != nil {
+		if stop != nil {
+			stop()
+		}
 		return nil, wrapErr(err)
 	}
 
-	return &subscriptionWrapper{sub: sub}, nil
+	return &subscriptionWrapper{sub: sub, stopObserving: stop}, nil
 }
 
 // jsSubscriptionWrapper wraps a jetstream consumer to implement

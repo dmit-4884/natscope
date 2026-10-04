@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dmit-4884/natscope/internal/entities"
+
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	livesvc "github.com/dmit-4884/natscope/internal/services/live"
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
@@ -25,6 +27,8 @@ const (
 	statsInterval         = 5 * time.Second
 	maxSubjectCardinality = 1000
 	maxBufferedBytes      = 16 << 20
+
+	maxSubscriptionTargets = 100
 
 	// defaultDeliverPolicy avoids replaying history implicitly; "see backlog"
 	// is an explicit action elsewhere.
@@ -75,10 +79,34 @@ type sessionState struct {
 	connectionID string
 	lost         chan struct{}
 	lostOnce     sync.Once
+
+	denials        chan *entities.LiveError
+	deniedMu       sync.Mutex
+	deniedSubjects map[string]struct{}
 }
 
 func newSessionState(connectionID string) *sessionState {
-	return &sessionState{connectionID: connectionID, lost: make(chan struct{})}
+	return &sessionState{
+		connectionID:   connectionID,
+		lost:           make(chan struct{}),
+		denials:        make(chan *entities.LiveError, maxSubscriptionTargets),
+		deniedSubjects: make(map[string]struct{}),
+	}
+}
+
+func (sess *sessionState) reportDenied(subject string, err error) {
+	sess.deniedMu.Lock()
+	if _, seen := sess.deniedSubjects[subject]; seen {
+		sess.deniedMu.Unlock()
+		return
+	}
+	sess.deniedSubjects[subject] = struct{}{}
+	sess.deniedMu.Unlock()
+
+	select {
+	case sess.denials <- liveErrorFor(subject, err):
+	default:
+	}
 }
 
 func (sess *sessionState) markLost() {
