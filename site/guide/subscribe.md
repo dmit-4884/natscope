@@ -17,8 +17,8 @@ holds, use [Messages](/guide/messages) or the [live tail](/guide/live-tail) of t
 3. Click **Start**, or press `Cmd+Enter` (`Ctrl+Enter` on Windows and Linux).
 
 `Backspace` in the empty field removes the last chip. **Quick add** offers JetStream advisories, all
-JetStream events, everything (`>`), and subjects you subscribed to before. Subjects are kept per
-connection until you disconnect.
+JetStream events, everything (`>`), and subjects you subscribed to before. The subjects and recents
+are kept until you disconnect or switch to another connection.
 
 `>` does not deliver system subjects such as `$JS.…`, `$SYS.…` or `_INBOX.…`: subscribe to them by name.
 
