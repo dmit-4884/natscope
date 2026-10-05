@@ -30,11 +30,13 @@ interface PillProps {
   status: WsStatus
   paused: boolean
   denied: boolean
+  failed: boolean
 }
 
-function pillState({ running, hasFeed, status, paused, denied }: PillProps) {
+function pillState({ running, hasFeed, status, paused, denied, failed }: PillProps) {
   if (!running) return { label: hasFeed ? 'Stopped' : 'Not subscribed', dot: 'bg-content-muted', text: 'text-content-tertiary', pulse: false }
   if (denied) return { label: 'No permission', dot: null, text: 'text-content-secondary', pulse: false }
+  if (failed) return { label: 'Disconnected', dot: 'bg-status-error-border', text: 'text-status-error-text', pulse: false }
   if (status !== 'connected') return { label: 'Connecting…', dot: 'bg-status-warning-border', text: 'text-status-warning-text', pulse: true }
   if (paused) return { label: 'Paused', dot: 'bg-status-warning-border', text: 'text-status-warning-text', pulse: false }
   return { label: 'Live', dot: 'bg-status-success-border', text: 'text-status-success-text', pulse: true }
@@ -192,7 +194,14 @@ export default function SubscribePage() {
               </p>
             )}
           </div>
-          <StatusPill running={running} hasFeed={hasFeed} status={live.wsStatus} paused={live.isPaused} denied={allDenied} />
+          <StatusPill
+            running={running}
+            hasFeed={hasFeed}
+            status={live.wsStatus}
+            paused={live.isPaused}
+            denied={allDenied}
+            failed={live.wsStatus === 'disconnected' && !!live.wsError}
+          />
         </div>
         <SubjectBar
           subjects={draft.subjects}

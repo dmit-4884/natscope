@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react'
 import type { SelectedMessage } from '@/types/messages'
 import type { LiveSubscription } from '../messages/unified/useLiveSubscription'
 
-export type SubscribeStatus = 'idle' | 'live' | 'connecting' | 'denied'
+export type SubscribeStatus = 'idle' | 'live' | 'connecting' | 'denied' | 'failed'
 
 export interface SubscribeSession {
   running: boolean

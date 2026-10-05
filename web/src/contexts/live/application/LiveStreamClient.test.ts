@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { create } from '@bufbuild/protobuf'
+import { Code, ConnectError } from '@connectrpc/connect'
 import { NatsMessageSchema } from '@/gen/types/nats/nats_message_pb'
 
 const subscribeCall = vi.hoisted(() => vi.fn())
@@ -120,6 +121,30 @@ describe('LiveStreamClient', () => {
     expect(kept).toBeGreaterThan(0)
     expect(kept).toBeLessThan(40)
     client.disconnect()
+  })
+
+  it('reconnects when the server aborts a stalled stream', async () => {
+    vi.useFakeTimers()
+    try {
+      subscribeCall.mockImplementationOnce(() => ({
+        [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(new ConnectError('live consumer stalled', Code.Aborted)) }),
+      }))
+      const client = new LiveStreamClient('conn-1')
+      const reconnecting = vi.fn()
+      const disconnected = vi.fn()
+      client.onReconnecting = reconnecting
+      client.onDisconnect = disconnected
+      client.connect()
+      client.subscribeSubjects(['orders.>'])
+
+      await vi.waitFor(() => expect(reconnecting).toHaveBeenCalled())
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(subscribeCall).toHaveBeenCalledTimes(2)
+      expect(disconnected).not.toHaveBeenCalled()
+      client.disconnect()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('opens no stream once disconnected', () => {

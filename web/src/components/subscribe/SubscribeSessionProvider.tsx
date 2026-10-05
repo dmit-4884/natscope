@@ -16,9 +16,10 @@ interface Props {
   children: ReactNode
 }
 
-function sessionStatus(running: boolean, allDenied: boolean, connected: boolean): SubscribeStatus {
+function sessionStatus(running: boolean, allDenied: boolean, connected: boolean, failed: boolean): SubscribeStatus {
   if (!running) return 'idle'
   if (allDenied) return 'denied'
+  if (failed) return 'failed'
   return connected ? 'live' : 'connecting'
 }
 
@@ -78,7 +79,7 @@ export function SubscribeSessionProvider({ connectionId, children }: Props) {
   const allDenied =
     running && draft.subjects.length > 0 && draft.subjects.every((s) => live.deniedSubjects.includes(s))
 
-  const status = sessionStatus(running, allDenied, live.wsStatus === 'connected')
+  const status = sessionStatus(running, allDenied, live.wsStatus === 'connected', live.wsStatus === 'disconnected' && !!live.wsError)
 
   const session = useMemo<SubscribeSession>(
     () => ({

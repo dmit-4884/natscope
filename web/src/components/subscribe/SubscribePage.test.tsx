@@ -186,6 +186,15 @@ describe('SubscribePage', () => {
     expect(within(screen.getByTestId('feed')).getByText('orders.new')).toBeInTheDocument()
   })
 
+  it('says the subscription is down once the client stopped trying', () => {
+    mockedLive.mockReturnValue(liveState({ wsStatus: 'disconnected', wsError: 'Connection failed after max retries' }))
+    renderPage()
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Disconnected')
+  })
+
   it('shows the missing permission when every subject is refused', () => {
     mockedLive.mockReturnValue(liveState({ deniedSubjects: ['secret.>'] }))
     renderPage()

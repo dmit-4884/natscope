@@ -216,7 +216,7 @@ export class LiveStreamClient {
       const connectErr = ConnectError.from(err)
       const errorMessage = connectErr.rawMessage || 'Stream error'
 
-      if (this.intentionalClose || connectErr.code === Code.Canceled || connectErr.code === Code.Aborted) {
+      if (this.intentionalClose || connectErr.code === Code.Canceled) {
         return
       }
 
