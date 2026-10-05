@@ -47,13 +47,13 @@ const (
 	schemeWS   = "ws"
 	schemeWSS  = "wss"
 
-	notReached  = "Not reached"
-	outOfTime   = "Not finished: the test ran out of time"
-	notChecked  = "Not checked: the test ran out of time"
+	notReached     = "Not reached"
+	outOfTime      = "Not finished: the test ran out of time"
+	notChecked     = "Not checked: the test ran out of time"
 	notCheckedSlow = "Not checked: an earlier step was too slow"
-	sentNothing = "The server sent nothing"
-	slowLink    = "; the connection still went through, so the link is slow"
-	clientPort  = "Use the client port of the NATS server, 4222 by default."
+	sentNothing    = "The server sent nothing"
+	slowLink       = "; the connection still went through, so the link is slow"
+	clientPort     = "Use the client port of the NATS server, 4222 by default."
 )
 
 var allSteps = []entities.ConnectionCheckStep{
@@ -847,8 +847,8 @@ func jetStreamCheck(ctx context.Context, d *diagnosis, conn *nats.Conn, cfg *ent
 	answered := make(chan accountAnswer, 1)
 	go func() {
 		defer panics.Handle(stepCtx)
-		info, err := js.AccountInfo(stepCtx)
-		answered <- accountAnswer{info: info, err: err}
+		info, infoErr := js.AccountInfo(stepCtx)
+		answered <- accountAnswer{info: info, err: infoErr}
 	}()
 	var answer accountAnswer
 	select {
