@@ -19,7 +19,7 @@ test.describe('consumers', () => {
     await expect(page).toHaveURL(/\/consumers$/)
     await expect(page.getByTestId('consumers-summary')).toContainText('stuck')
 
-    const row = page.getByRole('button', { name: new RegExp(`${CONSUMER}.*No subscriber`) })
+    const row = page.getByRole('link', { name: new RegExp(`${CONSUMER}.*No subscriber`) })
     await expect(row).toBeVisible()
 
     await row.click()
@@ -30,10 +30,17 @@ test.describe('consumers', () => {
 
   test('the next message to deliver opens in the stream with its fate per consumer', async ({ page }) => {
     await page.goto(`/streams/${STREAM}/consumers?consumer=${CONSUMER}`)
-    const next = page.getByTestId('consumer-position').getByRole('button', { name: /^Open message #\d+$/ }).last()
+    const next = page.getByTestId('consumer-position').getByRole('link', { name: /^Open message #\d+$/ }).last()
     await expect(next).toBeVisible()
     const label = (await next.getAttribute('aria-label')) ?? ''
     const sequence = label.replace('Open message #', '')
+    const href = (await next.getAttribute('href')) ?? ''
+    expect(href).toBe(`/streams/${STREAM}/messages?msg=history-${sequence}`)
+
+    const tab = await page.context().newPage()
+    await tab.goto(href)
+    await expect(tab.getByRole('heading', { name: `Message #${sequence}` })).toBeVisible()
+    await tab.close()
 
     await next.click()
     await expect(page).toHaveURL(new RegExp(`/streams/${STREAM}/messages$`))
@@ -47,7 +54,7 @@ test.describe('consumers', () => {
 
   test('the list exports as JSON', async ({ page }) => {
     await page.goto('/consumers')
-    await expect(page.getByRole('button', { name: new RegExp(CONSUMER) })).toBeVisible()
+    await expect(page.getByRole('link', { name: new RegExp(CONSUMER) })).toBeVisible()
 
     await page.getByRole('button', { name: 'Export consumers' }).click()
     const download = page.waitForEvent('download')
