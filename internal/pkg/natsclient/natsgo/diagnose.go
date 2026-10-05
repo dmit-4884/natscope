@@ -216,6 +216,15 @@ func until(ctx context.Context, timeout time.Duration) time.Time {
 	return deadline
 }
 
+// spent reports whether ctx is done or its deadline has passed, which a socket deadline can notice first.
+func spent(ctx context.Context) bool {
+	if ctx.Err() != nil {
+		return true
+	}
+	deadline, ok := ctx.Deadline()
+	return ok && !time.Now().Before(deadline)
+}
+
 // serverText drops control and formatting characters, bidirectional overrides among them, from text a server
 // sent, and shortens it.
 func serverText(s string) string {
@@ -268,7 +277,7 @@ func (d *diagnosis) resolve(ctx context.Context, t target) bool {
 	case err == nil:
 		d.add(entities.CheckStepDNS, entities.CheckStatusOK, fmt.Sprintf("%s resolves to %s", t.host, strings.Join(addrs, ", ")), "", start)
 		return true
-	case ctx.Err() != nil:
+	case spent(ctx):
 		d.timedOut(entities.CheckStepDNS, start)
 	default:
 		d.add(entities.CheckStepDNS, entities.CheckStatusFailed, fmt.Sprintf("%s does not resolve: %v", t.host, err), dnsHint(t.host), start)
@@ -295,7 +304,7 @@ func (d *diagnosis) dial(ctx context.Context, t target) net.Conn {
 	case err == nil:
 		d.add(entities.CheckStepTCP, entities.CheckStatusOK, "Connected to "+t.addr(), "", start)
 		return conn
-	case ctx.Err() != nil:
+	case spent(ctx):
 		d.timedOut(entities.CheckStepTCP, start)
 	default:
 		d.add(entities.CheckStepTCP, entities.CheckStatusFailed, fmt.Sprintf("Cannot connect to %s: %v", t.addr(), err), tcpHint(t, err), start)
@@ -385,7 +394,7 @@ func (d *diagnosis) readInfo(ctx context.Context, conn net.Conn, t target, tlsCo
 	}
 
 	detail, hint := unexpectedGreeting(stepCtx, conn, t, tlsConf, line, overTLS, d.greetTimeout)
-	if ctx.Err() != nil {
+	if spent(ctx) {
 		d.timedOut(entities.CheckStepProtocol, start)
 		return false
 	}
@@ -493,7 +502,7 @@ func (d *diagnosis) handshake(ctx context.Context, conn net.Conn, t target, base
 	defer cancel()
 	tc := tls.Client(conn, cfg)
 	if err := tc.HandshakeContext(stepCtx); err != nil {
-		if ctx.Err() != nil {
+		if spent(ctx) {
 			d.timedOut(entities.CheckStepTLS, start)
 		} else {
 			d.tlsFailed(err, start)
@@ -663,7 +672,7 @@ func (d *diagnosis) authCheck(ctx context.Context, connErr error, auth *entities
 			"Anyone can connect to this server; it ignores "+authLabels[method]+".", start)
 	case connErr == nil:
 		d.add(entities.CheckStepAuth, entities.CheckStatusOK, "Authenticated with "+authLabels[method], "", start)
-	case ctx.Err() != nil:
+	case spent(ctx):
 		d.timedOut(entities.CheckStepAuth, start)
 	case isTLSError(connErr):
 		d.tlsFailed(connErr, start)
@@ -734,7 +743,7 @@ func jetStreamCheck(ctx context.Context, d *diagnosis, conn *nats.Conn, cfg *ent
 		d.add(entities.CheckStepJetStream, entities.CheckStatusWarning, "JetStream is not enabled for this account", withoutJetStream, start)
 	case errors.Is(err, jetstream.ErrJetStreamNotEnabled):
 		d.add(entities.CheckStepJetStream, entities.CheckStatusFailed, "No JetStream answered"+where, hint, start)
-	case ctx.Err() != nil:
+	case spent(ctx):
 		d.timedOut(entities.CheckStepJetStream, start)
 	default:
 		d.add(entities.CheckStepJetStream, entities.CheckStatusFailed, "JetStream did not answer"+where+": "+serverText(err.Error()), hint, start)

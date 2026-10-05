@@ -51,7 +51,7 @@ func (d *Dialer) TestConnection(
 	var best *diagnosis
 	bestURL := ""
 	for _, url := range in.URLs {
-		if ctx.Err() != nil {
+		if spent(ctx) {
 			break
 		}
 		diag := diagnoseNetwork(ctx, url, in.TLS, connectTimeout)
