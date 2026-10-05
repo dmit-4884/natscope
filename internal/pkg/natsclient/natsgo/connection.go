@@ -6,6 +6,7 @@ package natsgo
 import (
 	"context"
 	"maps"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -33,7 +34,8 @@ func (w *subscriptionWrapper) Unsubscribe() error {
 	return w.sub.Unsubscribe()
 }
 
-// Subscribe creates a Core NATS subscription for the given subject.
+// Subscribe creates a Core NATS subscription for the given subject. Replies to this connection's own requests,
+// under its inbox prefix, reach only a subject that names that prefix.
 func (c *Client) Subscribe(
 	_ context.Context,
 	subject string,
@@ -44,7 +46,12 @@ func (c *Client) Subscribe(
 		return nil, wrapErr(err)
 	}
 
+	ownInbox := c.inboxPrefix()
+	hidesOwnInbox := !strings.HasPrefix(subject, ownInbox)
 	natsHandler := func(msg *nats.Msg) {
+		if hidesOwnInbox && strings.HasPrefix(msg.Subject, ownInbox) {
+			return
+		}
 		// Stamp the receive time at delivery, not at the later batch conversion.
 		handler(&entities.NatsMessage{
 			Subject:   msg.Subject,

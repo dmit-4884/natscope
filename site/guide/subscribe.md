@@ -21,8 +21,8 @@ advisories, all JetStream events, everything (`>`), and subjects you subscribed 
 and recents are kept until you disconnect or switch to another connection.
 
 NATS delivers every subject to `>`, but Natscope hides subjects that start with `$` (`$JS`, `$SYS`,
-`$KV`, `$SRV`, …) and `_INBOX` under a wildcard that doesn't name them. Subscribe to them by name, for
-example `$JS.EVENT.>`, to see them.
+`$KV`, `$SRV`, …), `_INBOX` and the connection's own inbox prefix under a wildcard that doesn't name
+them. Subscribe to them by name, for example `$JS.EVENT.>`, to see them.
 
 ## The feed
 
