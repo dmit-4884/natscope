@@ -222,10 +222,13 @@ func (s *Service) TestConnection(
 		if getErr != nil {
 			return nil, getErr
 		}
-		converter.Convert(saved, in)
-		if saved.Connection != nil {
-			in.ConnectTimeout = saved.Connection.ConnectTimeout
+		in.URLs, in.Auth, in.TLS = saved.URLs, saved.Auth, saved.TLS
+		if in.Connection == nil {
+			in.Connection = saved.Connection
 		}
+	}
+	if in.ConnectTimeout == nil && in.Connection != nil {
+		in.ConnectTimeout = in.Connection.ConnectTimeout
 	}
 
 	result, err := s.natService.TestConnection(ctx, in)

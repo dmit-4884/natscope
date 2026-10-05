@@ -43,12 +43,15 @@ Go to **Settings → Connections** (or click **New Connection** on the start scr
      whether it waits for a TLS handshake first
    - **TLS**: the handshake, whether the certificate is trusted, matches the host name and when it expires,
      and whether the server wants a client certificate
-   - **Authentication**: the credentials are accepted
+   - **Authentication**: the credentials are accepted, or a warning when the server checks none
    - **JetStream**: the account has JetStream, in the configured domain or API prefix
 
    A failed step says what to do next, such as adding the CA certificate or turning on **TLS
    handshake first**. When Natscope runs in Docker and the server is on your machine, it suggests
-   `host.docker.internal` instead of `localhost`. The later steps show as skipped.
+   `host.docker.internal` instead of `localhost`. The later steps show as skipped. With several
+   server URLs, Natscope tries them in order: the test passes when one of them connects, and
+   otherwise shows the server that got furthest. A test that runs out of time marks the steps it
+   could not finish as skipped, not failed.
 8. Click **Connect**.
 
 ## Import from the nats CLI

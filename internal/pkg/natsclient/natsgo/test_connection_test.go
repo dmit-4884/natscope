@@ -106,12 +106,14 @@ func TestConnection_MalformedHTTPResponseIsSanitized(t *testing.T) {
 
 	const banner = "SSH-2.0-QA_BANNER_SECRET\r\n"
 	go func() {
-		c, err := ln.Accept()
-		if err != nil {
-			return
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_, _ = c.Write([]byte(banner))
+			_ = c.Close()
 		}
-		defer c.Close()
-		_, _ = c.Write([]byte(banner))
 	}()
 
 	d := NewDialer()

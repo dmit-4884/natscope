@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -442,6 +443,28 @@ func TestService_TestConnection(t *testing.T) {
 		require.NotNil(t, store.updateInput)
 		require.NotNil(t, store.updateInput.Meta, "recordTestResult should write Meta")
 		assert.True(t, store.updateInput.Meta.LastSuccess)
+	})
+
+	t.Run("ConnectionID_KeepsTheEditedConnectionSettings", func(t *testing.T) {
+		t.Parallel()
+		saved := entities.SavedConnectionNew(func(c *entities.SavedConnection) {
+			c.URLs = []string{"nats://trusted:4222"}
+			c.Connection = &entities.ConnectionConfig{JetstreamDomain: ptrStr("hub"), ConnectTimeout: new(5 * time.Second)}
+		})
+		natsSvc := &mockNATSService{testResult: &entities.TestConnectionResult{Success: true}}
+		svc := New(&mockStorage{getResult: saved}, &mockLayouts{}, natsSvc, true)
+
+		_, err := svc.TestConnection(t.Context(), &entities.TestConnectionRequest{
+			ConnectionID: saved.Id,
+			URLs:         []string{"nats://edited:4222"},
+			Connection:   &entities.ConnectionConfig{JetstreamDomain: ptrStr("leaf"), ConnectTimeout: new(2 * time.Second)},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, natsSvc.testInput.Connection)
+		assert.Equal(t, "leaf", *natsSvc.testInput.Connection.JetstreamDomain)
+		assert.Equal(t, new(2*time.Second), natsSvc.testInput.ConnectTimeout)
+		assert.Equal(t, saved.URLs, natsSvc.testInput.URLs)
 	})
 
 	t.Run("NoConnectionID_SkipsOverlayAndRecord", func(t *testing.T) {

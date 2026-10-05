@@ -60,9 +60,8 @@ func buildOptions(saved *entities.SavedConnection) ([]nats.Option, error) {
 	return opts, nil
 }
 
-// buildTestOptions builds nats.Option from an ad-hoc test request (only
-// Auth/TLS; connect-timeout default always applies).
-func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, entities.ConnectionCheckStep, error) {
+// buildTestOptions builds nats.Option from an ad-hoc test request: auth, TLS, inbox prefix and the connect timeout.
+func buildTestOptions(in *entities.TestConnectionRequest, connectTimeout time.Duration) ([]nats.Option, entities.ConnectionCheckStep, error) {
 	var opts []nats.Option //nolint:prealloc // fan-in from variadic helpers; final size unknown
 
 	authOpts, err := buildAuthOptions(in.Auth)
@@ -79,11 +78,7 @@ func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, entiti
 		opts = append(opts, nats.CustomInboxPrefix(*in.Connection.InboxPrefix))
 	}
 
-	timeout := defaultConnectTimeout
-	if in.ConnectTimeout != nil {
-		timeout = *in.ConnectTimeout
-	}
-	opts = append(opts, nats.Timeout(timeout))
+	opts = append(opts, nats.Timeout(connectTimeout))
 
 	return opts, entities.CheckStepUnspecified, nil
 }

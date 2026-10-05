@@ -12,8 +12,6 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
@@ -23,18 +21,20 @@ import (
 // maxTestConnectionTimeout caps a single TestConnection call regardless of ctx, connect timeout or URL count.
 const maxTestConnectionTimeout = 30 * time.Second
 
-// TestConnection tests a NATS connection without saving or pooling it. The call is bounded by
-// maxTestConnectionTimeout and closes every dialed socket once ctx is done.
+// TestConnection tests a NATS connection without saving or pooling it. Each server URL is diagnosed in order and
+// connected to on its own; the first one that connects wins, otherwise the one that got furthest explains the failure.
+// The call is bounded by maxTestConnectionTimeout and closes every dialed socket once ctx is done.
 func (d *Dialer) TestConnection(
 	ctx context.Context,
 	in *entities.TestConnectionRequest,
 ) (*entities.TestConnectionResult, error) {
 	result := &entities.TestConnectionResult{}
+	connectTimeout := testConnectTimeout(in.ConnectTimeout)
 
-	natsOpts, badStep, err := buildTestOptions(in)
+	natsOpts, badStep, err := buildTestOptions(in, connectTimeout)
 	if err != nil {
 		result.Error = err.Error()
-		diag := newDiagnosis(defaultConnectTimeout)
+		diag := newDiagnosis(connectTimeout)
 		diag.add(badStep, entities.CheckStatusFailed, err.Error(), "Fix this setting of the connection.", time.Now())
 		result.Checks = diag.result()
 		return result, nil
@@ -43,29 +43,52 @@ func (d *Dialer) TestConnection(
 	ctx, cancel := corectx.WithMaxTimeout(ctx, maxTestConnectionTimeout)
 	defer cancel()
 
-	cd := newCtxDialer(ctx)
+	cd := newCtxDialer(ctx, connectTimeout)
 	stop := context.AfterFunc(ctx, cd.closeAll)
 	defer stop()
+	natsOpts = append(natsOpts, nats.SetCustomDialer(cd), nats.IgnoreDiscoveredServers())
 
-	natsOpts = append(natsOpts, nats.SetCustomDialer(cd))
-
-	url := strings.Join(in.URLs, ",")
-
-	start := time.Now()
-	conn, connErr := nats.Connect(url, natsOpts...)
-	probed := in.URLs[0]
-	if connErr == nil {
-		defer conn.Close()
-		probed = conn.ConnectedUrl()
+	var best *diagnosis
+	bestURL := ""
+	for _, url := range in.URLs {
+		if ctx.Err() != nil {
+			break
+		}
+		diag := diagnoseNetwork(ctx, url, in.TLS, connectTimeout)
+		if diag.reached {
+			if conn := diag.connect(ctx, url, natsOpts, in.Auth); conn != nil {
+				finishConnected(ctx, result, conn, diag, in)
+				return result, nil
+			}
+		}
+		if best == nil || diag.progress() > best.progress() {
+			best, bestURL = diag, url
+		}
 	}
-	diag := diagnoseNetwork(ctx, probed, in.TLS, ptr.Unwrap(in.ConnectTimeout, defaultConnectTimeout))
-	authCheck(diag, connErr, in.Auth, start)
-	if connErr != nil {
-		result.Error = sanitizeTestError(connErr)
-		result.Checks = diag.result()
-		return result, nil
+	if best == nil {
+		best = newDiagnosis(connectTimeout)
+		best.outOfTime = true
 	}
 
+	result.Error = best.failure()
+	if len(in.URLs) > 1 && bestURL != "" {
+		result.Error = natsutil.MaskURL(bestURL) + ": " + result.Error
+	}
+	result.Checks = best.result()
+	return result, nil
+}
+
+// testConnectTimeout is the connect timeout of a test, the default when unset or not positive.
+func testConnectTimeout(timeout *time.Duration) time.Duration {
+	if timeout == nil || *timeout <= 0 {
+		return defaultConnectTimeout
+	}
+	return *timeout
+}
+
+// finishConnected fills the result from a connection that succeeded, checks JetStream and closes the connection.
+func finishConnected(ctx context.Context, result *entities.TestConnectionResult, conn *nats.Conn, diag *diagnosis, in *entities.TestConnectionRequest) {
+	defer conn.Close()
 	result.Success = true
 	result.ConnectedURL = natsutil.MaskURL(conn.ConnectedUrl())
 	result.ServerVersion = conn.ConnectedServerVersion()
@@ -73,7 +96,7 @@ func (d *Dialer) TestConnection(
 	result.ServerID = conn.ConnectedServerId()
 	result.ClusterName = conn.ConnectedClusterName()
 	result.MaxPayload = conn.MaxPayload()
-	result.DiscoveredServers = conn.DiscoveredServers()
+	result.DiscoveredServers = diag.discovered(in.URLs)
 
 	rttStart := time.Now()
 	if flushErr := conn.Flush(); flushErr == nil {
@@ -82,7 +105,6 @@ func (d *Dialer) TestConnection(
 
 	result.JetstreamEnabled = jetStreamCheck(ctx, diag, conn, in.Connection)
 	result.Checks = diag.result()
-	return result, nil
 }
 
 // sanitizeTestError removes raw bytes echoed from the dialed endpoint from the error text.
@@ -91,7 +113,7 @@ func sanitizeTestError(err error) string {
 	if strings.HasPrefix(msg, "malformed HTTP") {
 		return "unexpected response from server: not a valid NATS or WebSocket endpoint"
 	}
-	return natsutil.MaskURL(msg)
+	return serverText(natsutil.MaskURL(msg))
 }
 
 // ctxDialer is a nats.CustomDialer that refuses dials once ctx is done and tracks sockets for closeAll.
@@ -104,8 +126,8 @@ type ctxDialer struct {
 	conns  []net.Conn
 }
 
-func newCtxDialer(ctx context.Context) *ctxDialer {
-	return &ctxDialer{ctx: ctx}
+func newCtxDialer(ctx context.Context, timeout time.Duration) *ctxDialer {
+	return &ctxDialer{ctx: ctx, dialer: net.Dialer{Timeout: timeout}}
 }
 
 // Dial implements nats.CustomDialer.
