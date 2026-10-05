@@ -11,21 +11,23 @@ import {
 } from '@/api/connections'
 import { connectionKeys } from '../queries/connectionKeys'
 
-export function useCreateConnection() {
+export function useCreateConnection({ silent = false }: { silent?: boolean } = {}) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (connection: CreateConnectionRequest) => createConnection(connection),
+    meta: { silent },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: connectionKeys.all })
     },
   })
 }
 
-export function useUpdateConnection() {
+export function useUpdateConnection({ silent = false }: { silent?: boolean } = {}) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { silent },
     mutationFn: ({ id, connection }: { id: string; connection: UpdateConnectionRequest }) =>
       updateConnection(id, connection),
     onSuccess: () => {

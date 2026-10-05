@@ -64,6 +64,7 @@ export default function WorkspacePage() {
   const validateMut = useMutation({
     mutationFn: (vars: { bytes: Uint8Array<ArrayBuffer>; strat: WorkspaceStrategy }) =>
       validateWorkspace(vars.bytes, [], vars.strat),
+    meta: { silent: true },
   })
   const { mutate: runValidateMutate } = validateMut
 

@@ -101,8 +101,8 @@ export default function ConnectionEditPage({ mode }: Props) {
   const [snapshot, setSnapshot] = useState<ConnectionFormData>(blankFormData)
   const lastHydratedFor = useRef<string | null>(null)
 
-  const createMutation = useCreateConnection()
-  const updateMutation = useUpdateConnection()
+  const createMutation = useCreateConnection({ silent: true })
+  const updateMutation = useUpdateConnection({ silent: true })
   const testMutation = useTestConnection()
 
   // Wait for connections to arrive (cache can be empty on a deep-link refresh),
