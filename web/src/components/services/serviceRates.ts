@@ -9,7 +9,7 @@ interface Counters {
 
 interface Sample {
   at: number
-  counters: Map<string, { service: string; instance: string; endpoint: string; subject: string } & Counters>
+  counters: Map<string, { service: string; instance: string; endpoint: string; subject: string; started?: number } & Counters>
 }
 
 export interface EndpointWindow extends Counters {
@@ -40,6 +40,7 @@ export function sampleOf(services: MicroService[], at: number): Sample {
           instance: instance.id,
           endpoint: e.name,
           subject: e.subject,
+          started: instance.started,
           requests: e.stats.num_requests,
           errors: e.stats.num_errors,
           processingNs: e.stats.processing_time_ns,
@@ -56,6 +57,8 @@ export function windowsBetween(before: Sample, after: Sample): EndpointWindow[] 
   const windows: EndpointWindow[] = []
   for (const [key, now] of after.counters) {
     const then = before.counters.get(key)
+    const startedInWindow = now.started != null && now.started >= before.at
+    if (!then && !startedInWindow) continue
     const restarted = !then || now.requests < then.requests
     windows.push({
       ...now,

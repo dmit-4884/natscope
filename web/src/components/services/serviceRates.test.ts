@@ -47,6 +47,22 @@ describe('windowsBetween', () => {
     expect(sumWindows(windows, (w) => w.endpoint === 'add')).toMatchObject({ requests: 12, errors: 7 })
   })
 
+  it('keeps measuring an endpoint the previous poll did not see, rather than take its lifetime totals for the window', () => {
+    const before = sampleOf([service({ a: [{ ...endpoint('add', 0, 0, 0), stats: undefined }] })], 0)
+    const after = sampleOf([service({ a: [endpoint('add', 1_000_000, 150_000, 0)] })], 5000)
+
+    expect(sumWindows(windowsBetween(before, after), () => true)).toBeUndefined()
+  })
+
+  it('counts a new instance that started within the window from zero', () => {
+    const before = sampleOf([service({ a: [endpoint('add', 10, 0, 0)] })], 0)
+    const fresh = service({ a: [endpoint('add', 20, 0, 0)], b: [endpoint('add', 3, 1, 0)] })
+    fresh.instances[1].started = 2000
+    const after = sampleOf([fresh], 5000)
+
+    expect(sumWindows(windowsBetween(before, after), (w) => w.instance === 'b')).toMatchObject({ requests: 3, errors: 1 })
+  })
+
   it('has nothing to compare for endpoints without statistics', () => {
     const noStats = service({ a: [{ ...endpoint('add', 0, 0, 0), stats: undefined }] })
     expect(windowsBetween(sampleOf([noStats], 0), sampleOf([noStats], 5000))).toEqual([])
