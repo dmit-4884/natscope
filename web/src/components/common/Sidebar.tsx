@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
-import { PlusIcon, ServicesIcon, SignalIcon, SwitchHorizontalIcon } from '@/components/ui'
+import { PlusIcon, ServicesIcon, SignalIcon, SwitchHorizontalIcon, UsersIcon } from '@/components/ui'
 import { useSubscribeStatus, type SubscribeStatus } from '../subscribe/subscribeSession'
 import StreamList from '../streams/StreamList'
 import KVList from '../kv/KVList'
@@ -36,6 +36,7 @@ interface PageEntry {
 }
 
 const PAGE_ENTRIES: PageEntry[] = [
+  { to: '/consumers', label: 'Consumers', icon: <UsersIcon /> },
   { to: '/request', label: 'Request / Reply', icon: <SwitchHorizontalIcon /> },
   { to: '/subscribe', label: 'Subscribe', icon: <SignalIcon /> },
   { to: '/services', label: 'Services', icon: <ServicesIcon /> },

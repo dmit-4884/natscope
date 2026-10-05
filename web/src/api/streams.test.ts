@@ -89,3 +89,29 @@ describe('toConsumerInfo priority groups', () => {
     expect(info.config?.ack_policy).toBe('flow_control')
   })
 })
+
+describe('toConsumerInfo activity and delivery target', () => {
+  it('maps when deliveries and acks last moved, and where a push consumer delivers', () => {
+    const info = toConsumerInfo(
+      create(ConsumerInfoSchema, {
+        name: 'pusher',
+        stream: 'ORDERS',
+        config: { deliverSubject: 'deliver.orders' },
+        delivered: { consumer: 5n, stream: 9n, lastActive: create(TimestampSchema, { seconds: 1_790_000_100n }) },
+        ackFloor: { consumer: 4n, stream: 8n, lastActive: create(TimestampSchema, { seconds: 1_790_000_000n }) },
+      }),
+    )
+
+    expect(info.delivered).toEqual({ consumer_seq: 5, stream_seq: 9, last_active: 1_790_000_100_000 })
+    expect(info.ack_floor).toEqual({ consumer_seq: 4, stream_seq: 8, last_active: 1_790_000_000_000 })
+    expect(info.config?.deliver_subject).toBe('deliver.orders')
+  })
+
+  it('leaves the activity unset before the first delivery', () => {
+    const info = toConsumerInfo(create(ConsumerInfoSchema, { name: 'idle', config: {} }))
+
+    expect(info.delivered?.last_active).toBeUndefined()
+    expect(info.ack_floor?.last_active).toBeUndefined()
+    expect(info.config?.deliver_subject).toBeUndefined()
+  })
+})

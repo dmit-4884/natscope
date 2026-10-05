@@ -1,4 +1,8 @@
+import type { AccessCheck } from '@/shared/domain/access'
+import type { ConsumerInfo, StreamInfo } from '../types/nats'
+import { toAccessCheck } from './access'
 import { statsClient } from './grpc/clients'
+import { toConsumerInfo, toStreamInfo } from './streams'
 
 export interface ConnectionHealth {
   id: string
@@ -141,5 +145,30 @@ export async function getHealth(
     is_connected: health.isConnected,
     is_reconnecting: health.isReconnecting,
     server_version: health.serverVersion || undefined,
+  }
+}
+
+export interface UnreadableStream {
+  stream: string
+  access?: AccessCheck
+  error?: string
+}
+
+export interface ConsumersOverview {
+  consumers: ConsumerInfo[]
+  streams: StreamInfo[]
+  unreadable: UnreadableStream[]
+}
+
+export async function getConsumersOverview(connectionId: string, signal?: AbortSignal): Promise<ConsumersOverview> {
+  const response = await statsClient.getAllConsumers({ connectionId }, { signal })
+  return {
+    consumers: response.consumers.map(toConsumerInfo),
+    streams: response.streams.map(toStreamInfo),
+    unreadable: response.unreadableStreams.map((u) => ({
+      stream: u.stream,
+      access: toAccessCheck(u.access),
+      error: u.error || undefined,
+    })),
   }
 }

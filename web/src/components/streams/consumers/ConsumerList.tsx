@@ -2,6 +2,8 @@ import { Button, Badge, Spinner, EmptyState, QueryErrorState, SearchInput, PlusI
 import Tooltip from '@/components/common/Tooltip'
 import { plural } from '@/utils/plural'
 import type { ConsumerInfo } from '@/types/nats'
+import { ConsumerStatus } from './ConsumerStatus'
+import type { ConsumerIssue } from './consumerHealth'
 
 const CONSUMER_ICON = <UsersIcon className="w-full h-full" />
 
@@ -16,6 +18,7 @@ interface Props {
   onRefetch: () => void
   onSelect: (consumer: ConsumerInfo) => void
   onCreate: () => void
+  issues?: Record<string, ConsumerIssue[]>
 }
 
 export function ConsumerList({
@@ -29,6 +32,7 @@ export function ConsumerList({
   onRefetch,
   onSelect,
   onCreate,
+  issues,
 }: Props) {
   const filtered = consumers.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
@@ -109,6 +113,11 @@ export function ConsumerList({
               {consumer.config?.filter_subject && (
                 <div className="text-xs text-content-muted mt-1 truncate font-mono">{consumer.config.filter_subject}</div>
               )}
+              {issues?.[consumer.name]?.length ? (
+                <div className="mt-1.5">
+                  <ConsumerStatus issues={issues[consumer.name]} state="warning" limit={1} />
+                </div>
+              ) : null}
             </button>
           ))
         )}

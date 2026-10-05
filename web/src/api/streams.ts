@@ -1,7 +1,7 @@
 import { durToNanos, tsToMillis } from '@/utils/timestamp'
-import type { StreamInfo as ProtoStreamInfo, StreamConfig as ProtoStreamConfig, StreamState as ProtoStreamState, ConsumerInfo as ProtoConsumerInfo, ConsumerConfig as ProtoConsumerConfig, ClusterInfo as ProtoClusterInfo, ConsumerLimits as ProtoConsumerLimits, ExternalStream as ProtoExternalStream, StreamSourceRef as ProtoStreamSourceRef, RePublish as ProtoRePublish, StreamRelationEdge as ProtoStreamRelationEdge, PriorityGroupState as ProtoPriorityGroupState } from '../gen/types/nats/nats_stream_pb'
+import type { StreamInfo as ProtoStreamInfo, StreamConfig as ProtoStreamConfig, StreamState as ProtoStreamState, ConsumerInfo as ProtoConsumerInfo, ConsumerConfig as ProtoConsumerConfig, ClusterInfo as ProtoClusterInfo, ConsumerLimits as ProtoConsumerLimits, ExternalStream as ProtoExternalStream, StreamSourceRef as ProtoStreamSourceRef, RePublish as ProtoRePublish, StreamRelationEdge as ProtoStreamRelationEdge, PriorityGroupState as ProtoPriorityGroupState, SequenceInfo as ProtoSequenceInfo } from '../gen/types/nats/nats_stream_pb'
 import { StreamRelationKind as ProtoStreamRelationKind, StreamNodeKind as ProtoStreamNodeKind } from '../gen/types/nats/nats_stream_pb'
-import type { StreamInfo, StreamDetail, StreamConfig, StreamConsumerLimits, StreamState, ConsumerInfo, ConsumerConfig, ClusterInfo, ExternalStreamRef, StreamSourceRef, StreamRePublish, StreamRelations, StreamRelationEdge, StreamRelationKind, StreamNodeKind, PriorityGroupState, PriorityPolicy } from '../types/nats'
+import type { StreamInfo, StreamDetail, StreamConfig, StreamConsumerLimits, StreamState, ConsumerInfo, ConsumerConfig, ClusterInfo, ExternalStreamRef, StreamSourceRef, StreamRePublish, StreamRelations, StreamRelationEdge, StreamRelationKind, StreamNodeKind, PriorityGroupState, PriorityPolicy, SequenceInfo } from '../types/nats'
 import { streamsClient } from './grpc/clients'
 
 export interface GetStreamsParams {
@@ -63,6 +63,7 @@ function toConsumerConfig(c: ProtoConsumerConfig | undefined): ConsumerConfig | 
   return {
     durable_name: c.durable || undefined,
     description: c.description || undefined,
+    deliver_subject: c.deliverSubject || undefined,
     deliver_policy: DELIVER_POLICY_STR[c.deliverPolicy] || undefined,
     opt_start_seq: Number(c.optStartSeq) || undefined,
     opt_start_time: c.optStartTime || undefined,
@@ -122,6 +123,14 @@ export function readConsumerPauseState(
   }
 }
 
+function toSequenceInfo(s: ProtoSequenceInfo | undefined): SequenceInfo {
+  return {
+    consumer_seq: Number(s?.consumer ?? 0n),
+    stream_seq: Number(s?.stream ?? 0n),
+    last_active: s?.lastActive ? tsToMillis(s.lastActive) : undefined,
+  }
+}
+
 export function toConsumerInfo(c: ProtoConsumerInfo): ConsumerInfo {
   let raw: Record<string, unknown> | undefined
   if (c.raw) {
@@ -133,14 +142,8 @@ export function toConsumerInfo(c: ProtoConsumerInfo): ConsumerInfo {
     stream_name: c.stream || undefined,
     config: toConsumerConfig(c.config),
     created: c.created != null ? tsToMillis(c.created) : undefined,
-    delivered: {
-      consumer_seq: Number(c.delivered?.consumer ?? 0n),
-      stream_seq: Number(c.delivered?.stream ?? 0n),
-    },
-    ack_floor: {
-      consumer_seq: Number(c.ackFloor?.consumer ?? 0n),
-      stream_seq: Number(c.ackFloor?.stream ?? 0n),
-    },
+    delivered: toSequenceInfo(c.delivered),
+    ack_floor: toSequenceInfo(c.ackFloor),
     num_pending: Number(c.numPending),
     num_ack_pending: c.numAckPending,
     num_redelivered: c.numRedelivered || undefined,

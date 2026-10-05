@@ -137,6 +137,7 @@ export interface StreamState {
 export interface ConsumerConfig {
   durable_name?: string
   description?: string
+  deliver_subject?: string
   deliver_policy?: string
   opt_start_seq?: number
   opt_start_time?: string
@@ -173,9 +174,10 @@ export interface PriorityGroupState {
   pinned_ts?: number // Unix milliseconds
 }
 
-interface SequenceInfo {
+export interface SequenceInfo {
   consumer_seq: number
   stream_seq: number
+  last_active?: number // Unix milliseconds
 }
 
 export interface ConsumerInfo {

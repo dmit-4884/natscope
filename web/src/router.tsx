@@ -24,6 +24,7 @@ const ObjectsOverviewPage = lazy(() => import('./components/objects/ObjectsOverv
 const RequestPage = lazy(() => import('./components/request/RequestPage'))
 const SubscribePage = lazy(() => import('./components/subscribe/SubscribePage'))
 const ServicesPage = lazy(() => import('./components/services/ServicesPage'))
+const ConsumersPage = lazy(() => import('./components/consumers/ConsumersPage'))
 // Settings pages are eager-loaded: lazy-load + Suspense caused a
 // "Loading..." flash on every tab switch.
 import SettingsLayout from './components/settings/page/SettingsLayout'
@@ -105,6 +106,8 @@ export const router = createBrowserRouter([
             ]
           },
 
+          { path: 'consumers', element: <LazyRoute><ConsumersPage /></LazyRoute> },
+
           // Request / Reply
           { path: 'request', element: <LazyRoute><RequestPage /></LazyRoute> },
           { path: 'subscribe', element: <LazyRoute><SubscribePage /></LazyRoute> },
@@ -135,7 +138,7 @@ export const router = createBrowserRouter([
           { path: 'storage/objects', element: <Navigate to="/objects" replace /> },
           { path: 'management', element: <Navigate to="/objects" replace /> },
           { path: 'management/streams', element: <Navigate to="/streams" replace /> },
-          { path: 'management/consumers', element: <Navigate to="/streams" replace /> },
+          { path: 'management/consumers', element: <Navigate to="/consumers" replace /> },
           { path: 'management/kv', element: <Navigate to="/kv" replace /> },
           { path: 'management/objects', element: <Navigate to="/objects" replace /> },
           { path: 'buckets', element: <Navigate to="/objects" replace /> },

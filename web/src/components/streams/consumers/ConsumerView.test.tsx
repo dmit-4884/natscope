@@ -57,3 +57,31 @@ describe('ConsumerView — reset', () => {
     expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled()
   })
 })
+
+describe('ConsumerView — problems', () => {
+  it('explains what holds the consumer back', () => {
+    renderView({
+      issues: [
+        { kind: 'ack_limit', severity: 'error', label: 'Ack limit reached', detail: '1000 messages wait for an ack.' },
+        { kind: 'redelivering', severity: 'warning', label: 'Redelivering', detail: '3 messages were delivered again.' },
+      ],
+    })
+
+    const problems = screen.getByTestId('consumer-problems')
+    expect(problems).toHaveTextContent('Ack limit reached')
+    expect(problems).toHaveTextContent('1000 messages wait for an ack.')
+    expect(problems).toHaveTextContent('3 messages were delivered again.')
+  })
+
+  it('stays quiet when nothing is wrong', () => {
+    renderView({ issues: [] })
+
+    expect(screen.queryByTestId('consumer-problems')).not.toBeInTheDocument()
+  })
+
+  it('shows where the consumer is when given', () => {
+    renderView({ position: <p>position card</p> })
+
+    expect(screen.getByText('position card')).toBeInTheDocument()
+  })
+})

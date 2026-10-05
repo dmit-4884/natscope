@@ -1,4 +1,5 @@
-import { Badge, Button, CopyButton, PencilIcon, RefreshIcon, InfoIcon } from '@/components/ui'
+import type { ReactNode } from 'react'
+import { Alert, Badge, Button, CopyButton, PencilIcon, RefreshIcon, InfoIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import JsonViewer from '@/components/common/JsonViewer'
 import type { ConsumerInfo } from '@/types/nats'
@@ -7,6 +8,7 @@ import { consumerConfigToNatsCli } from '../natsCli'
 import { StatCard, ConfigRow } from './consumerHelpers'
 import { getFilterSubjectsArray } from './consumerUtils'
 import { ConsumerPriority } from './ConsumerPriority'
+import type { ConsumerIssue } from './consumerHealth'
 
 interface Props {
   consumer: ConsumerInfo
@@ -29,6 +31,8 @@ interface Props {
   resetUnsupportedReason?: string
   /** When set, the server doesn't support priority groups — unpin is disabled with this tooltip. */
   unpinUnsupportedReason?: string
+  issues?: ConsumerIssue[]
+  position?: ReactNode
 }
 
 function formatPauseUntil(pauseUntil: string | undefined): string | null {
@@ -55,6 +59,8 @@ export function ConsumerView({
   pauseUnsupportedReason,
   resetUnsupportedReason,
   unpinUnsupportedReason,
+  issues = [],
+  position,
 }: Props) {
   const isPaused = consumer.paused === true
   const pauseUntilLabel = formatPauseUntil(consumer.pause_until)
@@ -88,6 +94,22 @@ export function ConsumerView({
       <div className="flex-1 overflow-auto p-4">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,600px),1fr))] gap-4 items-start">
           <div className="flex flex-col gap-4">
+            {issues.length > 0 && (
+              <Alert
+                variant={issues.some((i) => i.severity === 'error') ? 'error' : 'warning'}
+                title="What holds it back"
+                data-testid="consumer-problems"
+              >
+                <ul className="space-y-1.5">
+                  {issues.map((issue) => (
+                    <li key={issue.kind}>
+                      <span className="font-medium">{issue.label}.</span> {issue.detail}
+                    </li>
+                  ))}
+                </ul>
+              </Alert>
+            )}
+
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard
@@ -113,6 +135,8 @@ export function ConsumerView({
                 hint="Messages that were redelivered due to timeout or negative ack"
               />
             </div>
+
+            {position}
 
             {/* Configuration */}
             <div className="bg-surface-primary rounded-lg border">

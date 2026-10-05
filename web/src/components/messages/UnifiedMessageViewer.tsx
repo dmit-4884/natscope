@@ -23,6 +23,7 @@ import PayloadViewer from './PayloadViewer'
 import { DecodeNotices, type DecodeNotes } from './DecodeNotices'
 import { DetectTypeDialog } from './DetectTypeDialog'
 import { BookmarkButton } from './Bookmarks'
+import { MessageConsumers } from './MessageConsumers'
 import { MessageDeleteDialog } from './MessageDeleteDialog'
 import { buildResendDraft, type ResendDraft } from './resend'
 import type { MessageNavigation } from './unified/useMessageNavigation'
@@ -653,6 +654,14 @@ function UnifiedMessageViewer({
           )}
         </div>
       </div>
+
+      {streamName && connectionId && displayMessage?.sequence ? (
+        <MessageConsumers
+          connectionId={connectionId}
+          streamName={streamName}
+          message={{ sequence: displayMessage.sequence, subject: displayMessage.subject, timestamp: displayMessage.timestamp }}
+        />
+      ) : null}
 
       {/* Proto Type Info - hide for JSON messages without proto type */}
       {message?.content_type !== 'json' || selectedProtoType || selectedMessage?.decodedType ? (

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import type { ZodType } from 'zod'
@@ -132,7 +132,7 @@ export function createStreamScopedStore<T extends object>(
       const stored = useStore((s) => s.entries[k]?.data)
       const setEntry = useStore((s) => s.__setEntry)
       const data = useMemo(() => (stored ? { ...defaults, ...stored } : defaults), [stored])
-      const update = (patch: Partial<T>) => setEntry(k, patch, defaults)
+      const update = useCallback((patch: Partial<T>) => setEntry(k, patch, defaults), [setEntry, k])
       return [data, update] as const
     },
 

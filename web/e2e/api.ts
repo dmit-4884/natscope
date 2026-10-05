@@ -411,3 +411,31 @@ export async function requestReply(connectionId: string, subject: string, data: 
   })
   return atob(res.data ?? '')
 }
+
+export async function createPushConsumer(
+  connectionId: string,
+  streamName: string,
+  name: string,
+  filterSubject: string,
+  deliverSubject: string,
+): Promise<void> {
+  try {
+    await call('natscope.nats.management.v1.ManagementService', 'CreateConsumer', {
+      connectionId,
+      streamName,
+      name,
+      filterSubject,
+      deliverSubject,
+    })
+  } catch (e) {
+    if (!(e instanceof ConnectError && /exist|in use|already/i.test(e.message))) throw e
+  }
+}
+
+export async function deleteConsumer(connectionId: string, streamName: string, consumerName: string): Promise<void> {
+  try {
+    await call('natscope.nats.management.v1.ManagementService', 'DeleteConsumer', { connectionId, streamName, consumerName })
+  } catch (e) {
+    if (!(e instanceof ConnectError && /not found/i.test(e.message))) throw e
+  }
+}

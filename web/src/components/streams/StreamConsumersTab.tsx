@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import type { ConsumerInfo } from '@/types/nats'
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import type { ConsumerInfo, Message } from '@/types/nats'
 import {
   useConsumers,
   useCreateConsumer,
@@ -10,11 +10,14 @@ import {
   useResumeConsumer,
   useResetConsumer,
   useUnpinConsumer,
+  useStreamDetail,
 } from '@/contexts/streams'
 import { Button, PlusIcon, UsersIcon } from '@/components/ui'
 import { useServerCapabilities } from '@/contexts/connection'
 import { useConfirmation } from '@/contexts/settings'
 import { useConsumerEditorEntry } from '@/stores/streamTabState/consumerEditorStore'
+import { useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
+import { toSelectedHistoryMessage } from '../messages/unified/selectedMessage'
 import ConfigDiffModal from '../common/ConfigDiffModal'
 import type { StreamViewOutletContext } from './StreamView'
 import { ConsumerList } from './consumers/ConsumerList'
@@ -22,6 +25,8 @@ import { ConsumerEditor } from './consumers/ConsumerEditor'
 import { ConsumerView } from './consumers/ConsumerView'
 import { ConsumerConfirmDialog, type ConsumerConfirmAction } from './consumers/ConsumerConfirmDialog'
 import { consumerToConfig, defaultConsumerConfig, parseResetSequence, toConsumerUpdateRequest } from './consumers/consumerUtils'
+import { consumerIssues } from './consumers/consumerHealth'
+import { ConsumerPosition } from './consumers/ConsumerPosition'
 
 export default function StreamConsumersTab() {
   const { scope, connectionId, streamName } = useOutletContext<StreamViewOutletContext>()
@@ -34,7 +39,40 @@ export default function StreamConsumersTab() {
   const [showDiffModal, setShowDiffModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ConsumerConfirmAction | null>(null)
 
-  const { data: consumers = [], isLoading, error: consumersError, refetch, isFetching } = useConsumers(connectionId, streamName)
+  const {
+    data: consumers = [],
+    isLoading,
+    error: consumersError,
+    refetch,
+    isFetching,
+    dataUpdatedAt,
+  } = useConsumers(connectionId, streamName)
+  const { data: streamDetail } = useStreamDetail(streamName, connectionId)
+  const issues = useMemo(
+    () => Object.fromEntries(consumers.map((c) => [c.name, consumerIssues(c, streamDetail, dataUpdatedAt)])),
+    [consumers, streamDetail, dataUpdatedAt],
+  )
+
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedConsumer = searchParams.get('consumer')
+  useEffect(() => {
+    if (!requestedConsumer) return
+    setEditorState({ selectedName: requestedConsumer, isCreating: false, isEditing: false, editorMode: 'form', formDraft: null })
+    setSearchParams(
+      (params) => {
+        params.delete('consumer')
+        return params
+      },
+      { replace: true },
+    )
+  }, [requestedConsumer, setEditorState, setSearchParams])
+
+  const [, setMessagesView] = useMessagesViewEntry(scope)
+  const openMessage = (message: Message) => {
+    setMessagesView({ selectedMessage: toSelectedHistoryMessage(message) })
+    navigate(`/streams/${encodeURIComponent(streamName)}/messages`)
+  }
 
   const createConsumer = useCreateConsumer(connectionId, streamName)
   const updateConsumer = useUpdateConsumer(connectionId, streamName)
@@ -201,6 +239,7 @@ export default function StreamConsumersTab() {
         onCreate={() => {
           setEditorState({ isCreating: true, selectedName: null, formDraft: null })
         }}
+        issues={issues}
       />
 
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
@@ -264,6 +303,15 @@ export default function StreamConsumersTab() {
               pauseUnsupportedReason={pauseUnsupportedReason}
               resetUnsupportedReason={resetUnsupportedReason}
               unpinUnsupportedReason={unpinUnsupportedReason}
+              issues={issues[selectedConsumer.name]}
+              position={
+                <ConsumerPosition
+                  connectionId={connectionId}
+                  streamName={streamName}
+                  consumer={selectedConsumer}
+                  onOpenMessage={openMessage}
+                />
+              }
             />
           )
         ) : (

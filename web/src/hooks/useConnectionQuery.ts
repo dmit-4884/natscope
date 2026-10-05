@@ -20,7 +20,7 @@ export interface UseConnectionQueryOptions<T> {
   refetchOnMount?: boolean | 'always'
   refetchOnWindowFocus?: boolean | 'always'
   refetchOnReconnect?: boolean | 'always'
-  refetchInterval?: number | false | ((data: T | undefined) => number | false)
+  refetchInterval?: number | false | ((data: T | undefined, error: unknown) => number | false)
   retry?: boolean | number
 }
 
@@ -45,7 +45,7 @@ export function useConnectionQuery<T>(opts: UseConnectionQueryOptions<T>): UseQu
     refetchOnMount: opts.refetchOnMount,
     refetchOnWindowFocus: opts.refetchOnWindowFocus,
     refetchOnReconnect: opts.refetchOnReconnect,
-    refetchInterval: typeof interval === 'function' ? (query) => interval(query.state.data) : interval,
+    refetchInterval: typeof interval === 'function' ? (query) => interval(query.state.data, query.state.error) : interval,
     retry: opts.retry,
   })
 }

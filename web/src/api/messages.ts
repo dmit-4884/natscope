@@ -118,3 +118,17 @@ export async function getMessage(
   }
   return toMessage(response.message)
 }
+
+export async function getNextMessage(
+  connectionId: string,
+  streamName: string,
+  startSeq: number,
+  subjects: string[],
+  signal?: AbortSignal,
+): Promise<Message | null> {
+  const response = await messagesClient.getNextMessage(
+    { connectionId, streamName, startSeq: BigInt(startSeq), subjects },
+    { signal },
+  )
+  return response.message ? toMessage(response.message) : null
+}
