@@ -5,9 +5,8 @@ package natsgo
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
-	"strings"
+	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -16,6 +15,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 
+	corecontext "github.com/altessa-s/go-atlas/core/context"
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
@@ -104,6 +104,50 @@ func (c *Client) getMessagesViaConsumer(
 	return resp, nil
 }
 
+// fetchBrowseWindow pulls up to limit messages until the consumer has none left; skip drops messages past the window.
+// A delivery lost on the way, seen as a gap in the consumer sequence, fails the read instead of leaving a hole.
+func (c *Client) fetchBrowseWindow(consumer jetstream.Consumer, limit int, skip func(seq uint64) bool) ([]*entities.Message, error) {
+	messages := make([]*entities.Message, 0, min(limit, scanFetchMax))
+	var lastConsumerSeq uint64
+	for read := 0; read < limit; {
+		batch, err := consumer.Fetch(min(limit-read, scanFetchMax), jetstream.FetchMaxWait(scanFetchWait))
+		if err != nil {
+			return nil, wrapErr(coreerrs.Wrap(err, "fetch messages"))
+		}
+		got, done := 0, false
+		for msg := range batch.Messages() {
+			got++
+			meta, metaErr := msg.Metadata()
+			if metaErr != nil || meta == nil {
+				continue
+			}
+			if lastConsumerSeq > 0 && meta.Sequence.Consumer != lastConsumerSeq+1 {
+				return nil, wrapErr(fmt.Errorf("%w: a message was lost on a slow link, try again", errs.ErrNATSTimeout))
+			}
+			lastConsumerSeq = meta.Sequence.Consumer
+			read++
+			if !skip(meta.Sequence.Stream) {
+				messages = append(messages, scannedMessage(meta.Sequence.Stream, msg.Subject(), meta.Timestamp, msg.Data(), msg.Headers()))
+			}
+			if meta.NumPending == 0 || read >= limit {
+				done = true
+				break
+			}
+		}
+		if done {
+			break
+		}
+		if batchErr := batch.Error(); batchErr != nil && !errors.Is(batchErr, context.DeadlineExceeded) &&
+			!errors.Is(batchErr, nats.ErrTimeout) {
+			return nil, batchErr
+		}
+		if got == 0 {
+			break
+		}
+	}
+	return messages, nil
+}
+
 // consumeBrowseBatch pulls one window from an ephemeral consumer at optStartSeq and shapes it for direction.
 // startSeq is the request's upper bound (0 = LastSeq); backward results past it are dropped.
 func (c *Client) consumeBrowseBatch(
@@ -135,8 +179,13 @@ func (c *Client) consumeBrowseBatch(
 		return nil, wrapErr(err)
 	}
 	defer func() {
-		_ = stream.DeleteConsumer(ctx, ephCfg.Name) //nolint:errcheck // best-effort cleanup
+		cleanupCtx, cancel := corecontext.ApplyTimeout(context.WithoutCancel(ctx), ephemeralCleanupTimeout)
+		defer cancel()
+		_ = stream.DeleteConsumer(cleanupCtx, ephCfg.Name) //nolint:errcheck // best-effort cleanup
 	}()
+	if ci := consumer.CachedInfo(); ci != nil && ci.NumPending == 0 {
+		return &entities.MessagesResponse{Messages: []*entities.Message{}}, nil
+	}
 
 	endSeq := startSeq
 	fetchLimit := limit + 1 // +1 for hasMore detection
@@ -152,45 +201,11 @@ func (c *Client) consumeBrowseBatch(
 		fetchLimit = max(fetchLimit, limit+1)
 	}
 
-	batch, err := consumer.FetchNoWait(fetchLimit)
+	messages, err := c.fetchBrowseWindow(consumer, fetchLimit, func(seq uint64) bool {
+		return direction == DefaultDirection && endSeq > 0 && seq > endSeq
+	})
 	if err != nil {
-		return nil, wrapErr(coreerrs.Wrap(err, "fetch messages"))
-	}
-
-	messages := make([]*entities.Message, 0, min(fetchLimit, limit+1))
-	for msg := range batch.Messages() {
-		meta, metaErr := msg.Metadata()
-		if metaErr != nil || meta == nil {
-			continue
-		}
-
-		// For backward direction, skip messages after the requested upper bound.
-		if direction == DefaultDirection && endSeq > 0 && meta.Sequence.Stream > endSeq {
-			continue
-		}
-
-		headers := make(map[string]string)
-		hdrs := msg.Headers()
-		for k, v := range hdrs {
-			headers[k] = strings.Join(v, ", ")
-		}
-
-		messages = append(messages, &entities.Message{
-			Sequence:    meta.Sequence.Stream,
-			Subject:     msg.Subject(),
-			Timestamp:   meta.Timestamp,
-			DataBase64:  base64.StdEncoding.EncodeToString(msg.Data()),
-			DataSize:    len(msg.Data()),
-			ContentType: entities.DetectContentType(msg.Data()),
-			Headers:     headers,
-		})
-	}
-
-	// A plain fetch deadline just means the batch is exhausted; anything else
-	// (including a permissions violation recovered by the watched client) is a
-	// real error.
-	if batchErr := batch.Error(); batchErr != nil && !errors.Is(batchErr, context.DeadlineExceeded) {
-		return nil, batchErr
+		return nil, err
 	}
 
 	// Reverse for backward direction so newest messages come first.

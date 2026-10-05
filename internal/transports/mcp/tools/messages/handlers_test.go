@@ -211,4 +211,8 @@ func TestSearchRequest(t *testing.T) {
 
 	_, _, err = searchRequest(findMessagesInput{Stream: "ORDERS", Regex: true}, now)
 	require.EqualError(t, err, "regex needs contains")
+
+	req, _, err = searchRequest(findMessagesInput{Stream: "ORDERS", Contains: ` total \d+ `, Regex: true}, now)
+	require.NoError(t, err)
+	assert.Equal(t, ` total \d+ `, req.Text, "a regular expression is kept as written")
 }

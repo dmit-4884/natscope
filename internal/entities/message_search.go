@@ -69,6 +69,9 @@ type MessageSearchProgress struct {
 	CurrentSeq uint64
 	RangeFirst uint64
 	RangeLast  uint64
+
+	// ResumeSeq is where a search stopped now continues without skipping or repeating a match; 0 = nowhere left.
+	ResumeSeq uint64
 }
 
 // MessageSearchDone summarizes a finished search run.

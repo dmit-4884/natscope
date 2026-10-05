@@ -18,7 +18,7 @@ Click **Filters** in the toolbar to open the filter panel:
 - **Payload Search** — text the decoded or raw payload must contain, ignoring case. Turn on **Regular expression** to
   match an RE2 expression as written; start it with `(?i)` to ignore case.
 - **Header** — a header the message must carry, as `X-Trace` or `X-Trace=abc`. The name ignores case, a value must
-  match exactly.
+  match exactly; for a header sent several times, one of its values does.
 - **Start Sequence** — begin the listing at a stream sequence.
 - **Start Date & Time** — jump to the first message published at or after a timestamp. Quick chips:
   **Now**, **1h ago**, **24h ago**, **7d ago**.
@@ -34,7 +34,8 @@ It applies the subject filter itself and decodes Protobuf only when a payload do
 
 A line above the list shows how many messages the search read and how many matched, with a **Stop** button. One search
 reads at most 100,000 messages, runs at most 20 seconds and returns at most 500 matches, so a busy cluster never gets an
-unbounded scan. When it reaches one of these limits, **Search further** continues from where it stopped. The arrow keys
+unbounded scan. When it reaches one of these limits, or you stop it, **Search further** continues from where it stopped
+without skipping or repeating a match. The arrow keys
 in the message details step through the matches.
 
 Searching a work queue stream reads the messages one by one instead of through a consumer, which would remove them.

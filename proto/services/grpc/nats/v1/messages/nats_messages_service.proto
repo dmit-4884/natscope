@@ -230,6 +230,10 @@ message SearchProgress {
 
   // Required. Highest sequence of the searched range.
   uint64 range_last_seq = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Cursor that continues a search stopped now without skipping or repeating a match; unset when nothing
+  // is left. Every match before it has already been sent.
+  optional uint64 resume_seq = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines a batch of matching messages.

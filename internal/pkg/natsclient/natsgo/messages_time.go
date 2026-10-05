@@ -6,6 +6,7 @@ package natsgo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -179,10 +180,15 @@ func (c *Client) resolveSeqByTimeConsumer(
 		return 0, wrapErr(err)
 	}
 	defer func() {
-		_ = stream.DeleteConsumer(ctx, ephCfg.Name) //nolint:errcheck // best-effort cleanup
+		cleanupCtx, cancel := corecontext.ApplyTimeout(context.WithoutCancel(ctx), ephemeralCleanupTimeout)
+		defer cancel()
+		_ = stream.DeleteConsumer(cleanupCtx, ephCfg.Name) //nolint:errcheck // best-effort cleanup
 	}()
+	if ci := consumer.CachedInfo(); ci != nil && ci.NumPending == 0 {
+		return info.State.LastSeq + 1, nil
+	}
 
-	batch, err := consumer.FetchNoWait(1)
+	batch, err := consumer.Fetch(1, jetstream.FetchMaxWait(scanFetchWait))
 	if err != nil {
 		return 0, wrapErr(coreerrs.Wrap(err, "fetch by time"))
 	}
@@ -194,12 +200,9 @@ func (c *Client) resolveSeqByTimeConsumer(
 		}
 		return meta.Sequence.Stream, nil
 	}
-	// A plain fetch deadline means no message at/after target; the watched
-	// client already recovered any out-of-band permissions violation.
-	if batchErr := batch.Error(); batchErr != nil && !errors.Is(batchErr, context.DeadlineExceeded) {
+	if batchErr := batch.Error(); batchErr != nil && !errors.Is(batchErr, context.DeadlineExceeded) &&
+		!errors.Is(batchErr, nats.ErrTimeout) {
 		return 0, wrapErr(batchErr)
 	}
-
-	// Nothing at/after target — page from just past the end (empty result).
-	return info.State.LastSeq + 1, nil
+	return 0, wrapErr(fmt.Errorf("%w: the server sent no message although some follow the time", errs.ErrNATSTimeout))
 }

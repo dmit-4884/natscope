@@ -70,3 +70,20 @@ func TestSearchMatcherRejectsBadRegex(t *testing.T) {
 	require.True(t, errors.As(err, &validation))
 	assert.Contains(t, validation.Error(), "regular expression")
 }
+
+func TestSearchMatcherDecodesProtobufThatLooksLikeText(t *testing.T) {
+	t.Parallel()
+	m, err := newSearchMatcher(&entities.MessageSearchRequest{Text: `"id"`})
+	require.NoError(t, err)
+
+	msg := payloadMessage("\n$0b5f1b9e-7a64-4f4a-9a43-4d1b2a8c1f00", nil)
+	msg.ContentType = entities.ContentTypeText
+	assert.True(t, m.matchPayload(msg, func() string { return `{"id":"0b5f1b9e"}` }))
+}
+
+func TestSearchMatcherRejectsAValueWithoutAHeaderName(t *testing.T) {
+	t.Parallel()
+	_, err := newSearchMatcher(&entities.MessageSearchRequest{HeaderName: "   ", HeaderValue: "abc"})
+	var validation *errs.NATSValidationError
+	require.True(t, errors.As(err, &validation))
+}

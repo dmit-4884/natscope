@@ -27,7 +27,11 @@ const (
 	searchMatchBatch   = 50
 	searchFastWindow   = time.Second
 	searchWindowGrowth = 2
+	searchSubjectCache = 10_000
 )
+
+// searchClock is the clock budgets and progress are measured with.
+var searchClock = time.Now
 
 // searchMatcher holds the conditions a message must meet.
 type searchMatcher struct {
@@ -40,6 +44,9 @@ type searchMatcher struct {
 }
 
 func newSearchMatcher(in *entities.MessageSearchRequest) (*searchMatcher, error) {
+	if strings.TrimSpace(in.HeaderName) == "" && in.HeaderValue != "" {
+		return nil, &errs.NATSValidationError{Description: "a header value needs a header name"}
+	}
 	m := &searchMatcher{
 		headerName:  strings.TrimSpace(in.HeaderName),
 		headerValue: in.HeaderValue,
@@ -93,17 +100,14 @@ func (m *searchMatcher) matchHeaders(msg *entities.Message) bool {
 	return false
 }
 
-// matchPayload checks the text condition against the stored payload, and against the decoded one only when the
-// stored payload does not match.
+// matchPayload checks the text condition against the stored payload, and against the decoded one when the stored
+// payload does not match.
 func (m *searchMatcher) matchPayload(msg *entities.Message, decoded func() string) bool {
 	if !m.needsPayload() {
 		return true
 	}
 	if raw, err := base64.StdEncoding.DecodeString(msg.DataBase64); err == nil && m.matchText(string(raw)) {
 		return true
-	}
-	if msg.ContentType == entities.ContentTypeJSON || msg.ContentType == entities.ContentTypeText {
-		return false
 	}
 	text := decoded()
 	return text != "" && m.matchText(text)
@@ -193,7 +197,9 @@ type searchRun struct {
 	scanned      uint64
 	matched      uint64
 	current      uint64
+	resume       uint64
 	pending      []*entities.Message
+	unmapped     map[string]bool
 }
 
 // Search reads the stream in budgeted runs and streams progress, batches of matches and a summary through emit.
@@ -207,8 +213,12 @@ func (s *Service) Search(ctx context.Context, in *entities.MessageSearchRequest,
 		return err
 	}
 
-	run := &searchRun{s: s, ctx: ctx, in: in, plan: plan, matcher: matcher, emit: emit, started: time.Now()}
-	if err := run.progress(true); err != nil {
+	run := &searchRun{s: s, ctx: ctx, in: in, plan: plan, matcher: matcher, emit: emit, started: searchClock(), unmapped: map[string]bool{}}
+	run.resume = plan.from
+	if plan.backward {
+		run.resume = plan.to
+	}
+	if err := run.progress(); err != nil {
 		return err
 	}
 	if plan.rangeFirst == 0 || plan.from > plan.to {
@@ -241,7 +251,13 @@ func (r *searchRun) accept(msg *entities.Message) bool {
 		return false
 	}
 	return r.matcher.matchPayload(msg, func() string {
+		if r.unmapped[msg.Subject] {
+			return ""
+		}
 		r.s.protoService.DecodeMessages(r.ctx, []*entities.Message{msg}, false)
+		if msg.Decoded == nil && msg.DecodeError == "" && len(r.unmapped) < searchSubjectCache {
+			r.unmapped[msg.Subject] = true
+		}
 		return string(msg.Decoded)
 	})
 }
@@ -268,7 +284,7 @@ func (r *searchRun) overBudget() entities.SearchStopReason {
 	switch {
 	case r.scanned >= searchMaxScanned:
 		return entities.SearchStopScanLimit
-	case time.Since(r.started) >= searchMaxDuration:
+	case searchClock().Sub(r.started) >= searchMaxDuration:
 		return entities.SearchStopTimeLimit
 	default:
 		return entities.SearchStopUnspecified
@@ -284,6 +300,7 @@ func (r *searchRun) forward() error {
 			r.pending = append(r.pending, r.prepare(msg))
 			r.matched++
 		}
+		r.resume = msg.Sequence + 1
 		if emitErr = r.flush(false); emitErr != nil {
 			return false
 		}
@@ -311,28 +328,38 @@ func (r *searchRun) forward() error {
 	return r.done(reason, next)
 }
 
+// backward reads descending windows, each oldest first, and sends a window's matches newest first once it is read.
+// A budget reached inside a window drops that window, which the next run reads again; the first window of a run
+// always completes, so every run makes progress.
 func (r *searchRun) backward() error {
 	window := uint64(searchFirstWindow)
-	for winHi := r.plan.to; ; {
+	for winHi, first := r.plan.to, true; ; first = false {
 		winLo := r.plan.from
 		if winHi-r.plan.from+1 > window {
 			winLo = winHi - window + 1
 		}
+		r.resume = winHi
 
 		keep := int(r.maxMatches() - r.matched)
 		var found []*entities.Message
 		dropped := false
-		windowStarted := time.Now()
+		windowStarted := searchClock()
+		stop := entities.SearchStopUnspecified
 		var emitErr error
 		err := r.scan(winLo, winHi, func(msg *entities.Message) bool {
 			if r.accept(msg) {
-				found = append(found, r.prepare(msg))
+				found = append(found, msg)
 				if len(found) > keep {
-					found = slices.Delete(found, 0, 1)
+					found = found[1:]
 					dropped = true
 				}
 			}
-			emitErr = r.progress(false)
+			if !first {
+				if stop = r.overBudget(); stop != entities.SearchStopUnspecified {
+					return false
+				}
+			}
+			emitErr = r.flush(false)
 			return emitErr == nil
 		})
 		if emitErr != nil {
@@ -341,13 +368,16 @@ func (r *searchRun) backward() error {
 		if err != nil {
 			return err
 		}
+		if stop != entities.SearchStopUnspecified {
+			return r.done(stop, winHi)
+		}
 
 		slices.Reverse(found)
-		r.pending = append(r.pending, found...)
-		r.matched += uint64(len(found))
-		if err := r.flush(true); err != nil {
-			return err
+		for _, msg := range found {
+			r.pending = append(r.pending, r.prepare(msg))
 		}
+		r.matched += uint64(len(found))
+		r.resume = winLo - 1
 
 		if dropped {
 			return r.done(entities.SearchStopMatchLimit, found[len(found)-1].Sequence-1)
@@ -361,51 +391,74 @@ func (r *searchRun) backward() error {
 		if stop := r.overBudget(); stop != entities.SearchStopUnspecified {
 			return r.done(stop, winLo-1)
 		}
-		if time.Since(windowStarted) < searchFastWindow {
-			window = min(window*searchWindowGrowth, searchMaxWindow)
+		if err := r.flush(true); err != nil {
+			return err
 		}
+		window = r.nextWindow(window, windowStarted, winHi-winLo+1)
 		winHi = winLo - 1
 	}
 }
 
-// flush sends the matches found so far in batches and, when due or forced, a progress event.
+// nextWindow grows a window that read fast and keeps the next one within what is left of both budgets.
+func (r *searchRun) nextWindow(window uint64, started time.Time, covered uint64) uint64 {
+	took := searchClock().Sub(started)
+	if took < searchFastWindow {
+		window = min(window*searchWindowGrowth, searchMaxWindow)
+	}
+	if r.scanned < searchMaxScanned {
+		window = min(window, searchMaxScanned-r.scanned)
+	}
+	if perSeq := took / time.Duration(covered); perSeq > 0 {
+		left := searchMaxDuration - searchClock().Sub(r.started)
+		window = min(window, max(uint64(left/perSeq), 1))
+	}
+	return max(window, 1)
+}
+
+// flush sends the pending matches in full batches and, when due or forced, all of them followed by progress.
 func (r *searchRun) flush(force bool) error {
-	for len(r.pending) >= searchMatchBatch || (force && len(r.pending) > 0) {
-		n := min(len(r.pending), searchMatchBatch)
-		if err := r.emit(&entities.MessageSearchEvent{Matches: r.pending[:n]}); err != nil {
+	for len(r.pending) >= searchMatchBatch {
+		if err := r.emit(&entities.MessageSearchEvent{Matches: r.pending[:searchMatchBatch]}); err != nil {
 			return err
 		}
-		r.pending = r.pending[n:]
+		r.pending = r.pending[searchMatchBatch:]
 	}
-	if len(r.pending) > 0 && time.Since(r.lastProgress) >= searchProgressTick {
+	if !force && searchClock().Sub(r.lastProgress) < searchProgressTick {
+		return nil
+	}
+	return r.progress()
+}
+
+// progress sends every pending match, then where the search stands, so a stop resumes without gaps or repeats.
+func (r *searchRun) progress() error {
+	if len(r.pending) > 0 {
 		if err := r.emit(&entities.MessageSearchEvent{Matches: r.pending}); err != nil {
 			return err
 		}
 		r.pending = nil
 	}
-	return r.progress(force)
-}
-
-func (r *searchRun) progress(force bool) error {
-	if !force && time.Since(r.lastProgress) < searchProgressTick {
-		return nil
+	r.lastProgress = searchClock()
+	resume := r.resume
+	if resume < r.plan.rangeFirst || resume > r.plan.rangeLast {
+		resume = 0
 	}
-	r.lastProgress = time.Now()
 	return r.emit(&entities.MessageSearchEvent{Progress: &entities.MessageSearchProgress{
 		Scanned:    r.scanned,
 		Matched:    r.matched,
 		CurrentSeq: r.current,
 		RangeFirst: r.plan.rangeFirst,
 		RangeLast:  r.plan.rangeLast,
+		ResumeSeq:  resume,
 	}})
 }
 
 func (r *searchRun) done(reason entities.SearchStopReason, next uint64) error {
-	if err := r.flush(true); err != nil {
-		return err
-	}
 	if next < r.plan.rangeFirst || next > r.plan.rangeLast {
 		next = 0
+	}
+	r.resume = next
+	if err := r.flush(true); err != nil {
+		return err
 	}
 	return r.emit(&entities.MessageSearchEvent{Done: &entities.MessageSearchDone{
 		Scanned:    r.scanned,

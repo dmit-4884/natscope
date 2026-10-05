@@ -117,6 +117,9 @@ func pageWindow(in findMessagesInput, now time.Time, cursorWithSince bool) (*tim
 // searchRequest turns a find_messages call with contains or header into a server-side search; ok is false otherwise.
 func searchRequest(in findMessagesInput, now time.Time) (*entities.MessageSearchRequest, bool, error) {
 	contains := strings.TrimSpace(in.Contains)
+	if in.Regex && contains != "" {
+		contains = in.Contains
+	}
 	header := strings.TrimSpace(in.Header)
 	if in.Regex && contains == "" {
 		return nil, false, mcptransport.Errorf("regex needs contains")

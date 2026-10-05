@@ -166,11 +166,16 @@ func TestSearchEventToProto(t *testing.T) {
 	assert.Nil(t, complete.NextSeq, "a finished range has nothing to continue")
 
 	progress := searchEventToProto(&entities.MessageSearchEvent{Progress: &entities.MessageSearchProgress{
-		Scanned: 10, Matched: 1, CurrentSeq: 10, RangeFirst: 1, RangeLast: 900,
+		Scanned: 10, Matched: 1, CurrentSeq: 10, RangeFirst: 1, RangeLast: 900, ResumeSeq: 11,
 	}}).GetProgress()
 	require.NotNil(t, progress)
 	assert.Equal(t, uint64(10), progress.GetCurrentSeq())
 	assert.Equal(t, uint64(900), progress.GetRangeLastSeq())
+	require.NotNil(t, progress.ResumeSeq)
+	assert.Equal(t, uint64(11), progress.GetResumeSeq())
+
+	exhausted := searchEventToProto(&entities.MessageSearchEvent{Progress: &entities.MessageSearchProgress{RangeFirst: 1, RangeLast: 900}}).GetProgress()
+	assert.Nil(t, exhausted.ResumeSeq, "nothing left to resume")
 
 	matches := searchEventToProto(&entities.MessageSearchEvent{Matches: []*entities.Message{{Sequence: 7, Subject: "orders.paid"}}}).GetMatches()
 	require.Len(t, matches.GetMessages(), 1)

@@ -146,8 +146,11 @@ func searchEventToProto(event *entities.MessageSearchEvent) *messagespb.SearchMe
 		}
 		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Done{Done: done}}
 	case event.Progress != nil:
-		progress := converter.Convert(event.Progress, &messagespb.SearchProgress{})
+		progress := converter.Convert(event.Progress, &messagespb.SearchProgress{}, converter.WithIgnoreFields("ResumeSeq"))
 		progress.RangeFirstSeq, progress.RangeLastSeq = event.Progress.RangeFirst, event.Progress.RangeLast
+		if event.Progress.ResumeSeq > 0 {
+			progress.ResumeSeq = &event.Progress.ResumeSeq
+		}
 		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Progress{Progress: progress}}
 	default:
 		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Matches{
