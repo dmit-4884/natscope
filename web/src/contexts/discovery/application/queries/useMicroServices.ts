@@ -22,8 +22,7 @@ export function useMicroServices(connectionId: string | null, { autoRefresh }: {
       return skipStats ? { ...discovery, stats_access: previous?.stats_access } : discovery
     },
     refetchInterval: autoRefresh ? (data) => (data && isDenied(data.info_access) ? false : MICRO_REFRESH_MS) : false,
-    refetchOnWindowFocus: false,
-    retry: false,
+    staleTime: 0,
   })
 
   const { refetch } = query

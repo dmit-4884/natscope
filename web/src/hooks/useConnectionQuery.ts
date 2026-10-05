@@ -1,4 +1,4 @@
-import { useQuery, type QueryKey, type UseQueryResult } from '@tanstack/react-query'
+import { useQuery, type Query, type QueryKey, type UseQueryResult } from '@tanstack/react-query'
 
 /**
  * Shared key prefix for every connection-scoped query. Switching connection
@@ -35,17 +35,20 @@ export function useConnectionQuery<T>(opts: UseConnectionQueryOptions<T>): UseQu
   const connectionId = opts.connectionId ?? null
   const queryKey: QueryKey = [CONNECTION_QUERY_PREFIX, connectionId, ...opts.key]
   const interval = opts.refetchInterval
-
-  return useQuery<T>({
-    queryKey,
-    queryFn: ({ signal }) => opts.fetcher(signal),
-    enabled: !!connectionId && (opts.enabled ?? true),
+  const tuned = {
     staleTime: opts.staleTime,
     gcTime: opts.gcTime,
     refetchOnMount: opts.refetchOnMount,
     refetchOnWindowFocus: opts.refetchOnWindowFocus,
     refetchOnReconnect: opts.refetchOnReconnect,
-    refetchInterval: typeof interval === 'function' ? (query) => interval(query.state.data, query.state.error) : interval,
+    refetchInterval: typeof interval === 'function' ? (query: Query<T>) => interval(query.state.data, query.state.error) : interval,
     retry: opts.retry,
+  }
+
+  return useQuery<T>({
+    queryKey,
+    queryFn: ({ signal }) => opts.fetcher(signal),
+    enabled: !!connectionId && (opts.enabled ?? true),
+    ...Object.fromEntries(Object.entries(tuned).filter(([, value]) => value !== undefined)),
   })
 }

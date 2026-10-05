@@ -10,6 +10,6 @@ export function useConsumers(
     connectionId: connectionId ?? null,
     enabled: !!streamName,
     fetcher: (signal) => api.listConsumers(connectionId!, streamName!, signal),
-    retry: false,
+    staleTime: 0,
   })
 }

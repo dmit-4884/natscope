@@ -10,7 +10,6 @@ export function useConsumersOverview(connectionId: string | null, { autoRefresh 
     connectionId,
     fetcher: (signal) => getConsumersOverview(connectionId!, signal),
     refetchInterval: autoRefresh ? (_data, error) => (getAccessDenial(error) ? false : CONSUMERS_REFRESH_MS) : false,
-    refetchOnWindowFocus: false,
-    retry: false,
+    staleTime: 0,
   })
 }
