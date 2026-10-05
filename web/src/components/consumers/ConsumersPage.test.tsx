@@ -75,7 +75,7 @@ function renderPage() {
   )
 }
 
-const rows = () => screen.getAllByRole('button', { name: /ORDERS|EVENTS/ }).filter((el) => el.tagName === 'TR')
+const rows = () => screen.getAllByRole('link', { name: /ORDERS|EVENTS/ }).map((el) => el.closest('tr')!)
 
 describe('ConsumersPage', () => {
   beforeEach(() => {
@@ -100,6 +100,22 @@ describe('ConsumersPage', () => {
 
     fireEvent.click(await screen.findByText('billing'))
     expect(screen.getByTestId('location')).toHaveTextContent('/streams/ORDERS/consumers?consumer=billing')
+  })
+
+  it('links each consumer so it can open in a new tab', async () => {
+    mockedOverview.mockResolvedValue(overview())
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: 'billing on ORDERS: Ack limit reached' })
+    expect(link).toHaveAttribute('href', '/streams/ORDERS/consumers?consumer=billing')
+    expect(fireEvent.click(link, { metaKey: true })).toBe(true)
+    expect(screen.queryByTestId('location')).not.toBeInTheDocument()
+
+    fireEvent(within(link.closest('tr')!).getByText('Ack limit reached'), new MouseEvent('auxclick', { bubbles: true, button: 1 }))
+    expect(open).toHaveBeenCalledWith('/streams/ORDERS/consumers?consumer=billing', '_blank', 'noopener')
+    expect(screen.queryByTestId('location')).not.toBeInTheDocument()
+    open.mockRestore()
   })
 
   it('filters by text and by problems', async () => {
@@ -176,9 +192,9 @@ describe('ConsumersPage rows', () => {
     mockedOverview.mockResolvedValue(overview())
     renderPage()
 
-    expect(await screen.findByRole('button', { name: 'billing on ORDERS: Ack limit reached' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'mailer on EVENTS: Redelivering' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'archiver on ORDERS: Caught up' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'billing on ORDERS: Ack limit reached' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'mailer on EVENTS: Redelivering' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'archiver on ORDERS: Caught up' })).toBeInTheDocument()
   })
 
   it('tells a forgotten delivery time from a consumer that never delivered', async () => {
@@ -192,7 +208,7 @@ describe('ConsumersPage rows', () => {
     )
     renderPage()
 
-    expect(within(await screen.findByRole('button', { name: /^restarted on/ })).getByText('unknown')).toBeInTheDocument()
-    expect(within(screen.getByRole('button', { name: /^fresh on/ })).getByText('never')).toBeInTheDocument()
+    expect(within((await screen.findByRole('link', { name: /^restarted on/ })).closest('tr')!).getByText('unknown')).toBeInTheDocument()
+    expect(within(screen.getByRole('link', { name: /^fresh on/ }).closest('tr')!).getByText('never')).toBeInTheDocument()
   })
 })

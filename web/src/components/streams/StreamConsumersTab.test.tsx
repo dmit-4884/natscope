@@ -4,6 +4,7 @@ import { render, screen } from '@/test/utils'
 import StreamConsumersTab from './StreamConsumersTab'
 
 const policy = vi.hoisted(() => ({ readOnly: false }))
+const list = vi.hoisted(() => ({ isLoading: false }))
 
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
@@ -20,7 +21,7 @@ const mutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }
 
 vi.mock('@/contexts/streams', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/contexts/streams')>()),
-  useConsumers: () => ({ data: [], isLoading: false, error: null, refetch: vi.fn(), isFetching: false }),
+  useConsumers: () => ({ data: list.isLoading ? undefined : [], isLoading: list.isLoading, error: null, refetch: vi.fn(), isFetching: list.isLoading }),
   useStreamDetail: () => ({ data: undefined }),
   useCreateConsumer: () => mutation,
   useUpdateConsumer: () => mutation,
@@ -31,8 +32,9 @@ vi.mock('@/contexts/streams', async (importOriginal) => ({
   useUnpinConsumer: () => mutation,
 }))
 
-function renderTab(readOnly: boolean) {
+function renderTab(readOnly: boolean, isLoading = false) {
   policy.readOnly = readOnly
+  list.isLoading = isLoading
   render(
     <MemoryRouter>
       <StreamConsumersTab />
@@ -48,6 +50,14 @@ describe('StreamConsumersTab with no consumer selected', () => {
 
   it('offers no create button on a read-only connection', () => {
     renderTab(true)
+    expect(screen.queryByRole('button', { name: 'Create New Consumer' })).not.toBeInTheDocument()
+  })
+})
+
+describe('StreamConsumersTab while the consumers load', () => {
+  it('shows neither the empty pane nor the create offer', () => {
+    renderTab(false, true)
+    expect(screen.queryByText(/Select a consumer/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Create New Consumer' })).not.toBeInTheDocument()
   })
 })

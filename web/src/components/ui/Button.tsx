@@ -1,11 +1,12 @@
 import { forwardRef, type ReactNode, type ButtonHTMLAttributes } from 'react'
 import { cn } from '@/utils/cn'
+import { buttonClassName, type ButtonSize, type ButtonVariant } from './buttonStyles'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Button style variant */
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'link'
+  variant?: ButtonVariant
   /** Button size */
-  size?: 'sm' | 'md' | 'lg'
+  size?: ButtonSize
   /** Show loading spinner and disable button */
   loading?: boolean
   /** Icon to show on the left side */
@@ -16,45 +17,6 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean
   /** Button content */
   children?: ReactNode
-}
-
-const variantStyles = {
-  primary: [
-    'bg-accent text-content-inverse',
-    'hover:bg-accent-hover',
-    'active:bg-blue-800',
-    'disabled:bg-gray-300 disabled:text-content-tertiary',
-  ].join(' '),
-  secondary: [
-    'bg-surface-primary text-gray-700 border border-border-strong',
-    'hover:bg-surface-secondary',
-    'active:bg-surface-tertiary',
-    'disabled:bg-surface-tertiary disabled:text-content-muted',
-  ].join(' '),
-  danger: [
-    'bg-red-600 text-content-inverse',
-    'hover:bg-red-700',
-    'active:bg-red-800',
-    'disabled:bg-gray-300 disabled:text-content-tertiary',
-  ].join(' '),
-  ghost: [
-    'text-content-secondary bg-transparent',
-    'hover:bg-surface-tertiary hover:text-content-primary',
-    'active:bg-surface-hover',
-    'disabled:text-content-muted disabled:bg-transparent',
-  ].join(' '),
-  link: [
-    'text-accent bg-transparent underline-offset-4',
-    'hover:text-accent-text hover:underline',
-    'active:text-blue-800',
-    'disabled:text-content-muted disabled:no-underline',
-  ].join(' '),
-}
-
-const sizeStyles = {
-  sm: 'px-2.5 py-1.5 text-xs gap-1.5',
-  md: 'px-4 py-2 text-sm gap-2',
-  lg: 'px-6 py-3 text-base gap-2.5',
 }
 
 const iconSizeStyles = {
@@ -105,17 +67,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type={type}
         disabled={isDisabled}
         className={cn(
-          // Base styles
-          'inline-flex items-center justify-center font-medium rounded-md',
-          'transition-colors duration-150',
-          'focus:outline-none focus:ring-2 focus:ring-border-focus focus:ring-offset-2',
-          'disabled:cursor-not-allowed',
-          // Click feedback - subtle scale on active
-          'active:scale-[0.98]',
-          // Variant styles
-          variantStyles[variant],
-          // Size styles
-          sizeStyles[size],
+          buttonClassName(variant, size),
           // Full width
           fullWidth && 'w-full',
           // Loading state

@@ -1,5 +1,7 @@
+import { Link } from 'react-router-dom'
 import { Button, Badge, Spinner, EmptyState, QueryErrorState, SearchInput, PlusIcon, RefreshIcon, UsersIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
+import { isPlainClick } from '@/utils/clicks'
 import { plural } from '@/utils/plural'
 import type { ConsumerInfo } from '@/types/nats'
 import { ConsumerStatus } from './ConsumerStatus'
@@ -8,6 +10,7 @@ import type { ConsumerIssue } from './consumerHealth'
 const CONSUMER_ICON = <UsersIcon className="w-full h-full" />
 
 interface Props {
+  streamName: string
   consumers: ConsumerInfo[]
   selectedName: string | null
   searchQuery: string
@@ -22,6 +25,7 @@ interface Props {
 }
 
 export function ConsumerList({
+  streamName,
   consumers,
   selectedName,
   searchQuery,
@@ -49,7 +53,7 @@ export function ConsumerList({
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-content-tertiary">
-            {plural(filtered.length, 'consumer')}
+            {isLoading ? '' : plural(filtered.length, 'consumer')}
           </span>
           <div className="flex items-center gap-1">
             <Tooltip content="Refresh">
@@ -76,13 +80,18 @@ export function ConsumerList({
           <QueryErrorState error={error} onRetry={onRefetch} />
         ) : (
           filtered.map((consumer) => (
-            <button
-              type="button"
+            <Link
               key={consumer.name}
-              className={`w-full text-left appearance-none p-3 border-b cursor-pointer hover:bg-surface-secondary ${
+              to={`/streams/${encodeURIComponent(streamName)}/consumers?consumer=${encodeURIComponent(consumer.name)}`}
+              aria-current={selectedName === consumer.name ? 'true' : undefined}
+              className={`block w-full text-left p-3 border-b cursor-pointer hover:bg-surface-secondary ${
                 selectedName === consumer.name ? 'bg-accent-light' : ''
               }`}
-              onClick={() => onSelect(consumer)}
+              onClick={(event) => {
+                if (!isPlainClick(event)) return
+                event.preventDefault()
+                onSelect(consumer)
+              }}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-medium text-sm truncate">{consumer.name}</span>
@@ -120,7 +129,7 @@ export function ConsumerList({
                   <ConsumerStatus issues={issues[consumer.name]} state="warning" limit={1} />
                 </div>
               ) : null}
-            </button>
+            </Link>
           ))
         )}
 

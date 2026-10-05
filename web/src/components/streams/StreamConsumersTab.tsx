@@ -12,7 +12,7 @@ import {
   useUnpinConsumer,
   useStreamDetail,
 } from '@/contexts/streams'
-import { Button, PlusIcon, UsersIcon } from '@/components/ui'
+import { Button, PlusIcon, SkeletonRows, UsersIcon } from '@/components/ui'
 import { useConnectionPolicy, useServerCapabilities } from '@/contexts/connection'
 import { useConfirmation } from '@/contexts/settings'
 import { useConsumerEditorEntry } from '@/stores/streamTabState/consumerEditorStore'
@@ -220,6 +220,7 @@ export default function StreamConsumersTab() {
   return (
     <div className="flex-1 flex min-h-0 h-full">
       <ConsumerList
+        streamName={streamName}
         consumers={consumers}
         selectedName={selectedName}
         searchQuery={searchQuery}
@@ -259,6 +260,8 @@ export default function StreamConsumersTab() {
             priorityUnsupportedReason={unpinUnsupportedReason}
             prioritizedUnsupportedReason={prioritizedUnsupportedReason}
           />
+        ) : isLoading ? (
+          <SkeletonRows count={6} rowClassName="h-10" className="p-6" />
         ) : selectedConsumer ? (
           isEditing && !readOnly ? (
             <ConsumerEditor

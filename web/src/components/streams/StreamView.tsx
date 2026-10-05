@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
+import { Code } from '@connectrpc/connect'
+import { getErrorMessage, isErrorCode } from '@/api/errors'
 import { useStreamDetail } from '@/contexts/streams'
 import { useResizablePanel } from '@/hooks/useResizablePanel'
 import {
@@ -16,6 +18,7 @@ import {
   type HeaderDraft,
 } from '@/stores/streamTabState/publishDraftStore'
 import { useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
+import { toast } from '@/utils/toast'
 import type { SelectedMessage } from '../messages/UnifiedMessageList'
 import { useMessageNavigation } from '../messages/unified/useMessageNavigation'
 import UnifiedMessageViewer from '../messages/UnifiedMessageViewer'
@@ -25,6 +28,7 @@ import PublishHistory from './PublishHistory'
 import StreamNotFoundState from './StreamNotFoundState'
 import StreamTabs from './StreamTabs'
 import { isStreamNotFound } from './streamErrors'
+import { useLinkedMessage } from './useLinkedMessage'
 import { subjectMatchesStream } from './publish/subjectPatternUtils'
 import type { StreamPublishFeatures } from './publish/publishOptions'
 
@@ -57,7 +61,7 @@ export interface StreamViewOutletContext {
 export default function StreamView() {
   const { streamName } = useParams<{ streamName: string }>()
   const { connectionId, currentConnection, handleOpenMappings } = useOutletContext<ConnectionOutletContext>()
-  const [, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
   // The single per-stream scope used by every store keyed by (connection,
@@ -153,6 +157,26 @@ export default function StreamView() {
       return newParams
     }, { replace: true })
   }, [setSearchParams, setMessagesView])
+
+  const openLinkedMessage = useCallback(
+    (msg: SelectedMessage) => setMessagesView({ selectedMessage: msg }),
+    [setMessagesView],
+  )
+  const dropLinkedMessage = useCallback(
+    (sequence: number, error: unknown) => {
+      toast.error(isErrorCode(error, Code.NotFound) ? `Message #${sequence} is no longer in the stream` : getErrorMessage(error))
+      handleSelectMessage(null)
+    },
+    [handleSelectMessage],
+  )
+  useLinkedMessage({
+    connectionId: connectionId || null,
+    streamName: streamName ?? null,
+    param: searchParams.get('msg'),
+    selected: selectedMessage,
+    onFound: openLinkedMessage,
+    onMissing: dropLinkedMessage,
+  })
 
   // Edit & resend: fill the publish draft from a message, then jump to the
   // Publish tab.

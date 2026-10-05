@@ -1,4 +1,5 @@
-import { type KeyboardEvent, type ReactNode } from 'react'
+import { type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { isPlainClick } from '@/utils/clicks'
 import { cn } from '@/utils/cn'
 import { QueryErrorState } from './QueryErrorState'
 import { SkeletonRows } from './Skeleton'
@@ -16,6 +17,7 @@ export interface DataTableProps<T> {
   items: T[]
   rowKey: (item: T) => string
   onRowClick?: (item: T) => void
+  rowHref?: (item: T) => string
   rowActions?: (item: T) => ReactNode
   isLoading?: boolean
   loadingRows?: number
@@ -33,6 +35,7 @@ export function DataTable<T>({
   items,
   rowKey,
   onRowClick,
+  rowHref,
   rowActions,
   isLoading = false,
   loadingRows = 5,
@@ -83,14 +86,39 @@ export function DataTable<T>({
         {items.map((item) => {
           const key = rowKey(item)
           const clickable = Boolean(onRowClick)
+          const href = rowHref?.(item)
+          const rowButton = clickable && href === undefined
           const selected = selectedKey !== undefined && key === selectedKey
 
           const handleKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
-            if (!clickable) return
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault()
               onRowClick?.(item)
             }
+          }
+
+          const handleClick = (event: MouseEvent<HTMLTableRowElement>) => {
+            if (href !== undefined) {
+              if (event.target instanceof Element && event.target.closest('a, button, input, select, textarea')) return
+              if (!isPlainClick(event)) {
+                window.open(href, '_blank', 'noopener')
+                return
+              }
+            }
+            onRowClick?.(item)
+          }
+
+          const handleAuxClick = (event: MouseEvent<HTMLTableRowElement>) => {
+            if (href === undefined || event.button !== 1) return
+            if (event.target instanceof Element && event.target.closest('a')) return
+            event.preventDefault()
+            window.open(href, '_blank', 'noopener')
+          }
+
+          const handleLinkClick = (event: MouseEvent<HTMLAnchorElement>) => {
+            if (!isPlainClick(event)) return
+            event.preventDefault()
+            onRowClick?.(item)
           }
 
           return (
@@ -102,19 +130,31 @@ export function DataTable<T>({
                 selected && 'bg-accent-light',
                 rowClassName?.(item),
               )}
-              role={clickable ? 'button' : undefined}
-              aria-label={rowLabel?.(item)}
-              tabIndex={clickable ? 0 : undefined}
+              role={rowButton ? 'button' : undefined}
+              aria-label={rowButton ? rowLabel?.(item) : undefined}
+              tabIndex={rowButton ? 0 : undefined}
               aria-selected={selectedKey !== undefined ? selected : undefined}
-              onClick={clickable ? () => onRowClick?.(item) : undefined}
-              onKeyDown={clickable ? handleKeyDown : undefined}
+              onClick={clickable ? handleClick : undefined}
+              onAuxClick={href !== undefined ? handleAuxClick : undefined}
+              onKeyDown={rowButton ? handleKeyDown : undefined}
             >
-              {columns.map((column) => (
+              {columns.map((column, index) => (
                 <td
                   key={column.key}
                   className={cn('px-4 py-2.5', column.align === 'right' ? 'text-right' : 'text-left')}
                 >
-                  {column.render(item)}
+                  {href !== undefined && index === 0 ? (
+                    <a
+                      href={href}
+                      aria-label={rowLabel?.(item)}
+                      className="block rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                      onClick={handleLinkClick}
+                    >
+                      {column.render(item)}
+                    </a>
+                  ) : (
+                    column.render(item)
+                  )}
                 </td>
               ))}
               {hasActions && (

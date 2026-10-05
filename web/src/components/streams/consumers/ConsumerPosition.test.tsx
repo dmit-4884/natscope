@@ -1,5 +1,7 @@
+import type { ReactElement } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@/test/utils'
+import { MemoryRouter } from 'react-router-dom'
+import { render as renderWithClient, screen, fireEvent, waitFor } from '@/test/utils'
 import { getNextMessage } from '@/api/messages'
 import type { ConsumerInfo, Message } from '@/types/nats'
 import { ConsumerPosition } from './ConsumerPosition'
@@ -10,6 +12,10 @@ vi.mock('@/api/messages', async (importOriginal) => ({
 }))
 
 const mockedNext = vi.mocked(getNextMessage)
+
+function render(ui: ReactElement) {
+  return renderWithClient(<MemoryRouter>{ui}</MemoryRouter>)
+}
 
 function message(sequence: number, subject = 'orders.created'): Message {
   return { sequence, subject, timestamp: Date.UTC(2026, 9, 5, 12, 0, 0), data_base64: 'e30=', data_size: 2, content_type: 'json' }
@@ -44,8 +50,22 @@ describe('ConsumerPosition', () => {
     expect(mockedNext).toHaveBeenCalledWith('conn-1', 'ORDERS', 21, ['orders.created', 'orders.paid'], expect.anything())
     expect(screen.getByTestId('consumer-floor')).toHaveTextContent('Delivered up to #20 · done up to #12')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open message #22' }))
+    const open = screen.getByRole('link', { name: 'Open message #22' })
+    expect(open).toHaveAttribute('href', '/streams/ORDERS/messages?msg=history-22')
+    fireEvent.click(open)
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ sequence: 22 }))
+  })
+
+  it('leaves a modified click to the browser so the message opens in a new tab', async () => {
+    mockedNext.mockResolvedValue(message(22, 'orders.paid'))
+    const onOpen = vi.fn()
+    render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={consumer({ num_ack_pending: 0 })} onOpenMessage={onOpen} />)
+
+    const open = await screen.findByRole('link', { name: 'Open message #22' })
+    const passed = fireEvent.click(open, { metaKey: true })
+
+    expect(passed).toBe(true)
+    expect(onOpen).not.toHaveBeenCalled()
   })
 
   it('says when nothing waits, without asking the server', async () => {

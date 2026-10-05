@@ -11,6 +11,7 @@
 
 // Core components
 export { Button, type ButtonProps } from './Button'
+export { buttonClassName } from './buttonStyles'
 export { Input, type InputProps } from './Input'
 export { Modal, type ModalProps } from './Modal'
 export { DestructiveConfirm, type DestructiveConfirmProps } from './DestructiveConfirm'

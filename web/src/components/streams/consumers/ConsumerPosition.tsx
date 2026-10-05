@@ -1,9 +1,12 @@
+import { Link } from 'react-router-dom'
 import { getAccessDenial, getErrorMessage } from '@/api/errors'
-import { Button, Spinner } from '@/components/ui'
+import { buttonClassName, Spinner } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import { useNextMessage } from '@/contexts/messages'
 import { describePermission } from '@/shared/domain/access'
 import type { ConsumerInfo, Message } from '@/types/nats'
+import { isPlainClick } from '@/utils/clicks'
+import { cn } from '@/utils/cn'
 import { formatDateTime } from '@/utils/formatters'
 import { getFilterSubjectsArray, seesWholeStream } from './consumerUtils'
 
@@ -52,15 +55,18 @@ function Spot({ label, hint, idle, startSeq, lastSeq, connectionId, streamName, 
           {message.subject}
         </span>
         <span className="text-content-tertiary whitespace-nowrap">{formatDateTime(message.timestamp)}</span>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="ml-auto shrink-0"
+        <Link
+          to={`/streams/${encodeURIComponent(streamName)}/messages?msg=history-${message.sequence}`}
+          className={cn(buttonClassName('ghost', 'sm'), 'ml-auto shrink-0')}
           aria-label={`Open message #${message.sequence}`}
-          onClick={() => onOpenMessage(message)}
+          onClick={(event) => {
+            if (!isPlainClick(event)) return
+            event.preventDefault()
+            onOpenMessage(message)
+          }}
         >
           Open
-        </Button>
+        </Link>
       </span>
     )
   }

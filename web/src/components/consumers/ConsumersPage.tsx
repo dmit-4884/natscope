@@ -180,10 +180,9 @@ export default function ConsumersPage() {
     void refetch().finally(() => setManualRefresh(false))
   }
 
-  const open = (row: ConsumerRow) =>
-    navigate(
-      `/streams/${encodeURIComponent(row.consumer.stream_name ?? '')}/consumers?consumer=${encodeURIComponent(row.consumer.name)}`,
-    )
+  const hrefOf = (row: ConsumerRow) =>
+    `/streams/${encodeURIComponent(row.consumer.stream_name ?? '')}/consumers?consumer=${encodeURIComponent(row.consumer.name)}`
+  const open = (row: ConsumerRow) => navigate(hrefOf(row))
 
   const summary = () => {
     if (!data || allRows.length === 0) return 'Every JetStream consumer on this connection, and what holds it back.'
@@ -251,7 +250,7 @@ export default function ConsumersPage() {
             </div>
             <div className="flex-1 min-h-0 overflow-auto border-t border-border">
               {rows.length > 0 ? (
-                <DataTable columns={tableColumns} items={rows} rowKey={(r) => r.key} onRowClick={open}
+                <DataTable columns={tableColumns} items={rows} rowKey={(r) => r.key} onRowClick={open} rowHref={hrefOf}
                   rowLabel={(r) => `${r.consumer.name} on ${r.consumer.stream_name}: ${statusText(r.issues, r.state)}`}
                   className="min-w-[44rem]"
                 />
