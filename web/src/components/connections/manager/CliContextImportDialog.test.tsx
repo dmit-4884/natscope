@@ -63,6 +63,25 @@ describe('CliContextImportDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
+  it('imports a name two uploaded files share once, from the first file', async () => {
+    vi.mocked(listCliContexts).mockResolvedValue({
+      directory: '',
+      contexts: [
+        summary({ name: 'dup' }),
+        summary({ name: 'dup', importable: false, warnings: ['another uploaded file has the same name'] }),
+      ],
+    })
+    vi.mocked(importCliContexts).mockResolvedValue({ created: [], skipped: [] })
+    render(<CliContextImportDialog isOpen onClose={vi.fn()} />)
+
+    const boxes = await screen.findAllByRole('checkbox', { name: 'Import dup' })
+    expect(boxes[0]).toBeChecked()
+    expect(boxes[1]).not.toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Import 1 connection' }))
+
+    await waitFor(() => expect(importCliContexts).toHaveBeenCalledWith(['dup'], []))
+  })
+
   it('reports the skipped contexts', async () => {
     vi.mocked(listCliContexts).mockResolvedValue({ directory: '/d', contexts: [summary({ name: 'prod' })] })
     vi.mocked(importCliContexts).mockResolvedValue({ created: [], skipped: [{ name: 'prod', reason: 'a server URL is invalid' }] })

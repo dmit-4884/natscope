@@ -48,6 +48,18 @@ describe('jetStreamTargetErrors', () => {
     expect(jetStreamTargetErrors('', 'JS.*.API').prefix).toBeDefined()
     expect(jetStreamTargetErrors('hub', 'JS.A.API').prefix).toBe('Set a JetStream domain or an API prefix, not both')
   })
+
+  it.each(['hub-1', 'HUB_east', 'hub:east', 'région'])('accepts the domain %j the server accepts', (domain) => {
+    expect(jetStreamTargetErrors(domain, '')).toEqual({})
+  })
+
+  it.each(['hub east', 'hub.east', 'hub*', 'hub>'])('rejects the domain %j the server rejects', (domain) => {
+    expect(jetStreamTargetErrors(domain, '').domain).toBeDefined()
+  })
+
+  it.each(['JS..API', '.JS.API', 'JS.API.'])('rejects the prefix %j with an empty token', (prefix) => {
+    expect(jetStreamTargetErrors('', prefix).prefix).toBeDefined()
+  })
 })
 
 describe('inboxPrefixError', () => {

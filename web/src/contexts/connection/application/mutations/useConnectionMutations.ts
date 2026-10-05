@@ -78,7 +78,7 @@ export function useImportCliContexts() {
 
   return useMutation({
     mutationFn: ({ names, files }: { names: string[]; files: CliContextFile[] }) => importCliContexts(names, files),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: connectionKeys.all })
     },
   })

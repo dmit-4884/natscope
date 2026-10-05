@@ -47,7 +47,7 @@ export function CliContextImportDialog({ isOpen, onClose }: Props) {
   }
 
   const handleImport = async () => {
-    const names = contexts.filter((c) => chosen.has(c.name)).map((c) => c.name)
+    const names = [...new Set(contexts.filter((c) => selectable(c) && chosen.has(c.name)).map((c) => c.name))]
     try {
       const res = await importMutation.mutateAsync({ names, files: upload.files })
       if (res.created.length > 0) toast.success(`Imported ${plural(res.created.length, 'connection')}`)
@@ -127,12 +127,12 @@ export function CliContextImportDialog({ isOpen, onClose }: Props) {
           />
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border">
-            {contexts.map((c) => (
-              <li key={c.name} className="flex items-start gap-3 px-3 py-2.5">
+            {contexts.map((c, i) => (
+              <li key={`${i}:${c.name}`} className="flex items-start gap-3 px-3 py-2.5">
                 <input
                   type="checkbox"
                   aria-label={`Import ${c.name}`}
-                  checked={chosen.has(c.name)}
+                  checked={selectable(c) && chosen.has(c.name)}
                   disabled={!selectable(c)}
                   onChange={() => toggle(c.name)}
                   className="mt-1 rounded border-border-strong text-accent focus:ring-border-focus disabled:opacity-50"

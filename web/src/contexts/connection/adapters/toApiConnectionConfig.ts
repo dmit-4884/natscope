@@ -32,8 +32,9 @@ export function toApiConnectionConfig(
 export function jetStreamTargetErrors(domain: string, apiPrefix: string): { domain?: string; prefix?: string } {
   const d = domain.trim()
   const p = apiPrefix.trim()
-  if (d && !/^[A-Za-z0-9_-]+$/.test(d)) return { domain: 'A domain is one word: letters, digits, - and _' }
+  if (d && /[\s.*>]/.test(d)) return { domain: 'A domain cannot contain spaces, dots, * or >' }
   if (p && /[\s*>]/.test(p)) return { prefix: 'The API prefix cannot contain spaces or wildcards' }
+  if (p && p.split('.').some((token) => token === '')) return { prefix: 'The API prefix cannot start or end with a dot, or hold two in a row' }
   if (d && p) return { prefix: 'Set a JetStream domain or an API prefix, not both' }
   return {}
 }
