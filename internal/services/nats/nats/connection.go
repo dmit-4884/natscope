@@ -7,6 +7,8 @@ import (
 	"context"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
+	"github.com/dmit-4884/natscope/internal/pkg/natsclient"
 )
 
 // GetConnectionURL returns the NATS server URL for the given connection ID.
@@ -16,6 +18,19 @@ func (s *Service) GetConnectionURL(ctx context.Context, connectionID string) (st
 		return "", err
 	}
 	return c.URL(), nil
+}
+
+// EnsureWritable returns [errs.ErrConnectionReadOnly] for a read-only connection, so a write is refused before
+// anything is prepared for it.
+func (s *Service) EnsureWritable(ctx context.Context, connectionID string) error {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return err
+	}
+	if natsclient.IsReadOnly(c) {
+		return errs.ErrConnectionReadOnly
+	}
+	return nil
 }
 
 // GetConnectionHealth returns health status for a specific connection.

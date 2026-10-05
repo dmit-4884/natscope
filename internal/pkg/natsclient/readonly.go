@@ -26,6 +26,12 @@ type readOnlyClient struct {
 
 var _ Client = (*readOnlyClient)(nil)
 
+// IsReadOnly reports whether c refuses every write because its connection is read-only.
+func IsReadOnly(c Client) bool {
+	_, ok := c.(*readOnlyClient)
+	return ok
+}
+
 func newReadOnlyClient(c Client) *readOnlyClient {
 	return &readOnlyClient{
 		ConnectionInfo:    c,

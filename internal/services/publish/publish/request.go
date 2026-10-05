@@ -29,6 +29,9 @@ func (s *Service) Request(ctx context.Context, in *entities.RequestMessage) (*en
 	if err := natsutil.ValidateHeaderNames(in.Headers); err != nil {
 		return nil, err
 	}
+	if err := s.natsService.EnsureWritable(ctx, in.ConnectionID); err != nil && refused(err) {
+		return nil, err
+	}
 
 	data, encErr := s.resolvePayload(ctx, &in.PublishRequest)
 	if encErr != nil {

@@ -42,6 +42,11 @@ type mockNATSService struct {
 	corePublishFn func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) error
 	requestFn     func(ctx context.Context, connID, subject string, data []byte, headers map[string]string) (*entities.Reply, error)
 	urlFn         func(connID string) (string, error)
+	writableErr   error
+}
+
+func (m *mockNATSService) EnsureWritable(context.Context, string) error {
+	return m.writableErr
 }
 
 func (m *mockNATSService) Publish(ctx context.Context, connID, subject string, data []byte, headers map[string]string) error {
@@ -509,4 +514,29 @@ func TestPublish_HistoryKeepsTextEncodingHeadersAndDuplicate(t *testing.T) {
 	assert.Equal(t, entities.EncodingTypeText, hist.last.EncodingType)
 	assert.True(t, hist.last.Duplicate)
 	assert.Equal(t, map[string]string{"Nats-Msg-Id": "m-1"}, hist.last.Headers)
+}
+
+func TestPublish_ReadOnlyIsRefusedBeforeEncoding(t *testing.T) {
+	t.Parallel()
+
+	hist := &recordedHistory{}
+	proto := &mockProtoService{
+		encodeRawFn: func(context.Context, entities.CodecRequest) ([]byte, error) {
+			t.Error("a payload for a read-only connection was encoded")
+			return nil, errors.New("bad json")
+		},
+	}
+	natsm := &mockNATSService{writableErr: errs.ErrConnectionReadOnly}
+	s := New(natsm, natsm, natsm, proto, &mockHistoryService{rec: hist}, &mockSettingsService{})
+	msgType, sourceID := "api.v1.Order", "src-1"
+	req := entities.PublishRequest{ConnectionID: "c1", Subject: "orders.new", Data: "{}", MessageType: &msgType, SourceID: &sourceID}
+
+	_, err := s.Publish(t.Context(), &req)
+	require.ErrorIs(t, err, errs.ErrConnectionReadOnly)
+	_, err = s.Request(t.Context(), &entities.RequestMessage{PublishRequest: req})
+	require.ErrorIs(t, err, errs.ErrConnectionReadOnly)
+
+	hist.mu.Lock()
+	defer hist.mu.Unlock()
+	assert.Zero(t, hist.called, "a refused publish leaves no history")
 }

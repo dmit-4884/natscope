@@ -25,6 +25,9 @@ type ConnectionManager interface {
 	// GetConnectionURL returns the NATS server URL for the connection.
 	GetConnectionURL(ctx context.Context, connectionID string) (string, error)
 
+	// EnsureWritable returns errs.ErrConnectionReadOnly for a read-only connection.
+	EnsureWritable(ctx context.Context, connectionID string) error
+
 	// GetConnectionHealth returns health (RTT + state) for a connection.
 	GetConnectionHealth(ctx context.Context, connectionID string) (*entities.ConnectionHealth, error)
 
