@@ -127,7 +127,7 @@ func (s *Service) runLoop(
 
 	batch := make([]*entities.LiveMessage, 0, maxBatchSize)
 
-	var lastMsgCount int64
+	var lastMsgCount, muted int64
 	lastTime := time.Now()
 	warmup := true // skip first stats tick to avoid burst spike
 
@@ -183,7 +183,7 @@ func (s *Service) runLoop(
 			}
 
 			now := time.Now()
-			current := sess.totalMessages.Load()
+			current := sess.totalMessages.Load() - muted
 
 			if warmup {
 				warmup = false
@@ -223,6 +223,7 @@ func (s *Service) runLoop(
 				subjectCounts[msg.Subject]++
 			}
 			if limits.excludes(msg.Subject) {
+				muted++
 				continue
 			}
 

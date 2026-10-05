@@ -83,6 +83,7 @@ export function useLiveSubscription({
   const [deniedSubjects, setDeniedSubjects] = useState<string[]>([])
   const [msgPerSecond, setMsgPerSecond] = useState<number | undefined>(undefined)
   const [messagesDropped, setMessagesDropped] = useState<number | undefined>(undefined)
+  const skippedRef = useRef({ carried: 0, session: 0, cleared: 0 })
   const [pausedCount, setPausedCount] = useState(0)
 
   const [ws, setWs] = useState<LiveStreamClient | null>(null)
@@ -252,7 +253,9 @@ export function useLiveSubscription({
     socket.onBatch = processBatch
     socket.onStats = (payload: WSStatsPayload) => {
       setMsgPerSecond(payload.msg_per_second)
-      setMessagesDropped(payload.messages_dropped)
+      const skipped = skippedRef.current
+      skipped.session = payload.messages_dropped
+      setMessagesDropped(skipped.carried + skipped.session - skipped.cleared)
       if (!globalStats) return
       setGlobalStats({
         messagesReceived: payload.messages_received,
@@ -285,6 +288,7 @@ export function useLiveSubscription({
       setWs(null)
       setMsgPerSecond(undefined)
       setMessagesDropped(undefined)
+      skippedRef.current = { carried: 0, session: 0, cleared: 0 }
       setPausedCount(0)
       setIsPaused(false)
       stopDrip()
@@ -296,6 +300,8 @@ export function useLiveSubscription({
   // Subscribe / unsubscribe when stream changes on an open connection.
   useEffect(() => {
     if (!ws || wsStatus !== 'connected') return
+    const skipped = skippedRef.current
+    skippedRef.current = { carried: skipped.carried + skipped.session - skipped.cleared, session: 0, cleared: 0 }
     if (subjectsKey) ws.subscribeSubjects(subjectsKey.split('\n'), limitsRef.current)
     else if (streamName) ws.subscribe(streamName)
     else ws.unsubscribe()
@@ -330,6 +336,9 @@ export function useLiveSubscription({
     stopDrip()
     setLiveMessages([])
     setSubjectCounts({})
+    const skipped = skippedRef.current
+    skippedRef.current = { carried: 0, session: skipped.session, cleared: skipped.session }
+    setMessagesDropped((prev) => (prev === undefined ? prev : 0))
   }, [stopDrip])
 
   return useMemo(

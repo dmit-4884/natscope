@@ -461,3 +461,23 @@ func TestSubscribe_HoldsNoMoreThanItsByteBudget(t *testing.T) {
 	assert.Less(t, time.Since(start), holdTimeout/2, "a copy past the byte budget is shown, not held")
 	require.NotEmpty(t, batch.Batch.Messages)
 }
+
+func TestSubscribe_MutedSubjectsStayOutOfTheRate(t *testing.T) {
+	t.Parallel()
+
+	sub, events, stop := startFakeSessionWith(t, &entities.LiveSubscribeRequest{
+		ConnectionId:    "conn",
+		Subscriptions:   []*entities.LiveSubscriptionTarget{{Subject: ">"}},
+		ExcludeSubjects: []string{"metrics.>"},
+	})
+	defer stop()
+
+	time.Sleep(statsInterval + 500*time.Millisecond)
+	for range 50 {
+		sub.deliver(t, ">", &entities.NatsMessage{Subject: "metrics.cpu", Data: []byte("noise")})
+	}
+
+	stats := nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Stats != nil }).Stats
+	assert.Zero(t, stats.MessagesPerSecond)
+	assert.Zero(t, stats.TotalMessages)
+}

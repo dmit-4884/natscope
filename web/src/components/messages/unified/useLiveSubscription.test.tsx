@@ -247,6 +247,44 @@ describe('useLiveSubscription subjects', () => {
     expect(result.current.pausedCount).toBe(7)
   })
 
+  it('keeps counting skipped messages when the subscription restarts', () => {
+    const { result, rerender } = renderHook(
+      ({ rate }) =>
+        useLiveSubscription({
+          connectionId: 'conn-1',
+          streamName: null,
+          subjects: ['>'],
+          enabled: true,
+          initialLimit: 100,
+          globalStats: false,
+          subjectLimits: { maxDisplayRate: rate },
+        }),
+      { initialProps: { rate: 5 } },
+    )
+    const client = clients[clients.length - 1]
+    act(() => client.onStats?.({ messages_received: 900, messages_dropped: 500, msg_per_second: 90 }))
+
+    rerender({ rate: 10 })
+    expect(result.current.messagesDropped).toBe(500)
+
+    act(() => client.onStats?.({ messages_received: 10, messages_dropped: 3, msg_per_second: 2 }))
+    expect(result.current.messagesDropped).toBe(503)
+  })
+
+  it('clears the skipped count with the feed', () => {
+    const { result } = renderHook(() =>
+      useLiveSubscription({ connectionId: 'conn-1', streamName: null, subjects: ['>'], enabled: true, initialLimit: 100, globalStats: false }),
+    )
+    const client = clients[clients.length - 1]
+    act(() => client.onStats?.({ messages_received: 50, messages_dropped: 12, msg_per_second: 5 }))
+
+    act(() => result.current.clearMessages())
+    expect(result.current.messagesDropped).toBe(0)
+
+    act(() => client.onStats?.({ messages_received: 60, messages_dropped: 15, msg_per_second: 5 }))
+    expect(result.current.messagesDropped).toBe(3)
+  })
+
   it('keeps its own message rate and leaves the shared stream stats alone', () => {
     setStats.mockClear()
     const { result } = renderHook(() =>
