@@ -190,7 +190,7 @@ func truncateMessages(messages []*entities.Message, maxBytes int) {
 		}
 		m.Truncated = true
 		if dataTooBig {
-			m.DataBase64 = m.DataBase64[:base64Cap]
+			m.DataBase64 = strings.Clone(m.DataBase64[:base64Cap])
 		}
 		if decodedTooBig {
 			// Small fixed-size text preview: byte-cutting JSON is invalid

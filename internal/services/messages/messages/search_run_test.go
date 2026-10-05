@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,6 +40,8 @@ type fakeStream struct {
 	deleted     map[uint64]bool
 	match       uint64
 	clock       *fakeClock
+	size        int
+	onYield     func(*entities.Message)
 }
 
 func (f *fakeStream) has(seq uint64) bool { return seq >= f.first && seq <= f.last && !f.deleted[seq] }
@@ -63,7 +67,11 @@ func (f *fakeStream) ScanMessages(ctx context.Context, _, _ string, opts entitie
 			if seq%f.match == 0 {
 				payload = "needle"
 			}
-			msg := &entities.Message{Sequence: seq, Subject: "s", DataBase64: base64.StdEncoding.EncodeToString([]byte(payload))}
+			raw := []byte(payload + strings.Repeat(" ", max(f.size-len(payload), 0)))
+			msg := &entities.Message{Sequence: seq, Subject: "s", DataBase64: base64.StdEncoding.EncodeToString(raw), DataSize: len(raw)}
+			if f.onYield != nil {
+				f.onYield(msg)
+			}
 			if !yield(msg, nil) {
 				return
 			}
@@ -230,6 +238,31 @@ func TestSearchProgressNamesWhereToResumeFromTheStart(t *testing.T) {
 
 	fwd := runSearch(t, s, entities.MessageSearchRequest{Direction: "forward", Text: "needle", CursorSeq: new(uint64(1200))}, 1)
 	assert.Equal(t, uint64(1200), fwd.resume)
+}
+
+func TestSearchBackwardDoesNotHoldWholePayloadsOfAWindow(t *testing.T) {
+	const limit = 1024
+	type held struct {
+		msg      *entities.Message
+		original *byte
+	}
+	var seen []held
+	var oversized []uint64
+	f := &fakeStream{first: 1, last: 600, match: 1, size: 64 << 10, clock: &fakeClock{now: time.Unix(0, 0), step: time.Microsecond}}
+	f.onYield = func(next *entities.Message) {
+		for _, h := range seen {
+			if len(h.msg.DataBase64) > limit*2 || unsafe.StringData(h.msg.DataBase64) == h.original {
+				oversized = append(oversized, h.msg.Sequence)
+			}
+		}
+		seen = append(seen, held{msg: next, original: unsafe.StringData(next.DataBase64)})
+	}
+	s := newFakeSearch(t, f)
+
+	res := runSearch(t, s, entities.MessageSearchRequest{Direction: "backward", Text: "needle", MaxPayloadBytes: new(int32(limit))}, 0)
+
+	assert.Len(t, res.matches, searchMaxMatches)
+	assert.Empty(t, oversized, "a match waiting for its window keeps only the trimmed payload")
 }
 
 type countingCodec struct {

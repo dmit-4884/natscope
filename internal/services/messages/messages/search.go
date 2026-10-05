@@ -348,7 +348,7 @@ func (r *searchRun) backward() error {
 		var emitErr error
 		err := r.scan(winLo, winHi, func(msg *entities.Message) bool {
 			if r.accept(msg) {
-				found = append(found, msg)
+				found = append(found, r.prepare(msg))
 				if len(found) > keep {
 					found = found[1:]
 					dropped = true
@@ -373,9 +373,7 @@ func (r *searchRun) backward() error {
 		}
 
 		slices.Reverse(found)
-		for _, msg := range found {
-			r.pending = append(r.pending, r.prepare(msg))
-		}
+		r.pending = append(r.pending, found...)
 		r.matched += uint64(len(found))
 		r.resume = winLo - 1
 
