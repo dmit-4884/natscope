@@ -733,3 +733,15 @@ func TestToConsumerInfo_LastActive(t *testing.T) {
 	assert.Nil(t, idle.Delivered.LastActive, "a consumer that never delivered has no activity time")
 	assert.Nil(t, idle.AckFloor.LastActive)
 }
+
+func TestClient_OwnConsumersAreTrackedByName(t *testing.T) {
+	t.Parallel()
+	c := &Client{}
+
+	forget := c.trackOwnConsumer("natscope-live-abc")
+	assert.True(t, c.isOwnConsumer("natscope-live-abc"))
+	assert.False(t, c.isOwnConsumer("natscope-live-other"), "a matching prefix is not enough")
+
+	forget()
+	assert.False(t, c.isOwnConsumer("natscope-live-abc"))
+}

@@ -171,6 +171,7 @@ func (c *Client) resolveSeqByTimeConsumer(
 		InactiveThreshold: browseConsumerInactiveThreshold,
 		Name:              timeResConsumerPrefix + nats.NewInbox()[7:],
 	}
+	defer c.trackOwnConsumer(ephCfg.Name)()
 
 	consumer, err := stream.CreateConsumer(ctx, ephCfg)
 	if err != nil {

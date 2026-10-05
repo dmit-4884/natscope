@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -31,10 +30,16 @@ const (
 	timeResConsumerPrefix = "natscope-timeres-"
 )
 
-// isOwnConsumer reports whether natscope created the consumer to read a stream.
-func isOwnConsumer(name string) bool {
-	return strings.HasPrefix(name, liveConsumerPrefix) || strings.HasPrefix(name, browseConsumerPrefix) ||
-		strings.HasPrefix(name, timeResConsumerPrefix)
+// trackOwnConsumer remembers a consumer this client creates to read a stream; the returned func forgets it.
+func (c *Client) trackOwnConsumer(name string) func() {
+	c.ownConsumers.Store(name, struct{}{})
+	return func() { c.ownConsumers.Delete(name) }
+}
+
+// isOwnConsumer reports whether this client created the consumer to read a stream.
+func (c *Client) isOwnConsumer(name string) bool {
+	_, ok := c.ownConsumers.Load(name)
+	return ok
 }
 
 // GetConsumersOverview lists every stream, then the consumers of each in parallel; a stream whose consumers

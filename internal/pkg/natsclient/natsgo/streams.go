@@ -182,7 +182,7 @@ func (c *Client) GetStreamConsumers(ctx context.Context, streamName string) ([]e
 	consumers := []entities.ConsumerInfo{}
 	consumerLister := stream.ListConsumers(ctx)
 	for info := range consumerLister.Info() {
-		if info == nil || isOwnConsumer(info.Name) {
+		if info == nil || c.isOwnConsumer(info.Name) {
 			continue
 		}
 		consumers = append(consumers, *toConsumerInfo(info, streamName))

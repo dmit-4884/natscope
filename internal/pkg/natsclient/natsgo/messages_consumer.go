@@ -128,6 +128,7 @@ func (c *Client) consumeBrowseBatch(
 	} else if len(filterSubjects) > 1 {
 		ephCfg.FilterSubjects = filterSubjects
 	}
+	defer c.trackOwnConsumer(ephCfg.Name)()
 
 	consumer, err := stream.CreateConsumer(ctx, ephCfg)
 	if err != nil {

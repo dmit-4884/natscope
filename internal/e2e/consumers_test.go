@@ -4,6 +4,8 @@
 package e2e
 
 import (
+	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,9 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	livepb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/live"
 	messagespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/messages"
 	statspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/stats"
+	settingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/settings/v1/settings"
 	natstypes "github.com/dmit-4884/natscope/proto/gen/types/nats"
+	settingstypes "github.com/dmit-4884/natscope/proto/gen/types/settings"
 )
 
 func jetStreamFor(t *testing.T, url string, opts ...nats.Option) jetstream.JetStream {
@@ -98,9 +103,7 @@ func TestConsumersOverview(t *testing.T) {
 	recentTimestamp(t, c.GetAckFloor().GetLastActive(), "ack_floor.last_active")
 	assert.Equal(t, "overview.created", c.GetConfig().GetFilterSubject())
 	assert.Contains(t, c.GetRaw(), `"name":"billing"`)
-	for _, listed := range got.GetConsumers() {
-		assert.NotEqual(t, "natscope-browse-e2e", listed.GetName(), "natscope's own short-lived consumers stay out of the list")
-	}
+	findConsumer(t, got.GetConsumers(), "OVERVIEW", "natscope-browse-e2e")
 
 	names := make([]string, 0, len(got.GetStreams()))
 	for _, s := range got.GetStreams() {
@@ -229,4 +232,61 @@ func TestGetNextMessage(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err))
 	})
+}
+
+func TestConsumersOverviewHidesOnlyItsOwnLiveConsumer(t *testing.T) {
+	env := setupE2E(t)
+	connID := createTestConnection(t, env, "consumers-own", env.natsURL, nil)
+	js := jetStreamFor(t, env.natsURL)
+	ctx := t.Context()
+	_, err := env.settings.UpdateSettings(ctx, connect.NewRequest(&settingspb.UpdateSettingsRequest{
+		Live: &settingstypes.LiveSettings{SubscriptionMode: new("jetstream_ordered")},
+	}))
+	require.NoError(t, err)
+	stream := addStream(t, js, "OWN", "own.>")
+	_, err = stream.CreateConsumer(ctx, jetstream.ConsumerConfig{Name: "natscope-live-impostor", AckPolicy: jetstream.AckNonePolicy})
+	require.NoError(t, err)
+
+	subCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	stopPublishing := make(chan struct{})
+	defer close(stopPublishing)
+	go func() {
+		ticker := time.NewTicker(150 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopPublishing:
+				return
+			case <-subCtx.Done():
+				return
+			case <-ticker.C:
+				_, _ = js.Publish(subCtx, "own.tick", []byte(`{}`))
+			}
+		}
+	}()
+	sub, err := env.live.Subscribe(subCtx, connect.NewRequest(&livepb.SubscribeRequest{
+		ConnectionId:  connID,
+		Subscriptions: []*livepb.LiveSubscription{{Subject: "own.>", StreamName: new("OWN")}},
+	}))
+	require.NoError(t, err)
+	defer sub.Close()
+	require.True(t, sub.Receive(), "the live session starts")
+
+	var live string
+	require.Eventually(t, func() bool {
+		for name := range stream.ConsumerNames(ctx).Name() {
+			if strings.HasPrefix(name, "natscope-live-") && name != "natscope-live-impostor" {
+				live = name
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 100*time.Millisecond, "the live session reads the stream through its own consumer")
+
+	got := consumersOverview(t, env, connID)
+	findConsumer(t, got.GetConsumers(), "OWN", "natscope-live-impostor")
+	for _, c := range got.GetConsumers() {
+		assert.NotEqual(t, live, c.GetName(), "natscope's own live consumer is not the user's")
+	}
 }

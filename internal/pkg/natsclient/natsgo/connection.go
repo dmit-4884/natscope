@@ -80,6 +80,7 @@ type jsSubscriptionWrapper struct {
 	consumeCtx   jetstream.ConsumeContext
 	stream       jetstream.Stream
 	consumerName string
+	forget       func()
 }
 
 func (s *jsSubscriptionWrapper) Unsubscribe() error {
@@ -90,6 +91,9 @@ func (s *jsSubscriptionWrapper) Unsubscribe() error {
 		ctx, cancel := corecontext.ApplyTimeout(context.Background(), ephemeralCleanupTimeout)
 		defer cancel()
 		_ = s.stream.DeleteConsumer(ctx, s.consumerName) //nolint:errcheck // best-effort cleanup
+	}
+	if s.forget != nil {
+		s.forget()
 	}
 	return nil
 }
@@ -141,8 +145,10 @@ func (c *Client) SubscribeJetStream(
 		InactiveThreshold: ephemeralConsumerInactiveThreshold,
 	}
 
+	forget := c.trackOwnConsumer(consumerName)
 	consumer, err := stream.CreateConsumer(ctx, ephCfg)
 	if err != nil {
+		forget()
 		return nil, wrapErr(err)
 	}
 
@@ -164,6 +170,7 @@ func (c *Client) SubscribeJetStream(
 	})
 	if err != nil {
 		_ = stream.DeleteConsumer(ctx, consumerName) //nolint:errcheck // best-effort cleanup
+		forget()
 		return nil, wrapErr(errors.WrapOperation(err, "start consuming"))
 	}
 
@@ -171,6 +178,7 @@ func (c *Client) SubscribeJetStream(
 		consumeCtx:   consumeCtx,
 		stream:       stream,
 		consumerName: consumerName,
+		forget:       forget,
 	}, nil
 }
 

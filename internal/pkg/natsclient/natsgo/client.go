@@ -80,6 +80,9 @@ type Client struct {
 
 	// putObjectLocks serializes PutObject per (bucket, name).
 	putObjectLocks sync.Map
+
+	// ownConsumers holds the names of the short-lived consumers this client created to read streams.
+	ownConsumers sync.Map
 }
 
 var _ natsclient.Client = (*Client)(nil)
