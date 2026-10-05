@@ -58,7 +58,7 @@ func (c *Client) GetConsumersOverview(ctx context.Context) (*entities.ConsumersO
 	perStream, err := concurrency.ProcessCollect(ctx, streams,
 		func(ctx context.Context, stream entities.StreamInfo) (streamConsumers, error) {
 			defer panics.Handle(ctx)
-			consumers, listErr := c.GetStreamConsumers(ctx, stream.Config.Name)
+			consumers, listErr := c.listConsumers(ctx, stream.Config.Name)
 			return streamConsumers{consumers: consumers, err: listErr}, nil
 		},
 	)
@@ -87,6 +87,47 @@ func (c *Client) GetConsumersOverview(ctx context.Context) (*entities.ConsumersO
 		overview.Streams = append(overview.Streams, stream)
 	}
 	return overview, nil
+}
+
+// consumerListPage is one page of the CONSUMER.LIST response.
+type consumerListPage struct {
+	Total     int                       `json:"total"`
+	Consumers []*jetstream.ConsumerInfo `json:"consumers"`
+	Error     *jetstream.APIError       `json:"error,omitempty"`
+}
+
+// listConsumers pages CONSUMER.LIST of a stream whose info the caller already has, so no STREAM.INFO precedes it.
+func (c *Client) listConsumers(ctx context.Context, streamName string) ([]entities.ConsumerInfo, error) {
+	consumers := []entities.ConsumerInfo{}
+	for offset := 0; ; {
+		reqData, err := json.Marshal(struct {
+			Offset int `json:"offset"`
+		}{Offset: offset})
+		if err != nil {
+			return nil, wrapErr(coreerrs.WrapOperation(err, "marshal consumer list request"))
+		}
+		msg, err := c.request(ctx, c.apiSubject("CONSUMER.LIST."+streamName), reqData)
+		if err != nil {
+			return nil, wrapErr(coreerrs.WrapOperation(err, "list consumers"))
+		}
+		var page consumerListPage
+		if err := json.Unmarshal(msg.Data, &page); err != nil {
+			return nil, wrapErr(coreerrs.WrapOperation(err, "unmarshal consumer list"))
+		}
+		if page.Error != nil {
+			return nil, wrapErr(page.Error)
+		}
+		for _, info := range page.Consumers {
+			if info == nil || c.isOwnConsumer(info.Name) {
+				continue
+			}
+			consumers = append(consumers, *toConsumerInfo(info, streamName))
+		}
+		offset += len(page.Consumers)
+		if len(page.Consumers) == 0 || offset >= page.Total {
+			return consumers, nil
+		}
+	}
 }
 
 func unreadableStream(name string, err error) entities.UnreadableStream {

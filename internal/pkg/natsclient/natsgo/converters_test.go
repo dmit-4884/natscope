@@ -761,3 +761,19 @@ func TestToConsumerInfo_Pause(t *testing.T) {
 	assert.False(t, running.Paused)
 	assert.Nil(t, running.PauseUntil)
 }
+
+// TestConsumerInfoConversion_KeepsTheStartTimeFraction checks that a start time keeps the part of the second the server
+// starts from, so messages stored earlier in that second still count as skipped.
+func TestConsumerInfoConversion_KeepsTheStartTimeFraction(t *testing.T) {
+	start := time.Date(2026, 10, 5, 10, 30, 0, 250_000_000, time.UTC)
+	info := toConsumerInfo(&jetstream.ConsumerInfo{
+		Name:   "late",
+		Stream: "ORDERS",
+		Config: jetstream.ConsumerConfig{DeliverPolicy: jetstream.DeliverByStartTimePolicy, OptStartTime: &start},
+	}, "ORDERS")
+
+	require.NotNil(t, info.Config)
+	parsed, err := time.Parse(time.RFC3339Nano, info.Config.OptStartTime)
+	require.NoError(t, err)
+	assert.True(t, parsed.Equal(start), "got %s", info.Config.OptStartTime)
+}

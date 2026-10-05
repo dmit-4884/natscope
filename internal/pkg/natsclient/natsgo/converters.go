@@ -88,7 +88,7 @@ func toConsumerInfo(info *jetstream.ConsumerInfo, streamName string) *entities.C
 	result.Created = new(info.Created)
 	result.TimeStamp = new(info.TimeStamp)
 	if info.Config.OptStartTime != nil && result.Config != nil {
-		result.Config.OptStartTime = info.Config.OptStartTime.Format(time.RFC3339)
+		result.Config.OptStartTime = info.Config.OptStartTime.Format(time.RFC3339Nano)
 	}
 	if info.Paused && info.Config.PauseUntil != nil {
 		result.PauseUntil = new(*info.Config.PauseUntil)
