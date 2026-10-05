@@ -179,6 +179,31 @@ func TestSubscribeCoreSubjects(t *testing.T) {
 		}
 	})
 
+	t.Run("overlapping subjects deliver each message once", func(t *testing.T) {
+		events := openLive(t, env, connID, ">", "dup.>", "dup.*")
+		stop := make(chan struct{})
+		publishUntil(t, stop, func() { _ = nc.Publish("dup.probe", nil) })
+		var probe *natstypes.NatsMessage
+		waitLive(t, events, 10*time.Second, batchMessage("dup.probe", &probe))
+		close(stop)
+
+		require.NoError(t, nc.Publish("dup.once", []byte("1")))
+		require.NoError(t, nc.Publish("dup.end", nil))
+		require.NoError(t, nc.Flush())
+
+		seen := 0
+		var end *natstypes.NatsMessage
+		waitLive(t, events, 10*time.Second, func(ev *livepb.LiveEvent) bool {
+			for _, m := range ev.GetBatch().GetMessages() {
+				if m.GetSubject() == "dup.once" {
+					seen++
+				}
+			}
+			return batchMessage("dup.end", &end)(ev)
+		})
+		assert.Equal(t, 1, seen)
+	})
+
 	t.Run("core publish may carry no body", func(t *testing.T) {
 		resp, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
 			ConnectionId: connID, Subject: "core.empty", Core: true,

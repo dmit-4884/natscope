@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	livesvc "github.com/dmit-4884/natscope/internal/services/live"
@@ -81,7 +82,7 @@ type sessionState struct {
 	lostOnce     sync.Once
 
 	denials        chan *entities.LiveError
-	silentMu       sync.Mutex
+	silentMu       sync.RWMutex
 	silentSubjects map[string]struct{}
 }
 
@@ -115,15 +116,18 @@ func (sess *sessionState) markSilent(subject string) bool {
 	return true
 }
 
-func (sess *sessionState) allSilent(subjects []string) bool {
-	sess.silentMu.Lock()
-	defer sess.silentMu.Unlock()
-	for _, subject := range subjects {
-		if _, silent := sess.silentSubjects[subject]; !silent {
-			return false
+func (sess *sessionState) takenEarlier(earlier []string, subject string) bool {
+	sess.silentMu.RLock()
+	defer sess.silentMu.RUnlock()
+	for _, pattern := range earlier {
+		if _, silent := sess.silentSubjects[pattern]; silent {
+			continue
+		}
+		if natsutil.MatchSubject(pattern, subject) && takesInternal(pattern, subject) {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func (sess *sessionState) markLost() {

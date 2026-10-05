@@ -27,6 +27,10 @@ are kept until you disconnect or switch to another connection.
 Messages show up newest first with their subject, time and size. Click one to open it in the same
 viewer as stream messages, decoded from Protobuf when a [subject mapping](/guide/protobuf) matches.
 
+A message that matches several of your subjects, such as `orders.created` under both `orders.>` and
+`>`, shows up once and is counted once. A plain NATS client with overlapping subscriptions would get one
+copy per subscription.
+
 - **Search** filters the received messages by subject and payload text.
 - The counters under the toolbar show how many messages arrived on each subject; click one to show only
   that subject.

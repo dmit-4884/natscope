@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -25,7 +26,7 @@ func (s *Service) Subscribe(
 	if err := validateSubscriptionTargets(in.Subscriptions); err != nil {
 		return err
 	}
-	targets, shadows := dedupeSubscriptionTargets(in.Subscriptions)
+	targets := dedupeSubscriptionTargets(in.Subscriptions)
 
 	sess := newSessionState(in.ConnectionId)
 	s.registerSession(sess)
@@ -39,7 +40,7 @@ func (s *Service) Subscribe(
 
 	msgChan := make(chan *entities.NatsMessage, messageBufferSize)
 
-	subscriptions, partialErrs, setupErr := s.startSubscriptions(ctx, in.ConnectionId, targets, shadows, mode, msgChan, sess)
+	subscriptions, partialErrs, setupErr := s.startSubscriptions(ctx, in.ConnectionId, targets, mode, msgChan, sess)
 	defer func() {
 		for _, sub := range subscriptions {
 			if sub != nil {
@@ -74,11 +75,8 @@ func validateSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) err
 }
 
 // dedupeSubscriptionTargets drops exact duplicates and literal stream subjects covered by a wildcard of the same
-// stream. A covered core subject stays, keyed to the wildcards covering it, so it can deliver once the server
-// refuses all of them.
-func dedupeSubscriptionTargets(
-	targets []*entities.LiveSubscriptionTarget,
-) ([]*entities.LiveSubscriptionTarget, map[*entities.LiveSubscriptionTarget][]string) {
+// stream. Overlapping core subjects all stay: startSubscriptions hands each message to one of them.
+func dedupeSubscriptionTargets(targets []*entities.LiveSubscriptionTarget) []*entities.LiveSubscriptionTarget {
 	type targetKey struct {
 		subject    string
 		streamName string
@@ -98,34 +96,25 @@ func dedupeSubscriptionTargets(
 		out = append(out, t)
 	}
 
-	coverers := make(map[*entities.LiveSubscriptionTarget][]string)
-	for _, a := range out {
-		if isLiteralSubject(a.Subject) {
-			continue // only a wildcard pattern can cover another target
-		}
-		for _, b := range out {
-			if a == b || !isLiteralSubject(b.Subject) || streamNameOf(a) != streamNameOf(b) {
-				continue
-			}
-			if natsutil.MatchSubject(a.Subject, b.Subject) {
-				coverers[b] = append(coverers[b], a.Subject)
-			}
-		}
-	}
-
 	result := make([]*entities.LiveSubscriptionTarget, 0, len(out))
-	shadows := make(map[*entities.LiveSubscriptionTarget][]string)
-	for _, t := range out {
-		subjects, isCovered := coverers[t]
-		switch {
-		case !isCovered:
-			result = append(result, t)
-		case streamNameOf(t) == "":
-			result = append(result, t)
-			shadows[t] = subjects
+	for _, b := range out {
+		if !coveredInStream(b, out) {
+			result = append(result, b)
 		}
 	}
-	return result, shadows
+	return result
+}
+
+func coveredInStream(b *entities.LiveSubscriptionTarget, targets []*entities.LiveSubscriptionTarget) bool {
+	if streamNameOf(b) == "" || !isLiteralSubject(b.Subject) {
+		return false
+	}
+	for _, a := range targets {
+		if a != b && !isLiteralSubject(a.Subject) && streamNameOf(a) == streamNameOf(b) && natsutil.MatchSubject(a.Subject, b.Subject) {
+			return true
+		}
+	}
+	return false
 }
 
 func streamNameOf(t *entities.LiveSubscriptionTarget) string {
@@ -184,13 +173,12 @@ func liveErrorFor(subject string, err error) *entities.LiveError {
 }
 
 // startSubscriptions resolves every target into concrete NATS subscriptions;
-// it returns per-target failures as long as at least one target succeeds. A
-// shadowed target delivers only after the server refused every wildcard covering it.
+// it returns per-target failures as long as at least one target succeeds. When
+// core subjects overlap, a message is delivered by the first live one that takes it.
 func (s *Service) startSubscriptions(
 	ctx context.Context,
 	connectionID string,
 	targets []*entities.LiveSubscriptionTarget,
-	shadows map[*entities.LiveSubscriptionTarget][]string,
 	mode string,
 	msgChan chan<- *entities.NatsMessage,
 	sess *sessionState,
@@ -198,15 +186,19 @@ func (s *Service) startSubscriptions(
 	var subs []entities.Subscription
 	var partialErrs []*entities.LiveError
 	var lastErr error
+	var coreBefore []string
 	for _, target := range targets {
 		handler := s.buildMessageHandler(target.Subject, msgChan, sess)
-		if coverers := shadows[target]; len(coverers) > 0 {
-			deliver := handler
-			handler = func(msg *entities.NatsMessage) {
-				if sess.allSilent(coverers) {
-					deliver(msg)
+		if streamNameOf(target) == "" {
+			if earlier := slices.Clone(coreBefore); len(earlier) > 0 {
+				deliver := handler
+				handler = func(msg *entities.NatsMessage) {
+					if !sess.takenEarlier(earlier, msg.Subject) {
+						deliver(msg)
+					}
 				}
 			}
+			coreBefore = append(coreBefore, target.Subject)
 		}
 		targetSubs, err := s.subscribeTarget(ctx, connectionID, target, mode, handler, sess)
 		if err != nil {
@@ -234,9 +226,8 @@ func (s *Service) buildMessageHandler(
 	msgChan chan<- *entities.NatsMessage,
 	sess *sessionState,
 ) entities.MessageHandler {
-	allowInternal := natsutil.IsInternalSubject(targetSubject)
 	return func(msg *entities.NatsMessage) {
-		if !allowInternal && natsutil.IsInternalSubject(msg.Subject) {
+		if !takesInternal(targetSubject, msg.Subject) {
 			return
 		}
 		sess.totalMessages.Add(1)
@@ -253,6 +244,10 @@ func (s *Service) buildMessageHandler(
 			sess.messagesDropped.Add(1)
 		}
 	}
+}
+
+func takesInternal(pattern, subject string) bool {
+	return !natsutil.IsInternalSubject(subject) || natsutil.IsInternalSubject(pattern)
 }
 
 // subscribeTarget resolves a target into subscriptions: JetStream-ordered +

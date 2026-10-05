@@ -183,6 +183,110 @@ func TestSubscribe_ACoveredSubjectTakesOverWhenItsWildcardIsDenied(t *testing.T)
 	require.NoError(t, <-done)
 }
 
+func TestSubscribe_OverlappingSubjectsDeliverAMessageOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		targets  []string
+		subject  string
+		carriers []string
+	}{
+		{name: "wildcard under a wider wildcard", targets: []string{">", "orders.>"}, subject: "orders.created", carriers: []string{">", "orders.>"}},
+		{name: "wider wildcard listed second", targets: []string{"orders.>", ">"}, subject: "orders.created", carriers: []string{"orders.>", ">"}},
+		{name: "partial overlap", targets: []string{"orders.*", "*.created"}, subject: "orders.created", carriers: []string{"orders.*", "*.created"}},
+		{name: "literal under a wildcard", targets: []string{"orders.created", "orders.>"}, subject: "orders.created", carriers: []string{"orders.created", "orders.>"}},
+		{name: "system subject under the full wildcard", targets: []string{">", "$JS.EVENT.>"}, subject: "$JS.EVENT.ADVISORY.X", carriers: []string{">", "$JS.EVENT.>"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sub, events, stop := startFakeSession(t, tt.targets...)
+			defer stop()
+
+			for _, carrier := range tt.carriers {
+				sub.deliver(t, carrier, &entities.NatsMessage{Subject: tt.subject, Data: []byte("once")})
+			}
+			sub.deliver(t, tt.carriers[0], &entities.NatsMessage{Subject: tt.subject, Data: []byte("end")})
+			for _, carrier := range tt.carriers[1:] {
+				sub.deliver(t, carrier, &entities.NatsMessage{Subject: tt.subject, Data: []byte("end")})
+			}
+
+			assert.Equal(t, map[string]int{"once": 1, "end": 1}, collectPayloads(t, events, "end"))
+		})
+	}
+}
+
+func TestSubscribe_TheNextSubjectDeliversWhenAnOverlappingOneIsDenied(t *testing.T) {
+	t.Parallel()
+
+	sub, events, stop := startFakeSession(t, ">", "orders.>")
+	defer stop()
+
+	sub.deny(t, ">")
+	nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Error != nil })
+	sub.deliver(t, "orders.>", &entities.NatsMessage{Subject: "orders.created", Data: []byte("end")})
+
+	assert.Equal(t, map[string]int{"end": 1}, collectPayloads(t, events, "end"))
+}
+
+func startFakeSession(t *testing.T, subjects ...string) (*fakeSubscriber, <-chan *entities.LiveEvent, func()) {
+	t.Helper()
+
+	sub := &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}
+	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
+	ctx, cancel := context.WithCancel(t.Context())
+
+	targets := make([]*entities.LiveSubscriptionTarget, 0, len(subjects))
+	for _, subject := range subjects {
+		targets = append(targets, &entities.LiveSubscriptionTarget{Subject: subject})
+	}
+
+	events := make(chan *entities.LiveEvent, 64)
+	done := make(chan error, 1)
+	go func() {
+		done <- svc.Subscribe(ctx, &entities.LiveSubscribeRequest{ConnectionId: "conn", Subscriptions: targets},
+			func(ev *entities.LiveEvent) error {
+				events <- ev
+				return nil
+			})
+	}()
+
+	require.Eventually(t, func() bool {
+		sub.mu.Lock()
+		defer sub.mu.Unlock()
+		return len(sub.handlers) == len(subjects)
+	}, 5*time.Second, 10*time.Millisecond)
+
+	return sub, events, func() {
+		cancel()
+		require.NoError(t, <-done)
+	}
+}
+
+func collectPayloads(t *testing.T, events <-chan *entities.LiveEvent, last string) map[string]int {
+	t.Helper()
+	seen := map[string]int{}
+	for seen[last] == 0 {
+		batch := nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Batch != nil })
+		for _, m := range batch.Batch.Messages {
+			seen[string(m.NatsMessage.Data)]++
+		}
+	}
+	select {
+	case ev := <-events:
+		if ev.Batch != nil {
+			for _, m := range ev.Batch.Messages {
+				seen[string(m.NatsMessage.Data)]++
+			}
+		}
+	case <-time.After(300 * time.Millisecond):
+	}
+	return seen
+}
+
 func nextEvent(t *testing.T, events <-chan *entities.LiveEvent, match func(*entities.LiveEvent) bool) *entities.LiveEvent {
 	t.Helper()
 	deadline := time.After(5 * time.Second)
