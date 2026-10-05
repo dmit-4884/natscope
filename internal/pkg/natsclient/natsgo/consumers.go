@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -22,6 +23,19 @@ import (
 
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
+
+// Name prefixes of the short-lived consumers natscope creates to read streams.
+const (
+	liveConsumerPrefix    = "natscope-live-"
+	browseConsumerPrefix  = "natscope-browse-"
+	timeResConsumerPrefix = "natscope-timeres-"
+)
+
+// isOwnConsumer reports whether natscope created the consumer to read a stream.
+func isOwnConsumer(name string) bool {
+	return strings.HasPrefix(name, liveConsumerPrefix) || strings.HasPrefix(name, browseConsumerPrefix) ||
+		strings.HasPrefix(name, timeResConsumerPrefix)
+}
 
 // GetConsumersOverview lists every stream, then the consumers of each in parallel; a stream whose consumers
 // cannot be listed is reported in UnreadableStreams instead of failing the call.
@@ -72,7 +86,7 @@ func unreadableStream(name string, err error) entities.UnreadableStream {
 			Access: &entities.AccessCheck{Status: entities.AccessDenied, Operation: permErr.Operation, Subject: permErr.Subject},
 		}
 	}
-	return entities.UnreadableStream{Stream: name, Error: err.Error()}
+	return entities.UnreadableStream{Stream: name, Err: err}
 }
 
 // CreateConsumer creates a new consumer on a stream.

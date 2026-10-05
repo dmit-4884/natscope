@@ -4,6 +4,7 @@
 package streams
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 
 	mcptransport "github.com/dmit-4884/natscope/internal/transports/mcp"
 )
@@ -168,12 +170,15 @@ func TestRelationsView(t *testing.T) {
 
 func TestUnreadableStreamViewNamesTheReason(t *testing.T) {
 	t.Parallel()
-	denied := unreadableStreamViewOf(entities.UnreadableStream{
+	denied := unreadableStreamViewOf(t.Context(), entities.UnreadableStream{
 		Stream: "SECRET",
 		Access: &entities.AccessCheck{Status: entities.AccessDenied, Operation: "publish", Subject: "$JS.API.CONSUMER.LIST.SECRET"},
 	})
 	assert.Equal(t, unreadableStreamView{Stream: "SECRET", Reason: "no permission to publish to $JS.API.CONSUMER.LIST.SECRET"}, denied)
 
-	broken := unreadableStreamViewOf(entities.UnreadableStream{Stream: "BROKEN", Error: "stream offline"})
-	assert.Equal(t, unreadableStreamView{Stream: "BROKEN", Reason: "stream offline"}, broken)
+	broken := unreadableStreamViewOf(t.Context(), entities.UnreadableStream{Stream: "BROKEN", Err: errs.ErrJetStreamNotEnabled})
+	assert.Equal(t, unreadableStreamView{Stream: "BROKEN", Reason: "jetstream not enabled"}, broken)
+
+	leaky := unreadableStreamViewOf(t.Context(), entities.UnreadableStream{Stream: "LEAKY", Err: errors.New("dial tcp 10.0.0.7:4222")})
+	assert.Equal(t, unreadableStreamView{Stream: "LEAKY", Reason: "internal error"}, leaky)
 }

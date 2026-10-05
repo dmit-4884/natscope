@@ -5,6 +5,8 @@ package stats
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
 	statspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/stats"
@@ -190,7 +193,8 @@ func TestHandler_GetAllConsumers(t *testing.T) {
 		Streams: []entities.StreamInfo{{Config: entities.StreamConfig{Name: "ORDERS", MaxMsgs: 100}, State: &entities.StreamState{Msgs: 95}}},
 		UnreadableStreams: []entities.UnreadableStream{
 			{Stream: "SECRET", Access: &entities.AccessCheck{Status: entities.AccessDenied, Operation: "publish", Subject: "$JS.API.CONSUMER.LIST.SECRET"}},
-			{Stream: "BROKEN", Error: "stream offline"},
+			{Stream: "BROKEN", Err: fmt.Errorf("list consumers: %w", errs.ErrJetStreamNotEnabled)},
+			{Stream: "LEAKY", Err: errors.New("dial tcp 10.0.0.7:4222: /etc/nats/creds")},
 		},
 	}}
 
@@ -211,12 +215,13 @@ func TestHandler_GetAllConsumers(t *testing.T) {
 	assert.Equal(t, "ORDERS", resp.Msg.GetStreams()[0].GetConfig().GetName())
 	assert.Equal(t, uint64(95), resp.Msg.GetStreams()[0].GetState().GetMsgs())
 
-	require.Len(t, resp.Msg.GetUnreadableStreams(), 2)
+	require.Len(t, resp.Msg.GetUnreadableStreams(), 3)
 	denied := resp.Msg.GetUnreadableStreams()[0]
 	assert.Equal(t, "SECRET", denied.GetStream())
 	assert.Equal(t, natspb.AccessStatus_ACCESS_STATUS_DENIED, denied.GetAccess().GetStatus())
 	assert.Equal(t, "$JS.API.CONSUMER.LIST.SECRET", denied.GetAccess().GetSubject())
 	broken := resp.Msg.GetUnreadableStreams()[1]
 	assert.Nil(t, broken.Access)
-	assert.Equal(t, "stream offline", broken.GetError())
+	assert.Equal(t, "jetstream not enabled", broken.GetError(), "a known failure keeps its mapped message")
+	assert.Equal(t, "internal error", resp.Msg.GetUnreadableStreams()[2].GetError(), "an unmapped chain never reaches the UI")
 }

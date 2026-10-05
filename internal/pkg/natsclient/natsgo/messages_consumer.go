@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -122,7 +121,7 @@ func (c *Client) consumeBrowseBatch(
 		OptStartSeq:       optStartSeq,
 		AckPolicy:         jetstream.AckNonePolicy,
 		InactiveThreshold: browseConsumerInactiveThreshold,
-		Name:              fmt.Sprintf("natscope-browse-%s", nats.NewInbox()[7:]),
+		Name:              browseConsumerPrefix + nats.NewInbox()[7:],
 	}
 	if len(filterSubjects) == 1 {
 		ephCfg.FilterSubject = filterSubjects[0]

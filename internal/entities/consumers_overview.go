@@ -17,6 +17,6 @@ type UnreadableStream struct {
 	// Access is the refused permission; nil when the failure was not a permissions violation.
 	Access *AccessCheck
 
-	// Error is the failure when it was not a permissions violation.
-	Error string
+	// Err is the failure when it was not a permissions violation.
+	Err error
 }

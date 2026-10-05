@@ -5,7 +5,6 @@ package natsgo
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"time"
 
@@ -132,7 +131,7 @@ func (c *Client) SubscribeJetStream(
 		policy = jetstream.DeliverNewPolicy
 	}
 
-	consumerName := fmt.Sprintf("natscope-live-%s", nats.NewInbox()[7:])
+	consumerName := liveConsumerPrefix + nats.NewInbox()[7:]
 
 	ephCfg := jetstream.ConsumerConfig{
 		Name:              consumerName,

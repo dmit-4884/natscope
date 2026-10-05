@@ -74,6 +74,8 @@ func TestConsumersOverview(t *testing.T) {
 		Durable: "billing", FilterSubject: "overview.created", AckPolicy: jetstream.AckExplicitPolicy,
 	})
 	require.NoError(t, err)
+	_, err = stream.CreateConsumer(ctx, jetstream.ConsumerConfig{Name: "natscope-browse-e2e", AckPolicy: jetstream.AckNonePolicy})
+	require.NoError(t, err)
 	publishAll(t, js, "overview.created", "overview.paid", "overview.created", "overview.created")
 
 	batch, err := billing.Fetch(2, jetstream.FetchMaxWait(2*time.Second))
@@ -96,6 +98,9 @@ func TestConsumersOverview(t *testing.T) {
 	recentTimestamp(t, c.GetAckFloor().GetLastActive(), "ack_floor.last_active")
 	assert.Equal(t, "overview.created", c.GetConfig().GetFilterSubject())
 	assert.Contains(t, c.GetRaw(), `"name":"billing"`)
+	for _, listed := range got.GetConsumers() {
+		assert.NotEqual(t, "natscope-browse-e2e", listed.GetName(), "natscope's own short-lived consumers stay out of the list")
+	}
 
 	names := make([]string, 0, len(got.GetStreams()))
 	for _, s := range got.GetStreams() {
@@ -205,6 +210,16 @@ func TestGetNextMessage(t *testing.T) {
 		require.NotNil(t, msg)
 		assert.Equal(t, "next.paid", msg.GetSubject())
 		assert.JSONEq(t, `{"subject":"next.paid"}`, decodeMessagePayload(t, msg))
+	})
+
+	t.Run("a malformed subject is rejected, not answered with nothing", func(t *testing.T) {
+		for _, subject := range []string{"next. bad", "next..x", ">.foo"} {
+			_, err := env.messages.GetNextMessage(t.Context(), connect.NewRequest(&messagespb.GetNextMessageRequest{
+				ConnectionId: connID, StreamName: "NEXT", StartSeq: 1, Subjects: []string{subject},
+			}))
+			require.Error(t, err, subject)
+			assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), subject)
+		}
 	})
 
 	t.Run("an unknown stream is not found", func(t *testing.T) {

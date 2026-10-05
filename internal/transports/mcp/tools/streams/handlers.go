@@ -14,6 +14,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
 
 	mcptransport "github.com/dmit-4884/natscope/internal/transports/mcp"
 )
@@ -114,15 +115,18 @@ func (t *Toolset) consumers(ctx context.Context, connID, stream string) ([]consu
 	if err != nil {
 		return nil, nil, err
 	}
-	return slices.To(overview.Consumers, consumerViewOf), slices.To(overview.UnreadableStreams, unreadableStreamViewOf), nil
+	unreadable := slices.To(overview.UnreadableStreams, func(u entities.UnreadableStream) unreadableStreamView {
+		return unreadableStreamViewOf(ctx, u)
+	})
+	return slices.To(overview.Consumers, consumerViewOf), unreadable, nil
 }
 
 // unreadableStreamViewOf names the refused permission, or the failure, that hid a stream's consumers.
-func unreadableStreamViewOf(u entities.UnreadableStream) unreadableStreamView {
+func unreadableStreamViewOf(ctx context.Context, u entities.UnreadableStream) unreadableStreamView {
 	if u.Access != nil {
 		return unreadableStreamView{Stream: u.Stream, Reason: "no permission to " + u.Access.Operation + " to " + u.Access.Subject}
 	}
-	return unreadableStreamView{Stream: u.Stream, Reason: u.Error}
+	return unreadableStreamView{Stream: u.Stream, Reason: grpchelpers.ErrorMessage(ctx, u.Err)}
 }
 
 // consumerViewOf merges a consumer's state and config into one view.

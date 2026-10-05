@@ -6,7 +6,6 @@ package natsgo
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -170,7 +169,7 @@ func (c *Client) resolveSeqByTimeConsumer(
 		OptStartTime:      &startTime,
 		AckPolicy:         jetstream.AckNonePolicy,
 		InactiveThreshold: browseConsumerInactiveThreshold,
-		Name:              fmt.Sprintf("natscope-timeres-%s", nats.NewInbox()[7:]),
+		Name:              timeResConsumerPrefix + nats.NewInbox()[7:],
 	}
 
 	consumer, err := stream.CreateConsumer(ctx, ephCfg)

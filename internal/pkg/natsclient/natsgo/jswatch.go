@@ -98,9 +98,12 @@ func watchCall[T any](ctx context.Context, w *jetStreamWatch, subjects []string,
 // watchLister watches subjects while a lister pages in the background; end runs once, from Err or when ctx ends.
 func (w *jetStreamWatch) watchLister(ctx context.Context, subjects []string) (context.Context, func() error) {
 	watched, end := w.pw.Begin(ctx, subjects)
-	end = sync.OnceValue(end)
-	context.AfterFunc(ctx, func() { _ = end() }) //nolint:errcheck // releasing the watch; Err reports the violation
-	return watched, end
+	once := sync.OnceValue(end)
+	stop := context.AfterFunc(ctx, func() { _ = once() }) //nolint:errcheck // releasing the watch; Err reports the violation
+	return watched, func() error {
+		stop()
+		return once()
+	}
 }
 
 // listerErr reports the violation that stopped a lister in place of the cancellation the lister saw.

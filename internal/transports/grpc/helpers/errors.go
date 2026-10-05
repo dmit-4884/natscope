@@ -297,3 +297,8 @@ func NewStatus(code codes.Code, msg, reason string) error {
 	}
 	return st.Err()
 }
+
+// ErrorMessage is the text StatusErrorConvert would send for err, safe to show a user or an agent.
+func ErrorMessage(ctx context.Context, err error) string {
+	return status.Convert(StatusErrorConvert(ctx, err)).Message()
+}

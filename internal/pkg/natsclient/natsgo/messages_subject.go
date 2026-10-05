@@ -248,6 +248,9 @@ func (c *Client) GetNextMessage(ctx context.Context, streamName string, startSeq
 		if err := validateNATSSubjectLength("subject", subject); err != nil {
 			return nil, wrapErr(err)
 		}
+		if err := natsutil.ValidateSubjectPattern(subject); err != nil {
+			return nil, wrapErr(err)
+		}
 	}
 	if len(subjects) == 0 {
 		subjects = []string{">"}

@@ -87,7 +87,13 @@ func (h *Handler) GetAllConsumers(
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(converter.Convert(overview, &statspb.GetAllConsumersResponse{}, grpchelpers.ProtoCodecs)), nil
+	resp := converter.Convert(overview, &statspb.GetAllConsumersResponse{}, grpchelpers.ProtoCodecs)
+	for i, unreadable := range overview.UnreadableStreams {
+		if unreadable.Err != nil {
+			resp.UnreadableStreams[i].Error = grpchelpers.ErrorMessage(ctx, unreadable.Err)
+		}
+	}
+	return connect.NewResponse(resp), nil
 }
 
 // GetHealth returns connection health status.
