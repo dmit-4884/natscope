@@ -42,7 +42,7 @@ describe('ConsumerPosition', () => {
     expect(await screen.findByText('#22')).toBeInTheDocument()
     expect(mockedNext).toHaveBeenCalledWith('conn-1', 'ORDERS', 13, ['orders.created', 'orders.paid'], expect.anything())
     expect(mockedNext).toHaveBeenCalledWith('conn-1', 'ORDERS', 21, ['orders.created', 'orders.paid'], expect.anything())
-    expect(screen.getByTestId('consumer-floor')).toHaveTextContent('Delivered up to #20 · acknowledged up to #12')
+    expect(screen.getByTestId('consumer-floor')).toHaveTextContent('Delivered up to #20 · done up to #12')
 
     fireEvent.click(screen.getByRole('button', { name: 'Open message #22' }))
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ sequence: 22 }))
@@ -73,16 +73,30 @@ describe('ConsumerPosition', () => {
 
 describe('ConsumerPosition floor line', () => {
   it('says plainly when nothing was delivered or acknowledged yet', () => {
-    const fresh = consumer({ num_pending: 0, num_ack_pending: 0, delivered: { consumer_seq: 0, stream_seq: 0 }, ack_floor: { consumer_seq: 0, stream_seq: 0 } })
+    const fresh = consumer({ num_pending: 0, num_ack_pending: 0, delivered: { consumer_seq: 0, stream_seq: 40 }, ack_floor: { consumer_seq: 0, stream_seq: 40 } })
     render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={fresh} onOpenMessage={vi.fn()} />)
 
     expect(screen.getByTestId('consumer-floor')).toHaveTextContent('Nothing delivered yet')
   })
 
   it('says when deliveries are not acknowledged yet', () => {
-    const unacked = consumer({ num_pending: 0, num_ack_pending: 0, ack_floor: { consumer_seq: 0, stream_seq: 0 } })
+    const unacked = consumer({ num_pending: 0, num_ack_pending: 0, ack_floor: { consumer_seq: 0, stream_seq: 11 } })
     render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={unacked} onOpenMessage={vi.fn()} />)
 
     expect(screen.getByTestId('consumer-floor')).toHaveTextContent('Delivered up to #20 · nothing acknowledged yet')
+  })
+})
+
+describe('ConsumerPosition oldest unacknowledged', () => {
+  beforeEach(() => {
+    mockedNext.mockReset()
+  })
+
+  it('does not pass off a later message when the unacknowledged one left the stream', async () => {
+    mockedNext.mockResolvedValue(message(25))
+    render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={consumer({ num_pending: 0 })} onOpenMessage={vi.fn()} />)
+
+    expect(await screen.findByText(/no longer in the stream/i)).toBeInTheDocument()
+    expect(screen.queryByText('#25')).not.toBeInTheDocument()
   })
 })

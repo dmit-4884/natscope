@@ -60,12 +60,12 @@ describe('MessageConsumers', () => {
     renderFate()
 
     const toggle = await screen.findByRole('button', { name: /consumers:/i })
-    await waitFor(() => expect(toggle).toHaveTextContent('1 acknowledged · 1 waiting for ack · 1 not delivered yet'))
+    await waitFor(() => expect(toggle).toHaveTextContent('1 done · 1 waiting for ack · 1 not delivered yet'))
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(toggle)
     expect(screen.getByText('billing').closest('li')).toHaveTextContent('Waiting for ack')
-    expect(screen.getByText('audit').closest('li')).toHaveTextContent('Acknowledged')
+    expect(screen.getByText('audit').closest('li')).toHaveTextContent('Done')
     expect(screen.getByText('mailer').closest('li')).toHaveTextContent('Not delivered yet')
     expect(screen.getByText(/not for 1 other consumer: the filter leaves orders\.created out/i)).toBeInTheDocument()
 

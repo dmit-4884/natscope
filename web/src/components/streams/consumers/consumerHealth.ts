@@ -3,11 +3,20 @@ import { formatDateTime, formatDuration, formatNsDuration } from '@/utils/format
 import { plural } from '@/utils/plural'
 
 const IDLE_PULL_MS = 60_000
+const MIN_ACK_SILENCE_MS = 30_000
 const STREAM_FULL_RATIO = 0.9
+const OLDEST_SHARE = 0.1
 
 export type ConsumerKind = 'pull' | 'push'
 
-type IssueKind = 'paused' | 'ack_limit' | 'no_subscriber' | 'nobody_pulling' | 'redelivering' | 'stream_full'
+type IssueKind =
+  | 'paused'
+  | 'ack_limit'
+  | 'at_ack_limit'
+  | 'no_subscriber'
+  | 'nobody_pulling'
+  | 'redelivering'
+  | 'stream_full'
 
 export interface ConsumerIssue {
   kind: IssueKind
@@ -22,8 +31,12 @@ export function consumerKind(consumer: ConsumerInfo): ConsumerKind {
   return consumer.config?.deliver_subject ? 'push' : 'pull'
 }
 
-function messages(count: number): string {
-  return plural(count, 'message')
+function waiting(count: number): string {
+  return `${plural(count, 'message is', 'messages are')} waiting`
+}
+
+function ago(ms: number): string {
+  return formatDuration(Math.max(0, Math.floor(ms / 1000)))
 }
 
 function pausedIssue(consumer: ConsumerInfo): ConsumerIssue {
@@ -39,62 +52,87 @@ function pausedIssue(consumer: ConsumerInfo): ConsumerIssue {
   }
 }
 
-function ackLimitReached(consumer: ConsumerInfo): boolean {
+function ackLimitIssue(consumer: ConsumerInfo, now: number): ConsumerIssue {
   const max = consumer.config?.max_ack_pending ?? 0
-  return max > 0 && consumer.num_ack_pending >= max
+  const lastAck = consumer.ack_floor?.last_active
+  const silence = Math.max(MIN_ACK_SILENCE_MS, (consumer.config?.ack_wait ?? 0) / 1_000_000)
+  const atLimit = `${waiting(consumer.num_ack_pending)} for an ack, the most this consumer allows (max ack pending ${max}).`
+  if (lastAck != null && now - lastAck <= silence) {
+    return {
+      kind: 'at_ack_limit',
+      severity: 'warning',
+      label: 'At its ack limit',
+      detail: `${atLimit} Clients are still acking, so it is busy rather than stuck; new messages go out as acks free a slot.`,
+    }
+  }
+  return {
+    kind: 'ack_limit',
+    severity: 'error',
+    label: 'Ack limit reached',
+    detail:
+      `${atLimit} ${lastAck != null ? `No ack came in for ${ago(now - lastAck)}. ` : ''}` +
+      'Nothing new is delivered until clients ack or the ack wait runs out.',
+  }
 }
 
-function idleFor(consumer: ConsumerInfo, now: number): number | null {
-  const last = consumer.delivered?.last_active
-  return last == null ? null : now - last
-}
-
-function streamFill(stream: StreamInfo): number {
+function streamFillOf(stream: StreamInfo): number {
   const { max_msgs: maxMsgs, max_bytes: maxBytes } = stream.config
   const byMsgs = maxMsgs > 0 ? stream.messages / maxMsgs : 0
   const byBytes = maxBytes > 0 ? stream.bytes / maxBytes : 0
   return Math.max(byMsgs, byBytes)
 }
 
+function streamFullIssue(consumer: ConsumerInfo, stream: StreamInfo | undefined): ConsumerIssue | null {
+  if (!stream?.state || consumer.num_pending === 0 || (stream.config.discard ?? 'old') !== 'old') return null
+  const fill = streamFillOf(stream)
+  const next = (consumer.delivered?.stream_seq ?? 0) + 1
+  if (fill < STREAM_FULL_RATIO || next - stream.state.first_seq >= stream.messages * OLDEST_SHARE) return null
+  return {
+    kind: 'stream_full',
+    severity: 'warning',
+    label: 'May lose messages',
+    detail:
+      `Stream ${stream.name} is ${Math.min(100, Math.floor(fill * 100))}% full and drops its oldest messages when full. ` +
+      'The next message for this consumer is among the oldest, so it may be gone before the consumer gets it.',
+  }
+}
+
 export function consumerIssues(consumer: ConsumerInfo, stream: StreamInfo | undefined, now: number): ConsumerIssue[] {
   const issues: ConsumerIssue[] = []
+  const at = consumer.time_stamp ?? now
   const pending = consumer.num_pending
   const paused = consumer.paused === true
-  const blocked = ackLimitReached(consumer)
+  const max = consumer.config?.max_ack_pending ?? 0
+  const blocked = max > 0 && consumer.num_ack_pending >= max
 
   if (paused) issues.push(pausedIssue(consumer))
-
-  if (blocked) {
-    issues.push({
-      kind: 'ack_limit',
-      severity: 'error',
-      label: 'Ack limit reached',
-      detail:
-        `${messages(consumer.num_ack_pending)} wait for an ack, the most this consumer allows (max ack pending ` +
-        `${consumer.config?.max_ack_pending}). Nothing new is delivered until clients ack them or the ack wait runs out.`,
-    })
-  }
+  if (blocked) issues.push(ackLimitIssue(consumer, at))
 
   if (!paused && pending > 0 && consumerKind(consumer) === 'push' && !consumer.push_bound) {
     issues.push({
       kind: 'no_subscriber',
       severity: 'error',
       label: 'No subscriber',
-      detail: `${messages(pending)} wait, and nobody is subscribed to ${consumer.config?.deliver_subject}, where this push consumer delivers.`,
+      detail: `${waiting(pending)}, and nobody is subscribed to ${consumer.config?.deliver_subject}, where this push consumer delivers.`,
     })
   }
 
   if (!paused && !blocked && pending > 0 && consumerKind(consumer) === 'pull' && !(consumer.num_waiting ?? 0)) {
-    const idle = idleFor(consumer, now)
-    if (idle == null || idle > IDLE_PULL_MS) {
+    const neverDelivered = (consumer.delivered?.consumer_seq ?? 0) === 0
+    const last = consumer.delivered?.last_active
+    if (neverDelivered) {
       issues.push({
         kind: 'nobody_pulling',
         severity: 'warning',
         label: 'Nobody pulling',
-        detail:
-          idle == null
-            ? `${messages(pending)} wait, and no client has pulled yet.`
-            : `${messages(pending)} wait, and no client has pulled for ${formatDuration(Math.floor(idle / 1000))}.`,
+        detail: `${waiting(pending)}, and no client has pulled yet.`,
+      })
+    } else if (last != null && at - last > IDLE_PULL_MS) {
+      issues.push({
+        kind: 'nobody_pulling',
+        severity: 'warning',
+        label: 'Nobody pulling',
+        detail: `${waiting(pending)}, and no client has pulled for ${ago(at - last)}.`,
       })
     }
   }
@@ -112,19 +150,8 @@ export function consumerIssues(consumer: ConsumerInfo, stream: StreamInfo | unde
     })
   }
 
-  if (stream && pending > 0 && (stream.config.discard ?? 'old') === 'old') {
-    const fill = streamFill(stream)
-    if (fill >= STREAM_FULL_RATIO) {
-      issues.push({
-        kind: 'stream_full',
-        severity: 'warning',
-        label: 'May lose messages',
-        detail:
-          `Stream ${stream.name} is ${Math.min(100, Math.floor(fill * 100))}% full and drops its oldest messages when full, ` +
-          `so some of the ${messages(pending)} this consumer has not received yet may be gone before it gets them.`,
-      })
-    }
-  }
+  const full = streamFullIssue(consumer, stream)
+  if (full) issues.push(full)
 
   return issues.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'error' ? -1 : 1))
 }
@@ -147,4 +174,9 @@ export function compareByHealth(
     b.consumer.num_pending - a.consumer.num_pending ||
     a.consumer.name.localeCompare(b.consumer.name)
   )
+}
+
+export function statusText(issues: ConsumerIssue[], state: ConsumerState): string {
+  if (issues.length > 0) return issues.map((i) => i.label).join(', ')
+  return state === 'working' ? 'Catching up' : 'Caught up'
 }

@@ -79,7 +79,7 @@ function exportRecord(row: ConsumerRow) {
 }
 
 function csvField(value: string | number): string {
-  const text = String(value)
+  const text = typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value)
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 

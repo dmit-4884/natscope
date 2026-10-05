@@ -195,6 +195,8 @@ export interface ConsumerInfo {
   paused?: boolean
   /** RFC3339 instant the pause lifts; only meaningful while paused. */
   pause_until?: string
+  /** When the server answered, Unix milliseconds on the server clock. */
+  time_stamp?: number
   cluster?: ClusterInfo
   priority_groups?: PriorityGroupState[]
   raw?: Record<string, unknown>

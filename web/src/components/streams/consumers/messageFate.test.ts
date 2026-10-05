@@ -25,7 +25,7 @@ const stateOf = (c: ConsumerInfo, m = message(15)) => messageFates([c], m).fates
 describe('messageFates', () => {
   it('tells acknowledged, delivered and not yet delivered apart by the consumer position', () => {
     const c = consumer('billing')
-    expect(stateOf(c, message(12))).toBe('acked')
+    expect(stateOf(c, message(12))).toBe('done')
     expect(stateOf(c, message(13))).toBe('awaiting_ack')
     expect(stateOf(c, message(20))).toBe('awaiting_ack')
     expect(stateOf(c, message(21))).toBe('not_delivered')
@@ -72,12 +72,25 @@ describe('messageFates', () => {
 
   it('cannot tell acknowledged from skipped for a consumer that started at the last message', () => {
     const fromLast = consumer('tail', { config: { deliver_policy: 'last' } })
-    expect(stateOf(fromLast, message(10, 'orders.created', CREATED - 1_000))).toBe('acked_or_skipped')
-    expect(stateOf(fromLast, message(10, 'orders.created', CREATED + 1_000))).toBe('acked')
+    expect(stateOf(fromLast, message(10, 'orders.created', CREATED - 1_000))).toBe('done_or_skipped')
+    expect(stateOf(fromLast, message(15, 'orders.created', CREATED - 1_000))).toBe('awaiting_or_skipped')
+    expect(stateOf(fromLast, message(10, 'orders.created', CREATED + 1_000))).toBe('done')
   })
 
   it('mentions a pause on messages still to deliver', () => {
     const paused = consumer('billing', { paused: true })
     expect(messageFates([paused], message(30)).fates[0].detail).toContain('paused')
+  })
+})
+
+describe('messageFates done', () => {
+  it('admits a message past the ack floor may have been given up on', () => {
+    const limited = consumer('billing', { config: { ack_policy: 'explicit', deliver_policy: 'all', max_deliver: 5 } })
+    const fate = messageFates([limited], message(10)).fates[0]
+    expect(fate.label).toBe('Done')
+    expect(fate.detail).toBe('Acknowledged, terminated by a client, or dropped after 5 delivery attempts.')
+
+    const unlimited = messageFates([consumer('audit')], message(10)).fates[0]
+    expect(unlimited.detail).toBe('Acknowledged or terminated by a client.')
   })
 })

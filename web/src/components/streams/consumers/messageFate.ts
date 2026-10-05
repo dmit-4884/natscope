@@ -2,7 +2,14 @@ import { matchSubject } from '@/shared/domain/subjectMatch'
 import type { ConsumerInfo } from '@/types/nats'
 import { getFilterSubjectsArray } from './consumerUtils'
 
-export type FateState = 'acked' | 'acked_or_skipped' | 'skipped' | 'delivered' | 'awaiting_ack' | 'not_delivered'
+export type FateState =
+  | 'done'
+  | 'done_or_skipped'
+  | 'skipped'
+  | 'delivered'
+  | 'awaiting_ack'
+  | 'awaiting_or_skipped'
+  | 'not_delivered'
 
 export interface MessageFate {
   consumer: ConsumerInfo
@@ -41,6 +48,13 @@ function startedAfter(consumer: ConsumerInfo, message: FateMessage): 'yes' | 'ma
   }
 }
 
+function doneDetail(consumer: ConsumerInfo): string {
+  const maxDeliver = consumer.config?.max_deliver ?? 0
+  return maxDeliver > 0
+    ? `Acknowledged, terminated by a client, or dropped after ${maxDeliver} delivery attempts.`
+    : 'Acknowledged or terminated by a client.'
+}
+
 function fateOf(consumer: ConsumerInfo, message: FateMessage): Omit<MessageFate, 'consumer'> {
   const delivered = consumer.delivered?.stream_seq ?? 0
   const ackFloor = consumer.ack_floor?.stream_seq ?? 0
@@ -63,11 +77,18 @@ function fateOf(consumer: ConsumerInfo, message: FateMessage): Omit<MessageFate,
   if (message.sequence <= ackFloor) {
     return before === 'maybe'
       ? {
-          state: 'acked_or_skipped',
-          label: 'Acked or skipped',
-          detail: 'Acknowledged, or skipped because the consumer started from the last message.',
+          state: 'done_or_skipped',
+          label: 'Done or skipped',
+          detail: `${doneDetail(consumer)} Or skipped: the consumer started from the last message.`,
         }
-      : { state: 'acked', label: 'Acknowledged', detail: 'Delivered and acknowledged.' }
+      : { state: 'done', label: 'Done', detail: doneDetail(consumer) }
+  }
+  if (before === 'maybe') {
+    return {
+      state: 'awaiting_or_skipped',
+      label: 'Waiting for ack or skipped',
+      detail: 'Delivered and not acknowledged yet, or skipped: the consumer started from the last message.',
+    }
   }
   return {
     state: 'awaiting_ack',

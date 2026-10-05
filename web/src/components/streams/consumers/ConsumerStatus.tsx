@@ -1,14 +1,10 @@
 import { Badge } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
-import type { ConsumerIssue, ConsumerState } from './consumerHealth'
+import { statusText, type ConsumerIssue, type ConsumerState } from './consumerHealth'
 
-const CALM: Record<'working' | 'caught_up', { label: string; hint: string; variant: 'primary' | 'success' }> = {
-  working: {
-    label: 'Catching up',
-    hint: 'Messages are on their way or waiting for an ack, and nothing looks wrong.',
-    variant: 'primary',
-  },
-  caught_up: { label: 'Caught up', hint: 'Nothing left to deliver and nothing waiting for an ack.', variant: 'success' },
+const CALM: Record<'working' | 'caught_up', { hint: string; variant: 'primary' | 'success' }> = {
+  working: { hint: 'Messages are on their way or waiting for an ack, and nothing looks wrong.', variant: 'primary' },
+  caught_up: { hint: 'Nothing left to deliver and nothing waiting for an ack.', variant: 'success' },
 }
 
 interface Props {
@@ -23,7 +19,7 @@ export function ConsumerStatus({ issues, state, limit }: Props) {
     return (
       <Tooltip content={calm.hint}>
         <Badge variant={calm.variant} size="sm" data-testid="consumer-status">
-          {calm.label}
+          {statusText([], state)}
         </Badge>
       </Tooltip>
     )

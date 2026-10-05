@@ -166,3 +166,33 @@ describe('ConsumersPage', () => {
     expect(downloadBlob).toHaveBeenLastCalledWith(expect.stringContaining('"consumer": "billing"'), expect.stringMatching(/^consumers-.*\.json$/), 'application/json')
   })
 })
+
+describe('ConsumersPage rows', () => {
+  beforeEach(() => {
+    mockedOverview.mockReset()
+  })
+
+  it('names each row by consumer, stream and state', async () => {
+    mockedOverview.mockResolvedValue(overview())
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'billing on ORDERS: Ack limit reached' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'mailer on EVENTS: Redelivering' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'archiver on ORDERS: Caught up' })).toBeInTheDocument()
+  })
+
+  it('tells a forgotten delivery time from a consumer that never delivered', async () => {
+    mockedOverview.mockResolvedValue(
+      overview({
+        consumers: [
+          consumer('restarted', 'ORDERS', { delivered: { consumer_seq: 4, stream_seq: 4 } }),
+          consumer('fresh', 'ORDERS', { delivered: { consumer_seq: 0, stream_seq: 9 } }),
+        ],
+      }),
+    )
+    renderPage()
+
+    expect(within(await screen.findByRole('button', { name: /^restarted on/ })).getByText('unknown')).toBeInTheDocument()
+    expect(within(screen.getByRole('button', { name: /^fresh on/ })).getByText('never')).toBeInTheDocument()
+  })
+})

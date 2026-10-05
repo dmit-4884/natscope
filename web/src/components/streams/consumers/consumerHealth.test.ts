@@ -17,7 +17,7 @@ function consumer(overrides: Partial<ConsumerInfo> = {}): ConsumerInfo {
   }
 }
 
-function stream(overrides: Partial<StreamInfo['config']> = {}, messages = 10, bytes = 1_000): StreamInfo {
+function stream(overrides: Partial<StreamInfo['config']> = {}, messages = 10, bytes = 1_000, firstSeq = 1): StreamInfo {
   return {
     name: 'ORDERS',
     subjects: ['orders.>'],
@@ -26,10 +26,12 @@ function stream(overrides: Partial<StreamInfo['config']> = {}, messages = 10, by
     consumer_count: 1,
     created: NOW,
     config: { retention: 'limits', max_msgs: -1, max_bytes: -1, max_age: 0, discard: 'old', ...overrides },
+    state: { messages, bytes, first_seq: firstSeq, last_seq: firstSeq + messages - 1, first_ts: NOW, last_ts: NOW },
   }
 }
 
 const kinds = (c: ConsumerInfo, s?: StreamInfo) => consumerIssues(c, s, NOW).map((i) => i.kind)
+const ackedLongAgo = { consumer_seq: 10, stream_seq: 10, last_active: NOW - 5 * 60_000 }
 
 describe('consumerKind', () => {
   it('is push when the consumer delivers to a subject, pull otherwise', () => {
@@ -43,15 +45,32 @@ describe('consumerIssues', () => {
     expect(consumerIssues(consumer(), stream(), NOW)).toEqual([])
   })
 
-  it('flags a consumer that hit its ack limit as stuck', () => {
-    const issues = consumerIssues(consumer({ num_pending: 50, num_ack_pending: 1000, num_waiting: 1 }), stream(), NOW)
+  it('flags a consumer at its ack limit whose acks stopped as stuck', () => {
+    const issues = consumerIssues(consumer({ num_pending: 50, num_ack_pending: 1000, num_waiting: 1, ack_floor: ackedLongAgo }), stream(), NOW)
     expect(issues.map((i) => i.kind)).toEqual(['ack_limit'])
     expect(issues[0].severity).toBe('error')
-    expect(issues[0].detail).toContain('1000')
+    expect(issues[0].detail).toContain('1000 messages are waiting for an ack')
+    expect(issues[0].detail).toContain('5m')
+  })
+
+  it('calls a consumer at its ack limit busy while acks keep coming', () => {
+    const issues = consumerIssues(consumer({ num_pending: 50, num_ack_pending: 1000, num_waiting: 1 }), stream(), NOW)
+    expect(issues.map((i) => i.kind)).toEqual(['at_ack_limit'])
+    expect(issues[0].severity).toBe('warning')
+  })
+
+  it('treats an ack limit without any known ack as stuck', () => {
+    expect(kinds(consumer({ num_ack_pending: 1000, ack_floor: { consumer_seq: 0, stream_seq: 0 } }))).toEqual(['ack_limit'])
+  })
+
+  it('uses the singular for one message', () => {
+    const one = consumer({ num_ack_pending: 1, config: { max_ack_pending: 1 }, ack_floor: ackedLongAgo })
+    expect(consumerIssues(one, stream(), NOW)[0].detail).toContain('1 message is waiting for an ack')
   })
 
   it('ignores the ack limit when the consumer has none', () => {
     expect(kinds(consumer({ num_ack_pending: 5, config: { ack_policy: 'explicit' } }))).toEqual([])
+    expect(kinds(consumer({ num_ack_pending: 5, config: { ack_policy: 'explicit', max_ack_pending: -1 } }))).toEqual([])
   })
 
   it('flags a push consumer with pending messages and no subscriber', () => {
@@ -59,7 +78,7 @@ describe('consumerIssues', () => {
     const issues = consumerIssues(lonely, stream(), NOW)
     expect(issues.map((i) => i.kind)).toEqual(['no_subscriber'])
     expect(issues[0].severity).toBe('error')
-    expect(issues[0].detail).toContain('deliver.orders')
+    expect(issues[0].detail).toContain('12 messages are waiting, and nobody is subscribed to deliver.orders')
 
     expect(kinds({ ...lonely, push_bound: true })).toEqual([])
     expect(kinds({ ...lonely, num_pending: 0 })).toEqual([])
@@ -76,6 +95,24 @@ describe('consumerIssues', () => {
   it('flags a pull consumer that never delivered anything', () => {
     const fresh = consumer({ num_pending: 5, delivered: { consumer_seq: 0, stream_seq: 0 } })
     expect(consumerIssues(fresh, stream(), NOW)[0].detail).toContain('no client has pulled yet')
+  })
+
+  it('counts an idle start policy as never delivered', () => {
+    const startsNew = consumer({ num_pending: 5, delivered: { consumer_seq: 0, stream_seq: 40 } })
+    expect(consumerIssues(startsNew, stream(), NOW)[0].detail).toContain('no client has pulled yet')
+  })
+
+  it('does not guess when the server no longer knows the last delivery', () => {
+    expect(kinds(consumer({ num_pending: 5, delivered: { consumer_seq: 3, stream_seq: 3 } }))).toEqual([])
+  })
+
+  it('measures idleness on the server clock when it has one', () => {
+    const skewed = consumer({
+      num_pending: 5,
+      time_stamp: NOW - 10 * 60_000,
+      delivered: { consumer_seq: 3, stream_seq: 3, last_active: NOW - 10 * 60_000 - 5_000 },
+    })
+    expect(kinds(skewed)).toEqual([])
   })
 
   it('trusts a waiting pull request or a recent delivery', () => {
@@ -95,25 +132,37 @@ describe('consumerIssues', () => {
     expect(kinds({ ...paused, config: { deliver_subject: 'deliver.orders' } })).toEqual(['paused'])
   })
 
-  it('warns when a nearly full stream that drops old messages holds undelivered ones', () => {
-    const behind = consumer({ num_pending: 40, num_waiting: 1 })
-    const issues = consumerIssues(behind, stream({ max_msgs: 100 }, 95), NOW)
+  it('warns when the next message for a consumer is among the oldest of a nearly full stream that drops old ones', () => {
+    const atTheTail = consumer({ num_pending: 90, num_waiting: 1, delivered: { consumer_seq: 5, stream_seq: 905, last_active: NOW } })
+    const full = stream({ max_msgs: 100 }, 95, 1_000, 906)
+    const issues = consumerIssues(atTheTail, full, NOW)
     expect(issues.map((i) => i.kind)).toEqual(['stream_full'])
     expect(issues[0].detail).toContain('95%')
 
-    expect(kinds(behind, stream({ max_bytes: 10_000 }, 10, 9_500))).toEqual(['stream_full'])
-    expect(kinds(behind, stream({ max_msgs: 100, discard: 'new' }, 95))).toEqual([])
-    expect(kinds(behind, stream({ max_msgs: 100 }, 50))).toEqual([])
-    expect(kinds({ ...behind, num_pending: 0 }, stream({ max_msgs: 100 }, 95))).toEqual([])
+    expect(kinds(atTheTail, stream({ max_bytes: 10_000 }, 95, 9_500, 906))).toEqual(['stream_full'])
+    expect(kinds(atTheTail, stream({ max_msgs: 100, discard: 'new' }, 95, 1_000, 906))).toEqual([])
+    expect(kinds(atTheTail, stream({ max_msgs: 100 }, 50, 1_000, 906))).toEqual([])
+    expect(kinds({ ...atTheTail, num_pending: 0 }, full)).toEqual([])
+  })
+
+  it('leaves a consumer near the head of a full stream alone', () => {
+    const nearHead = consumer({ num_pending: 3, num_waiting: 1, delivered: { consumer_seq: 90, stream_seq: 997, last_active: NOW } })
+    expect(kinds(nearHead, stream({ max_msgs: 100 }, 95, 1_000, 906))).toEqual([])
   })
 
   it('lists the stuck issues first', () => {
-    const many = consumer({ num_pending: 5, num_ack_pending: 1000, num_redelivered: 4, config: { deliver_subject: 'deliver.orders', max_ack_pending: 1000 } })
+    const many = consumer({
+      num_pending: 5,
+      num_ack_pending: 1000,
+      num_redelivered: 4,
+      config: { deliver_subject: 'deliver.orders', max_ack_pending: 1000 },
+      ack_floor: ackedLongAgo,
+    })
     expect(kinds(many)).toEqual(['ack_limit', 'no_subscriber', 'redelivering'])
   })
 
   it('does not blame idle pull clients while the ack limit blocks delivery', () => {
-    const blocked = consumer({ num_pending: 5, num_ack_pending: 1000, delivered: { consumer_seq: 0, stream_seq: 0 } })
+    const blocked = consumer({ num_pending: 5, num_ack_pending: 1000, delivered: { consumer_seq: 0, stream_seq: 0 }, ack_floor: ackedLongAgo })
     expect(kinds(blocked)).toEqual(['ack_limit'])
   })
 })

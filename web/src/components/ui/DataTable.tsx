@@ -25,6 +25,7 @@ export interface DataTableProps<T> {
   className?: string
   selectedKey?: string
   rowClassName?: (item: T) => string
+  rowLabel?: (item: T) => string
 }
 
 export function DataTable<T>({
@@ -41,6 +42,7 @@ export function DataTable<T>({
   className,
   selectedKey,
   rowClassName,
+  rowLabel,
 }: DataTableProps<T>) {
   if (isLoading) {
     return <SkeletonRows count={loadingRows} rowClassName="h-9" className="p-2" />
@@ -101,6 +103,7 @@ export function DataTable<T>({
                 rowClassName?.(item),
               )}
               role={clickable ? 'button' : undefined}
+              aria-label={rowLabel?.(item)}
               tabIndex={clickable ? 0 : undefined}
               aria-selected={selectedKey !== undefined ? selected : undefined}
               onClick={clickable ? () => onRowClick?.(item) : undefined}

@@ -27,17 +27,20 @@ import { plural } from '@/utils/plural'
 import { AccessDeniedState } from '../common/access/AccessDeniedState'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import { ConsumerStatus } from '../streams/consumers/ConsumerStatus'
+import { statusText } from '../streams/consumers/consumerHealth'
 import { getFilterSubjectsArray } from '../streams/consumers/consumerUtils'
 import { buildRows, filterRows, formatAgo, rowsToCsv, rowsToJson, type ConsumerRow } from './consumersOverview'
 
 const WHAT_IS_IT =
   'A consumer reads a stream for an application and remembers what it delivered and what clients acknowledged. ' +
-  'natscope reads every consumer every 5 seconds and says in plain words what holds one back.'
+  'With Auto-refresh on, natscope reads them every 5 seconds and says in plain words what holds one back.'
 
 function ColumnHint({ label, hint }: { label: string; hint: string }) {
   return (
     <Tooltip content={hint}>
-      <span className="cursor-help underline decoration-dotted underline-offset-2">{label}</span>
+      <span className="cursor-help underline decoration-dotted underline-offset-2" tabIndex={0}>
+        {label}
+      </span>
     </Tooltip>
   )
 }
@@ -56,29 +59,29 @@ function columns(now: number): DataTableColumn<ConsumerRow>[] {
     {
       key: 'consumer',
       header: 'Consumer',
-      width: 'w-[30%]',
-      render: ({ consumer }) => {
+      width: 'w-[28%]',
+      render: ({ consumer, kind }) => {
         const filters = getFilterSubjectsArray(consumer)
         return (
-          <div className="min-w-0">
-            <div className="font-medium text-content-primary truncate">{consumer.name}</div>
+          <div className="min-w-0 max-w-[20rem]">
+            <div className="font-medium text-content-primary truncate" title={consumer.name}>
+              {consumer.name}
+            </div>
             <div className="text-xs text-content-tertiary truncate">
               <span className="font-mono">{consumer.stream_name}</span>
               {filters.length > 0 && <span className="font-mono"> · {filters.join(', ')}</span>}
+              {` · ${kind}`}
+              {!consumer.config?.durable_name && ', ephemeral'}
             </div>
           </div>
         )
       },
     },
     {
-      key: 'type',
-      header: 'Type',
-      render: ({ kind, consumer }) => (
-        <span className="text-xs text-content-secondary whitespace-nowrap">
-          {kind === 'push' ? 'Push' : 'Pull'}
-          {!consumer.config?.durable_name && ' · ephemeral'}
-        </span>
-      ),
+      key: 'status',
+      header: 'Status',
+      width: 'w-[24%]',
+      render: ({ issues, state }) => <ConsumerStatus issues={issues} state={state} limit={2} />,
     },
     {
       key: 'pending',
@@ -103,18 +106,19 @@ function columns(now: number): DataTableColumn<ConsumerRow>[] {
       header: <ColumnHint label="Last delivery" hint="When the consumer last handed a message to a client" />,
       render: ({ consumer }) => {
         const at = consumer.delivered?.last_active
+        if (at == null && (consumer.delivered?.consumer_seq ?? 0) > 0) {
+          return (
+            <span className="text-xs text-content-tertiary" title="The server keeps the delivery time only until it restarts">
+              unknown
+            </span>
+          )
+        }
         return (
           <span className="text-xs text-content-secondary whitespace-nowrap" title={at != null ? formatDateTime(at) : undefined}>
-            {formatAgo(at, now)}
+            {formatAgo(at, consumer.time_stamp ?? now)}
           </span>
         )
       },
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      width: 'w-[22%]',
-      render: ({ issues, state }) => <ConsumerStatus issues={issues} state={state} limit={2} />,
     },
   ]
 }
@@ -127,7 +131,7 @@ function UnreadableNotice({ streams }: { streams: UnreadableStream[] }) {
     >
       <LockClosedIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <p>Consumers of {plural(streams.length, 'stream')} are not shown, because this NATS user could not list them:</p>
+        <p>Consumers of {plural(streams.length, 'stream')} are not shown:</p>
         <ul className="mt-1 space-y-0.5">
           {streams.map((s) => (
             <li key={s.stream} className="break-all">
@@ -247,7 +251,10 @@ export default function ConsumersPage() {
             </div>
             <div className="flex-1 min-h-0 overflow-auto border-t border-border">
               {rows.length > 0 ? (
-                <DataTable columns={tableColumns} items={rows} rowKey={(r) => r.key} onRowClick={open} className="min-w-[56rem]" />
+                <DataTable columns={tableColumns} items={rows} rowKey={(r) => r.key} onRowClick={open}
+                  rowLabel={(r) => `${r.consumer.name} on ${r.consumer.stream_name}: ${statusText(r.issues, r.state)}`}
+                  className="min-w-[44rem]"
+                />
               ) : (
                 <p className="px-6 py-4 text-sm text-content-tertiary">
                   {problemsOnly && !query ? 'No consumer has a problem right now.' : 'No consumer matches the filter.'}

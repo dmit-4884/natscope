@@ -151,6 +151,7 @@ export function toConsumerInfo(c: ProtoConsumerInfo): ConsumerInfo {
     push_bound: c.pushBound || undefined,
     paused: pause.paused,
     pause_until: pause.pauseUntil,
+    time_stamp: c.timeStamp ? tsToMillis(c.timeStamp) : undefined,
     cluster: toClusterInfo(c.cluster),
     priority_groups: toPriorityGroups(c.priorityGroups),
     raw,

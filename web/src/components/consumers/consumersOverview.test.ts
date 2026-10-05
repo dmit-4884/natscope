@@ -27,6 +27,7 @@ function stream(name: string, maxMsgs = -1, messages = 10): StreamInfo {
     consumer_count: 1,
     created: NOW,
     config: { retention: 'limits', max_msgs: maxMsgs, max_bytes: -1, max_age: 0, discard: 'old' },
+    state: { messages, bytes: 100, first_seq: 2, last_seq: messages + 1, first_ts: NOW, last_ts: NOW },
   }
 }
 
@@ -72,6 +73,13 @@ describe('exports', () => {
     const csv = rowsToCsv(rows).split('\n')
     expect(csv[0]).toBe('stream,consumer,type,durable,filter_subjects,pending,ack_pending,max_ack_pending,redelivered,waiting,last_delivery,status,problems')
     expect(csv[1]).toBe(`ORDERS,billing,pull,yes,orders.created,40,100,100,0,0,${new Date(NOW - 2_000).toISOString()},stuck,Ack limit reached`)
+  })
+
+  it('defuses text a spreadsheet would run as a formula', () => {
+    const names = ['=HYPERLINK("http://x")', '+1', '-2', '@cmd', '\tx']
+    const risky = buildRows({ ...overview, consumers: names.map((n) => consumer(n, 'ORDERS')) }, NOW)
+    const cells = rowsToCsv(risky).split('\n').slice(1).map((line) => line.split(',')[1])
+    expect(cells.sort()).toEqual([`"'=HYPERLINK(""http://x"")"`, `'+1`, `'-2`, `'@cmd`, `'\tx`].sort())
   })
 
   it('quotes CSV fields that need it', () => {

@@ -14,23 +14,33 @@ interface Props {
   message: { sequence: number; subject: string; timestamp: number }
 }
 
-const STATE_ORDER: FateState[] = ['acked', 'acked_or_skipped', 'skipped', 'delivered', 'awaiting_ack', 'not_delivered']
+const STATE_ORDER: FateState[] = [
+  'done',
+  'done_or_skipped',
+  'skipped',
+  'delivered',
+  'awaiting_ack',
+  'awaiting_or_skipped',
+  'not_delivered',
+]
 
 const SUMMARY: Record<FateState, string> = {
-  acked: 'acknowledged',
-  acked_or_skipped: 'acked or skipped',
+  done: 'done',
+  done_or_skipped: 'done or skipped',
   skipped: 'skipped',
   delivered: 'delivered',
   awaiting_ack: 'waiting for ack',
+  awaiting_or_skipped: 'waiting for ack or skipped',
   not_delivered: 'not delivered yet',
 }
 
 const BADGE: Record<FateState, 'success' | 'warning' | 'primary' | 'default'> = {
-  acked: 'success',
-  acked_or_skipped: 'default',
+  done: 'success',
+  done_or_skipped: 'default',
   skipped: 'default',
   delivered: 'success',
   awaiting_ack: 'warning',
+  awaiting_or_skipped: 'default',
   not_delivered: 'primary',
 }
 
