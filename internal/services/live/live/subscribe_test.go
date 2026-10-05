@@ -170,14 +170,14 @@ func TestSubscribe_ACoveredSubjectTakesOverWhenItsWildcardIsDenied(t *testing.T)
 		return len(sub.handlers) == 2
 	}, 5*time.Second, 10*time.Millisecond, "a literal subject covered by a wildcard is subscribed too")
 
+	sub.deliver(t, "orders.>", &entities.NatsMessage{Subject: "orders.created", Data: []byte("early")})
 	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: []byte("early")})
 	sub.deny(t, "orders.>")
 	nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Error != nil })
 	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: []byte("late")})
 
-	batch := nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Batch != nil })
-	require.Len(t, batch.Batch.Messages, 1, "while the wildcard is live it delivers, so the covered copy is dropped")
-	assert.Equal(t, "late", string(batch.Batch.Messages[0].NatsMessage.Data))
+	assert.Equal(t, map[string]int{"early": 1, "late": 1}, collectPayloads(t, events, "late"),
+		"while the wildcard delivers, the covered copy is dropped; once it is denied, the covered subject takes over")
 
 	cancel()
 	require.NoError(t, <-done)
@@ -370,4 +370,16 @@ func TestSubscribe_ExcludedSubjectsDoNotUseTheDisplayRate(t *testing.T) {
 	}
 	assert.Zero(t, stats.MessagesDropped, "a muted message is not a skipped one")
 	assert.Equal(t, int64(5), stats.SubjectCounts["metrics.cpu"], "muted subjects still count")
+}
+
+func TestSubscribe_AnAllowedSubjectKeepsItsMessagesUntilAnEarlierWildcardProvesLive(t *testing.T) {
+	t.Parallel()
+
+	sub, events, stop := startFakeSession(t, ">", "orders.>")
+	defer stop()
+
+	sub.deliver(t, "orders.>", &entities.NatsMessage{Subject: "orders.created", Data: []byte("first")})
+
+	assert.Equal(t, map[string]int{"first": 1}, collectPayloads(t, events, "first"),
+		"the wildcard may still be refused, so the covered subject delivers until the wildcard has delivered")
 }

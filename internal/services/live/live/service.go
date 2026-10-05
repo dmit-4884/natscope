@@ -84,6 +84,8 @@ type sessionState struct {
 	denials        chan *entities.LiveError
 	silentMu       sync.RWMutex
 	silentSubjects map[string]struct{}
+	// liveSubjects are the subjects whose subscription has delivered, so the server did not refuse it.
+	liveSubjects map[string]struct{}
 }
 
 func newSessionState(connectionID string) *sessionState {
@@ -92,7 +94,21 @@ func newSessionState(connectionID string) *sessionState {
 		lost:           make(chan struct{}),
 		denials:        make(chan *entities.LiveError, maxSubscriptionTargets),
 		silentSubjects: make(map[string]struct{}),
+		liveSubjects:   make(map[string]struct{}),
 	}
+}
+
+// markLive records that subject's subscription delivers.
+func (sess *sessionState) markLive(subject string) {
+	sess.silentMu.RLock()
+	_, known := sess.liveSubjects[subject]
+	sess.silentMu.RUnlock()
+	if known {
+		return
+	}
+	sess.silentMu.Lock()
+	sess.liveSubjects[subject] = struct{}{}
+	sess.silentMu.Unlock()
 }
 
 func (sess *sessionState) reportDenied(subject string, err error) {
@@ -116,11 +132,16 @@ func (sess *sessionState) markSilent(subject string) bool {
 	return true
 }
 
+// takenEarlier reports whether an earlier subject that has proved live delivers subject; one that has not
+// delivered yet may still be refused, so the later subject keeps the message.
 func (sess *sessionState) takenEarlier(earlier []string, subject string) bool {
 	sess.silentMu.RLock()
 	defer sess.silentMu.RUnlock()
 	for _, pattern := range earlier {
 		if _, silent := sess.silentSubjects[pattern]; silent {
+			continue
+		}
+		if _, live := sess.liveSubjects[pattern]; !live {
 			continue
 		}
 		if natsutil.MatchSubject(pattern, subject) && takesInternal(pattern, subject) {

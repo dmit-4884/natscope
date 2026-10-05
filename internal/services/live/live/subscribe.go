@@ -194,12 +194,12 @@ func (s *Service) startSubscriptions(
 	for _, target := range targets {
 		handler := s.buildMessageHandler(target.Subject, msgChan, sess)
 		if streamNameOf(target) == "" {
-			if earlier := slices.Clone(coreBefore); len(earlier) > 0 {
-				deliver := handler
-				handler = func(msg *entities.NatsMessage) {
-					if !sess.takenEarlier(earlier, msg.Subject) {
-						deliver(msg)
-					}
+			earlier := slices.Clone(coreBefore)
+			subject, deliver := target.Subject, handler
+			handler = func(msg *entities.NatsMessage) {
+				sess.markLive(subject)
+				if len(earlier) == 0 || !sess.takenEarlier(earlier, msg.Subject) {
+					deliver(msg)
 				}
 			}
 			coreBefore = append(coreBefore, target.Subject)
