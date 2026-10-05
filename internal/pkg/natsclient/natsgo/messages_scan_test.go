@@ -166,14 +166,16 @@ func TestScanDirect_JumpsOverGaps(t *testing.T) {
 	require.NoError(t, err)
 	_, err = js.Publish(t.Context(), "roll.first", []byte("first"), jetstream.WithMsgID("first"))
 	require.NoError(t, err)
-	for range 30_000 {
-		_, err = js.PublishAsync("roll.state", []byte("s"))
-		require.NoError(t, err)
-	}
-	select {
-	case <-js.PublishAsyncComplete():
-	case <-time.After(30 * time.Second):
-		t.Fatal("publishing did not finish")
+	for range 30 {
+		for range 1000 {
+			_, err = js.PublishAsync("roll.state", []byte("s"))
+			require.NoError(t, err)
+		}
+		select {
+		case <-js.PublishAsyncComplete():
+		case <-time.After(30 * time.Second):
+			t.Fatal("publishing did not finish")
+		}
 	}
 	_, err = js.Publish(t.Context(), "roll.last", []byte("last"))
 	require.NoError(t, err)

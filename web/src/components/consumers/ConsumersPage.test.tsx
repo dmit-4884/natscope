@@ -51,7 +51,7 @@ function overview(over: Partial<ConsumersOverview> = {}): ConsumersOverview {
     consumers: [
       consumer('archiver', 'ORDERS'),
       consumer('billing', 'ORDERS', { num_pending: 40, num_ack_pending: 100, config: { durable_name: 'billing', max_ack_pending: 100, filter_subject: 'orders.created' } }),
-      consumer('mailer', 'EVENTS', { num_pending: 7, num_waiting: 2, num_redelivered: 2 }),
+      consumer('mailer', 'EVENTS', { num_pending: 7, num_ack_pending: 2, num_waiting: 2, num_redelivered: 2 }),
     ],
     streams: [stream('ORDERS'), stream('EVENTS')],
     unreadable: [],
