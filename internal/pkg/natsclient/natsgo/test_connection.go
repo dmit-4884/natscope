@@ -46,7 +46,8 @@ func (d *Dialer) TestConnection(
 	cd := newCtxDialer(ctx, connectTimeout)
 	stop := context.AfterFunc(ctx, cd.closeAll)
 	defer stop()
-	natsOpts = append(natsOpts, nats.SetCustomDialer(cd), nats.IgnoreDiscoveredServers())
+	denials := newDenialWatch()
+	natsOpts = append(natsOpts, nats.SetCustomDialer(cd), nats.IgnoreDiscoveredServers(), nats.ErrorHandler(denials.record))
 
 	var best *diagnosis
 	bestURL := ""
@@ -55,9 +56,10 @@ func (d *Dialer) TestConnection(
 			break
 		}
 		diag := diagnoseNetwork(ctx, url, in.TLS, connectTimeout)
-		if diag.reached {
+		if diag.reached || diag.slow {
 			if conn := diag.connect(ctx, url, natsOpts, in.Auth); conn != nil {
-				finishConnected(ctx, result, conn, diag, in)
+				diag.connectedDespiteSlowness()
+				finishConnected(ctx, result, conn, diag, in, denials)
 				return result, nil
 			}
 		}
@@ -87,7 +89,14 @@ func testConnectTimeout(timeout *time.Duration) time.Duration {
 }
 
 // finishConnected fills the result from a connection that succeeded, checks JetStream and closes the connection.
-func finishConnected(ctx context.Context, result *entities.TestConnectionResult, conn *nats.Conn, diag *diagnosis, in *entities.TestConnectionRequest) {
+func finishConnected(
+	ctx context.Context,
+	result *entities.TestConnectionResult,
+	conn *nats.Conn,
+	diag *diagnosis,
+	in *entities.TestConnectionRequest,
+	denials *denialWatch,
+) {
 	defer conn.Close()
 	result.Success = true
 	result.ConnectedURL = natsutil.MaskURL(conn.ConnectedUrl())
@@ -103,7 +112,7 @@ func finishConnected(ctx context.Context, result *entities.TestConnectionResult,
 		result.RTTMs = time.Since(rttStart).Milliseconds()
 	}
 
-	result.JetstreamEnabled = jetStreamCheck(ctx, diag, conn, in.Connection)
+	result.JetstreamEnabled = jetStreamCheck(ctx, diag, conn, in.Connection, denials)
 	result.Checks = diag.result()
 }
 

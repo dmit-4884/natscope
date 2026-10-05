@@ -25,6 +25,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
+	"github.com/altessa-s/go-atlas/core/runtime/panics"
+
 	"github.com/dmit-4884/natscope/internal/entities"
 
 	corectx "github.com/altessa-s/go-atlas/core/context"
@@ -45,9 +47,13 @@ const (
 	schemeWS   = "ws"
 	schemeWSS  = "wss"
 
-	notReached = "Not reached"
-	outOfTime  = "Not finished: the test ran out of time"
-	notChecked = "Not checked: the test ran out of time"
+	notReached  = "Not reached"
+	outOfTime   = "Not finished: the test ran out of time"
+	notChecked  = "Not checked: the test ran out of time"
+	notCheckedSlow = "Not checked: an earlier step was too slow"
+	sentNothing = "The server sent nothing"
+	slowLink    = "; the connection still went through, so the link is slow"
+	clientPort  = "Use the client port of the NATS server, 4222 by default."
 )
 
 var allSteps = []entities.ConnectionCheckStep{
@@ -58,6 +64,12 @@ var allSteps = []entities.ConnectionCheckStep{
 var (
 	errServerMaxConnections = errors.New("nats: " + nats.MAX_CONNECTIONS_ERR)
 	errAuthTimeout          = errors.New("nats: authentication timeout")
+	errRoutePort            = errors.New("nats: attempted to connect to route port")
+	errLeafPort             = errors.New("nats: attempted to connect to leaf node port")
+	errGatewayPort          = errors.New("nats: attempted to connect to gateway port")
+	errWrongPort            = errors.New("nats: attempted to connect to wrong port")
+	errUserExpired          = errors.New("nats: user authentication expired")
+	errUserRevoked          = errors.New("nats: user authentication revoked")
 )
 
 // inContainer reports whether Natscope runs inside a Docker or Podman container.
@@ -117,6 +129,9 @@ type diagnosis struct {
 	info          *serverInfo
 	reached       bool
 	outOfTime     bool
+	slow          bool
+	slowConnected bool
+	websocket     bool
 	tlsUsed       bool
 	certRequested bool
 	certSent      bool
@@ -148,8 +163,11 @@ func (d *diagnosis) timedOut(step entities.ConnectionCheckStep, start time.Time)
 // result lists the checks in step order; a step that never ran is reported as not reached or not checked in time.
 func (d *diagnosis) result() []entities.ConnectionCheck {
 	missing := notReached
-	if d.outOfTime {
+	switch {
+	case d.outOfTime:
 		missing = notChecked
+	case d.slowConnected:
+		missing = notCheckedSlow
 	}
 	out := make([]entities.ConnectionCheck, 0, len(allSteps))
 	for _, step := range allSteps {
@@ -207,6 +225,33 @@ func (d *diagnosis) discovered(urls []string) []string {
 	return out
 }
 
+// connectedDespiteSlowness turns the network steps that only ran out of their own time into warnings once the
+// connection itself went through.
+func (d *diagnosis) connectedDespiteSlowness() {
+	if !d.slow {
+		return
+	}
+	d.slowConnected = true
+	for step, c := range d.checks {
+		if c.Status != entities.CheckStatusFailed {
+			continue
+		}
+		c.Status = entities.CheckStatusWarning
+		c.Detail += slowLink
+		c.Hint = "If connections time out, raise the connect timeout of the connection."
+		d.checks[step] = c
+	}
+}
+
+// isTimeout reports whether err is a network or context timeout.
+func isTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	netErr, ok := errors.AsType[net.Error](err)
+	return ok && netErr.Timeout()
+}
+
 // until is the earlier of now plus timeout and ctx's deadline.
 func until(ctx context.Context, timeout time.Duration) time.Time {
 	deadline := time.Now().Add(timeout)
@@ -252,6 +297,7 @@ func diagnoseNetwork(ctx context.Context, raw string, tlsCfg *entities.TlsConfig
 		d.add(entities.CheckStepDNS, entities.CheckStatusFailed, "The server URL cannot be read", "Check the server URL.", time.Now())
 		return d
 	}
+	d.websocket = t.websocket()
 	if !d.resolve(ctx, t) {
 		return d
 	}
@@ -280,6 +326,7 @@ func (d *diagnosis) resolve(ctx context.Context, t target) bool {
 	case spent(ctx):
 		d.timedOut(entities.CheckStepDNS, start)
 	default:
+		d.slow = isTimeout(err)
 		d.add(entities.CheckStepDNS, entities.CheckStatusFailed, fmt.Sprintf("%s does not resolve: %v", t.host, err), dnsHint(t.host), start)
 	}
 	return false
@@ -307,6 +354,7 @@ func (d *diagnosis) dial(ctx context.Context, t target) net.Conn {
 	case spent(ctx):
 		d.timedOut(entities.CheckStepTCP, start)
 	default:
+		d.slow = isTimeout(err)
 		d.add(entities.CheckStepTCP, entities.CheckStatusFailed, fmt.Sprintf("Cannot connect to %s: %v", t.addr(), err), tcpHint(t, err), start)
 	}
 	return nil
@@ -398,6 +446,7 @@ func (d *diagnosis) readInfo(ctx context.Context, conn net.Conn, t target, tlsCo
 		d.timedOut(entities.CheckStepProtocol, start)
 		return false
 	}
+	d.slow = detail == sentNothing && isTimeout(err)
 	d.add(entities.CheckStepProtocol, entities.CheckStatusFailed, detail, hint, start)
 	return false
 }
@@ -418,7 +467,7 @@ func unexpectedGreeting(
 	case strings.HasPrefix(line, "HTTP/"):
 		return "This port speaks HTTP, not the NATS protocol", httpHint
 	case line == "":
-		return "The server sent nothing", notNATS
+		return sentNothing, notNATS
 	default:
 		return "This is not a NATS server", notNATS
 	}
@@ -445,8 +494,8 @@ func speaksHTTP(conn net.Conn, deadline time.Time) bool {
 	return strings.HasPrefix(line, "HTTP/")
 }
 
-// answersTLSFirst reports whether a fresh connection completes a TLS handshake right away. The probe presents no
-// client certificate, as it trusts any server.
+// answersTLSFirst reports whether a fresh connection gets a TLS answer right away: a completed handshake, or an alert
+// from a server that wants a client certificate. The probe presents none, as it trusts any server.
 func answersTLSFirst(ctx context.Context, t target, base *tls.Config) bool {
 	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", t.addr())
 	if err != nil {
@@ -458,7 +507,9 @@ func answersTLSFirst(ctx context.Context, t target, base *tls.Config) bool {
 	cfg.InsecureSkipVerify = true //nolint:gosec // only probes whether the server talks TLS first; nothing is sent over it
 	cfg.Certificates = nil
 	cfg.GetClientCertificate = nil
-	return tls.Client(conn, cfg).HandshakeContext(ctx) == nil
+	err = tls.Client(conn, cfg).HandshakeContext(ctx)
+	_, alerted := remoteAlert(err)
+	return err == nil || alerted
 }
 
 func describeInfo(info *serverInfo) string {
@@ -505,6 +556,7 @@ func (d *diagnosis) handshake(ctx context.Context, conn net.Conn, t target, base
 		if spent(ctx) {
 			d.timedOut(entities.CheckStepTLS, start)
 		} else {
+			d.slow = isTimeout(err)
 			d.tlsFailed(err, start)
 		}
 		return nil
@@ -648,15 +700,28 @@ func isTLSError(err error) bool {
 func (d *diagnosis) connect(ctx context.Context, url string, opts []nats.Option, auth *entities.AuthConfig) *nats.Conn {
 	start := time.Now()
 	conn, err := nats.Connect(url, opts...)
-	d.authCheck(ctx, err, auth, start)
 	if err != nil {
+		d.authCheck(ctx, err, auth, false, start)
 		return nil
 	}
+	d.authCheck(ctx, nil, auth, conn.AuthRequired(), start)
 	return conn
 }
 
-// authCheck reports the authentication step from the outcome of the connection.
-func (d *diagnosis) authCheck(ctx context.Context, connErr error, auth *entities.AuthConfig, start time.Time) {
+// wrongPorts names the listeners a client cannot connect to by the error the server sends on them.
+var wrongPorts = []struct {
+	err  error
+	role string
+}{
+	{errRoutePort, "This is the route port of the NATS server, which links the servers of a cluster"},
+	{errLeafPort, "This is the leaf node port of the NATS server"},
+	{errGatewayPort, "This is the gateway port of the NATS server, which links clusters"},
+	{errWrongPort, "This is not the client port of the NATS server"},
+}
+
+// authCheck reports the authentication step from the outcome of the connection; authRequired is what the server
+// said in its greeting.
+func (d *diagnosis) authCheck(ctx context.Context, connErr error, auth *entities.AuthConfig, authRequired bool, start time.Time) {
 	method := entities.AuthMethodNone
 	if auth != nil {
 		method = auth.Method
@@ -664,12 +729,28 @@ func (d *diagnosis) authCheck(ctx context.Context, connErr error, auth *entities
 	fail := func(detail, hint string) {
 		d.add(entities.CheckStepAuth, entities.CheckStatusFailed, detail, hint, start)
 	}
+	protocolFailed := func(detail, hint string) {
+		d.add(entities.CheckStepProtocol, entities.CheckStatusFailed, detail, hint, start)
+		d.add(entities.CheckStepAuth, entities.CheckStatusSkipped, notReached, "", start)
+	}
+	if connErr != nil {
+		for _, p := range wrongPorts {
+			if errors.Is(connErr, p.err) {
+				protocolFailed(p.role+", not the client port", clientPort)
+				return
+			}
+		}
+	}
 	switch {
+	case connErr == nil && method == entities.AuthMethodNone && authRequired && d.certSent:
+		d.add(entities.CheckStepAuth, entities.CheckStatusOK, "Authenticated by the client certificate", "", start)
+	case connErr == nil && method == entities.AuthMethodNone && authRequired:
+		d.add(entities.CheckStepAuth, entities.CheckStatusOK, "Accepted without credentials", "", start)
 	case connErr == nil && method == entities.AuthMethodNone:
 		d.add(entities.CheckStepAuth, entities.CheckStatusOK, "No authentication required", "", start)
-	case connErr == nil && d.info != nil && !d.info.AuthRequired:
-		d.add(entities.CheckStepAuth, entities.CheckStatusWarning, "Connected, but the credentials were not checked: the server does not require authentication",
-			"Anyone can connect to this server; it ignores "+authLabels[method]+".", start)
+	case connErr == nil && !authRequired:
+		d.add(entities.CheckStepAuth, entities.CheckStatusWarning, "Connected; the server also accepts clients without credentials",
+			"Anyone who reaches this server can connect, with or without "+authLabels[method]+".", start)
 	case connErr == nil:
 		d.add(entities.CheckStepAuth, entities.CheckStatusOK, "Authenticated with "+authLabels[method], "", start)
 	case spent(ctx):
@@ -677,9 +758,11 @@ func (d *diagnosis) authCheck(ctx context.Context, connErr error, auth *entities
 	case isTLSError(connErr):
 		d.tlsFailed(connErr, start)
 		d.add(entities.CheckStepAuth, entities.CheckStatusSkipped, notReached, "", start)
-	case errors.Is(connErr, nats.ErrAuthExpired), errors.Is(connErr, nats.ErrAccountAuthExpired):
+	case errors.Is(connErr, nats.ErrAuthExpired), errors.Is(connErr, nats.ErrAccountAuthExpired), errors.Is(connErr, errUserExpired):
 		fail(sanitizeTestError(connErr), "The credentials have expired: issue new ones.")
-	case errors.Is(connErr, nats.ErrAuthorization), errors.Is(connErr, nats.ErrAuthRevoked):
+	case errors.Is(connErr, nats.ErrAuthRevoked), errors.Is(connErr, errUserRevoked):
+		fail(sanitizeTestError(connErr), "The credentials have been revoked: ask the operator of the account for new ones.")
+	case errors.Is(connErr, nats.ErrAuthorization):
 		fail(sanitizeTestError(connErr), authHints[method])
 	case errors.Is(connErr, nats.ErrMaxConnectionsExceeded), errors.Is(connErr, errServerMaxConnections):
 		fail("The server refuses new connections: it has reached its connection limit", "Close idle clients, or raise max_connections on the server.")
@@ -687,6 +770,11 @@ func (d *diagnosis) authCheck(ctx context.Context, connErr error, auth *entities
 		fail("The account has reached its connection limit", "Close idle clients of this account, or raise the account's connection limit.")
 	case errors.Is(connErr, errAuthTimeout):
 		fail("The server stopped waiting for the credentials", "Check auth_timeout on the server: a slow link or a slow auth callout service can exceed it.")
+	case d.slow:
+		d.add(entities.CheckStepAuth, entities.CheckStatusSkipped, notReached, "", start)
+	case d.websocket:
+		protocolFailed("The WebSocket handshake failed: "+sanitizeTestError(connErr),
+			"Check that this is the WebSocket port of the NATS server; use wss:// when its WebSocket listener uses TLS.")
 	default:
 		fail("The connection failed: "+sanitizeTestError(connErr), "")
 	}
@@ -708,8 +796,34 @@ var authHints = map[entities.AuthMethod]string{
 	entities.AuthMethodCredentials: "The credentials may belong to another account or operator, or have been revoked.",
 }
 
-// jetStreamCheck reports the account's JetStream in the configured domain or API prefix and whether it is on.
-func jetStreamCheck(ctx context.Context, d *diagnosis, conn *nats.Conn, cfg *entities.ConnectionConfig) bool {
+// denialWatch collects the permission violations the server reports while a test connection is open; it also keeps
+// nats.go from printing them to stderr.
+type denialWatch struct {
+	denied chan PermissionViolation
+}
+
+func newDenialWatch() *denialWatch {
+	return &denialWatch{denied: make(chan PermissionViolation, 1)}
+}
+
+func (w *denialWatch) record(_ *nats.Conn, _ *nats.Subscription, err error) {
+	if v, ok := ParsePermissionViolation(err); ok {
+		select {
+		case w.denied <- v:
+		default:
+		}
+	}
+}
+
+// accountAnswer is the outcome of a JetStream account info request.
+type accountAnswer struct {
+	info *jetstream.AccountInfo
+	err  error
+}
+
+// jetStreamCheck reports the account's JetStream in the configured domain or API prefix and whether it is on. A
+// permission the server refuses on the way ends the check at once.
+func jetStreamCheck(ctx context.Context, d *diagnosis, conn *nats.Conn, cfg *entities.ConnectionConfig, denials *denialWatch) bool {
 	start := time.Now()
 	domain, prefix := jetStreamTarget(cfg)
 	where := ""
@@ -730,7 +844,20 @@ func jetStreamCheck(ctx context.Context, d *diagnosis, conn *nats.Conn, cfg *ent
 	}
 	stepCtx, cancel := corectx.WithMaxTimeout(ctx, checkTimeout)
 	defer cancel()
-	info, err := js.AccountInfo(stepCtx)
+	answered := make(chan accountAnswer, 1)
+	go func() {
+		defer panics.Handle(stepCtx)
+		info, err := js.AccountInfo(stepCtx)
+		answered <- accountAnswer{info: info, err: err}
+	}()
+	var answer accountAnswer
+	select {
+	case answer = <-answered:
+	case v := <-denials.denied:
+		jetStreamDenied(d, v, start)
+		return false
+	}
+	info, err := answer.info, answer.err
 	const withoutJetStream = "Streams, consumers, KV and Object Store need JetStream; core publish, subscribe and request work without it."
 	switch {
 	case err == nil:
@@ -739,6 +866,8 @@ func jetStreamCheck(ctx context.Context, d *diagnosis, conn *nats.Conn, cfg *ent
 		return true
 	case errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount):
 		d.add(entities.CheckStepJetStream, entities.CheckStatusWarning, "JetStream is not enabled for this account"+where, withoutJetStream, start)
+	case errors.Is(err, jetstream.ErrJetStreamNotEnabled) && where == "" && d.info != nil && !d.info.JetStream:
+		d.add(entities.CheckStepJetStream, entities.CheckStatusWarning, "JetStream is not enabled on this server", withoutJetStream, start)
 	case errors.Is(err, jetstream.ErrJetStreamNotEnabled) && where == "":
 		d.add(entities.CheckStepJetStream, entities.CheckStatusWarning, "JetStream is not enabled for this account", withoutJetStream, start)
 	case errors.Is(err, jetstream.ErrJetStreamNotEnabled):
@@ -749,4 +878,16 @@ func jetStreamCheck(ctx context.Context, d *diagnosis, conn *nats.Conn, cfg *ent
 		d.add(entities.CheckStepJetStream, entities.CheckStatusFailed, "JetStream did not answer"+where+": "+serverText(err.Error()), hint, start)
 	}
 	return false
+}
+
+// jetStreamDenied reports a JetStream check the server refused a permission for.
+func jetStreamDenied(d *diagnosis, v PermissionViolation, start time.Time) {
+	subject := serverText(v.Subject)
+	if v.Operation == violatedSubscription {
+		d.add(entities.CheckStepJetStream, entities.CheckStatusWarning, "No permission to receive replies on "+subject,
+			"Set an inbox prefix this user may subscribe to in the connection settings, or ask the operator of the account to allow it.", start)
+		return
+	}
+	d.add(entities.CheckStepJetStream, entities.CheckStatusWarning, "No permission to publish to "+subject,
+		"JetStream needs this user to publish to the JetStream API ($JS.API.>); ask the operator of the account to allow it.", start)
 }

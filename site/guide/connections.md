@@ -39,19 +39,22 @@ Go to **Settings → Connections** (or click **New Connection** on the start scr
 7. Click **Test**. Natscope checks the connection step by step and shows what each step found:
    - **DNS**: the host name resolves
    - **TCP**: something listens on the port
-   - **NATS protocol**: the server greets like a NATS server, not an HTTP or monitoring port, and
-     whether it waits for a TLS handshake first
+   - **NATS protocol**: the server greets like a NATS server, not an HTTP, monitoring, route or leaf node
+     port, and whether it waits for a TLS handshake first
    - **TLS**: the handshake, whether the certificate is trusted, matches the host name and when it expires,
      and whether the server wants a client certificate
-   - **Authentication**: the credentials are accepted, or a warning when the server checks none
-   - **JetStream**: the account has JetStream, in the configured domain or API prefix
+   - **Authentication**: the credentials are accepted, or a warning when the server also lets clients in
+     without credentials
+   - **JetStream**: the account has JetStream, in the configured domain or API prefix, and the user may use it
 
    A failed step says what to do next, such as adding the CA certificate or turning on **TLS
    handshake first**. When Natscope runs in Docker and the server is on your machine, it suggests
    `host.docker.internal` instead of `localhost`. The later steps show as skipped. With several
    server URLs, Natscope tries them in order: the test passes when one of them connects, and
    otherwise shows the server that got furthest. A test that runs out of time marks the steps it
-   could not finish as skipped, not failed.
+   could not finish as skipped, not failed. A step that is only slow, such as a greeting that takes
+   longer than three seconds through a tunnel, does not stop the test: when the connection itself goes
+   through within the connect timeout, the slow step shows as a warning and the test passes.
 8. Click **Connect**.
 
 ## Import from the nats CLI

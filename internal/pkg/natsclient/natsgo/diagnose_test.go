@@ -13,6 +13,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -285,6 +286,7 @@ func TestDiagnose_NoJetStream(t *testing.T) {
 
 	require.True(t, res.Success)
 	assert.Equal(t, warning, check(t, res, entities.CheckStepJetStream).Status)
+	assert.Equal(t, "JetStream is not enabled on this server", check(t, res, entities.CheckStepJetStream).Detail)
 	assert.False(t, res.JetstreamEnabled)
 }
 
@@ -463,7 +465,7 @@ func TestDiagnose_CredentialsTheServerDoesNotCheck(t *testing.T) {
 	require.True(t, res.Success, res.Error)
 	auth := check(t, res, entities.CheckStepAuth)
 	assert.Equal(t, warning, auth.Status)
-	assert.Contains(t, auth.Detail, "not checked")
+	assert.Contains(t, auth.Detail, "without credentials")
 }
 
 func TestDiagnose_ServerRefusals(t *testing.T) {
@@ -473,6 +475,8 @@ func TestDiagnose_ServerRefusals(t *testing.T) {
 		"connection limit":         {"-ERR 'maximum connections exceeded'", "max_connections"},
 		"account connection limit": {"-ERR 'maximum account active connections exceeded'", "account"},
 		"authentication timeout":   {"-ERR 'Authentication Timeout'", "auth_timeout"},
+		"expired user":             {"-ERR 'User Authentication Expired'", "expired"},
+		"revoked user":             {"-ERR 'User Authentication Revoked'", "revoked"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -636,6 +640,49 @@ func TestDiagnose_MoreTLS(t *testing.T) {
 		assert.Equal(t, ok, check(t, res, entities.CheckStepTLS).Status)
 	})
 
+	t.Run("a client certificate the server maps to a user", func(t *testing.T) {
+		t.Parallel()
+		url := startTestServer(t, func(o *server.Options) {
+			o.TLSConfig = &tls.Config{
+				Certificates: []tls.Certificate{ca.serverCert(t, 90*24*time.Hour, "127.0.0.1")},
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+				ClientCAs:    ca.pool(),
+				MinVersion:   tls.VersionTLS12,
+			}
+			o.TLSVerify, o.TLSMap = true, true
+			o.Users = []*server.User{{Username: "CN=natscope client"}}
+		})
+		certPEM, keyPEM := ca.clientCert(t)
+
+		res := diagnoseURL(t, &entities.TestConnectionRequest{
+			URLs: []string{url},
+			TLS:  &entities.TlsConfig{CaCert: &ca.pem, ClientCert: &certPEM, ClientKey: &keyPEM},
+		})
+
+		require.True(t, res.Success, res.Error)
+		assert.Equal(t, "Authenticated by the client certificate", check(t, res, entities.CheckStepAuth).Detail)
+	})
+
+	t.Run("a TLS 1.2 TLS-first server that requires a client certificate", func(t *testing.T) {
+		t.Parallel()
+		url := startTestServer(t, func(o *server.Options) {
+			o.TLSConfig = &tls.Config{
+				Certificates: []tls.Certificate{ca.serverCert(t, 90*24*time.Hour, "127.0.0.1")},
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+				ClientCAs:    ca.pool(),
+				MinVersion:   tls.VersionTLS12,
+				MaxVersion:   tls.VersionTLS12,
+			}
+			o.TLSVerify = true
+			o.TLSHandshakeFirst = true
+		})
+
+		res := diagnoseURL(t, &entities.TestConnectionRequest{URLs: []string{url}, TLS: &entities.TlsConfig{CaCert: &ca.pem}})
+
+		require.False(t, res.Success)
+		assert.Contains(t, check(t, res, entities.CheckStepProtocol).Detail, "TLS handshake first")
+	})
+
 	t.Run("the TLS-first probe sends no client certificate", func(t *testing.T) {
 		t.Parallel()
 		presented := make(chan bool, 10)
@@ -676,4 +723,125 @@ func TestDiagnose_MoreTLS(t *testing.T) {
 			t.Fatal("the probe never completed a handshake")
 		}
 	})
+}
+
+// slowProxy forwards a TCP port, connecting upstream only after delay.
+func slowProxy(t *testing.T, upstream string, delay time.Duration) string {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = lis.Close() })
+	go func() {
+		for {
+			client, err := lis.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				time.Sleep(delay)
+				srv, err := net.Dial("tcp", upstream)
+				if err != nil {
+					_ = client.Close()
+					return
+				}
+				go func() { _, _ = io.Copy(srv, client); _ = srv.Close() }()
+				_, _ = io.Copy(client, srv)
+				_ = client.Close()
+			}()
+		}
+	}()
+	return "nats://" + lis.Addr().String()
+}
+
+func TestDiagnose_ASlowLinkIsNotAFailedConnection(t *testing.T) {
+	t.Parallel()
+	url := startTestServer(t, nil)
+
+	res := diagnoseURL(t, &entities.TestConnectionRequest{URLs: []string{slowProxy(t, strings.TrimPrefix(url, "nats://"), 4*time.Second)}})
+
+	require.True(t, res.Success, res.Error)
+	assert.Equal(t, warning, check(t, res, entities.CheckStepProtocol).Status)
+	assert.Equal(t, ok, check(t, res, entities.CheckStepAuth).Status)
+}
+
+func TestDiagnose_ADefaultUserIsNotIgnoredCredentials(t *testing.T) {
+	t.Parallel()
+	url := startTestServer(t, func(o *server.Options) {
+		o.Users = []*server.User{{Username: "app", Password: "pw"}, {Username: "anon", Password: "anon"}}
+		o.NoAuthUser = "anon"
+	})
+
+	res := diagnoseURL(t, &entities.TestConnectionRequest{
+		URLs: []string{url},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("pw")},
+	})
+
+	require.True(t, res.Success, res.Error)
+	auth := check(t, res, entities.CheckStepAuth)
+	assert.NotContains(t, auth.Detail, "not checked")
+	assert.Contains(t, auth.Detail, "without credentials")
+}
+
+func TestDiagnose_WrongPortsAreProtocolFailures(t *testing.T) {
+	t.Parallel()
+	opts := &server.Options{Host: "127.0.0.1", Port: -1, NoLog: true, NoSigs: true, Cluster: server.ClusterOpts{Name: "c", Host: "127.0.0.1", Port: -1}}
+	srv, err := server.NewServer(opts)
+	require.NoError(t, err)
+	go srv.Start()
+	require.True(t, srv.ReadyForConnections(10*time.Second))
+	t.Cleanup(srv.Shutdown)
+
+	for name, url := range map[string]string{
+		"route port":            "nats://" + srv.ClusterAddr().String(),
+		"websocket client port": "ws://" + strings.TrimPrefix(srv.ClientURL(), "nats://"),
+	} {
+		res := diagnoseURL(t, &entities.TestConnectionRequest{URLs: []string{url}})
+		require.False(t, res.Success, name)
+		assert.Equal(t, failed, check(t, res, entities.CheckStepProtocol).Status, name)
+		assert.NotEqual(t, failed, check(t, res, entities.CheckStepAuth).Status, name)
+		assert.NotEmpty(t, check(t, res, entities.CheckStepProtocol).Hint, name)
+	}
+}
+
+func TestDiagnose_JetStreamWithoutPermission(t *testing.T) {
+	t.Parallel()
+	url := startTestServer(t, func(o *server.Options) {
+		o.JetStream, o.StoreDir = true, t.TempDir()
+		o.Users = []*server.User{{
+			Username: "app", Password: "pw",
+			Permissions: &server.Permissions{Publish: &server.SubjectPermission{Allow: []string{">"}, Deny: []string{"$JS.API.>"}}},
+		}}
+	})
+
+	start := time.Now()
+	res := diagnoseURL(t, &entities.TestConnectionRequest{
+		URLs: []string{url},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("pw")},
+	})
+
+	require.True(t, res.Success, res.Error)
+	js := check(t, res, entities.CheckStepJetStream)
+	assert.Equal(t, warning, js.Status)
+	assert.Contains(t, js.Detail, "permission")
+	assert.Less(t, time.Since(start), 4*time.Second)
+}
+
+func TestDiagnose_WebSocketCredentialsTheServerDoesNotNeed(t *testing.T) {
+	t.Parallel()
+	opts := &server.Options{Host: "127.0.0.1", Port: -1, NoLog: true, NoSigs: true}
+	wsPort := freePort(t)
+	opts.Websocket.Host, opts.Websocket.Port, opts.Websocket.NoTLS = "127.0.0.1", wsPort, true
+	srv, err := server.NewServer(opts)
+	require.NoError(t, err)
+	go srv.Start()
+	require.True(t, srv.ReadyForConnections(10*time.Second))
+	t.Cleanup(srv.Shutdown)
+
+	res := diagnoseURL(t, &entities.TestConnectionRequest{
+		URLs: []string{"ws://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(wsPort))},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("secret")},
+	})
+
+	require.True(t, res.Success, res.Error)
+	assert.Equal(t, warning, check(t, res, entities.CheckStepAuth).Status)
 }
