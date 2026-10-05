@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
@@ -29,6 +31,10 @@ const (
 
 	// maxReferencedFile bounds a credentials, key or certificate file a context points at.
 	maxReferencedFile = 1 << 20
+
+	// maxName and maxDescription are the lengths a saved connection accepts.
+	maxName        = 256
+	maxDescription = 4096
 )
 
 // cliContext is the part of a nats CLI context file Natscope understands.
@@ -41,6 +47,7 @@ type cliContext struct {
 	Creds            string `json:"creds"`
 	NKey             string `json:"nkey"`
 	UserJWT          string `json:"user_jwt"`
+	UserSeed         string `json:"user_seed"`
 	Cert             string `json:"cert"`
 	Key              string `json:"key"`
 	CA               string `json:"ca"`
@@ -92,11 +99,19 @@ func Read(dir string) ([]entities.CliContext, error) {
 	return contexts, nil
 }
 
-// Parse translates uploaded context files; the files they point at are reported, never read from this host.
+// Parse translates uploaded context files; the files they point at are reported, never read from this host. A file
+// whose name an earlier one already took is not importable.
 func Parse(files []entities.CliContextFile) []entities.CliContext {
 	contexts := make([]entities.CliContext, 0, len(files))
+	seen := map[string]bool{}
 	for _, f := range files {
-		contexts = append(contexts, parse(f.Name, f.Content, nil, nil))
+		c := parse(f.Name, f.Content, nil, nil)
+		if seen[c.Name] {
+			c.Connection = nil
+			c.Warnings = append(c.Warnings, "another uploaded file has the same name")
+		}
+		seen[c.Name] = true
+		contexts = append(contexts, c)
 	}
 	return contexts
 }
@@ -124,17 +139,11 @@ func parse(fileName string, content []byte, readErr error, read readFunc) entiti
 	t := translator{read: read}
 	conn := &entities.SavedConnectionCreate{
 		Name:        c.Name,
-		Description: ptr.WrapNonZero(cli.Description),
+		Description: ptr.WrapNonZero(t.description(cli.Description)),
 		URLs:        urls(cli.URL),
 		Auth:        t.auth(cli),
 		TLS:         t.tls(cli),
-	}
-	if cli.InboxPrefix != "" || cli.JetStreamDomain != "" || cli.JetStreamAPI != "" {
-		conn.Connection = &entities.ConnectionConfig{
-			InboxPrefix:        ptr.WrapNonZero(cli.InboxPrefix),
-			JetstreamDomain:    ptr.WrapNonZero(cli.JetStreamDomain),
-			JetstreamAPIPrefix: ptr.WrapNonZero(cli.JetStreamAPI),
-		}
+		Connection:  t.connection(cli),
 	}
 	if cli.NSC != "" {
 		t.warn("nsc references are not supported: add the user's credentials to the connection")
@@ -145,9 +154,45 @@ func parse(fileName string, content []byte, readErr error, read readFunc) entiti
 	if cli.WindowsCertStore != "" {
 		t.warn("the Windows certificate store is not supported: add the certificate files to the connection")
 	}
-	c.Connection = conn
 	c.Warnings = t.warnings
+	if problem := unusable(c.Name, conn.Connection); problem != "" {
+		c.Warnings = append(c.Warnings, problem)
+		return c
+	}
+	c.Connection = conn
 	return c
+}
+
+// unusable names why a context would make a connection the edit form refuses to save, or returns "".
+func unusable(name string, cfg *entities.ConnectionConfig) string {
+	switch {
+	case strings.TrimSpace(name) == "":
+		return "the context has no name"
+	case strings.ContainsFunc(name, func(r rune) bool { return unicode.In(r, unicode.Cc, unicode.Cf) }):
+		return "the context name holds control or formatting characters"
+	case utf8.RuneCountInString(name) > maxName:
+		return fmt.Sprintf("the context name is longer than %d characters", maxName)
+	case cfg == nil:
+		return ""
+	}
+	if domain := ptr.Unwrap(cfg.JetstreamDomain, ""); strings.ContainsAny(domain, " \t\r\n\f.*>") {
+		return fmt.Sprintf("the JetStream domain %q may not contain spaces, dots, * or >", domain)
+	}
+	if prefix := ptr.Unwrap(cfg.JetstreamAPIPrefix, ""); prefix != "" && !plainSubject(prefix) {
+		return fmt.Sprintf("the JetStream API prefix %q is not a subject without wildcards", prefix)
+	}
+	if inbox := ptr.Unwrap(cfg.InboxPrefix, ""); inbox != "" && !plainSubject(inbox) {
+		return fmt.Sprintf("the inbox prefix %q is not a subject without wildcards", inbox)
+	}
+	return ""
+}
+
+// plainSubject reports whether s is a subject of non-empty tokens without spaces or wildcards.
+func plainSubject(s string) bool {
+	if strings.ContainsFunc(s, unicode.IsSpace) || strings.ContainsAny(s, "*>") {
+		return false
+	}
+	return !slices.Contains(strings.Split(s, "."), "")
 }
 
 func urls(raw string) []string {
@@ -197,17 +242,30 @@ func (t *translator) seed(path string) []byte {
 	if content == nil {
 		return nil
 	}
+	return t.seedFrom(content, "the NKey file "+path)
+}
+
+// seedFrom returns the NKey seed in content, or nil with a warning naming where it came from.
+func (t *translator) seedFrom(content []byte, source string) []byte {
 	kp, err := nkeys.ParseDecoratedNKey(content)
 	if err != nil {
-		t.warn(fmt.Sprintf("the NKey file %s holds no seed: %v", path, err))
+		t.warn(fmt.Sprintf("%s holds no seed: %v", source, err))
 		return nil
 	}
 	seed, err := kp.Seed()
 	if err != nil {
-		t.warn(fmt.Sprintf("the NKey file %s holds no seed: %v", path, err))
+		t.warn(fmt.Sprintf("%s holds no seed: %v", source, err))
 		return nil
 	}
 	return seed
+}
+
+// userSeed is the seed that signs for a user JWT: the context's own user seed, else its NKey file.
+func (t *translator) userSeed(cli cliContext) []byte {
+	if cli.UserSeed != "" {
+		return t.seedFrom([]byte(cli.UserSeed), "the user seed")
+	}
+	return t.seed(cli.NKey)
 }
 
 func (t *translator) auth(cli cliContext) *entities.AuthConfig {
@@ -215,9 +273,10 @@ func (t *translator) auth(cli cliContext) *entities.AuthConfig {
 		return &entities.AuthConfig{Method: entities.AuthMethodCredentials, Credentials: ptr.Wrap(string(creds))}
 	}
 	if cli.UserJWT != "" {
-		if seed := t.seed(cli.NKey); seed != nil {
+		if seed := t.userSeed(cli); seed != nil {
 			return &entities.AuthConfig{Method: entities.AuthMethodCredentials, JWT: ptr.Wrap(cli.UserJWT), NkeySeed: ptr.Wrap(string(seed))}
 		}
+		t.warn("the user JWT comes without a seed: add the seed or a credentials file to the connection")
 	} else if seed := t.seed(cli.NKey); seed != nil {
 		return &entities.AuthConfig{Method: entities.AuthMethodNKey, NkeySeed: ptr.Wrap(string(seed))}
 	}
@@ -243,6 +302,33 @@ func (t *translator) tls(cli cliContext) *entities.TlsConfig {
 	return cfg
 }
 
+// connection carries the inbox prefix and JetStream target; with both a domain and an API prefix, the domain wins.
+func (t *translator) connection(cli cliContext) *entities.ConnectionConfig {
+	if cli.InboxPrefix == "" && cli.JetStreamDomain == "" && cli.JetStreamAPI == "" {
+		return nil
+	}
+	prefix := cli.JetStreamAPI
+	if cli.JetStreamDomain != "" && prefix != "" {
+		t.warn("the JetStream API prefix is ignored: the context also sets a JetStream domain")
+		prefix = ""
+	}
+	return &entities.ConnectionConfig{
+		InboxPrefix:        ptr.WrapNonZero(cli.InboxPrefix),
+		JetstreamDomain:    ptr.WrapNonZero(cli.JetStreamDomain),
+		JetstreamAPIPrefix: ptr.WrapNonZero(prefix),
+	}
+}
+
+// description keeps as much of the context's description as a saved connection holds.
+func (t *translator) description(text string) string {
+	runes := []rune(text)
+	if len(runes) <= maxDescription {
+		return text
+	}
+	t.warn(fmt.Sprintf("the description was shortened to %d characters", maxDescription))
+	return string(runes[:maxDescription])
+}
+
 func wrapBytes(b []byte) *string {
 	if b == nil {
 		return nil
@@ -262,8 +348,18 @@ func readReferenced(path string) ([]byte, error) {
 	return readLimited(path)
 }
 
+// readLimited reads a regular file of at most maxReferencedFile bytes. It checks the file type before opening it,
+// as opening a FIFO waits for a writer.
 func readLimited(path string) ([]byte, error) {
-	f, err := os.Open(filepath.Clean(path))
+	path = filepath.Clean(path)
+	before, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !before.Mode().IsRegular() {
+		return nil, errors.New("not a regular file")
+	}
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}

@@ -148,4 +148,24 @@ func TestJetStreamDomainAndAPIPrefix(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 	})
+
+	t.Run("domains and prefixes follow the server's rules", func(t *testing.T) {
+		create := func(name string, cfg *natstypes.ConnectionConfig) error {
+			_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
+				Name: name, Urls: []string{hubURL}, Connection: cfg,
+			}))
+			return err
+		}
+		require.NoError(t, create("colon-domain", &natstypes.ConnectionConfig{JetstreamDomain: new("hub:east")}))
+		require.NoError(t, create("accented-domain", &natstypes.ConnectionConfig{JetstreamDomain: new("région")}))
+		for name, cfg := range map[string]*natstypes.ConnectionConfig{
+			"dotted-domain": {JetstreamDomain: new("hub.east")},
+			"empty-token":   {JetstreamApiPrefix: new("JS..API")},
+			"leading-dot":   {JetstreamApiPrefix: new(".JS.API")},
+		} {
+			err := create(name, cfg)
+			require.Error(t, err, name)
+			assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), name)
+		}
+	})
 }

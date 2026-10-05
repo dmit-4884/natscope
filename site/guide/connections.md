@@ -72,7 +72,9 @@ stay on your machine, so add them to each connection after the import.
 
 Contexts whose name is already taken are skipped, so an import never overwrites a connection. Settings
 Natscope cannot carry over are listed under each context: `nsc` references, SOCKS proxies and the
-Windows certificate store.
+Windows certificate store. A context with both a JetStream domain and an API prefix keeps the domain, as
+the CLI does. A context whose name, JetStream domain, API prefix or inbox prefix the connection form
+would refuse is listed with the reason but cannot be imported.
 
 ## Manage saved connections
 

@@ -6,6 +6,7 @@ package natscontext_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nats-io/nkeys"
@@ -141,4 +142,67 @@ func TestParse_UploadsNeverReadLocalFiles(t *testing.T) {
 	assert.Nil(t, c.Connection.Auth.Credentials)
 	require.Len(t, c.Warnings, 1)
 	assert.Contains(t, c.Warnings[0], "server-side.creds")
+}
+
+func TestParse_UserJWTAndSeed(t *testing.T) {
+	kp, err := nkeys.CreateUser()
+	require.NoError(t, err)
+	seed, err := kp.Seed()
+	require.NoError(t, err)
+
+	contexts := natscontext.Parse([]entities.CliContextFile{
+		{Name: "jwt.json", Content: []byte(`{"url": "nats://a:4222", "user_jwt": "eyJ.jwt", "user_seed": "` + string(seed) + `"}`)},
+		{Name: "lonely.json", Content: []byte(`{"url": "nats://a:4222", "user_jwt": "eyJ.jwt"}`)},
+	})
+
+	jwt := byName(t, contexts, "jwt")
+	require.NotNil(t, jwt.Connection.Auth)
+	assert.Equal(t, entities.AuthMethodCredentials, jwt.Connection.Auth.Method)
+	assert.Equal(t, "eyJ.jwt", *jwt.Connection.Auth.JWT)
+	assert.Equal(t, string(seed), *jwt.Connection.Auth.NkeySeed)
+
+	lonely := byName(t, contexts, "lonely")
+	assert.Nil(t, lonely.Connection.Auth)
+	assert.Contains(t, lonely.Warnings, "the user JWT comes without a seed: add the seed or a credentials file to the connection")
+}
+
+func TestParse_KeepsWhatTheEditFormAccepts(t *testing.T) {
+	contexts := natscontext.Parse([]entities.CliContextFile{
+		{Name: "both.json", Content: []byte(`{"url": "nats://a:4222", "jetstream_domain": "hub", "jetstream_api_prefix": "JS.A.API"}`)},
+		{Name: "inbox.json", Content: []byte(`{"url": "nats://a:4222", "inbox_prefix": "bad inbox *"}`)},
+		{Name: "domain.json", Content: []byte(`{"url": "nats://a:4222", "jetstream_domain": "a.b"}`)},
+		{Name: "prefix.json", Content: []byte(`{"url": "nats://a:4222", "jetstream_api_prefix": "JS..API"}`)},
+		{Name: ".json", Content: []byte(`{"url": "nats://a:4222"}`)},
+		{Name: "odd‮name.json", Content: []byte(`{"url": "nats://a:4222"}`)},
+		{Name: "long.json", Content: []byte(`{"url": "nats://a:4222", "description": "` + strings.Repeat("d", 5000) + `"}`)},
+	})
+
+	both := byName(t, contexts, "both")
+	require.NotNil(t, both.Connection)
+	assert.Equal(t, "hub", *both.Connection.Connection.JetstreamDomain)
+	assert.Nil(t, both.Connection.Connection.JetstreamAPIPrefix)
+	assert.NotEmpty(t, both.Warnings)
+
+	for _, name := range []string{"inbox", "domain", "prefix", "", "odd‮name"} {
+		c := byName(t, contexts, name)
+		assert.Nil(t, c.Connection, "%q is not importable", name)
+		assert.NotEmpty(t, c.Warnings, name)
+	}
+
+	long := byName(t, contexts, "long")
+	require.NotNil(t, long.Connection)
+	assert.Len(t, *long.Connection.Description, 4096)
+}
+
+func TestParse_SameNameTwice(t *testing.T) {
+	contexts := natscontext.Parse([]entities.CliContextFile{
+		{Name: "dup.json", Content: []byte(`{"url": "nats://first:4222"}`)},
+		{Name: "dup.json", Content: []byte(`{"url": "nats://second:4222"}`)},
+	})
+
+	require.Len(t, contexts, 2)
+	require.NotNil(t, contexts[0].Connection)
+	assert.Equal(t, []string{"nats://first:4222"}, contexts[0].Connection.URLs)
+	assert.Nil(t, contexts[1].Connection)
+	assert.NotEmpty(t, contexts[1].Warnings)
 }

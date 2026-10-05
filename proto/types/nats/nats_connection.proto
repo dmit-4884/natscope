@@ -105,11 +105,13 @@ message ConnectionConfig {
   // Optional. Ignore servers discovered via cluster INFO. Default: false.
   bool ignore_discovered_servers = 6;
 
-  // Optional. JetStream domain to manage, e.g. "hub" for a leaf node; API calls go to $JS.<domain>.API.
-  optional string jetstream_domain = 7 [(buf.validate.field).string = {max_len: 256, pattern: "^[A-Za-z0-9_-]*$"}];
+  // Optional. JetStream domain to manage, e.g. "hub" for a leaf node; API calls go to $JS.<domain>.API. Like the
+  // server, a domain may not hold whitespace, ".", "*" or ">".
+  optional string jetstream_domain = 7 [(buf.validate.field).string = {max_len: 256, pattern: "^[^\\s.*>]*$"}];
 
-  // Optional. JetStream API prefix imported from another account, e.g. "JS.orders.API"; replaces $JS.API.
-  optional string jetstream_api_prefix = 8 [(buf.validate.field).string = {max_len: 256, pattern: "^[^\\s*>]*$"}];
+  // Optional. JetStream API prefix imported from another account, e.g. "JS.orders.API"; replaces $JS.API. A subject
+  // of non-empty tokens without whitespace or wildcards.
+  optional string jetstream_api_prefix = 8 [(buf.validate.field).string = {max_len: 256, pattern: "^([^\\s.*>]+(\\.[^\\s.*>]+)*)?$"}];
 }
 
 // Reconnection behavior settings.

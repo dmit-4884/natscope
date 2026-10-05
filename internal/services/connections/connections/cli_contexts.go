@@ -15,6 +15,8 @@ import (
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/natscontext"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
+
+	slogx "github.com/altessa-s/go-atlas/observability/slog"
 )
 
 const allConnectionsLimit = 10000
@@ -35,7 +37,8 @@ func (s *Service) ListCliContexts(ctx context.Context, files []entities.CliConte
 	return found, nil
 }
 
-// ImportCliContexts creates a connection per named context; a missing, unusable or already saved one is skipped.
+// ImportCliContexts creates a connection per named context; a missing, unusable or already saved one is skipped, as is
+// one that fails to save, so the contexts already created are reported.
 func (s *Service) ImportCliContexts(
 	ctx context.Context,
 	names []string,
@@ -45,15 +48,23 @@ func (s *Service) ImportCliContexts(
 	if err != nil {
 		return nil, err
 	}
-	byName := maps.FromSliceWith(found.Contexts, func(c entities.CliContext) (string, entities.CliContext) {
-		return c.Name, c
-	})
+	byName := make(map[string]entities.CliContext, len(found.Contexts))
+	for _, c := range found.Contexts {
+		if _, taken := byName[c.Name]; !taken {
+			byName[c.Name] = c
+		}
+	}
 
 	res := &entities.CliContextImport{}
 	skip := func(name, reason string) {
 		res.Skipped = append(res.Skipped, entities.CliContextSkip{Name: name, Reason: reason})
 	}
+	done := make(map[string]bool, len(names))
 	for _, name := range names {
+		if done[name] {
+			continue
+		}
+		done[name] = true
 		c, ok := byName[name]
 		if !ok {
 			skip(name, "no such context")
@@ -72,7 +83,8 @@ func (s *Service) ImportCliContexts(
 		case isInvalidConnection(createErr):
 			skip(name, createErr.Error())
 		default:
-			return nil, createErr
+			s.logger.WarnContext(ctx, "nats CLI context not imported", slog.String("name", name), slogx.Error(createErr))
+			skip(name, "the connection could not be saved")
 		}
 	}
 

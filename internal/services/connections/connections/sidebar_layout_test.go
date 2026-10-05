@@ -130,3 +130,36 @@ func TestCliContexts_HostDirectoryOffForRemoteAccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, found.Contexts, 1)
 }
+
+func TestCliContexts_ImportKeepsGoingPastAFailedSave(t *testing.T) {
+	t.Parallel()
+	store := &mockStorage{listResult: &entities.List[entities.SavedConnections]{}, saveErr: errors.New("disk full")}
+	svc := New(store, &mockLayouts{}, nil, false)
+	files := []entities.CliContextFile{
+		{Name: "a.json", Content: []byte(`{"url":"nats://a:4222"}`)},
+		{Name: "b.json", Content: []byte(`{"url":"nats://b:4222"}`)},
+	}
+
+	res, err := svc.ImportCliContexts(t.Context(), []string{"a", "b"}, files)
+
+	require.NoError(t, err)
+	assert.Empty(t, res.Created)
+	require.Len(t, res.Skipped, 2)
+	assert.Contains(t, res.Skipped[1].Reason, "could not be saved")
+}
+
+func TestCliContexts_ImportTakesTheFirstOfTwoUploadsWithOneName(t *testing.T) {
+	t.Parallel()
+	store := &mockStorage{listResult: &entities.List[entities.SavedConnections]{}}
+	svc := New(store, &mockLayouts{}, nil, false)
+	files := []entities.CliContextFile{
+		{Name: "dup.json", Content: []byte(`{"url":"nats://first:4222"}`)},
+		{Name: "dup.json", Content: []byte(`{"url":"nats://second:4222"}`)},
+	}
+
+	res, err := svc.ImportCliContexts(t.Context(), []string{"dup", "dup"}, files)
+
+	require.NoError(t, err)
+	require.Len(t, res.Created, 1)
+	assert.Equal(t, []string{"nats://first:4222"}, res.Created[0].URLs)
+}
