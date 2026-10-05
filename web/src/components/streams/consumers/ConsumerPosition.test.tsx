@@ -83,7 +83,7 @@ describe('ConsumerPosition floor line', () => {
     const unacked = consumer({ num_pending: 0, num_ack_pending: 0, ack_floor: { consumer_seq: 0, stream_seq: 11 } })
     render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={unacked} onOpenMessage={vi.fn()} />)
 
-    expect(screen.getByTestId('consumer-floor')).toHaveTextContent('Delivered up to #20 · nothing acknowledged yet')
+    expect(screen.getByTestId('consumer-floor')).toHaveTextContent('Delivered up to #20 · nothing done in order yet')
   })
 })
 
@@ -103,7 +103,7 @@ describe('ConsumerPosition oldest unacknowledged', () => {
 
 describe('ConsumerPosition lost messages', () => {
   it('says which messages left the stream before the consumer reached them', () => {
-    const behind = consumer({ num_pending: 0, num_ack_pending: 0 })
+    const behind = consumer({ num_pending: 0, num_ack_pending: 0, config: { ack_policy: 'explicit' } })
     render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={behind} firstSeq={40} onOpenMessage={vi.fn()} />)
 
     expect(screen.getByTestId('consumer-lost')).toHaveTextContent('Messages #21–#39 left the stream before this consumer reached them.')
@@ -122,5 +122,47 @@ describe('ConsumerPosition lost messages for a new consumer', () => {
     render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={fresh} firstSeq={40} onOpenMessage={vi.fn()} />)
 
     expect(screen.queryByTestId('consumer-lost')).not.toBeInTheDocument()
+  })
+})
+
+describe('ConsumerPosition lost messages for a filtered consumer', () => {
+  it('makes no claim when the filter skips some of the stream subjects', () => {
+    const behind = consumer({ num_pending: 0, num_ack_pending: 0 })
+    render(
+      <ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={behind} firstSeq={40} streamSubjects={['orders.>']} onOpenMessage={vi.fn()} />,
+    )
+
+    expect(screen.queryByTestId('consumer-lost')).not.toBeInTheDocument()
+  })
+
+  it('names the gap when the filter takes the whole stream', () => {
+    const behind = consumer({ num_pending: 0, num_ack_pending: 0, config: { ack_policy: 'explicit', filter_subject: 'orders.>' } })
+    render(
+      <ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={behind} firstSeq={40} streamSubjects={['orders.>']} onOpenMessage={vi.fn()} />,
+    )
+
+    expect(screen.getByTestId('consumer-lost')).toHaveTextContent('Messages #21–#39 left the stream')
+  })
+})
+
+describe('ConsumerPosition with a delivery limit', () => {
+  beforeEach(() => {
+    mockedNext.mockReset()
+  })
+
+  it('admits the oldest unacknowledged may be one that ran out of attempts', async () => {
+    mockedNext.mockResolvedValue(message(14))
+    const limited = consumer({ config: { ack_policy: 'explicit', max_deliver: 3 } })
+    render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={limited} onOpenMessage={vi.fn()} />)
+
+    expect(await screen.findByText(/ran out of delivery attempts/)).toBeInTheDocument()
+  })
+
+  it('says nothing about attempts without a limit', async () => {
+    mockedNext.mockResolvedValue(message(14))
+    render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={consumer()} onOpenMessage={vi.fn()} />)
+
+    expect(await screen.findByText('#14')).toBeInTheDocument()
+    expect(screen.queryByText(/ran out of delivery attempts/)).not.toBeInTheDocument()
   })
 })

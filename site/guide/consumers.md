@@ -22,9 +22,12 @@ The **Status** column names the problem in plain words. Hover a badge for the de
 | **At its ack limit**  | The same limit, but clients are still acking: the consumer is busy, not stuck.                           |
 | **No subscriber**     | A push consumer has messages to deliver and nobody subscribes to its deliver subject.                   |
 | **Nobody pulling**    | A pull consumer has messages to deliver, no pull request waits, and no client pulled in the last minute. |
-| **Redelivering**      | Some unacknowledged messages were delivered again: a client rejected them or missed the ack wait.        |
+| **Redelivering**      | Messages still wait for an ack, and some were delivered again: a client rejected them or missed the ack wait. |
 | **May lose messages** | The stream is at least 90% full and drops its oldest messages, and the next message for this consumer is among the oldest tenth. |
 | **Losing messages**  | The same, and the stream already dropped messages this consumer had not reached.                      |
+
+Natscope raises the last two only for a consumer that sees the whole stream: one without a filter, or whose filter takes every
+subject of the stream. For a filtered consumer the server does not say which of the dropped messages were on its subjects.
 | **Paused**            | Delivery is paused until the time shown.                                                                |
 
 A consumer with nothing wrong is **Catching up** while it has work left, and **Caught up** when it has none.
@@ -44,10 +47,12 @@ permission the server refused. If it may not list streams at all, the page names
 The view of a consumer starts with **What holds it back** when one of the problems above applies. **Where it is** shows:
 
 - **Oldest waiting for ack**: the first delivered message no client acknowledged. The consumer cannot move its ack floor
-  past it.
+  past it. With a delivery limit, it may instead be a message that ran out of delivery attempts: the server reports no
+  floor past such a message until every later one is acknowledged.
 - **Next to deliver**: the next new message for the consumer. Redeliveries of unacknowledged messages go out before it.
-- How far the consumer delivered, and up to where every message is done.
-- Which messages left the stream before the consumer reached them, when that happened.
+- How far the consumer delivered, and up to where every message is done in order.
+- Which messages left the stream before the consumer reached them, when that happened and the consumer sees the whole
+  stream.
 
 **Open** shows the message on the stream's **Messages** tab. Natscope reads these messages straight from the stream, so
 looking at them does not deliver or acknowledge anything.
@@ -57,13 +62,15 @@ looking at them does not deliver or acknowledge anything.
 The details of a stream message have a **Consumers** line: how many consumers are done with it, got it and still owe an
 ack, or have not received it yet. Expand it to see each consumer:
 
-- **Done**: acknowledged, terminated by a client, or dropped after the last delivery attempt. The server treats all three the
-  same, so it cannot tell them apart.
+- **Done**: acknowledged, terminated by a client, or out of delivery attempts; the server does not report which. Once no
+  message waits for an ack, every delivered message counts as done.
 - **Waiting for ack**: delivered, not acknowledged yet. With explicit acks a client may have acknowledged it out of order,
   which the server does not report per message.
 - **Not delivered yet**: still in line for this consumer
 - **Skipped**: the consumer starts after this message, so it never gets it
 - **Delivered**: delivered to a consumer that does not use acks
+- **… or skipped**: the consumer started from the last message, or the last message per subject, so a message from
+  before it was created may have been skipped instead
 
 Consumers whose filter leaves the subject out are counted separately.
 

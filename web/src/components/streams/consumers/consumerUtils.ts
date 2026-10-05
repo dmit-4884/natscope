@@ -1,3 +1,4 @@
+import { coversSubject } from '@/shared/domain/subjectMatch'
 import type { ConsumerInfo } from '@/types/nats'
 import type { ConsumerCreateRequest, ConsumerUpdateRequest } from '@/types/management'
 
@@ -116,6 +117,13 @@ export function getFilterSubjectsArray(consumer: ConsumerInfo): string[] {
     return [consumer.config.filter_subject]
   }
   return []
+}
+
+export function seesWholeStream(consumer: ConsumerInfo, streamSubjects: string[] | undefined): boolean {
+  const filters = getFilterSubjectsArray(consumer)
+  if (filters.length === 0) return true
+  const subjects = streamSubjects && streamSubjects.length > 0 ? streamSubjects : ['>']
+  return subjects.every((subject) => filters.some((filter) => coversSubject(filter, subject)))
 }
 
 export function parseResetSequence(raw: string | undefined): number | undefined | null {

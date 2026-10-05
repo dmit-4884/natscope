@@ -52,7 +52,7 @@ describe('MessageConsumers', () => {
 
   it('sums up what each consumer did with the message and lists them on demand', async () => {
     mockedList.mockResolvedValue([
-      consumer('billing'),
+      consumer('billing', { num_ack_pending: 2 }),
       consumer('audit', { ack_floor: { consumer_seq: 8, stream_seq: 20 } }),
       consumer('mailer', { delivered: { consumer_seq: 2, stream_seq: 9 }, ack_floor: { consumer_seq: 2, stream_seq: 9 } }),
       consumer('shipping', { config: { filter_subject: 'orders.shipped' } }),

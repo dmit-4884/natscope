@@ -19,9 +19,11 @@ const STATE_ORDER: FateState[] = [
   'done_or_skipped',
   'skipped',
   'delivered',
+  'delivered_or_skipped',
   'awaiting_ack',
   'awaiting_or_skipped',
   'not_delivered',
+  'not_delivered_or_skipped',
 ]
 
 const SUMMARY: Record<FateState, string> = {
@@ -29,9 +31,11 @@ const SUMMARY: Record<FateState, string> = {
   done_or_skipped: 'done or skipped',
   skipped: 'skipped',
   delivered: 'delivered',
+  delivered_or_skipped: 'delivered or skipped',
   awaiting_ack: 'waiting for ack',
   awaiting_or_skipped: 'waiting for ack or skipped',
   not_delivered: 'not delivered yet',
+  not_delivered_or_skipped: 'not delivered yet or skipped',
 }
 
 const BADGE: Record<FateState, 'success' | 'warning' | 'primary' | 'default'> = {
@@ -39,9 +43,11 @@ const BADGE: Record<FateState, 'success' | 'warning' | 'primary' | 'default'> = 
   done_or_skipped: 'default',
   skipped: 'default',
   delivered: 'success',
+  delivered_or_skipped: 'default',
   awaiting_ack: 'warning',
   awaiting_or_skipped: 'default',
   not_delivered: 'primary',
+  not_delivered_or_skipped: 'default',
 }
 
 export function MessageConsumers({ connectionId, streamName, message }: Props) {

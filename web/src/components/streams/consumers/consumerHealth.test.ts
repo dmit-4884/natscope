@@ -205,3 +205,23 @@ describe('consumerIssues lost messages for a new consumer', () => {
     expect(issues[0].label).toBe('May lose messages')
   })
 })
+
+describe('consumerIssues lost messages for a filtered consumer', () => {
+  const full = stream({ max_msgs: 100 }, 95, 1_000, 906)
+  const behind = (filter: string) =>
+    consumer({ num_pending: 1, num_waiting: 1, config: { filter_subject: filter }, delivered: { consumer_seq: 5, stream_seq: 5, last_active: NOW } })
+
+  it('makes no claim about messages on subjects the consumer does not take', () => {
+    expect(kinds(behind('orders.eu'), full)).toEqual([])
+  })
+
+  it('still warns when its filter takes every subject of the stream', () => {
+    expect(kinds(behind('orders.>'), full)).toEqual(['stream_full'])
+  })
+})
+
+describe('consumerIssues redelivering', () => {
+  it('stops once nothing waits for an ack, as a message that ran out of attempts keeps the count', () => {
+    expect(kinds(consumer({ num_ack_pending: 0, num_redelivered: 1 }))).toEqual([])
+  })
+})

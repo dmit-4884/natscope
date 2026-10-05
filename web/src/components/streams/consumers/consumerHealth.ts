@@ -1,6 +1,7 @@
 import type { ConsumerInfo, StreamInfo } from '@/types/nats'
 import { formatDateTime, formatDuration, formatNsDuration } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
+import { seesWholeStream } from './consumerUtils'
 
 const IDLE_PULL_MS = 60_000
 const MIN_ACK_SILENCE_MS = 30_000
@@ -84,6 +85,7 @@ function streamFillOf(stream: StreamInfo): number {
 
 function streamFullIssue(consumer: ConsumerInfo, stream: StreamInfo | undefined): ConsumerIssue | null {
   if (!stream?.state || consumer.num_pending === 0 || (stream.config.discard ?? 'old') !== 'old') return null
+  if (!seesWholeStream(consumer, stream.subjects)) return null
   const fill = streamFillOf(stream)
   const next = (consumer.delivered?.stream_seq ?? 0) + 1
   if (fill < STREAM_FULL_RATIO || next - stream.state.first_seq >= stream.messages * OLDEST_SHARE) return null
@@ -149,7 +151,7 @@ export function consumerIssues(consumer: ConsumerInfo, stream: StreamInfo | unde
   }
 
   const redelivered = consumer.num_redelivered ?? 0
-  if (redelivered > 0) {
+  if (redelivered > 0 && consumer.num_ack_pending > 0) {
     const ackWait = consumer.config?.ack_wait
     issues.push({
       kind: 'redelivering',

@@ -7,9 +7,11 @@ export type FateState =
   | 'done_or_skipped'
   | 'skipped'
   | 'delivered'
+  | 'delivered_or_skipped'
   | 'awaiting_ack'
   | 'awaiting_or_skipped'
   | 'not_delivered'
+  | 'not_delivered_or_skipped'
 
 export interface MessageFate {
   consumer: ConsumerInfo
@@ -65,16 +67,25 @@ function fateOf(consumer: ConsumerInfo, message: FateMessage): Omit<MessageFate,
     return { state: 'skipped', label: 'Skipped', detail: 'The consumer starts after this message, so it never gets it.' }
   }
   if (message.sequence > delivered) {
-    return {
-      state: 'not_delivered',
-      label: 'Not delivered yet',
-      detail: consumer.paused ? 'Waiting in line; the consumer is paused.' : 'Waiting in line for this consumer.',
-    }
+    const inLine = consumer.paused ? 'Waiting in line; the consumer is paused.' : 'Waiting in line for this consumer.'
+    return before === 'maybe'
+      ? {
+          state: 'not_delivered_or_skipped',
+          label: 'Not delivered yet or skipped',
+          detail: `${inLine} Or skipped: the consumer started from the last message.`,
+        }
+      : { state: 'not_delivered', label: 'Not delivered yet', detail: inLine }
   }
   if (ackPolicy === 'none') {
-    return { state: 'delivered', label: 'Delivered', detail: 'Delivered. This consumer does not use acks.' }
+    return before === 'maybe'
+      ? {
+          state: 'delivered_or_skipped',
+          label: 'Delivered or skipped',
+          detail: 'Delivered, or skipped: the consumer started from the last message. This consumer does not use acks.',
+        }
+      : { state: 'delivered', label: 'Delivered', detail: 'Delivered. This consumer does not use acks.' }
   }
-  if (message.sequence <= ackFloor) {
+  if (message.sequence <= ackFloor || consumer.num_ack_pending === 0) {
     return before === 'maybe'
       ? {
           state: 'done_or_skipped',

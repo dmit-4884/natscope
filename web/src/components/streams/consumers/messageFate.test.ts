@@ -10,7 +10,7 @@ function consumer(name: string, overrides: Partial<ConsumerInfo> = {}): Consumer
     stream_name: 'ORDERS',
     created: CREATED,
     num_pending: 0,
-    num_ack_pending: 0,
+    num_ack_pending: 3,
     config: { ack_policy: 'explicit', deliver_policy: 'all' },
     delivered: { consumer_seq: 8, stream_seq: 20 },
     ack_floor: { consumer_seq: 5, stream_seq: 12 },
@@ -92,5 +92,30 @@ describe('messageFates done', () => {
 
     const unlimited = messageFates([consumer('audit')], message(10)).fates[0]
     expect(unlimited.detail).toBe('Acknowledged or terminated by a client.')
+  })
+})
+
+describe('messageFates with nothing waiting for an ack', () => {
+  it('counts every delivered message as done, as one that ran out of attempts stays under the reported floor', () => {
+    const exhausted = consumer('billing', { num_ack_pending: 0, config: { ack_policy: 'explicit', deliver_policy: 'all', max_deliver: 3 } })
+    expect(stateOf(exhausted, message(15))).toBe('done')
+    expect(stateOf(exhausted, message(21))).toBe('not_delivered')
+  })
+})
+
+describe('messageFates for a consumer that started at the last message per subject', () => {
+  const lastPerSubject = (overrides: Partial<ConsumerInfo> = {}) =>
+    consumer('watcher', { config: { ack_policy: 'none', deliver_policy: 'last_per_subject' }, ...overrides })
+
+  it('cannot tell delivered from skipped without acks', () => {
+    const fate = messageFates([lastPerSubject()], message(10, 'orders.created', CREATED - 1_000)).fates[0]
+    expect(fate.state).toBe('delivered_or_skipped')
+    expect(fate.label).toBe('Delivered or skipped')
+  })
+
+  it('cannot tell waiting from skipped for an older message it has not reached', () => {
+    const fate = messageFates([lastPerSubject()], message(25, 'orders.created', CREATED - 1_000)).fates[0]
+    expect(fate.state).toBe('not_delivered_or_skipped')
+    expect(fate.label).toBe('Not delivered yet or skipped')
   })
 })

@@ -5,13 +5,14 @@ import { useNextMessage } from '@/contexts/messages'
 import { describePermission } from '@/shared/domain/access'
 import type { ConsumerInfo, Message } from '@/types/nats'
 import { formatDateTime } from '@/utils/formatters'
-import { getFilterSubjectsArray } from './consumerUtils'
+import { getFilterSubjectsArray, seesWholeStream } from './consumerUtils'
 
 interface Props {
   connectionId: string
   streamName: string
   consumer: ConsumerInfo
   firstSeq?: number
+  streamSubjects?: string[]
   onOpenMessage: (message: Message) => void
 }
 
@@ -76,7 +77,7 @@ function Spot({ label, hint, idle, startSeq, lastSeq, connectionId, streamName, 
   )
 }
 
-export function ConsumerPosition({ connectionId, streamName, consumer, firstSeq, onOpenMessage }: Props) {
+export function ConsumerPosition({ connectionId, streamName, consumer, firstSeq, streamSubjects, onOpenMessage }: Props) {
   const subjects = getFilterSubjectsArray(consumer)
   const delivered = consumer.delivered?.stream_seq ?? 0
   const ackFloor = consumer.ack_floor?.stream_seq ?? 0
@@ -98,6 +99,12 @@ export function ConsumerPosition({ connectionId, streamName, consumer, firstSeq,
           subjects={subjects}
           onOpenMessage={onOpenMessage}
         />
+        {consumer.num_ack_pending > 0 && (consumer.config?.max_deliver ?? 0) > 0 && (
+          <p className="pb-1 text-xs text-content-muted">
+            With a delivery limit, it may be a message that ran out of delivery attempts: the server reports no floor past
+            it until every later message is acknowledged.
+          </p>
+        )}
         <Spot
           label="Next to deliver"
           hint="The next new message for this consumer; redeliveries of unacknowledged messages go out before it"
@@ -111,9 +118,12 @@ export function ConsumerPosition({ connectionId, streamName, consumer, firstSeq,
         <p className="mt-1 text-xs text-content-muted" data-testid="consumer-floor">
           {(consumer.delivered?.consumer_seq ?? 0) === 0
             ? 'Nothing delivered yet'
-            : `Delivered up to #${delivered} · ${(consumer.ack_floor?.consumer_seq ?? 0) === 0 ? 'nothing acknowledged yet' : `done up to #${ackFloor}`}`}
+            : `Delivered up to #${delivered} · ${(consumer.ack_floor?.consumer_seq ?? 0) === 0 ? 'nothing done in order yet' : `done up to #${ackFloor}`}`}
         </p>
-        {firstSeq != null && (consumer.delivered?.consumer_seq ?? 0) > 0 && delivered + 1 < firstSeq && (
+        {firstSeq != null &&
+          (consumer.delivered?.consumer_seq ?? 0) > 0 &&
+          delivered + 1 < firstSeq &&
+          seesWholeStream(consumer, streamSubjects) && (
           <p className="mt-1 text-xs text-status-warning-text" data-testid="consumer-lost">
             Messages #{delivered + 1}–#{firstSeq - 1} left the stream before this consumer reached them.
           </p>
