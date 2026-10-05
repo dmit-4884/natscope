@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { ChevronDownIcon, OverflowMenu, RelationsIcon, UsersIcon } from '@/components/ui'
 import { cn } from '@/utils/cn'
 
@@ -9,7 +10,7 @@ interface StreamTab {
   icon: ReactNode
 }
 
-const TABS: StreamTab[] = [
+const ALL_TABS: StreamTab[] = [
   {
     path: 'messages',
     label: 'Messages',
@@ -42,6 +43,8 @@ const TABS: StreamTab[] = [
   },
 ]
 
+const READ_ONLY_TABS = ALL_TABS.filter((t) => t.path !== 'publish')
+
 const GAP_PX = 4
 const MORE_PX = 36
 
@@ -54,9 +57,11 @@ const tabClass = (active: boolean) =>
   )
 
 export default function StreamTabs({ baseUrl }: { baseUrl: string }) {
+  const { readOnly } = useConnectionPolicy()
+  const tabs = readOnly ? READ_ONLY_TABS : ALL_TABS
   const rowRef = useRef<HTMLDivElement>(null)
   const measureRefs = useRef<(HTMLSpanElement | null)[]>([])
-  const [visibleCount, setVisibleCount] = useState(TABS.length)
+  const [visibleCount, setVisibleCount] = useState(tabs.length)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -69,7 +74,7 @@ export default function StreamTabs({ baseUrl }: { baseUrl: string }) {
       const widths = measureRefs.current.map((el) => el?.offsetWidth ?? 0)
       const total = widths.reduce((sum, w) => sum + w, 0) + GAP_PX * (widths.length - 1)
       if (total <= available) {
-        setVisibleCount(TABS.length)
+        setVisibleCount(tabs.length)
         return
       }
       let used = MORE_PX
@@ -85,15 +90,15 @@ export default function StreamTabs({ baseUrl }: { baseUrl: string }) {
     const observer = new ResizeObserver(fit)
     observer.observe(row)
     return () => observer.disconnect()
-  }, [])
+  }, [tabs])
 
-  const activeIndex = TABS.findIndex((t) => location.pathname.endsWith(`/${t.path}`))
-  const hidden = TABS.slice(visibleCount)
+  const activeIndex = tabs.findIndex((t) => location.pathname.endsWith(`/${t.path}`))
+  const hidden = tabs.slice(visibleCount)
 
   return (
     <div className="relative">
       <div ref={rowRef} data-testid="stream-tabs" className="flex gap-1">
-        {TABS.slice(0, visibleCount).map((t) => (
+        {tabs.slice(0, visibleCount).map((t) => (
           <NavLink
             key={t.path}
             to={`${baseUrl}/${t.path}`}
@@ -113,14 +118,14 @@ export default function StreamTabs({ baseUrl }: { baseUrl: string }) {
             items={hidden.map((t) => ({
               label: t.label,
               icon: t.icon,
-              selected: TABS.indexOf(t) === activeIndex,
+              selected: tabs.indexOf(t) === activeIndex,
               onSelect: () => navigate(`${baseUrl}/${t.path}`),
             }))}
           />
         )}
       </div>
       <div aria-hidden="true" className="invisible absolute left-0 top-0 h-0 w-0 overflow-hidden">
-        {TABS.map((t, i) => (
+        {tabs.map((t, i) => (
           <span
             key={t.path}
             ref={(el) => {

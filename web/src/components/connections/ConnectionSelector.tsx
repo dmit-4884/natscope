@@ -19,6 +19,7 @@ import {
   type AuthMethod,
 } from '@/contexts/connection'
 import { Alert, CloseIcon, EyeIcon, EyeOffIcon, Input, LogoIcon, PlusIcon, QueryErrorState, Spinner } from '@/components/ui'
+import { ConnectionBadges } from './ConnectionBadges'
 import { AUTH_LABELS } from './manager/connectionFormData'
 
 type AuthMethodTab = AuthMethod
@@ -287,7 +288,10 @@ export default function ConnectionSelector() {
                         }`}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-content-primary truncate">{conn.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-content-primary truncate">{conn.name}</span>
+                          <ConnectionBadges policy={{ readOnly: conn.readOnly, label: conn.label ?? null }} />
+                        </div>
                         <div className="text-xs text-content-tertiary font-mono truncate">{conn.urls.join(', ')}</div>
                         {error?.id === conn.id && (
                           <div className="text-xs text-status-error-text mt-0.5">{error.message}</div>

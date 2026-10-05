@@ -2,6 +2,7 @@ import type { SavedConnection } from '@/api/connections'
 import { stripErrorCodePrefix } from '@/api/errors'
 import { LockClosedIcon, RowActionButton } from '@/components/ui'
 import { formatDate } from '@/utils/formatters'
+import { ConnectionBadges } from '../ConnectionBadges'
 import { AUTH_LABELS } from './connectionFormData'
 
 interface Props {
@@ -80,6 +81,7 @@ export function ConnectionCard({
         <div className="flex-1 min-w-[200px]">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm text-content-primary truncate">{connection.name}</span>
+            <ConnectionBadges policy={{ readOnly: connection.readOnly, label: connection.label ?? null }} />
             {isActive && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-2xs bg-status-success-light text-green-700 rounded-full font-medium">
                 <span aria-hidden="true" className="w-1 h-1 rounded-full bg-green-500" />

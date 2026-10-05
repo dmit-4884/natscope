@@ -17,7 +17,7 @@ interface Props {
   error?: unknown
   onRefetch: () => void
   onSelect: (consumer: ConsumerInfo) => void
-  onCreate: () => void
+  onCreate?: () => void
   issues?: Record<string, ConsumerIssue[]>
 }
 
@@ -57,10 +57,12 @@ export function ConsumerList({
                 <RefreshIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
               </Button>
             </Tooltip>
-            <Button variant="ghost" size="sm" onClick={onCreate}>
-              <PlusIcon className="w-4 h-4 mr-1" />
-              New
-            </Button>
+            {onCreate && (
+              <Button variant="ghost" size="sm" onClick={onCreate}>
+                <PlusIcon className="w-4 h-4 mr-1" />
+                New
+              </Button>
+            )}
           </div>
         </div>
       </div>

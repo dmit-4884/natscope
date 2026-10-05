@@ -6,6 +6,7 @@ import NotFoundPage from './components/common/NotFoundPage'
 import { LazyRoute } from './components/common/LazyRoute'
 import StreamView from './components/streams/StreamView'
 import ConnectionSelector from './components/connections/ConnectionSelector'
+import { ReadOnlyGate } from './components/connections/ReadOnlyGate'
 
 // Stream tab components (eagerly loaded as they're commonly used)
 import MessagesTab from './components/streams/MessagesTab'
@@ -64,7 +65,7 @@ export const router = createBrowserRouter([
                 </div>
               ) },
               // Create new stream - must be before :streamName
-              { path: 'new', element: <LazyRoute><CreateStreamPage /></LazyRoute> },
+              { path: 'new', element: <ReadOnlyGate><LazyRoute><CreateStreamPage /></LazyRoute></ReadOnlyGate> },
               {
                 path: ':streamName',
                 element: <StreamView />,
@@ -74,7 +75,7 @@ export const router = createBrowserRouter([
                   { path: 'config', element: <LazyRoute><StreamConfigTab /></LazyRoute> },
                   { path: 'consumers', element: <LazyRoute><StreamConsumersTab /></LazyRoute> },
                   { path: 'relations', element: <LazyRoute><StreamRelationsTab /></LazyRoute> },
-                  { path: 'publish', element: <PublishTab /> },
+                  { path: 'publish', element: <ReadOnlyGate><PublishTab /></ReadOnlyGate> },
                   // Redirect old 'info' route to 'config'
                   { path: 'info', element: <Navigate to="../config" replace /> },
                 ]
@@ -88,7 +89,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <LazyRoute><KVOverviewPage /></LazyRoute> },
               // Create new KV store - must be before :bucketName
-              { path: 'new', element: <LazyRoute><CreateKVPage /></LazyRoute> },
+              { path: 'new', element: <ReadOnlyGate><LazyRoute><CreateKVPage /></LazyRoute></ReadOnlyGate> },
               // KV store view
               { path: ':bucketName', element: <LazyRoute><KVStorePage /></LazyRoute> },
             ]
@@ -100,7 +101,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <LazyRoute><ObjectsOverviewPage /></LazyRoute> },
               // Create new bucket - must be before :bucketName
-              { path: 'new', element: <LazyRoute><ObjectsTab createMode /></LazyRoute> },
+              { path: 'new', element: <ReadOnlyGate><LazyRoute><ObjectsTab createMode /></LazyRoute></ReadOnlyGate> },
               // Object store view
               { path: ':bucketName', element: <LazyRoute><ObjectsTab /></LazyRoute> },
             ]
@@ -109,7 +110,7 @@ export const router = createBrowserRouter([
           { path: 'consumers', element: <LazyRoute><ConsumersPage /></LazyRoute> },
 
           // Request / Reply
-          { path: 'request', element: <LazyRoute><RequestPage /></LazyRoute> },
+          { path: 'request', element: <ReadOnlyGate><LazyRoute><RequestPage /></LazyRoute></ReadOnlyGate> },
           { path: 'subscribe', element: <LazyRoute><SubscribePage /></LazyRoute> },
           { path: 'services/:name?', element: <LazyRoute><ServicesPage /></LazyRoute> },
 

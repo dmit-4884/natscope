@@ -1,5 +1,6 @@
 import { memo, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { toast } from '@/utils/toast'
 import { copyText } from '@/utils/clipboard'
 import { formatBytes, formatDateTime } from '@/utils/formatters'
@@ -80,6 +81,7 @@ function UnifiedMessageViewer({
   const display = useDisplayPreferences()
   const queryClient = useQueryClient()
   const deleteConfirmation = useConfirmation('deleteMessage')
+  const { readOnly } = useConnectionPolicy()
   const behavior = useBehaviorPolicy()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -463,7 +465,7 @@ function UnifiedMessageViewer({
   const showActionSeparator =
     !!navigation &&
     !!displayMessage &&
-    ((!!streamName && !!displayMessage.sequence) || (!!onResend && !!displayMessage.subject))
+    ((!!streamName && !!displayMessage.sequence) || (!readOnly && !!onResend && !!displayMessage.subject))
 
   return (
     <div className="flex flex-col h-full">
@@ -535,7 +537,7 @@ function UnifiedMessageViewer({
                 dataPreview={jsonData ? JSON.stringify(jsonData).slice(0, 100) : displayMessage.data_base64?.slice(0, 100)}
               />
             )}
-            {onResend && displayMessage?.subject && (
+            {!readOnly && onResend && displayMessage?.subject && (
               <Tooltip
                 content={
                   truncatedForGood
@@ -555,7 +557,7 @@ function UnifiedMessageViewer({
                 </button>
               </Tooltip>
             )}
-            {onReply && displayMessage?.reply && (
+            {!readOnly && onReply && displayMessage?.reply && (
               <Tooltip
                 content={
                   isJetStreamControlReply(displayMessage.reply)
@@ -575,7 +577,7 @@ function UnifiedMessageViewer({
                 </button>
               </Tooltip>
             )}
-            {streamName && displayMessage?.sequence && !displayMessage?.isLive && (
+            {!readOnly && streamName && displayMessage?.sequence && !displayMessage?.isLive && (
               <Tooltip content="Delete this message from the stream">
                 <button
                   type="button"

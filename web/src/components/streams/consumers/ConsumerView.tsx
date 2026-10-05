@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { READ_ONLY_HINT } from '@/components/connections/readOnly'
 import { Alert, Badge, Button, CopyButton, PencilIcon, RefreshIcon, InfoIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import JsonViewer from '@/components/common/JsonViewer'
@@ -21,6 +22,7 @@ interface Props {
   onReset: () => void
   onUnpin: (group: string) => void
   onDelete: () => void
+  readOnly?: boolean
   isResuming: boolean
   isPausing: boolean
   isResetting: boolean
@@ -52,6 +54,7 @@ export function ConsumerView({
   onReset,
   onUnpin,
   onDelete,
+  readOnly = false,
   isResuming,
   isPausing,
   isResetting,
@@ -148,10 +151,12 @@ export function ConsumerView({
                       <RefreshIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
                     </Button>
                   </Tooltip>
-                  <Button variant="secondary" size="sm" onClick={onEdit}>
-                    <PencilIcon className="w-4 h-4 mr-1.5" />
-                    Edit
-                  </Button>
+                  {!readOnly && (
+                    <Button variant="secondary" size="sm" onClick={onEdit}>
+                      <PencilIcon className="w-4 h-4 mr-1.5" />
+                      Edit
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="p-4">
@@ -248,51 +253,53 @@ export function ConsumerView({
                   consumer={consumer}
                   onUnpin={onUnpin}
                   isUnpinning={isUnpinning}
-                  unpinUnsupportedReason={unpinUnsupportedReason}
+                  unpinUnsupportedReason={readOnly ? READ_ONLY_HINT : unpinUnsupportedReason}
                 />
               </div>
             </div>
 
-            <div className="flex gap-2">
-              {pauseUnsupportedReason ? (
-                <Tooltip content={pauseUnsupportedReason}>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" disabled>
-                      Pause
-                    </Button>
-                    <Button variant="secondary" size="sm" disabled>
-                      Resume
-                    </Button>
-                  </div>
+            {!readOnly && (
+              <div className="flex gap-2">
+                {pauseUnsupportedReason ? (
+                  <Tooltip content={pauseUnsupportedReason}>
+                    <div className="flex gap-2">
+                      <Button variant="secondary" size="sm" disabled>
+                        Pause
+                      </Button>
+                      <Button variant="secondary" size="sm" disabled>
+                        Resume
+                      </Button>
+                    </div>
+                  </Tooltip>
+                ) : (
+                  <>
+                    <Tooltip content={isPaused ? 'Consumer is already paused' : 'Suspend message delivery'}>
+                      <Button variant="secondary" size="sm" onClick={onPause} disabled={isPaused || isPausing}>
+                        Pause
+                      </Button>
+                    </Tooltip>
+                    <Tooltip content={isPaused ? 'Resume message delivery now' : 'Consumer is not paused'}>
+                      <Button variant="secondary" size="sm" onClick={onResume} disabled={!isPaused || isResuming}>
+                        Resume
+                      </Button>
+                    </Tooltip>
+                  </>
+                )}
+                <Tooltip content={resetUnsupportedReason ?? 'Clear the delivery state and redeliver unacknowledged messages'}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onReset}
+                    disabled={!!resetUnsupportedReason || isResetting}
+                  >
+                    Reset
+                  </Button>
                 </Tooltip>
-              ) : (
-                <>
-                  <Tooltip content={isPaused ? 'Consumer is already paused' : 'Suspend message delivery'}>
-                    <Button variant="secondary" size="sm" onClick={onPause} disabled={isPaused || isPausing}>
-                      Pause
-                    </Button>
-                  </Tooltip>
-                  <Tooltip content={isPaused ? 'Resume message delivery now' : 'Consumer is not paused'}>
-                    <Button variant="secondary" size="sm" onClick={onResume} disabled={!isPaused || isResuming}>
-                      Resume
-                    </Button>
-                  </Tooltip>
-                </>
-              )}
-              <Tooltip content={resetUnsupportedReason ?? 'Clear the delivery state and redeliver unacknowledged messages'}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={onReset}
-                  disabled={!!resetUnsupportedReason || isResetting}
-                >
-                  Reset
+                <Button variant="danger" size="sm" onClick={onDelete}>
+                  Delete
                 </Button>
-              </Tooltip>
-              <Button variant="danger" size="sm" onClick={onDelete}>
-                Delete
-              </Button>
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-surface-primary rounded-lg border h-fit sticky top-4">

@@ -1,6 +1,6 @@
 import { tsToMillis, durToMillis, millisToDur } from '@/utils/timestamp'
 import type { SavedConnection as ProtoSavedConnection } from '../gen/types/nats/nats_connection_pb'
-import { AuthMethod as ProtoAuthMethod } from '../gen/types/nats/nats_connection_pb'
+import { AuthMethod as ProtoAuthMethod, LabelColor as ProtoLabelColor } from '../gen/types/nats/nats_connection_pb'
 import type { AuthConfig, TlsConfig, ConnectionConfig, ReconnectConfig, PingConfig } from '../gen/types/nats/nats_connection_pb'
 import type { TestConnectionResponse } from '../gen/services/grpc/nats/v1/connections/nats_connections_service_pb'
 import { connectionsClient } from './grpc/clients'
@@ -16,6 +16,36 @@ const PROTO_TO_DOMAIN_AUTH_METHOD: Record<ProtoAuthMethod, AuthMethod> = {
   [ProtoAuthMethod.TOKEN]: 'token',
   [ProtoAuthMethod.NKEY]: 'nkey',
   [ProtoAuthMethod.CREDENTIALS]: 'credentials',
+}
+
+export type LabelColor = 'gray' | 'blue' | 'green' | 'amber' | 'red'
+
+export interface ConnectionLabel {
+  text: string
+  color: LabelColor
+}
+
+const PROTO_TO_LABEL_COLOR: Record<ProtoLabelColor, LabelColor> = {
+  [ProtoLabelColor.UNSPECIFIED]: 'gray',
+  [ProtoLabelColor.GRAY]: 'gray',
+  [ProtoLabelColor.BLUE]: 'blue',
+  [ProtoLabelColor.GREEN]: 'green',
+  [ProtoLabelColor.AMBER]: 'amber',
+  [ProtoLabelColor.RED]: 'red',
+}
+
+const LABEL_COLOR_TO_PROTO: Record<LabelColor, ProtoLabelColor> = {
+  gray: ProtoLabelColor.GRAY,
+  blue: ProtoLabelColor.BLUE,
+  green: ProtoLabelColor.GREEN,
+  amber: ProtoLabelColor.AMBER,
+  red: ProtoLabelColor.RED,
+}
+
+function toProtoLabel(label: ConnectionLabel | null | undefined) {
+  if (label === undefined) return undefined
+  if (label === null) return { text: '', color: ProtoLabelColor.UNSPECIFIED }
+  return { text: label.text, color: LABEL_COLOR_TO_PROTO[label.color] }
 }
 
 /** Most recent server probe (server-populated, never client). */
@@ -80,6 +110,8 @@ export interface SavedConnection {
     maxPingsOutstanding?: number
   }
   meta?: ConnectionMeta
+  readOnly: boolean
+  label?: ConnectionLabel
   createdAt: number
   updatedAt: number
 }
@@ -93,6 +125,8 @@ export interface CreateConnectionRequest {
   connection?: ConnectionConfig
   reconnect?: ReconnectConfig
   ping?: PingConfig
+  readOnly?: boolean
+  label?: ConnectionLabel
 }
 
 export interface UpdateConnectionRequest {
@@ -104,6 +138,9 @@ export interface UpdateConnectionRequest {
   connection?: ConnectionConfig
   reconnect?: ReconnectConfig
   ping?: PingConfig
+  readOnly?: boolean
+  /** `null` removes the label. */
+  label?: ConnectionLabel | null
 }
 
 export interface TestConnectionRequest {
@@ -121,6 +158,8 @@ function toSavedConnection(proto: ProtoSavedConnection): SavedConnection {
     name: proto.name,
     description: proto.description,
     urls: proto.urls,
+    readOnly: proto.readOnly,
+    label: proto.label?.text ? { text: proto.label.text, color: PROTO_TO_LABEL_COLOR[proto.label.color] ?? 'gray' } : undefined,
     createdAt: tsToMillis(proto.createdAt),
     updatedAt: tsToMillis(proto.updatedAt),
   }
@@ -219,6 +258,8 @@ export async function createConnection(req: CreateConnectionRequest): Promise<Sa
     connection: req.connection,
     reconnect: req.reconnect,
     ping: req.ping,
+    readOnly: req.readOnly,
+    label: toProtoLabel(req.label),
   })
   return toSavedConnection(response.connection!)
 }
@@ -234,6 +275,8 @@ export async function updateConnection(id: string, req: UpdateConnectionRequest)
     connection: req.connection,
     reconnect: req.reconnect,
     ping: req.ping,
+    readOnly: req.readOnly,
+    label: toProtoLabel(req.label),
   })
   return toSavedConnection(response.connection!)
 }

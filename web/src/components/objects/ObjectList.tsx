@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { useObjectBuckets } from '@/contexts/objects'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { EmptyState, PlusIcon, RefreshIcon, SkeletonRows } from '@/components/ui'
@@ -25,6 +26,7 @@ const SEALED_ICON = (
 )
 
 export default function ObjectList({ connectionId }: ObjectListProps) {
+  const { readOnly } = useConnectionPolicy()
   const { bucketName: selectedBucket } = useParams()
   const { data: buckets, isLoading, isFetching, error, refetch } = useObjectBuckets(connectionId)
 
@@ -60,13 +62,15 @@ export default function ObjectList({ connectionId }: ObjectListProps) {
               <RefreshIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            <Link
-              to={`/objects/new`}
-              className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-text"
-            >
-              <PlusIcon className="w-4 h-4" />
-              Create object store
-            </Link>
+            {!readOnly && (
+              <Link
+                to={`/objects/new`}
+                className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-text"
+              >
+                <PlusIcon className="w-4 h-4" />
+                Create object store
+              </Link>
+            )}
           </div>
         }
       />
@@ -75,17 +79,19 @@ export default function ObjectList({ connectionId }: ObjectListProps) {
 
   return (
     <div>
-      <Link
-        to={`/objects/new`}
-        className="px-3 py-2.5 flex items-center gap-2 border-b border-border bg-surface-secondary hover:bg-surface-tertiary transition-colors"
-      >
-        <span className="text-content-muted">
-          <PlusIcon className="w-4 h-4" />
-        </span>
-        <span className="text-xs font-semibold uppercase tracking-wide text-content-secondary whitespace-nowrap truncate">
-          Create Object Store
-        </span>
-      </Link>
+      {!readOnly && (
+        <Link
+          to={`/objects/new`}
+          className="px-3 py-2.5 flex items-center gap-2 border-b border-border bg-surface-secondary hover:bg-surface-tertiary transition-colors"
+        >
+          <span className="text-content-muted">
+            <PlusIcon className="w-4 h-4" />
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-content-secondary whitespace-nowrap truncate">
+            Create Object Store
+          </span>
+        </Link>
+      )}
 
       <SidebarResourceList
         connectionId={connectionId}

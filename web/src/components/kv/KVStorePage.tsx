@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom'
+import { useConnectionPolicy } from '@/contexts/connection'
 import {
   useKVBuckets,
   useKVKeys,
@@ -97,6 +98,8 @@ export default function KVStorePage() {
 
   const target = useKVProtoTarget(bucketName ?? '', selectedKey ?? '', keyEntry?.decoded)
   const newKeyTarget = useKVProtoTarget(bucketName ?? '', newKeyName.trim())
+
+  const { readOnly } = useConnectionPolicy()
 
   // Mutations
   const deleteBucket = useDeleteKVBucket(connectionId)
@@ -223,20 +226,22 @@ export default function KVStorePage() {
               )}
             </p>
           </div>
-          <OverflowMenu
-            label="Bucket actions"
-            items={[
-              {
-                label: 'Delete bucket…',
-                destructive: true,
-                onSelect: () => setConfirmAction({
-                  type: 'delete-bucket',
-                  name: bucketName,
-                  confirmText: '',
-                }),
-              },
-            ]}
-          />
+          {!readOnly && (
+            <OverflowMenu
+              label="Bucket actions"
+              items={[
+                {
+                  label: 'Delete bucket…',
+                  destructive: true,
+                  onSelect: () => setConfirmAction({
+                    type: 'delete-bucket',
+                    name: bucketName,
+                    confirmText: '',
+                  }),
+                },
+              ]}
+            />
+          )}
         </div>
       </div>
 
@@ -257,19 +262,21 @@ export default function KVStorePage() {
               <span className="text-xs text-content-tertiary">
                 {plural(filteredKeys.length, 'key')}
               </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label="New key"
-                onClick={() => {
-                  setIsCreatingKey(true)
-                  setSelectedKey(null)
-                  setNewKeyName('')
-                  setNewKeyValue('')
-                }}
-              >
-                <PlusIcon className="w-4 h-4" />
-              </Button>
+              {!readOnly && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label="New key"
+                  onClick={() => {
+                    setIsCreatingKey(true)
+                    setSelectedKey(null)
+                    setNewKeyName('')
+                    setNewKeyValue('')
+                  }}
+                >
+                  <PlusIcon className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           </div>
 
@@ -304,40 +311,42 @@ export default function KVStorePage() {
                     >
                       {key}
                     </button>
-                    <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-                      <Tooltip content="Purge all revisions">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            requestAction({
-                              type: 'purge-key',
-                              name: key,
-                              confirmText: '',
-                            })
-                          }}
-                          className="p-1 hover:text-orange-600"
-                          aria-label={`Purge all revisions of ${key}`}
-                        >
-                          <RefreshIcon className="w-3.5 h-3.5" />
-                        </button>
-                      </Tooltip>
-                      <Tooltip content="Delete key">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            requestAction({
-                              type: 'delete-key',
-                              name: key,
-                              confirmText: '',
-                            })
-                          }}
-                          className="p-1 hover:text-status-error-text"
-                          aria-label={`Delete key ${key}`}
-                        >
-                          <CloseIcon className="w-3.5 h-3.5" />
-                        </button>
-                      </Tooltip>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                        <Tooltip content="Purge all revisions">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              requestAction({
+                                type: 'purge-key',
+                                name: key,
+                                confirmText: '',
+                              })
+                            }}
+                            className="p-1 hover:text-orange-600"
+                            aria-label={`Purge all revisions of ${key}`}
+                          >
+                            <RefreshIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Delete key">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              requestAction({
+                                type: 'delete-key',
+                                name: key,
+                                confirmText: '',
+                              })
+                            }}
+                            className="p-1 hover:text-status-error-text"
+                            aria-label={`Delete key ${key}`}
+                          >
+                            <CloseIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -353,7 +362,7 @@ export default function KVStorePage() {
 
         {/* Key Editor */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {isCreatingKey ? (
+          {isCreatingKey && !readOnly ? (
             <>
               <div className="p-4 border-b bg-surface-secondary">
                 <h3 className="font-semibold text-content-primary">Create New Key</h3>
@@ -425,28 +434,32 @@ export default function KVStorePage() {
                     >
                       History
                     </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => requestAction({
-                        type: 'purge-key',
-                        name: selectedKey,
-                        confirmText: '',
-                      })}
-                    >
-                      Purge
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => requestAction({
-                        type: 'delete-key',
-                        name: selectedKey,
-                        confirmText: '',
-                      })}
-                    >
-                      Delete
-                    </Button>
+                    {!readOnly && (
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => requestAction({
+                            type: 'purge-key',
+                            name: selectedKey,
+                            confirmText: '',
+                          })}
+                        >
+                          Purge
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => requestAction({
+                            type: 'delete-key',
+                            name: selectedKey,
+                            confirmText: '',
+                          })}
+                        >
+                          Delete
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -482,31 +495,34 @@ export default function KVStorePage() {
                       setValueDirty(true)
                     }}
                     aria-label="Key value"
+                    readOnly={readOnly}
                     className="w-full flex-1 min-h-0 p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
                     spellCheck={false}
                   />
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 p-3 border-t bg-surface-secondary">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    if (keyEntry) {
-                      setEditingValue(editableValue(keyEntry, !!target))
-                      setValueDirty(false)
-                    }
-                  }}
-                >
-                  Reset
-                </Button>
-                <Button
-                  onClick={handleSaveKey}
-                  disabled={putKey.isPending || showRaw}
-                >
-                  {putKey.isPending ? 'Saving...' : 'Save Value'}
-                </Button>
-              </div>
+              {!readOnly && (
+                <div className="flex justify-end gap-2 p-3 border-t bg-surface-secondary">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      if (keyEntry) {
+                        setEditingValue(editableValue(keyEntry, !!target))
+                        setValueDirty(false)
+                      }
+                    }}
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    onClick={handleSaveKey}
+                    disabled={putKey.isPending || showRaw}
+                  >
+                    {putKey.isPending ? 'Saving...' : 'Save Value'}
+                  </Button>
+                </div>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-content-tertiary">
@@ -515,17 +531,19 @@ export default function KVStorePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
                 <p className="text-sm mb-4">Select a key to view/edit</p>
-                <Button
-                  onClick={() => {
-                    setIsCreatingKey(true)
-                    setSelectedKey(null)
-                    setNewKeyName('')
-                    setNewKeyValue('')
-                  }}
-                >
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Create New Key
-                </Button>
+                {!readOnly && (
+                  <Button
+                    onClick={() => {
+                      setIsCreatingKey(true)
+                      setSelectedKey(null)
+                      setNewKeyName('')
+                      setNewKeyValue('')
+                    }}
+                  >
+                    <PlusIcon className="w-4 h-4 mr-2" />
+                    Create New Key
+                  </Button>
+                )}
               </div>
             </div>
           )}

@@ -36,7 +36,7 @@ once at startup: restart the client after changing `mcp.allowWrites`.
 
 | Tool | What it does |
 |------|--------------|
-| `list_connections` | Saved connections with URLs and the last test result, no credentials |
+| `list_connections` | Saved connections with URLs, label, read-only flag and the last test result, no credentials |
 | `get_server_info` | Server version, cluster, max payload, JetStream account usage |
 | `list_streams`, `get_stream` | Streams with subjects, limits and state |
 | `get_stream_relations` | Sources, mirrors and republish targets with filters, transforms, lag, last activity and errors; one stream's links when `stream` is set |
@@ -64,6 +64,7 @@ The endpoint is read-only by default. Set `mcp.allowWrites: true` (env `MCP__ALL
 `publish_message` and `request_message`. Every publish lands in the [publish history](/guide/history), so you can
 see what the agent sent. A request is not recorded, but the service that answers it may act on it, so it counts as
 a write. Deleting, purging and sealing are not exposed over MCP at all.
+A [read-only connection](/guide/connections#labels-and-read-only-connections) refuses both tools even with writes on.
 
 Message payloads reach the agent as data. A payload that contains instructions can still influence a model,
 which is one more reason to keep writes off unless you need them.

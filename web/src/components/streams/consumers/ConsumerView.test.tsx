@@ -85,3 +85,14 @@ describe('ConsumerView — problems', () => {
     expect(screen.getByText('position card')).toBeInTheDocument()
   })
 })
+
+describe('ConsumerView — read-only connection', () => {
+  it('offers no action that changes the consumer', () => {
+    renderView({ readOnly: true })
+
+    for (const name of ['Edit', 'Pause', 'Resume', 'Reset', 'Delete']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
+  })
+})

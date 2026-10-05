@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { PlusIcon, ServicesIcon, SignalIcon, SwitchHorizontalIcon, UsersIcon } from '@/components/ui'
 import { useSubscribeStatus, type SubscribeStatus } from '../subscribe/subscribeSession'
 import StreamList from '../streams/StreamList'
@@ -12,6 +13,8 @@ import CollapsibleSection from './CollapsibleSection'
 import Tooltip from './Tooltip'
 
 function CreateLink({ to, label }: { to: string; label: string }) {
+  const { readOnly } = useConnectionPolicy()
+  if (readOnly) return null
   return (
     <Tooltip content={label}>
       <Link

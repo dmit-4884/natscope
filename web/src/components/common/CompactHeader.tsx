@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SavedConnection } from '@/api/connections'
-import { useConnections , useConnectionHealth, type ConnectionStatus } from '@/contexts/connection'
+import { useConnections, useConnectionHealth, useConnectionPolicy, type ConnectionStatus } from '@/contexts/connection'
+import { ConnectionBadges } from '@/components/connections/ConnectionBadges'
+import { LABEL_STRIPE_CLASSES } from '@/components/connections/labelStyles'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
 import { Badge, ChevronDownIcon, LogoIcon, PlusIcon, RefreshIcon } from '@/components/ui'
@@ -98,11 +100,16 @@ export default function CompactHeader({
   }
 
 
+  const policy = useConnectionPolicy()
+
   const sidebarCollapsed = usePreferencesStore((s) => s.isPanelCollapsed(SIDEBAR_PANEL_ID))
   const togglePanelCollapsed = usePreferencesStore((s) => s.togglePanelCollapsed)
 
   return (
-    <header className="bg-surface-primary border-b border-border h-12 flex items-center justify-between px-4 text-sm">
+    <header className="relative bg-surface-primary border-b border-border h-12 flex items-center justify-between px-4 text-sm">
+      {currentConnection && policy.label && (
+        <div aria-hidden="true" className={`absolute inset-x-0 top-0 h-[3px] ${LABEL_STRIPE_CLASSES[policy.label.color]}`} />
+      )}
       {/* Left side - Logo and connection */}
       <div className="flex items-center gap-3">
         <Tooltip content={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}>
@@ -155,6 +162,7 @@ export default function CompactHeader({
                 <span className="text-content-tertiary font-mono text-xs truncate">
                   {currentConnection.urls[0]}
                 </span>
+                <ConnectionBadges policy={policy} />
               </>
             ) : (
               <span className="text-content-tertiary">Click to connect...</span>
@@ -209,7 +217,10 @@ export default function CompactHeader({
                             className={`w-2 h-2 rounded-full shrink-0 ${currentConnection?.id === conn.id ? 'bg-green-500' : 'bg-gray-300'}`}
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-content-primary truncate">{conn.name}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-content-primary truncate">{conn.name}</span>
+                              <ConnectionBadges policy={{ readOnly: conn.readOnly, label: conn.label ?? null }} />
+                            </div>
                             <div className="text-xs text-content-tertiary font-mono truncate">{conn.urls[0]}</div>
                           </div>
                           {conn.auth?.username && (

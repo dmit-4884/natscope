@@ -1,5 +1,5 @@
 import { Entity } from '@/shared'
-import type { AuthMethod, SavedConnection } from '@/api/connections'
+import type { AuthMethod, ConnectionLabel, SavedConnection } from '@/api/connections'
 import { NatsUrl } from '../value-objects/NatsUrl'
 
 /** @deprecated use AuthMethod from '@/contexts/connection' */
@@ -13,6 +13,8 @@ interface ConnectionProps {
   authMethod: AuthMethodType
   hasTls: boolean
   hasAdvancedConfig: boolean
+  readOnly: boolean
+  label: ConnectionLabel | null
   createdAt: Date
   updatedAt: Date | null
 }
@@ -32,6 +34,8 @@ export class Connection extends Entity<ConnectionProps> {
       authMethod: data.auth?.method ?? 'none',
       hasTls: !!data.tls,
       hasAdvancedConfig: !!data.connection || !!data.reconnect || !!data.ping,
+      readOnly: data.readOnly,
+      label: data.label ?? null,
       createdAt: new Date(data.createdAt),
       updatedAt: data.updatedAt ? new Date(data.updatedAt) : null,
     })
@@ -63,6 +67,14 @@ export class Connection extends Entity<ConnectionProps> {
 
   get hasAdvancedConfig(): boolean {
     return this.props.hasAdvancedConfig
+  }
+
+  get readOnly(): boolean {
+    return this.props.readOnly
+  }
+
+  get label(): ConnectionLabel | null {
+    return this.props.label
   }
 
   get createdAt(): Date {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { getErrorMessage } from '@/api/errors'
 import { Alert, Spinner } from '@/components/ui'
 import { useStreamDetail, useUpdateStream, useDeleteStream, usePurgeStream, useSealStream } from '@/contexts/streams'
@@ -30,6 +31,7 @@ export default function StreamConfigTab() {
 
   const { data: streamDetail, isLoading, error, refetch, isFetching } = useStreamDetail(streamName, connectionId)
 
+  const { readOnly } = useConnectionPolicy()
   const updateStream = useUpdateStream(connectionId)
   const deleteStream = useDeleteStream(connectionId)
   const purgeStream = usePurgeStream(connectionId)
@@ -136,7 +138,7 @@ export default function StreamConfigTab() {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className={innerClass}>
-        {isEditing && formValue ? (
+        {isEditing && formValue && !readOnly ? (
           <StreamConfigEditor
             editorMode={editorMode}
             onModeChange={(m) => setEditorState({ editorMode: m })}
@@ -157,6 +159,7 @@ export default function StreamConfigTab() {
             onPurge={() => setConfirmAction('purge')}
             onSeal={() => setConfirmAction('seal')}
             onDelete={() => setConfirmAction('delete')}
+            readOnly={readOnly}
           />
         )}
       </div>

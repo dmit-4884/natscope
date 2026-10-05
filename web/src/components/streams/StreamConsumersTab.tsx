@@ -13,7 +13,7 @@ import {
   useStreamDetail,
 } from '@/contexts/streams'
 import { Button, PlusIcon, UsersIcon } from '@/components/ui'
-import { useServerCapabilities } from '@/contexts/connection'
+import { useConnectionPolicy, useServerCapabilities } from '@/contexts/connection'
 import { useConfirmation } from '@/contexts/settings'
 import { useConsumerEditorEntry } from '@/stores/streamTabState/consumerEditorStore'
 import { useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
@@ -74,6 +74,7 @@ export default function StreamConsumersTab() {
     navigate(`/streams/${encodeURIComponent(streamName)}/messages`)
   }
 
+  const { readOnly } = useConnectionPolicy()
   const createConsumer = useCreateConsumer(connectionId, streamName)
   const updateConsumer = useUpdateConsumer(connectionId, streamName)
   const deleteConsumer = useDeleteConsumer(connectionId, streamName)
@@ -236,14 +237,14 @@ export default function StreamConsumersTab() {
             formDraft: null,
           })
         }}
-        onCreate={() => {
+        onCreate={readOnly ? undefined : () => {
           setEditorState({ isCreating: true, selectedName: null, formDraft: null })
         }}
         issues={issues}
       />
 
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
-        {isCreating ? (
+        {isCreating && !readOnly ? (
           <ConsumerEditor
             title="Create New Consumer"
             subtitle={`Create a consumer for stream "${streamName}"`}
@@ -259,7 +260,7 @@ export default function StreamConsumersTab() {
             prioritizedUnsupportedReason={prioritizedUnsupportedReason}
           />
         ) : selectedConsumer ? (
-          isEditing ? (
+          isEditing && !readOnly ? (
             <ConsumerEditor
               title={selectedConsumer.name}
               subtitle="Edit consumer configuration"
@@ -296,6 +297,7 @@ export default function StreamConsumersTab() {
               onReset={() => setConfirmAction({ type: 'reset', consumer: selectedConsumer })}
               onUnpin={(group) => unpinConsumer.mutate({ name: selectedConsumer.name, group })}
               onDelete={() => requestDeleteConsumer(selectedConsumer)}
+              readOnly={readOnly}
               isResuming={resumeConsumer.isPending}
               isPausing={pauseConsumer.isPending}
               isResetting={resetConsumer.isPending}

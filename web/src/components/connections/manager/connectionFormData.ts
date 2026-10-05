@@ -1,4 +1,5 @@
 import type { AuthMethod } from '@/contexts/connection'
+import type { LabelColor } from '@/api/connections'
 
 export type AuthMethodTab = AuthMethod
 
@@ -25,6 +26,9 @@ export interface ConnectionFormData {
     tlsFirst: boolean
   }
   inboxPrefix: string
+  readOnly: boolean
+  labelText: string
+  labelColor: LabelColor
   /**
    * Presence of stored secrets, from the server's read-only `has_*` flags. The
    * API never returns secret values, so on edit these drive a "leave blank to

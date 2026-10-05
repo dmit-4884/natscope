@@ -439,3 +439,15 @@ export async function deleteConsumer(connectionId: string, streamName: string, c
     if (!(e instanceof ConnectError && /not found/i.test(e.message))) throw e
   }
 }
+
+/** Copy a connection (credentials included) as a read-only one with a red PROD label. */
+export async function ensureReadOnlyCopy(sourceId: string, name: string): Promise<string> {
+  const service = 'natscope.nats.connections.v1.ConnectionsService'
+  const res = await call<{ connections?: SavedConnection[] }>(service, 'ListConnections', { pageSize: 500 })
+  const stale = (res.connections ?? []).find((c) => c.name === name)
+  if (stale) await call(service, 'DeleteConnection', { id: stale.id })
+  const copy = await call<{ connection: SavedConnection }>(service, 'DuplicateConnection', { id: sourceId, name })
+  const id = copy.connection.id
+  await call(service, 'UpdateConnection', { id, readOnly: true, label: { text: 'PROD', color: 'LABEL_COLOR_RED' } })
+  return id
+}

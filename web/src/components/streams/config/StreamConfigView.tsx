@@ -15,6 +15,7 @@ interface Props {
   onPurge: () => void
   onSeal: () => void
   onDelete: () => void
+  readOnly?: boolean
 }
 
 export function StreamConfigView({
@@ -25,6 +26,7 @@ export function StreamConfigView({
   onPurge,
   onSeal,
   onDelete,
+  readOnly = false,
 }: Props) {
   const isSealed = streamDetail.config?.sealed
   const { mirror, republish, subject_transform: subjectTransform, consumer_limits: consumerLimits } = streamDetail.config
@@ -66,10 +68,12 @@ export function StreamConfigView({
                     <RefreshIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
                   </Button>
                 </Tooltip>
-                <Button variant="secondary" size="sm" onClick={onStartEdit}>
-                  <PencilIcon className="w-4 h-4 mr-1.5" />
-                  Edit
-                </Button>
+                {!readOnly && (
+                  <Button variant="secondary" size="sm" onClick={onStartEdit}>
+                    <PencilIcon className="w-4 h-4 mr-1.5" />
+                    Edit
+                  </Button>
+                )}
               </div>
             </div>
             <div className="p-4">
@@ -362,19 +366,21 @@ export function StreamConfigView({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={onPurge} disabled={isSealed}>
-              Purge
-            </Button>
-            {!isSealed && (
-              <Button variant="secondary" size="sm" onClick={onSeal}>
-                Seal
+          {!readOnly && (
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" onClick={onPurge} disabled={isSealed}>
+                Purge
               </Button>
-            )}
-            <Button variant="danger" size="sm" onClick={onDelete}>
-              Delete
-            </Button>
-          </div>
+              {!isSealed && (
+                <Button variant="secondary" size="sm" onClick={onSeal}>
+                  Seal
+                </Button>
+              )}
+              <Button variant="danger" size="sm" onClick={onDelete}>
+                Delete
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Raw JSON */}

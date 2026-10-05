@@ -37,6 +37,9 @@ const blankFormData: ConnectionFormData = {
   credentials: '',
   tls: { ...emptyTls },
   inboxPrefix: '',
+  readOnly: false,
+  labelText: '',
+  labelColor: 'gray',
   secretsSet: { ...noSecretsSet },
 }
 
@@ -63,6 +66,9 @@ function formFromConnection(c: SavedConnection): ConnectionFormData {
       tlsFirst: c.tls?.tlsFirst ?? false,
     },
     inboxPrefix: c.connection?.inboxPrefix ?? '',
+    readOnly: c.readOnly,
+    labelText: c.label?.text ?? '',
+    labelColor: c.label?.color ?? 'gray',
     secretsSet: {
       password: c.auth?.hasPassword ?? false,
       token: c.auth?.hasToken ?? false,
@@ -230,6 +236,8 @@ export default function ConnectionEditPage({ mode }: Props) {
     try {
       const name = form.name.trim()
       const description = form.description.trim() || undefined
+      const labelText = form.labelText.trim()
+      const label = labelText ? { text: labelText, color: form.labelColor } : undefined
       // Edit mode sends explicit auth/tls (even empty) so the user can clear
       // them; Create mode only sends what's actually filled in.
       if (isEdit && id) {
@@ -244,6 +252,8 @@ export default function ConnectionEditPage({ mode }: Props) {
             connection: form.inboxPrefix.trim() !== snapshot.inboxPrefix.trim()
               ? toApiConnectionConfig(existing?.connection, form.inboxPrefix)
               : undefined,
+            readOnly: form.readOnly,
+            label: label ?? null,
           },
         })
         toast.success('Connection updated')
@@ -255,6 +265,8 @@ export default function ConnectionEditPage({ mode }: Props) {
           auth: toApiAuthConfig(buildAuth({ explicit: false })),
           tls: toApiTlsConfig(form.tls, { explicit: false }),
           connection: toApiConnectionConfig(undefined, form.inboxPrefix),
+          readOnly: form.readOnly,
+          label,
         })
         toast.success('Connection saved')
       }

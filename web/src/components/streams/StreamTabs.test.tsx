@@ -3,6 +3,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import StreamTabs from './StreamTabs'
 
+const policy = vi.hoisted(() => ({ readOnly: false }))
+
+vi.mock('@/contexts/connection', () => ({
+  useConnectionPolicy: () => ({ readOnly: policy.readOnly, label: null }),
+}))
+
 const TAB_WIDTH = 120
 let rowWidth = 0
 
@@ -42,6 +48,15 @@ describe('StreamTabs', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    policy.readOnly = false
+  })
+
+  it('drops the Publish tab on a read-only connection', () => {
+    rowWidth = 1000
+    policy.readOnly = true
+    renderAt('/streams/ORDERS/messages')
+
+    expect(tabNames()).toEqual(['Messages', 'Config', 'Consumers', 'Relations'])
   })
 
   it('shows every tab when they fit', () => {

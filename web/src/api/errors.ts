@@ -67,6 +67,7 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   // Connections
   CONNECTION_NOT_FOUND: 'Connection not found',
   CONNECTION_NAME_ALREADY_IN_USE: 'Connection name already in use',
+  CONNECTION_READ_ONLY: 'This connection is read-only. Turn it off in the connection settings to make changes',
   CONNECTION_NAME_REQUIRED: 'Connection name is required',
   CONNECTION_URL_INVALID: 'A server URL is invalid',
   CONNECTION_URL_CREDENTIALS_MIXED:

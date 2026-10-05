@@ -1,4 +1,5 @@
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { useKVBuckets } from '@/contexts/kv'
 import { formatBytes } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
@@ -12,6 +13,7 @@ const KV_ICON = (
 )
 
 export default function KVOverviewPage() {
+  const { readOnly } = useConnectionPolicy()
   const { connectionId } = useOutletContext<ConnectionOutletContext>()
   const navigate = useNavigate()
   const { data: buckets = [], isLoading, error, refetch } = useKVBuckets(connectionId)
@@ -25,13 +27,15 @@ export default function KVOverviewPage() {
             {plural(buckets.length, 'bucket')}
           </p>
         </div>
-        <Link
-          to="/kv/new"
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-content-inverse bg-accent hover:bg-accent-hover rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          New KV bucket
-        </Link>
+        {!readOnly && (
+          <Link
+            to="/kv/new"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-content-inverse bg-accent hover:bg-accent-hover rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            New KV bucket
+          </Link>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -45,10 +49,12 @@ export default function KVOverviewPage() {
             title="No KV buckets"
             description="Create a bucket to store key-value data on this server."
             action={
-              <Link to="/kv/new" className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-text">
-                <PlusIcon className="w-4 h-4" />
-                Create KV bucket
-              </Link>
+              !readOnly && (
+                <Link to="/kv/new" className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-text">
+                  <PlusIcon className="w-4 h-4" />
+                  Create KV bucket
+                </Link>
+              )
             }
           />
         ) : (

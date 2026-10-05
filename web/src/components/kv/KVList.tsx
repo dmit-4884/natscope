@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { useStreamNames } from '@/contexts/streams'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { EmptyState, PlusIcon, RefreshIcon, SkeletonRows } from '@/components/ui'
@@ -21,6 +22,7 @@ interface KVListProps {
 const bucketHref = (name: string) => `/kv/${encodeURIComponent(name)}`
 
 export default function KVList({ connectionId }: KVListProps) {
+  const { readOnly } = useConnectionPolicy()
   const { bucketName: selectedBucket } = useParams()
   const { data: streamNames, isLoading, isFetching, error, refetch } = useStreamNames(connectionId)
 
@@ -62,13 +64,15 @@ export default function KVList({ connectionId }: KVListProps) {
               <RefreshIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            <Link
-              to={`/kv/new`}
-              className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-text"
-            >
-              <PlusIcon className="w-4 h-4" />
-              Create KV store
-            </Link>
+            {!readOnly && (
+              <Link
+                to={`/kv/new`}
+                className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-text"
+              >
+                <PlusIcon className="w-4 h-4" />
+                Create KV store
+              </Link>
+            )}
           </div>
         }
       />
@@ -77,17 +81,19 @@ export default function KVList({ connectionId }: KVListProps) {
 
   return (
     <div>
-      <Link
-        to={`/kv/new`}
-        className="px-3 py-2.5 flex items-center gap-2 border-b border-border bg-surface-secondary hover:bg-surface-tertiary transition-colors"
-      >
-        <span className="text-content-muted">
-          <PlusIcon className="w-4 h-4" />
-        </span>
-        <span className="text-xs font-semibold uppercase tracking-wide text-content-secondary whitespace-nowrap truncate">
-          Create KV Store
-        </span>
-      </Link>
+      {!readOnly && (
+        <Link
+          to={`/kv/new`}
+          className="px-3 py-2.5 flex items-center gap-2 border-b border-border bg-surface-secondary hover:bg-surface-tertiary transition-colors"
+        >
+          <span className="text-content-muted">
+            <PlusIcon className="w-4 h-4" />
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-content-secondary whitespace-nowrap truncate">
+            Create KV Store
+          </span>
+        </Link>
+      )}
 
       <SidebarResourceList
         connectionId={connectionId}

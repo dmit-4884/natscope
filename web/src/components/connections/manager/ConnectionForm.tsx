@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useRowKeys } from '@/hooks/useRowKeys'
-import { CloseIcon, EyeIcon, EyeOffIcon, Input, LockClosedIcon, PlusIcon } from '@/components/ui'
+import { CloseIcon, EyeIcon, EyeOffIcon, Input, LockClosedIcon, PlusIcon, Toggle } from '@/components/ui'
+import type { LabelColor } from '@/api/connections'
+import { LABEL_BADGE_CLASSES, LABEL_COLORS } from '../labelStyles'
 import {
   AUTH_LABELS,
   emptyTls,
@@ -18,6 +20,14 @@ interface Props {
   nameError?: string
   urlErrors?: (string | undefined)[]
   inboxPrefixError?: string
+}
+
+const COLOR_NAMES: Record<LabelColor, string> = {
+  gray: 'Gray',
+  blue: 'Blue',
+  green: 'Green',
+  amber: 'Amber',
+  red: 'Red',
 }
 
 function uploadFile(onChange: (value: string) => void) {
@@ -114,6 +124,56 @@ export function ConnectionForm({
             className="w-full px-3 py-2 border border-border-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-border-focus focus:border-border-focus"
           />
         </label>
+
+        <fieldset className="border-0 p-0 m-0">
+          <legend className="block text-sm font-medium text-gray-700 mb-1">Environment</legend>
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="block">
+              <span className="block text-xs text-content-secondary mb-1">Label</span>
+              <input
+                type="text"
+                value={value.labelText}
+                maxLength={16}
+                onChange={(e) => update({ labelText: e.target.value })}
+                placeholder="PROD"
+                className="w-36 px-3 py-2 border border-border-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-border-focus"
+              />
+            </label>
+            <div role="radiogroup" aria-label="Label color" className="flex items-center gap-1.5 pb-2">
+              {LABEL_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  role="radio"
+                  aria-checked={value.labelColor === color}
+                  aria-label={COLOR_NAMES[color]}
+                  onClick={() => update({ labelColor: color })}
+                  className={`w-6 h-6 rounded-full ${LABEL_BADGE_CLASSES[color]} ${
+                    value.labelColor === color ? 'ring-2 ring-offset-2 ring-border-focus' : ''
+                  }`}
+                />
+              ))}
+            </div>
+            {value.labelText.trim() && (
+              <span
+                data-testid="label-preview"
+                className={`mb-2 rounded px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wide ${LABEL_BADGE_CLASSES[value.labelColor]}`}
+              >
+                {value.labelText.trim()}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 flex items-start gap-3">
+            <Toggle checked={value.readOnly} onChange={(readOnly) => update({ readOnly })} label="Read-only" className="mt-0.5" />
+            <span className="text-sm">
+              <span className="font-medium text-gray-700">Read-only</span>
+              <span className="block text-xs text-content-tertiary">
+                Natscope refuses every write through this connection: publishing, requests, and creating, changing or deleting
+                streams, consumers, messages, KV and objects. AI agents over MCP included.
+              </span>
+            </span>
+          </div>
+        </fieldset>
 
         <fieldset className="border-0 p-0 m-0">
           <legend className="block text-sm font-medium text-gray-700 mb-1">Servers</legend>

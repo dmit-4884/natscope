@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom'
+import { useConnectionPolicy } from '@/contexts/connection'
 import type { ObjectBucketConfig, ObjectBucketInfo, ObjectInfo } from '@/types/management'
 import {
   useObjectBuckets,
@@ -74,6 +75,7 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
   )
 
   // Mutations
+  const { readOnly } = useConnectionPolicy()
   const createBucket = useCreateObjectBucket(connectionId)
   const deleteBucket = useDeleteObjectBucket(connectionId)
   const sealBucket = useSealObjectBucket(connectionId)
@@ -282,30 +284,32 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
               )}
             </p>
           </div>
-          <OverflowMenu
-            label="Bucket actions"
-            items={[
-              ...(selectedBucket && !selectedBucket.sealed
-                ? [{
-                    label: 'Seal bucket…',
-                    onSelect: () => setConfirmAction({
-                      type: 'seal-bucket' as const,
-                      name: bucketName!,
-                      confirmText: '',
-                    }),
-                  }]
-                : []),
-              {
-                label: 'Delete bucket…',
-                destructive: true,
-                onSelect: () => setConfirmAction({
-                  type: 'delete-bucket',
-                  name: bucketName!,
-                  confirmText: '',
-                }),
-              },
-            ]}
-          />
+          {!readOnly && (
+            <OverflowMenu
+              label="Bucket actions"
+              items={[
+                ...(selectedBucket && !selectedBucket.sealed
+                  ? [{
+                      label: 'Seal bucket…',
+                      onSelect: () => setConfirmAction({
+                        type: 'seal-bucket' as const,
+                        name: bucketName!,
+                        confirmText: '',
+                      }),
+                    }]
+                  : []),
+                {
+                  label: 'Delete bucket…',
+                  destructive: true,
+                  onSelect: () => setConfirmAction({
+                    type: 'delete-bucket',
+                    name: bucketName!,
+                    confirmText: '',
+                  }),
+                },
+              ]}
+            />
+          )}
         </div>
       </div>
 
@@ -328,18 +332,20 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                 className="hidden"
                 disabled={selectedBucket?.sealed}
               />
-              <Tooltip content={selectedBucket?.sealed ? 'Object store is sealed' : 'Upload file'}>
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  size="sm"
-                  disabled={selectedBucket?.sealed}
-                  aria-label={selectedBucket?.sealed ? 'Object store is sealed' : 'Upload file'}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                </Button>
-              </Tooltip>
+              {!readOnly && (
+                <Tooltip content={selectedBucket?.sealed ? 'Object store is sealed' : 'Upload file'}>
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    size="sm"
+                    disabled={selectedBucket?.sealed}
+                    aria-label={selectedBucket?.sealed ? 'Object store is sealed' : 'Upload file'}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                  </Button>
+                </Tooltip>
+              )}
             </div>
             <div className="text-xs text-content-tertiary">
               {plural(filteredObjects.length, 'object')}
@@ -421,17 +427,19 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                       </svg>
                       Download
                     </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => requestAction({
-                        type: 'delete-object',
-                        name: selectedObject.name,
-                        confirmText: '',
-                      })}
-                    >
-                      Delete
-                    </Button>
+                    {!readOnly && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => requestAction({
+                          type: 'delete-object',
+                          name: selectedObject.name,
+                          confirmText: '',
+                        })}
+                      >
+                        Delete
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -470,8 +478,8 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                 <svg className="mx-auto h-12 w-12 text-content-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
-                <p className="text-sm mb-4">Select an object to view or upload a file</p>
-                {!selectedBucket?.sealed && (
+                <p className="text-sm mb-4">{readOnly ? 'Select an object to view' : 'Select an object to view or upload a file'}</p>
+                {!readOnly && !selectedBucket?.sealed && (
                   <div>
                     <Input
                       placeholder="Description (optional)"

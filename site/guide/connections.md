@@ -16,6 +16,8 @@ connection does not dial anything until you select it.
 Go to **Settings → Connections** (or click **New Connection** on the start screen).
 
 1. **Name** the connection, add an optional **Description**.
+   Under **Environment**, give it a **Label** such as `PROD` in one of five colors and switch on
+   **Read-only** if Natscope must never change anything there (see below).
 2. Add URLs under **Servers**. Use **Add server** for each extra node; multiple URLs give cluster
    failover. Supported schemes: `nats://`, `tls://`, `ws://`, `wss://`.
 3. Choose an auth method:
@@ -45,6 +47,20 @@ Each connection row carries its own actions:
 
 Rows show a **Connected** chip when active, a node count for multi-URL connections, and TLS badges
 (**TLS**, **mTLS**, **TLS skip-verify**).
+
+## Labels and read-only connections
+
+A label shows next to the connection name in the header, in the connection lists, and as a colored
+stripe across the top of the window, so a red `PROD` is hard to miss.
+
+A **Read-only** connection lets you browse everything but change nothing. The server refuses every
+write through it: publishing, requests, creating, editing, purging, sealing or deleting streams and
+consumers, pausing or resetting consumers, deleting messages, and writing KV keys or objects. That
+holds for AI agents over [MCP](/guide/mcp) too. The UI hides those actions, and pages that only write,
+such as **Publish** and **Request / Reply**, explain why and link to the connection settings.
+
+Reading still works the way it does elsewhere: browsing and searching messages may create short-lived
+ordered consumers that the server removes on its own.
 
 ## Where credentials live
 
