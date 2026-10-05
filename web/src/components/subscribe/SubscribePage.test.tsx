@@ -19,9 +19,10 @@ vi.mock('@/contexts/mappings', () => ({
 }))
 
 const updateSettings = vi.hoisted(() => vi.fn())
+const livePolicy = vi.hoisted(() => ({ maxDisplayRate: 0 }))
 
 vi.mock('@/contexts/settings', () => ({
-  useLivePolicy: () => ({ maxDisplayRate: 0 }),
+  useLivePolicy: () => livePolicy,
   useUpdateSettings: () => ({ mutate: updateSettings }),
   useDisplayPreferences: () => ({ density: 'comfortable', timestampFormat: 'relative' }),
 }))
@@ -288,6 +289,20 @@ describe('SubscribePage', () => {
     expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ subjectLimits: expect.objectContaining({ maxDisplayRate: 5 }) }))
     expect(mockedLive.mock.lastCall?.[0].maxDisplayRate).toBeUndefined()
     expect(updateSettings).not.toHaveBeenCalled()
+  })
+
+  it('names a display rate from the settings that the list does not offer', () => {
+    livePolicy.maxDisplayRate = 100
+    try {
+      Element.prototype.scrollIntoView = vi.fn()
+      renderPage()
+      addSubject('orders.>')
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+      expect(screen.getByRole('button', { name: 'Display rate' })).toHaveTextContent('At most 100 msg/s')
+    } finally {
+      livePolicy.maxDisplayRate = 0
+    }
   })
 
   it('shows how many messages wait while paused', () => {

@@ -14,6 +14,13 @@ const RATE_OPTIONS = [
   { value: '50', label: 'At most 50 msg/s' },
 ]
 
+function rateOptions(current: number) {
+  if (RATE_OPTIONS.some((o) => Number(o.value) === current)) return RATE_OPTIONS
+  return [...RATE_OPTIONS, { value: String(current), label: `At most ${formatCount(current)} msg/s` }].sort(
+    (a, b) => Number(a.value) - Number(b.value),
+  )
+}
+
 const MAX_SUBJECT_CHIPS = 12
 
 const chipClass = (active: boolean) =>
@@ -131,7 +138,7 @@ export function SubscribeToolbar({
                 label="Display rate"
                 value={String(displayRate)}
                 onChange={(v) => onDisplayRateChange(Number(v))}
-                options={RATE_OPTIONS}
+                options={rateOptions(displayRate)}
               />
             </span>
           </Tooltip>
