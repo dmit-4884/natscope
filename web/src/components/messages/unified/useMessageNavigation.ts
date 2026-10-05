@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Code } from '@connectrpc/connect'
 import { getMessage, getMessages } from '@/api/messages'
 import type { SelectedMessage } from '@/types/messages'
 import type { NavQuery } from '@/stores/streamTabState/messagesViewStore'
 import { toast } from '@/utils/toast'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage, isErrorCode } from '@/api/errors'
 import { resolveNavTarget, type VisualDirection } from './navTarget'
 import { toSelectedHistoryMessage } from './selectedMessage'
 
@@ -30,6 +31,26 @@ export interface MessageNavigation {
   nextLoading: boolean
 }
 
+function neighbourMatch(matches: number[], sequence: number, visual: VisualDirection, direction: 'forward' | 'backward'): number {
+  const at = matches.indexOf(sequence)
+  if (at >= 0) return at + (visual === 'up' ? -1 : 1)
+  const listedAfter = (seq: number) => (direction === 'backward' ? seq < sequence : seq > sequence)
+  const firstAfter = matches.findIndex(listedAfter)
+  if (visual === 'down') return firstAfter
+  return (firstAfter < 0 ? matches.length : firstAfter) - 1
+}
+
+async function firstStoredMatch(connectionId: string, streamName: string, matches: number[], from: number, step: number) {
+  for (let i = from; i >= 0 && i < matches.length; i += step) {
+    try {
+      return await getMessage(connectionId, streamName, matches[i])
+    } catch (err) {
+      if (!isErrorCode(err, Code.NotFound)) throw err
+    }
+  }
+  return undefined
+}
+
 /**
  * Pure-API prev/next stepping from the detail panel: one
  * listMessages(limit=1) per press, mapped from visual direction to sequence
@@ -51,11 +72,11 @@ export function useMessageNavigation({
   const sequence = selectedMessage?.sequence
   const canNavigate = !!streamName && !!connectionId && sequence != null && sequence > 0
 
-  // Edge knowledge belongs to the message it was learned on.
   const selectedId = selectedMessage?.id ?? null
+  const matchesKey = navQuery?.sequences?.join(',')
   useEffect(() => {
     setEdges({ up: false, down: false })
-  }, [selectedId])
+  }, [selectedId, matchesKey])
 
   // Fresh selected id for the stale-response guard: a row click during an
   // in-flight nav request must win over the request's result.
@@ -69,7 +90,7 @@ export function useMessageNavigation({
     async (visual: VisualDirection) => {
       if (!canNavigate || inFlightRef.current) return
       const matches = navQuery?.sequences
-      const matchIndex = matches ? matches.indexOf(sequence!) + (visual === 'up' ? -1 : 1) : -1
+      const matchIndex = matches ? neighbourMatch(matches, sequence!, visual, navQuery?.direction ?? 'backward') : -1
       const target = matches ? null : resolveNavTarget(visual, navQuery?.direction ?? 'backward', sequence!)
       if (target === 'edge' || (matches && (matchIndex < 0 || matchIndex >= matches.length))) {
         setEdges((prev) => ({ ...prev, [visual]: true }))
@@ -80,7 +101,7 @@ export function useMessageNavigation({
       setLoadingDir(visual)
       try {
         const next = matches
-          ? await getMessage(connectionId!, streamName!, matches[matchIndex])
+          ? await firstStoredMatch(connectionId!, streamName!, matches, matchIndex, visual === 'up' ? -1 : 1)
           : (
               await getMessages(streamName!, {
                 connection_id: connectionId!,

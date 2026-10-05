@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
+import { Code, ConnectError } from '@connectrpc/connect'
 import * as messagesApi from '@/api/messages'
 import type { MessagesResponse } from '@/api/messages'
 import type { Message } from '@/types/nats'
@@ -225,5 +226,39 @@ describe('useMessageNavigation over search matches', () => {
 
     await waitFor(() => expect(result.current.prevDisabled).toBe(true))
     expect(api.getMessage).not.toHaveBeenCalled()
+  })
+
+  it('goes to the nearest match from a message that is not one', async () => {
+    api.getMessage.mockResolvedValueOnce(msg(40))
+    const o = opts({ selectedMessage: selected(60), navQuery: { direction: 'backward', sequences: [120, 90, 40] } })
+    const { result } = renderHook(() => useMessageNavigation(o))
+
+    act(() => { result.current.goNext() })
+
+    await waitFor(() => expect(o.onSelectMessage).toHaveBeenCalledWith(expect.objectContaining({ sequence: 40 })))
+    expect(api.getMessage).toHaveBeenCalledWith('conn-1', 'ORDERS', 40)
+  })
+
+  it('opens the last edge again when more matches arrive', async () => {
+    const o = opts({ selectedMessage: selected(90), navQuery: { direction: 'backward', sequences: [120, 90] } })
+    const { result, rerender } = renderHook((props: UseMessageNavigationOptions) => useMessageNavigation(props), { initialProps: o })
+    act(() => { result.current.goNext() })
+    await waitFor(() => expect(result.current.nextDisabled).toBe(true))
+
+    rerender({ ...o, navQuery: { direction: 'backward', sequences: [120, 90, 40] } })
+
+    expect(result.current.nextDisabled).toBe(false)
+  })
+
+  it('steps past a match deleted since the search', async () => {
+    api.getMessage.mockRejectedValueOnce(new ConnectError('message not found', Code.NotFound)).mockResolvedValueOnce(msg(10))
+    const o = opts({ selectedMessage: selected(90), navQuery: { direction: 'backward', sequences: [90, 40, 10] } })
+    const { result } = renderHook(() => useMessageNavigation(o))
+
+    act(() => { result.current.goNext() })
+
+    await waitFor(() => expect(o.onSelectMessage).toHaveBeenCalledWith(expect.objectContaining({ sequence: 10 })))
+    expect(api.getMessage).toHaveBeenNthCalledWith(1, 'conn-1', 'ORDERS', 40)
+    expect(api.getMessage).toHaveBeenNthCalledWith(2, 'conn-1', 'ORDERS', 10)
   })
 })

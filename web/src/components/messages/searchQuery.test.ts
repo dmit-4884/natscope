@@ -14,6 +14,7 @@ describe('isSearchFilter', () => {
     expect(isSearchFilter(filters({ header: 'X-Trace' }))).toBe(true)
     expect(isSearchFilter(filters({ stopSequence: 5 }))).toBe(true)
     expect(isSearchFilter(filters({ stopDate: '2026-10-05T10:00' }))).toBe(true)
+    expect(isSearchFilter(filters({ header: '=abc' }))).toBe(false)
   })
 })
 
@@ -23,12 +24,16 @@ describe('toSearchQuery', () => {
   })
 
   it('carries the text, the regex switch and the subject', () => {
-    expect(toSearchQuery(filters({ contentFilter: ' needle ', contentRegex: true, subject: 'orders.>' }), 'backward')).toEqual({
+    expect(toSearchQuery(filters({ contentFilter: ' needle ', subject: 'orders.>' }), 'backward')).toEqual({
       direction: 'backward',
       subject_filter: 'orders.>',
       text: 'needle',
-      regex: true,
+      regex: false,
     })
+  })
+
+  it('keeps a regular expression as written', () => {
+    expect(toSearchQuery(filters({ contentFilter: ' total \\d+ ', contentRegex: true }), 'backward')).toMatchObject({ text: ' total \\d+ ', regex: true })
   })
 
   it('splits a header into name and value', () => {

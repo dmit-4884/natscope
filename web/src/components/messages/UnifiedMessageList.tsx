@@ -23,7 +23,7 @@ import ExportDialog from './ExportDialog'
 import { parseStartDate } from './jumpToTime'
 import StreamStatsHeader from './StreamStatsHeader'
 import type { FilterValues } from './AdvancedFilters'
-import { EMPTY_FILTERS, toSearchQuery } from './searchQuery'
+import { EMPTY_FILTERS, isSearchFilter, toSearchQuery } from './searchQuery'
 import { MessageToolbar } from './unified/MessageToolbar'
 import { CompareModeBar } from './unified/CompareModeBar'
 import {
@@ -38,7 +38,7 @@ import { MessageVirtualTable } from './unified/MessageVirtualTable'
 import { useHistoryRefreshOnModeChange } from './unified/useHistoryRefreshOnModeChange'
 import { useLiveSubscription } from './unified/useLiveSubscription'
 import { useLoadMoreMessages } from './unified/useLoadMoreMessages'
-import { useMessageSearch } from './unified/useMessageSearch'
+import { useMessageSearch, type MessageSearch } from './unified/useMessageSearch'
 import { SearchStatusBar } from './unified/SearchStatusBar'
 import { toSelectedHistoryMessage } from './unified/selectedMessage'
 import {
@@ -61,6 +61,18 @@ interface UnifiedMessageListProps {
 // Re-export: SelectedMessage lives in @/types/messages (so stores avoid the
 // stores->ui boundary); keeps existing imports working.
 export type { SelectedMessage } from '@/types/messages'
+
+function searchEmptyText(search: MessageSearch): string {
+  switch (search.status) {
+    case 'running':
+    case 'idle':
+      return 'Looking for matching messages…'
+    case 'error':
+      return 'No results: the search failed.'
+    default:
+      return search.canContinue ? 'No message matched in the part searched so far.' : 'No message matched.'
+  }
+}
 
 export default function UnifiedMessageList({
   streamName,
@@ -120,6 +132,7 @@ export default function UnifiedMessageList({
     [mode, debouncedFilters, msgSettings.defaultDirection],
   )
   const searchActive = searchQuery != null
+  const searchWanted = searchActive || (mode === 'history' && isSearchFilter(filters))
   const search = useMessageSearch(connectionId, streamName, searchQuery)
   const searchSequences = useMemo(() => search.messages.map((m) => m.sequence), [search.messages])
 
@@ -141,7 +154,7 @@ export default function UnifiedMessageList({
     start_seq: jumpActive ? undefined : (filters.startSequence ?? undefined),
     start_time: jumpActive ? jumpStartMs : undefined,
     direction: effectiveDirection,
-  }, { enabled: mode === 'history' && !searchActive })
+  }, { enabled: mode === 'history' && !searchWanted })
 
   // Follow-up pages chained off the base query; reset whenever it changes.
   const {
@@ -359,7 +372,7 @@ export default function UnifiedMessageList({
         />
       )}
 
-      {mode === 'history' && error && !isWorkQueueConsumerError && (
+      {mode === 'history' && !searchWanted && error && !isWorkQueueConsumerError && (
         <div className="px-4 py-2">
           <ErrorAlert message={getErrorMessage(error)} />
         </div>
@@ -407,7 +420,7 @@ export default function UnifiedMessageList({
         (displayMessages.length === 0 ? (
           searchActive ? (
             <div className="flex-1 flex items-center justify-center p-6 text-sm text-content-tertiary" data-testid="search-empty">
-              {search.status === 'running' ? 'Looking for matching messages…' : 'No message matched in the part searched so far.'}
+              {searchEmptyText(search)}
             </div>
           ) : (
             <EmptyMessagesState subjectFilter={filters.subject} isRealtime={mode === 'realtime'} />

@@ -11,11 +11,21 @@ const BUDGET: Record<Exclude<SearchStopReason, 'complete'>, string> = {
 
 const count = (n: number) => n.toLocaleString('en-US')
 
+const ANNOUNCEMENT: Record<MessageSearch['status'], string> = {
+  idle: '',
+  running: 'Searching',
+  done: 'Search finished',
+  stopped: 'Search stopped',
+  error: 'Search failed',
+}
+
 function percentDone(search: MessageSearch, direction: 'forward' | 'backward'): number {
   const range = search.range
-  const current = search.progress?.current_seq
-  if (!range || !current || range.last <= range.first) return 0
-  const read = direction === 'backward' ? range.last - current : current - range.first
+  const progress = search.progress
+  if (!range || !progress || range.last <= range.first) return 0
+  const resume = progress.resume_seq
+  if (resume == null) return 100
+  const read = direction === 'backward' ? range.last - resume : resume - range.first
   return Math.min(100, Math.max(0, Math.round((read / (range.last - range.first)) * 100)))
 }
 
@@ -53,10 +63,17 @@ export function SearchStatusBar({ search, direction }: Props) {
       className="px-4 py-2 bg-surface-secondary border-b text-xs text-content-secondary"
       data-testid="search-status"
       data-state={search.status}
-      role="status"
+      aria-busy={search.status === 'running'}
     >
+      <span className="sr-only" role="status">
+        {ANNOUNCEMENT[search.status]}
+      </span>
       <div className="flex items-center gap-3">
-        {search.status === 'running' && <Spinner size="sm" />}
+        {search.status === 'running' && (
+          <span aria-hidden="true" className="inline-flex">
+            <Spinner size="sm" />
+          </span>
+        )}
         <span className={`flex-1 min-w-0 ${search.status === 'error' ? 'text-status-error-text' : ''}`}>{text()}</span>
         {search.status === 'running' && (
           <Button size="sm" variant="secondary" onClick={search.stop}>

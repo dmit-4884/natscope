@@ -25,7 +25,11 @@ function search(over: Partial<MessageSearch>): MessageSearch {
 
 describe('SearchStatusBar', () => {
   it('shows how much a running search read and found, and stops it', () => {
-    const s = search({ scanned: 120_000, messages: found(3), progress: { scanned: 120_000, matched: 3, current_seq: 880_001, range_first: 1, range_last: 1_000_000 } })
+    const s = search({
+      scanned: 120_000,
+      messages: found(3),
+      progress: { scanned: 120_000, matched: 3, current_seq: 870_000, range_first: 1, range_last: 1_000_000, resume_seq: 880_000 },
+    })
     render(<SearchStatusBar search={s} direction="backward" />)
 
     expect(screen.getByTestId('search-status')).toHaveTextContent('Searching… 120,000 messages read · 3 found')
@@ -83,6 +87,18 @@ describe('SearchStatusBar', () => {
       />,
     )
     expect(screen.getByTestId('search-status')).toHaveTextContent('One search returns up to 500 matches')
+  })
+
+  it('says when the range holds nothing to search', () => {
+    render(<SearchStatusBar search={search({ status: 'done', range: null, done: { scanned: 0, matched: 0, reason: 'complete', range_first: 0, range_last: 0 } })} direction="backward" />)
+    expect(screen.getByTestId('search-status')).toHaveTextContent('Nothing to search in this range')
+  })
+
+  it('announces the state, not every count', () => {
+    const { rerender } = render(<SearchStatusBar search={search({ scanned: 10 })} direction="backward" />)
+    expect(screen.getByRole('status')).toHaveTextContent(/^Searching$/)
+    rerender(<SearchStatusBar search={search({ status: 'done', scanned: 50, done: { scanned: 50, matched: 0, reason: 'complete', range_first: 1, range_last: 9 } })} direction="backward" />)
+    expect(screen.getByRole('status')).toHaveTextContent(/^Search finished$/)
   })
 
   it('reports a stopped search and a failed one', () => {

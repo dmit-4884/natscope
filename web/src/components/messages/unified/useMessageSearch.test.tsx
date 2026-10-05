@@ -35,9 +35,9 @@ function scripted(events: SearchEvent[], hold?: Promise<void>) {
   }
 }
 
-const progress = (current: number, scanned: number): SearchEvent => ({
+const progress = (current: number, scanned: number, resume?: number): SearchEvent => ({
   kind: 'progress',
-  progress: { scanned, matched: 0, current_seq: current, range_first: 1, range_last: 1000 },
+  progress: { scanned, matched: 0, current_seq: current, range_first: 1, range_last: 1000, resume_seq: resume },
 })
 const done = (next?: number): SearchEvent => ({
   kind: 'done',
@@ -80,9 +80,9 @@ describe('useMessageSearch', () => {
     expect(result.current.canContinue).toBe(false)
   })
 
-  it('stops on request and can pick up after the last message it read', async () => {
+  it('stops on request and picks up where the server says nothing is skipped', async () => {
     let release = () => {}
-    mockedSearch.mockImplementationOnce(scripted([progress(700, 300)], new Promise<void>((r) => (release = r))))
+    mockedSearch.mockImplementationOnce(scripted([progress(700, 300, 999)], new Promise<void>((r) => (release = r))))
     const { result } = renderHook(() => useMessageSearch('conn-1', 'ORDERS', query))
     await waitFor(() => expect(result.current.progress?.current_seq).toBe(700))
 
@@ -95,7 +95,35 @@ describe('useMessageSearch', () => {
     mockedSearch.mockImplementationOnce(scripted([done()]))
     act(() => result.current.more())
     await waitFor(() => expect(result.current.status).toBe('done'))
-    expect(mockedSearch.mock.calls[1][1]).toMatchObject({ cursor_seq: 699 })
+    expect(mockedSearch.mock.calls[1][1]).toMatchObject({ cursor_seq: 999 })
+  })
+
+  it('keeps its place when stopped right after searching further', async () => {
+    mockedSearch.mockImplementationOnce(scripted([done(899)]))
+    const { result } = renderHook(() => useMessageSearch('conn-1', 'ORDERS', query))
+    await waitFor(() => expect(result.current.status).toBe('done'))
+
+    mockedSearch.mockImplementationOnce(scripted([], new Promise<void>(() => {})))
+    act(() => result.current.more())
+    act(() => result.current.stop())
+
+    expect(result.current.status).toBe('stopped')
+    expect(result.current.canContinue).toBe(true)
+    mockedSearch.mockImplementationOnce(scripted([done()]))
+    act(() => result.current.more())
+    await waitFor(() => expect(mockedSearch).toHaveBeenCalledTimes(3))
+    expect(mockedSearch.mock.calls[2][1]).toMatchObject({ cursor_seq: 899 })
+  })
+
+  it('shows a match once even when a run sends it again', async () => {
+    mockedSearch.mockImplementationOnce(scripted([{ kind: 'matches', messages: [msg(101), msg(150)] }, done(151)]))
+    mockedSearch.mockImplementationOnce(scripted([{ kind: 'matches', messages: [msg(150), msg(200)] }, done()]))
+    const { result } = renderHook(() => useMessageSearch('conn-1', 'ORDERS', { ...query, direction: 'forward' }))
+    await waitFor(() => expect(result.current.status).toBe('done'))
+
+    act(() => result.current.more())
+    await waitFor(() => expect(result.current.done?.next_seq).toBeUndefined())
+    expect(result.current.messages.map((m) => m.sequence)).toEqual([101, 150, 200])
   })
 
   it('starts over when the query changes', async () => {

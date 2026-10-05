@@ -39,6 +39,7 @@ interface SearchState {
   error: unknown
   carried: number
   range: { first: number; last: number } | null
+  runCursor?: number
   resume?: number
 }
 
@@ -47,11 +48,14 @@ const IDLE: SearchState = { status: 'idle', messages: [], progress: null, done: 
 function applyEvent(prev: SearchState, event: SearchEvent): SearchState {
   switch (event.kind) {
     case 'progress':
-      return { ...prev, progress: event.progress, range: { first: event.progress.range_first, last: event.progress.range_last } }
-    case 'matches':
-      return { ...prev, messages: [...prev.messages, ...event.messages] }
+      return { ...prev, progress: event.progress, range: rangeOf(event.progress.range_first, event.progress.range_last) }
+    case 'matches': {
+      const seen = new Set(prev.messages.map((m) => m.sequence))
+      const fresh = event.messages.filter((m) => !seen.has(m.sequence))
+      return fresh.length === 0 ? prev : { ...prev, messages: [...prev.messages, ...fresh] }
+    }
     case 'done':
-      return { ...prev, status: 'done', done: event.done, range: { first: event.done.range_first, last: event.done.range_last } }
+      return { ...prev, status: 'done', done: event.done, range: rangeOf(event.done.range_first, event.done.range_last) }
   }
 }
 
@@ -59,10 +63,12 @@ function runScanned(state: SearchState): number {
   return state.done?.scanned ?? state.progress?.scanned ?? 0
 }
 
-function resumeAfter(progress: SearchProgress | null, direction: SearchQuery['direction']): number | undefined {
-  if (!progress || progress.current_seq === 0) return undefined
-  const next = direction === 'backward' ? progress.current_seq - 1 : progress.current_seq + 1
-  return next >= progress.range_first && next <= progress.range_last ? next : undefined
+function rangeOf(first: number, last: number): SearchState['range'] {
+  return first > 0 ? { first, last } : null
+}
+
+function resumeAfter(state: SearchState): number | undefined {
+  return state.progress ? state.progress.resume_seq : state.runCursor
 }
 
 export function useMessageSearch(connectionId: string | null, streamName: string | null, query: SearchQuery | null): MessageSearch {
@@ -85,6 +91,7 @@ export function useMessageSearch(connectionId: string | null, streamName: string
         error: null,
         carried: append ? prev.carried + runScanned(prev) : 0,
         range: append ? prev.range : null,
+        runCursor: cursor,
       }))
       void (async () => {
         try {
@@ -112,9 +119,8 @@ export function useMessageSearch(connectionId: string | null, streamName: string
 
   const stop = useCallback(() => {
     controllerRef.current?.abort()
-    const direction = queryKey ? (JSON.parse(queryKey) as SearchQuery).direction : 'backward'
-    setState((prev) => (prev.status === 'running' ? { ...prev, status: 'stopped', resume: resumeAfter(prev.progress, direction) } : prev))
-  }, [queryKey])
+    setState((prev) => (prev.status === 'running' ? { ...prev, status: 'stopped', resume: resumeAfter(prev) } : prev))
+  }, [])
 
   const cursor = state.status === 'done' ? state.done?.next_seq : state.status === 'stopped' ? state.resume : undefined
 

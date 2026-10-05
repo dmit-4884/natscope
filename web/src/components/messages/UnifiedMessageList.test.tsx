@@ -8,6 +8,7 @@ import type { StreamDetail } from '@/types/nats'
 const { fixtures } = vi.hoisted(() => ({
   fixtures: {
     messagesError: null as unknown,
+    messagesEnabled: [] as unknown[],
     workQueueStream: {
       name: 'ORDERS_WORKQUEUE',
       subjects: ['orders.>'],
@@ -28,8 +29,9 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/hooks/useConnectionQuery', () => ({
   CONNECTION_QUERY_PREFIX: 'conn',
-  useConnectionQuery: (opts: { key: readonly unknown[] }) => {
+  useConnectionQuery: (opts: { key: readonly unknown[]; enabled?: boolean }) => {
     if (opts.key[0] === 'messages') {
+      fixtures.messagesEnabled.push(opts.enabled)
       return { data: undefined, isLoading: false, isFetching: false, error: fixtures.messagesError, refetch: vi.fn() }
     }
     if (opts.key[0] === 'stream') {
@@ -134,5 +136,45 @@ describe('UnifiedMessageList search', () => {
       expect.any(AbortSignal),
     )
     expect(screen.queryByTestId('search-empty')).not.toBeInTheDocument()
+  })
+})
+
+describe('UnifiedMessageList search states', () => {
+  const applySearch = () => {
+    fireEvent.click(screen.getByRole('button', { name: /filters/i }))
+    fireEvent.change(screen.getByLabelText(/payload search/i), { target: { value: 'needle' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+  }
+
+  it('stops reading the page as soon as a search is applied', () => {
+    fixtures.messagesError = null
+    renderList()
+    fixtures.messagesEnabled = []
+
+    applySearch()
+
+    expect(fixtures.messagesEnabled[fixtures.messagesEnabled.length - 1]).toBe(false)
+  })
+
+  it('hides a list error from before the search', async () => {
+    fixtures.messagesError = streamNotFoundError()
+    renderList()
+
+    applySearch()
+
+    await waitFor(() => expect(screen.getByTestId('search-status')).toBeInTheDocument())
+    expect(screen.queryByText('Stream not found')).not.toBeInTheDocument()
+  })
+
+  it('says plainly that nothing matched once the whole range was searched', async () => {
+    fixtures.messagesError = null
+    vi.mocked(searchMessages).mockImplementationOnce(async function* () {
+      yield { kind: 'done', done: { scanned: 120, matched: 0, reason: 'complete', range_first: 1, range_last: 120 } }
+    })
+    renderList()
+
+    applySearch()
+
+    await waitFor(() => expect(screen.getByTestId('search-empty')).toHaveTextContent(/^No message matched\.$/))
   })
 })

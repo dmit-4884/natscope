@@ -25,8 +25,10 @@ export const EMPTY_FILTERS: FilterValues = {
   stopDate: null,
 }
 
+const headerName = (header: string) => header.split('=')[0].trim()
+
 export function isSearchFilter(filters: FilterValues): boolean {
-  return !!filters.contentFilter.trim() || !!filters.header.trim() || filters.stopSequence != null || !!filters.stopDate
+  return !!filters.contentFilter.trim() || !!headerName(filters.header) || filters.stopSequence != null || !!filters.stopDate
 }
 
 export function toSearchQuery(filters: FilterValues, listDirection: 'forward' | 'backward'): SearchQuery | null {
@@ -37,7 +39,7 @@ export function toSearchQuery(filters: FilterValues, listDirection: 'forward' | 
   const direction = startTime != null ? 'forward' : listDirection
   const forward = direction === 'forward'
   const [name, ...value] = filters.header.split('=')
-  const text = filters.contentFilter.trim()
+  const text = filters.contentFilter.trim() && filters.contentRegex ? filters.contentFilter : filters.contentFilter.trim()
   const subject = filters.subject.trim()
 
   const query: SearchQuery = { direction }

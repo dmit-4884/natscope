@@ -153,6 +153,7 @@ export interface SearchProgress {
   current_seq: number
   range_first: number
   range_last: number
+  resume_seq?: number
 }
 
 export interface SearchDone {
@@ -213,6 +214,7 @@ export async function* searchMessages(streamName: string, params: SearchParams, 
             current_seq: Number(event.value.currentSeq),
             range_first: Number(event.value.rangeFirstSeq),
             range_last: Number(event.value.rangeLastSeq),
+            resume_seq: event.value.resumeSeq != null ? Number(event.value.resumeSeq) : undefined,
           },
         }
         break
