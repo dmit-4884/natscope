@@ -51,7 +51,7 @@ test.describe('Connections management (Settings > Connections)', () => {
     await page.getByLabel('Server URL 1').fill('nats://127.0.0.1:4300')
     await page.getByRole('button', { name: 'Test', exact: true }).click()
     await expect(page.getByText('Success')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByText('enabled')).toBeVisible() // JetStream: enabled
+    await expect(page.getByText('enabled', { exact: true })).toBeVisible()
   })
 
   test('test connection: failure against an unreachable port shows an error', async ({ page, env }) => {
