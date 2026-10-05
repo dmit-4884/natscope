@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -89,5 +90,52 @@ func TestPool_WritableConnection_PassesWrites(t *testing.T) {
 	c := pooledClient(t, &entities.SavedConnection{}, &panicClient{})
 	if _, delegated := callMethod(reflect.ValueOf(c).MethodByName("CreateStream")); !delegated {
 		t.Fatalf("CreateStream did not reach the connection")
+	}
+}
+
+type gatedDialer struct {
+	fakeDialer
+	entered chan struct{}
+	release chan struct{}
+	calls   atomic.Int32
+}
+
+func (d *gatedDialer) Dial(context.Context, *entities.SavedConnection) (Client, error) {
+	if d.calls.Add(1) == 1 {
+		close(d.entered)
+		<-d.release
+	}
+	return &fakeClient{connected: true}, nil
+}
+
+func TestPool_ReadOnlySwitchedOnDuringDial_IsNotLost(t *testing.T) {
+	t.Parallel()
+
+	var readOnly atomic.Bool
+	d := &gatedDialer{entered: make(chan struct{}), release: make(chan struct{})}
+	pool := NewPool(d, func(context.Context, string) (*entities.SavedConnection, error) {
+		return &entities.SavedConnection{ReadOnly: readOnly.Load()}, nil
+	})
+
+	got := make(chan Client, 1)
+	go func() {
+		c, err := pool.Client(t.Context(), "conn-1")
+		if err != nil {
+			t.Errorf("Client() error = %v", err)
+		}
+		got <- c
+	}()
+	<-d.entered
+	readOnly.Store(true)
+	pool.Disconnect("conn-1")
+	close(d.release)
+
+	if _, ok := (<-got).(*readOnlyClient); !ok {
+		t.Fatalf("the pool handed out a writable client dialed before the connection became read-only")
+	}
+	if c, _ := pool.Pooled("conn-1"); c != nil {
+		if _, ok := c.(*readOnlyClient); !ok {
+			t.Fatalf("the pool kept a writable client for a read-only connection")
+		}
 	}
 }

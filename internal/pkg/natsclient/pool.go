@@ -19,6 +19,9 @@ import (
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 )
 
+// maxStaleDials bounds the re-dials when connections keep being disconnected mid-dial.
+const maxStaleDials = 3
+
 // ConfigSource resolves a connection ID to its saved configuration. The pool
 // stays storage-agnostic: the caller decides where configurations live and
 // passes a resolver here.
@@ -32,6 +35,7 @@ type Pool struct {
 	group singleflight.Group
 
 	clients   map[string]Client
+	gens      map[string]uint64
 	dialer    Dialer
 	source    ConfigSource
 	logger    *slog.Logger
@@ -43,6 +47,7 @@ type Pool struct {
 func NewPool(dialer Dialer, source ConfigSource) *Pool {
 	return &Pool{
 		clients: make(map[string]Client),
+		gens:    make(map[string]uint64),
 		dialer:  dialer,
 		source:  source,
 		logger:  slog.Default().With(slogx.Module("natsclient:pool")),
@@ -76,12 +81,33 @@ func (p *Pool) Client(ctx context.Context, connectionID string) (Client, error) 
 	// Slow path: singleflight dedups concurrent connects. DoChan + select-on-ctx
 	// lets the caller bail on cancel while the dial finishes in the background.
 	ch := p.group.DoChan(connectionID, func() (any, error) {
-		// Re-check pool (another goroutine may have connected while we waited).
+		return p.dial(ctx, connectionID)
+	})
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		c, ok := res.Val.(Client)
+		if !ok {
+			return nil, fmt.Errorf("%w: %T", errs.ErrUnexpectedSingleflightType, res.Val)
+		}
+		return c, nil
+	}
+}
+
+// dial loads the configuration and dials, again when a Disconnect made the configuration it read stale.
+func (p *Pool) dial(ctx context.Context, connectionID string) (Client, error) {
+	for attempt := 1; ; attempt++ {
 		p.mu.RLock()
 		if c, ok := p.clients[connectionID]; ok {
 			p.mu.RUnlock()
 			return c, nil
 		}
+		gen := p.gens[connectionID]
 		p.mu.RUnlock()
 
 		saved, err := p.source(ctx, connectionID)
@@ -98,24 +124,17 @@ func (p *Pool) Client(ctx context.Context, connectionID string) (Client, error) 
 		}
 
 		p.mu.Lock()
-		p.clients[connectionID] = c
+		if p.gens[connectionID] == gen {
+			p.clients[connectionID] = c
+			p.mu.Unlock()
+			return c, nil
+		}
 		p.mu.Unlock()
+		c.Close()
 
-		return c, nil
-	})
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case res := <-ch:
-		if res.Err != nil {
-			return nil, res.Err
+		if attempt == maxStaleDials {
+			return nil, errs.ErrNATSConnectionClosed
 		}
-		c, ok := res.Val.(Client)
-		if !ok {
-			return nil, fmt.Errorf("%w: %T", errs.ErrUnexpectedSingleflightType, res.Val)
-		}
-		return c, nil
 	}
 }
 
@@ -138,6 +157,7 @@ func (p *Pool) OnDisconnect(fn func(connectionID string)) {
 // Disconnect closes and removes a live client, then notifies OnDisconnect listeners.
 func (p *Pool) Disconnect(connectionID string) {
 	p.mu.Lock()
+	p.gens[connectionID]++
 	c, ok := p.clients[connectionID]
 	if !ok {
 		p.mu.Unlock()
