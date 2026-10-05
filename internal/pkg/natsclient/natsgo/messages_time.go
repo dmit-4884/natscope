@@ -84,7 +84,7 @@ func (c *Client) resolveSeqByTime(
 		return 0, nil
 	}
 
-	if fetchMethod == "consumer" {
+	if fetchMethod == fetchMethodConsumer {
 		return c.resolveSeqByTimeConsumer(ctx, stream, info, target)
 	}
 	return c.resolveSeqByTimeDirect(ctx, stream, info, target)
@@ -99,7 +99,7 @@ func (c *Client) resolveSeqByTimeDirect(
 	target time.Time,
 ) (uint64, error) {
 	nextPresent := func(seq uint64) (uint64, time.Time, bool, error) {
-		msg, err := c.nextMsgWithRetry(ctx, stream, seq)
+		msg, err := c.nextMsgWithRetry(ctx, stream, seq, ">")
 		if err != nil {
 			// No present message at/after seq — treat as past the end.
 			if errors.Is(err, jetstream.ErrMsgNotFound) {
@@ -123,12 +123,13 @@ func (c *Client) nextMsgWithRetry(
 	ctx context.Context,
 	stream jetstream.Stream,
 	seq uint64,
+	subject string,
 ) (*jetstream.RawStreamMsg, error) {
 	var msg *jetstream.RawStreamMsg
 	err := retry.Do(ctx, func(ctx context.Context) error {
 		attemptCtx, cancel := corecontext.WithMaxTimeout(ctx, perAttemptTimeout)
 		defer cancel()
-		got, err := stream.GetMsg(attemptCtx, seq, jetstream.WithGetMsgSubject(">"))
+		got, err := stream.GetMsg(attemptCtx, seq, jetstream.WithGetMsgSubject(subject))
 		if err != nil {
 			return err
 		}

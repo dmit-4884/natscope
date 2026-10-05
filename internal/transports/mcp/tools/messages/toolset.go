@@ -47,7 +47,8 @@ func (t *Toolset) Register(s *mcp.Server) {
 		Name: "find_messages",
 		Description: "Read a page of messages stored in a JetStream stream, newest first by default. Payloads come back as `decoded` JSON " +
 			"when the subject maps to a Protobuf type, otherwise as a raw `body`. Filter by subject (wildcards allowed), start at a " +
-			"sequence or a point in time, and page with nextSeq.",
+			"sequence or a point in time, and page with nextSeq. With contains or header the server searches the whole stream, " +
+			"up to 100000 messages per call; pass nextSeq back as startSeq to search further.",
 		Annotations: mcptransport.ReadOnly("Find messages"),
 	}, t.findMessages)
 

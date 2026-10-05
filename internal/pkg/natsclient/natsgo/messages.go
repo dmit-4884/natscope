@@ -50,7 +50,7 @@ func (c *Client) GetMessages(
 		opts.StartSeq = seq
 	}
 
-	if opts.FetchMethod == "consumer" {
+	if opts.FetchMethod == fetchMethodConsumer {
 		return c.getMessagesViaConsumer(ctx, streamName, opts.SubjectFilter, opts.StartSeq, limit, direction)
 	}
 

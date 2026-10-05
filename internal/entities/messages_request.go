@@ -21,8 +21,7 @@ type MessageListRequest struct {
 	Direction string
 	// FetchMethod is "", "direct", or "consumer"; empty = user setting then NATS
 	// default.
-	FetchMethod   string
-	ContentFilter *string
+	FetchMethod string
 	// MaxPayloadBytes caps payload + decoded JSON per message; nil → user-settings
 	// default (Messages.MaxPayloadBytesInList), 0 → unlimited.
 	MaxPayloadBytes *int32

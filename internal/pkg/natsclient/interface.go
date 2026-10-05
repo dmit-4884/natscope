@@ -5,6 +5,7 @@ package natsclient
 
 import (
 	"context"
+	"iter"
 	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -86,6 +87,13 @@ type StreamReader interface {
 	// GetNextMessage returns the first message at or after startSeq on any of subjects (every subject when empty),
 	// or nil when none matches; it reads the stream directly.
 	GetNextMessage(ctx context.Context, streamName string, startSeq uint64, subjects []string) (*entities.Message, error)
+
+	// ScanMessages reads the stored messages in opts' range oldest first; stopping the iteration releases what the
+	// scan holds on the server.
+	ScanMessages(ctx context.Context, streamName string, opts entities.ScanOptions) iter.Seq2[*entities.Message, error]
+
+	// SeqAtTime returns the first sequence stored at or after t, or the last sequence plus one when none is.
+	SeqAtTime(ctx context.Context, streamName, fetchMethod string, t time.Time) (uint64, error)
 }
 
 // StreamManager creates, mutates, and deletes JetStream streams and their

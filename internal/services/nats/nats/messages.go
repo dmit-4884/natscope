@@ -5,6 +5,8 @@ package nats
 
 import (
 	"context"
+	"iter"
+	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 )
@@ -95,4 +97,26 @@ func (s *Service) Request(
 		return nil, err
 	}
 	return c.Request(ctx, subject, data, headers)
+}
+
+// ScanMessages reads the stored messages in opts' range oldest first.
+func (s *Service) ScanMessages(
+	ctx context.Context,
+	connectionID, streamName string,
+	opts entities.ScanOptions,
+) iter.Seq2[*entities.Message, error] {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return func(yield func(*entities.Message, error) bool) { yield(nil, err) }
+	}
+	return c.ScanMessages(ctx, streamName, opts)
+}
+
+// SeqAtTime returns the first sequence stored at or after t, or the last sequence plus one when none is.
+func (s *Service) SeqAtTime(ctx context.Context, connectionID, streamName, fetchMethod string, t time.Time) (uint64, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return 0, err
+	}
+	return c.SeqAtTime(ctx, streamName, fetchMethod, t)
 }

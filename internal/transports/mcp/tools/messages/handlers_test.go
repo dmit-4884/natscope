@@ -98,7 +98,6 @@ func TestListRequest(t *testing.T) {
 	assert.Equal(t, directionForward, req.Direction)
 	assert.Equal(t, now.Add(-time.Hour), *req.StartTime)
 	assert.Equal(t, "orders.>", *req.SubjectFilter)
-	assert.Equal(t, "abc", *req.ContentFilter)
 	assert.Equal(t, int64(maxPageSize), *req.Limit)
 
 	req, err = listRequest(findMessagesInput{Stream: "ORDERS", StartSeq: 40, Direction: "Backward"}, now)
@@ -172,4 +171,44 @@ func TestPayloadLimitHonorsResponseBudget(t *testing.T) {
 	assert.Equal(t, responsePayloadBudget/maxPageSize, payloadLimit(maxPayload, maxPageSize))
 	assert.Equal(t, minMessagePayload, payloadLimit(maxPayload, 10_000))
 	assert.Equal(t, maxPayload, payloadLimit(10*maxPayload, 1))
+}
+
+func TestSearchRequest(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+
+	req, ok, err := searchRequest(findMessagesInput{Stream: "ORDERS", Contains: " needle ", Limit: 7}, now)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "needle", req.Text)
+	assert.False(t, req.Regex)
+	assert.Equal(t, directionBackward, req.Direction)
+	assert.Equal(t, 7, req.MaxMatches)
+	assert.Nil(t, req.CursorSeq)
+
+	req, ok, err = searchRequest(findMessagesInput{
+		Stream: "ORDERS", Contains: `order-\d+`, Regex: true, Header: "X-Trace = abc", StartSeq: 40, Since: "1h", Subject: "orders.>",
+	}, now)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.True(t, req.Regex)
+	assert.Equal(t, "X-Trace", req.HeaderName)
+	assert.Equal(t, "abc", req.HeaderValue)
+	assert.Equal(t, uint64(40), *req.CursorSeq)
+	assert.Equal(t, now.Add(-time.Hour), *req.FromTime)
+	assert.Equal(t, "orders.>", req.SubjectFilter)
+	assert.Equal(t, directionForward, req.Direction)
+
+	req, ok, err = searchRequest(findMessagesInput{Stream: "ORDERS", Header: "X-Trace"}, now)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "X-Trace", req.HeaderName)
+	assert.Empty(t, req.HeaderValue)
+
+	_, ok, err = searchRequest(findMessagesInput{Stream: "ORDERS", Subject: "orders.>"}, now)
+	require.NoError(t, err)
+	assert.False(t, ok, "without contains or header a plain page is read")
+
+	_, _, err = searchRequest(findMessagesInput{Stream: "ORDERS", Regex: true}, now)
+	require.EqualError(t, err, "regex needs contains")
 }

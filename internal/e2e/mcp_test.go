@@ -102,6 +102,7 @@ type mcpMessagesPage struct {
 	Messages []mcpMessage `json:"messages"`
 	HasMore  bool         `json:"hasMore"`
 	NextSeq  uint64       `json:"nextSeq"`
+	Scanned  uint64       `json:"scanned"`
 }
 
 var readOnlyTools = []string{
@@ -230,6 +231,8 @@ func TestMCPReadOnly(t *testing.T) {
 		filtered := callTool[mcpMessagesPage](t, cs, "find_messages", map[string]any{"stream": stream, "contains": "HELLO"})
 		require.Len(t, filtered.Messages, 1)
 		assert.Equal(t, uint64(3), filtered.Messages[0].Seq)
+		assert.Equal(t, uint64(3), filtered.Scanned, "contains searches the whole stream on the server")
+		assert.False(t, filtered.HasMore)
 
 		clipped := callTool[mcpMessage](t, cs, "get_message", map[string]any{"stream": stream, "seq": 3, "maxPayloadBytes": 5})
 		assert.Equal(t, "hello", clipped.Body.Text)

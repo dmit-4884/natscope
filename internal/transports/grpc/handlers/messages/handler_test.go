@@ -42,6 +42,10 @@ func (m *mockMsgService) Next(_ context.Context, in *entities.MessageNextRequest
 	return m.nextResult, nil
 }
 
+func (m *mockMsgService) Search(context.Context, *entities.MessageSearchRequest, func(*entities.MessageSearchEvent) error) error {
+	return nil
+}
+
 // --- Tests ---
 
 func TestHandler_ListMessages(t *testing.T) {
@@ -141,4 +145,34 @@ func TestHandler_GetNextMessage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, resp.Msg.Message)
 	})
+}
+
+func TestSearchEventToProto(t *testing.T) {
+	t.Parallel()
+
+	done := searchEventToProto(&entities.MessageSearchEvent{Done: &entities.MessageSearchDone{
+		Scanned: 100, Matched: 3, Reason: entities.SearchStopScanLimit, RangeFirst: 1, RangeLast: 900, NextSeq: 101,
+	}}).GetDone()
+	require.NotNil(t, done)
+	assert.Equal(t, messagespb.SearchStopReason_SEARCH_STOP_REASON_SCAN_LIMIT, done.GetReason())
+	assert.Equal(t, uint64(100), done.GetScanned())
+	assert.Equal(t, uint64(3), done.GetMatched())
+	assert.Equal(t, uint64(1), done.GetRangeFirstSeq())
+	assert.Equal(t, uint64(900), done.GetRangeLastSeq())
+	require.NotNil(t, done.NextSeq)
+	assert.Equal(t, uint64(101), done.GetNextSeq())
+
+	complete := searchEventToProto(&entities.MessageSearchEvent{Done: &entities.MessageSearchDone{Reason: entities.SearchStopComplete}}).GetDone()
+	assert.Nil(t, complete.NextSeq, "a finished range has nothing to continue")
+
+	progress := searchEventToProto(&entities.MessageSearchEvent{Progress: &entities.MessageSearchProgress{
+		Scanned: 10, Matched: 1, CurrentSeq: 10, RangeFirst: 1, RangeLast: 900,
+	}}).GetProgress()
+	require.NotNil(t, progress)
+	assert.Equal(t, uint64(10), progress.GetCurrentSeq())
+	assert.Equal(t, uint64(900), progress.GetRangeLastSeq())
+
+	matches := searchEventToProto(&entities.MessageSearchEvent{Matches: []*entities.Message{{Sequence: 7, Subject: "orders.paid"}}}).GetMatches()
+	require.Len(t, matches.GetMessages(), 1)
+	assert.Equal(t, uint64(7), matches.GetMessages()[0].GetSequence())
 }

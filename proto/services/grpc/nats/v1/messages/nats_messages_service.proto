@@ -19,6 +19,10 @@ service MessagesService {
   // Returns the first message at or after a sequence whose subject matches one of the filters.
   // Reads the stream directly, so no consumer state changes.
   rpc GetNextMessage(GetNextMessageRequest) returns (GetNextMessageResponse) {}
+
+  // Searches a whole stream on the server, streaming progress and matches until the range ends or a budget runs out.
+  // Closing the stream stops the search.
+  rpc SearchMessages(SearchMessagesRequest) returns (stream SearchMessagesResponse) {}
 }
 
 // Defines the direction for sequential message retrieval.
@@ -62,8 +66,8 @@ message ListMessagesRequest {
   // Optional. Maximum number of messages to return per page.
   optional int64 limit = 6;
 
-  // Optional. Case-insensitive substring filter applied to message payload content (decoded JSON or raw text).
-  optional string content_filter = 7;
+  reserved 7;
+  reserved "content_filter";
 
   // Optional. When > 0, truncate each message's `data` (and decoded JSON) to
   // this many bytes for the list view. The original byte count is preserved
@@ -133,4 +137,142 @@ message GetNextMessageRequest {
 message GetNextMessageResponse {
   // Optional. The first matching message, decoded like GetMessage; unset when nothing matches.
   optional .natscope.types.nats.NatsMessage message = 1;
+}
+
+// Defines the request message for searching a JetStream stream.
+message SearchMessagesRequest {
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.messages.search_seq_range"
+    message: "from_seq must not be above to_seq"
+    expression: "!has(this.from_seq) || !has(this.to_seq) || this.from_seq <= this.to_seq"
+  };
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.messages.search_time_range"
+    message: "from_time must not be after to_time"
+    expression: "!has(this.from_time) || !has(this.to_time) || this.from_time <= this.to_time"
+  };
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.messages.search_header_value_needs_name"
+    message: "header_value needs header_name"
+    expression: "this.header_value == '' || this.header_name != ''"
+  };
+
+  // Required. Identifier of the NATS connection to search through.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Name of the JetStream stream to search.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. Subject filter, wildcards allowed; the NATS server applies it.
+  optional string subject_filter = 3;
+
+  // Optional. Search order. Defaults to the user's list direction.
+  Direction direction = 4;
+
+  // Optional. Lowest sequence to search, inclusive.
+  optional uint64 from_seq = 5 [(buf.validate.field).uint64.gt = 0];
+
+  // Optional. Highest sequence to search, inclusive.
+  optional uint64 to_seq = 6 [(buf.validate.field).uint64.gt = 0];
+
+  // Optional. Earliest publish time to search, inclusive.
+  optional google.protobuf.Timestamp from_time = 7;
+
+  // Optional. Latest publish time to search, inclusive.
+  optional google.protobuf.Timestamp to_time = 8;
+
+  // Optional. Resumes a previous run at the next_seq its SearchDone returned.
+  optional uint64 cursor_seq = 9 [(buf.validate.field).uint64.gt = 0];
+
+  // Optional. Text the decoded or raw payload must contain, case-insensitive; with regex, an RE2 expression.
+  string text = 10 [(buf.validate.field).string.max_len = 1024];
+
+  // Optional. Treats text as an RE2 regular expression, matched as written.
+  bool regex = 11;
+
+  // Optional. Header the message must carry, matched without regard to case.
+  string header_name = 12 [(buf.validate.field).string.max_len = 256];
+
+  // Optional. Value the header must have; empty means any value.
+  string header_value = 13 [(buf.validate.field).string.max_len = 1024];
+
+  // Optional. Caps each returned payload; unset uses the user's list setting, 0 disables the cap.
+  optional int32 max_payload_bytes = 14 [(buf.validate.field).int32.gte = 0];
+}
+
+// Defines one event of a running search.
+message SearchMessagesResponse {
+  oneof event {
+    // How far the search got.
+    SearchProgress progress = 1;
+
+    // Messages that matched since the previous batch.
+    SearchMatches matches = 2;
+
+    // The last event: why the run ended and where to continue.
+    SearchDone done = 3;
+  }
+}
+
+// Defines how far a running search got.
+message SearchProgress {
+  // Required. Messages read so far in this run.
+  uint64 scanned = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Messages that matched so far in this run.
+  uint64 matched = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Sequence of the last message read.
+  uint64 current_seq = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Lowest sequence of the searched range.
+  uint64 range_first_seq = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Highest sequence of the searched range.
+  uint64 range_last_seq = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines a batch of matching messages.
+message SearchMatches {
+  // Required. Matching messages in search order.
+  repeated .natscope.types.nats.NatsMessage messages = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines why a search run ended.
+enum SearchStopReason {
+  // Not set.
+  SEARCH_STOP_REASON_UNSPECIFIED = 0;
+
+  // The whole range was searched.
+  SEARCH_STOP_REASON_COMPLETE = 1;
+
+  // The run read as many messages as one run may.
+  SEARCH_STOP_REASON_SCAN_LIMIT = 2;
+
+  // The run took as long as one run may.
+  SEARCH_STOP_REASON_TIME_LIMIT = 3;
+
+  // The run found as many matches as one run returns.
+  SEARCH_STOP_REASON_MATCH_LIMIT = 4;
+}
+
+// Defines the summary of a search run.
+message SearchDone {
+  // Required. Messages read in this run.
+  uint64 scanned = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Messages that matched in this run.
+  uint64 matched = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Why the run ended.
+  SearchStopReason reason = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Lowest sequence of the searched range.
+  uint64 range_first_seq = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Highest sequence of the searched range.
+  uint64 range_last_seq = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Pass as cursor_seq with the same filters to continue; unset when the range is done.
+  optional uint64 next_seq = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

@@ -121,3 +121,37 @@ func messageToProto(m *entities.Message) *natspb.NatsMessage {
 	}
 	return pb
 }
+
+// SearchMessages streams a budgeted search through a stream: progress, batches of matches and a summary.
+func (h *Handler) SearchMessages(
+	ctx context.Context,
+	req *connect.Request[messagespb.SearchMessagesRequest],
+	stream *connect.ServerStream[messagespb.SearchMessagesResponse],
+) error {
+	in := converter.Convert(req.Msg, &entities.MessageSearchRequest{}, grpchelpers.ProtoCodecs, converter.WithIgnoreFields("Direction"))
+	in.Direction = directionFromProto(req.Msg.GetDirection())
+	return h.service.Search(ctx, in, func(event *entities.MessageSearchEvent) error {
+		return stream.Send(searchEventToProto(event))
+	})
+}
+
+// searchEventToProto converts one search event to its wire form.
+func searchEventToProto(event *entities.MessageSearchEvent) *messagespb.SearchMessagesResponse {
+	switch {
+	case event.Done != nil:
+		done := converter.Convert(event.Done, &messagespb.SearchDone{}, converter.WithIgnoreFields("NextSeq"))
+		done.RangeFirstSeq, done.RangeLastSeq = event.Done.RangeFirst, event.Done.RangeLast
+		if event.Done.NextSeq > 0 {
+			done.NextSeq = &event.Done.NextSeq
+		}
+		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Done{Done: done}}
+	case event.Progress != nil:
+		progress := converter.Convert(event.Progress, &messagespb.SearchProgress{})
+		progress.RangeFirstSeq, progress.RangeLastSeq = event.Progress.RangeFirst, event.Progress.RangeLast
+		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Progress{Progress: progress}}
+	default:
+		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Matches{
+			Matches: &messagespb.SearchMatches{Messages: slices.To(event.Matches, messageToProto)},
+		}}
+	}
+}

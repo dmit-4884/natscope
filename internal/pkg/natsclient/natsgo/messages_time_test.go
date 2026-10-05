@@ -296,7 +296,7 @@ func TestNextMsgWithRetry_NotFoundTerminal(t *testing.T) {
 	svc := &Client{}
 	stream := newFakeStream(streamInfo(1, 10, 0), presentMap()) // empty → always NotFound
 
-	_, err := svc.nextMsgWithRetry(t.Context(), stream, 1)
+	_, err := svc.nextMsgWithRetry(t.Context(), stream, 1, ">")
 	require.ErrorIs(t, err, jetstream.ErrMsgNotFound)
 	assert.Equal(t, 1, stream.calls, "NotFound is terminal — no retries")
 }

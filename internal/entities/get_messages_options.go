@@ -23,9 +23,6 @@ type GetMessagesOptions struct {
 	// Direction is the fetch direction (forward, backward).
 	Direction string
 
-	// ContentFilter is a case-insensitive substring filter on payload content.
-	ContentFilter string
-
 	// FetchMethod is "direct" (parallel GetMsg) or "consumer" (ordered consumer).
 	FetchMethod string
 

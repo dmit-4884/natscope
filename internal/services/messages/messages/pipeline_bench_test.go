@@ -123,18 +123,6 @@ func BenchmarkDecodedPreview_1MB(b *testing.B) {
 	}
 }
 
-// BenchmarkFilterByContent_Mixed measures filterByContent — substring search
-// across decoded JSON + raw payload; worst case scans every message's body.
-func BenchmarkFilterByContent_Mixed(b *testing.B) {
-	msgs := makeMixedMessages()
-	const needle = "nonexistent_needle_xyz"
-
-	b.ResetTimer()
-	for b.Loop() {
-		_ = filterByContent(msgs, needle)
-	}
-}
-
 func cloneMessages(src []*entities.Message) []*entities.Message {
 	out := make([]*entities.Message, len(src))
 	for i, m := range src {

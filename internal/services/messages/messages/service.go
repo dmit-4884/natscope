@@ -6,7 +6,6 @@ package messages
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 	"strings"
@@ -46,8 +45,8 @@ func New(
 // MaxPayloadBytes — decoded JSON would surely blow the cap too (waste).
 const skipDecodeMultiplier = 8
 
-// List applies settings defaults, fetches, decodes, content-filters, then
-// truncates payload + decoded JSON to the cap.
+// List applies settings defaults, fetches, decodes, then truncates payload +
+// decoded JSON to the cap.
 func (s *Service) List(ctx context.Context, in *entities.MessageListRequest) (*entities.MessagesResponse, error) {
 	opts := s.buildOptions(ctx, in)
 
@@ -64,10 +63,6 @@ func (s *Service) List(ctx context.Context, in *entities.MessageListRequest) (*e
 	}
 
 	s.protoService.DecodeMessages(ctx, toDecodeList, s.detectsTypes(ctx))
-
-	if opts.ContentFilter != "" {
-		resp.Messages = filterByContent(resp.Messages, opts.ContentFilter)
-	}
 
 	if opts.MaxPayloadBytes > 0 {
 		truncateMessages(resp.Messages, int(opts.MaxPayloadBytes))
@@ -133,9 +128,6 @@ func (s *Service) buildOptions(ctx context.Context, in *entities.MessageListRequ
 	}
 	if in.Limit != nil {
 		opts.Limit = int(*in.Limit)
-	}
-	if in.ContentFilter != nil {
-		opts.ContentFilter = *in.ContentFilter
 	}
 	// Request-level override has highest precedence; we still apply settings
 	// fall-through below when nil.
@@ -291,38 +283,6 @@ func base64DecodedLen(s string) int {
 	default:
 		return n
 	}
-}
-
-// filterByContent returns the subset of messages whose decoded JSON or
-// base64-decoded raw payload contains the lowercased filter substring.
-func filterByContent(messages []*entities.Message, filter string) []*entities.Message {
-	if filter == "" {
-		return messages
-	}
-	lowerFilter := strings.ToLower(filter)
-	out := messages[:0]
-	for _, msg := range messages {
-		if matchesContent(msg, lowerFilter) {
-			out = append(out, msg)
-		}
-	}
-	return out
-}
-
-func matchesContent(msg *entities.Message, lowerFilter string) bool {
-	if msg.Decoded != nil {
-		if strings.Contains(strings.ToLower(string(msg.Decoded)), lowerFilter) {
-			return true
-		}
-	}
-	if msg.DataBase64 != "" {
-		if raw, err := base64.StdEncoding.DecodeString(msg.DataBase64); err == nil {
-			if strings.Contains(strings.ToLower(string(raw)), lowerFilter) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 var _ messagessvc.Service = (*Service)(nil)

@@ -32,7 +32,9 @@ type findMessagesInput struct {
 	Since           string `json:"since,omitempty" jsonschema:"start at the first message published at or after this time: RFC 3339 or a duration ago like 15m"`
 	Direction       string `json:"direction,omitempty" jsonschema:"backward (newest first) or forward; defaults to forward when startSeq or since is set"`
 	Limit           int    `json:"limit,omitempty" jsonschema:"messages per page, 1-100 (default 20)"`
-	Contains        string `json:"contains,omitempty" jsonschema:"case-insensitive text the payload must contain; filters the fetched page, so keep paging"`
+	Contains        string `json:"contains,omitempty" jsonschema:"case-insensitive payload text; searches the whole stream, 100000 messages per call"`
+	Regex           bool   `json:"regex,omitempty" jsonschema:"treat contains as an RE2 regular expression, matched as written"`
+	Header          string `json:"header,omitempty" jsonschema:"header the message must carry, as name or name=value; searches like contains"`
 	MaxPayloadBytes int    `json:"maxPayloadBytes,omitempty" jsonschema:"per-message payload budget in bytes (default 4096); a page carries at most 256 KiB"`
 }
 
@@ -40,6 +42,7 @@ type findMessagesOutput struct {
 	Messages []messageView `json:"messages"`
 	HasMore  bool          `json:"hasMore"`
 	NextSeq  uint64        `json:"nextSeq,omitempty" jsonschema:"pass as startSeq with the same direction for the next page"`
+	Scanned  uint64        `json:"scanned,omitempty" jsonschema:"messages the server read for a contains or header search"`
 }
 
 type getMessageInput struct {
