@@ -120,7 +120,7 @@ export default function ConnectionEditPage({ mode }: Props) {
 
   const createMutation = useCreateConnection({ silent: true })
   const updateMutation = useUpdateConnection({ silent: true })
-  const testMutation = useTestConnection()
+  const testMutation = useTestConnection({ silent: true })
 
   // Wait for connections to arrive (cache can be empty on a deep-link refresh),
   // then hydrate once per id so a later refetch doesn't clobber the user's edits.
@@ -183,7 +183,12 @@ export default function ConnectionEditPage({ mode }: Props) {
   }
 
   const handleTest = async () => {
-    if (!validateUrls()) return
+    const urlsOk = validateUrls()
+    const nextInboxError = inboxPrefixError(form.inboxPrefix)
+    setInboxError(nextInboxError)
+    const nextJetStreamErrors = jetStreamTargetErrors(form.jetstreamDomain, form.jetstreamApiPrefix)
+    setJetStreamErrors(nextJetStreamErrors)
+    if (!urlsOk || nextInboxError || nextJetStreamErrors.domain || nextJetStreamErrors.prefix) return
     const urls = form.urls.filter(Boolean)
     setError(null)
     // Snapshot exactly what the user sent so we can detect later edits.

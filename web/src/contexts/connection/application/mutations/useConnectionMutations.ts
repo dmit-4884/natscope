@@ -49,10 +49,11 @@ export function useDeleteConnection() {
   })
 }
 
-export function useTestConnection() {
+export function useTestConnection({ silent = false }: { silent?: boolean } = {}) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (req: TestConnectionRequest) => testConnection(req),
+    meta: { silent },
     onSettled: (_data, _err, req) => {
       if (req.connectionId) {
         queryClient.invalidateQueries({ queryKey: connectionKeys.all })

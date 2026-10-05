@@ -43,7 +43,7 @@ export default function ConnectionsPage() {
   const createConnectionMutation = useCreateConnection()
   const deleteConnectionMutation = useDeleteConnection()
   const duplicateConnectionMutation = useDuplicateConnection()
-  const testConnectionMutation = useTestConnection()
+  const testConnectionMutation = useTestConnection({ silent: true })
   const { data: mappings = [] } = useMappingItems()
   const bulkSaveMappingsMutation = useBulkSaveMappings()
 
