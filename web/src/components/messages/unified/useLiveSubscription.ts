@@ -91,7 +91,9 @@ export function useLiveSubscription({
   const subjectsKey = subjects && subjects.length > 0 ? subjects.join('\n') : null
   const subjectsKeyRef = useRef(subjectsKey)
   const subjectFilterRef = useRef(subjectFilter)
-  const limitsKey = subjectLimits ? `${subjectLimits.maxPayloadBytes ?? ''}|${subjectLimits.maxDisplayRate ?? ''}` : ''
+  const limitsKey = subjectLimits
+    ? `${subjectLimits.maxPayloadBytes ?? ''}|${subjectLimits.maxDisplayRate ?? ''}|${(subjectLimits.exclude ?? []).join('\n')}`
+    : ''
   const limitsRef = useRef(subjectLimits)
   const excludeRef = useRef(exclude)
   useEffect(() => {
@@ -218,7 +220,7 @@ export function useLiveSubscription({
       const converted = relevant.map(toLiveMessage)
       const rate = maxDisplayRateRef.current
 
-      if (!rate || rate <= 0 || resumingRef.current) {
+      if (!rate || rate <= 0 || resumingRef.current || subjectMode) {
         flush(converted)
         return
       }

@@ -31,14 +31,15 @@ export interface WSErrorPayload {
 export interface SubjectSessionLimits {
   maxPayloadBytes?: number
   maxDisplayRate?: number
+  exclude?: string[]
 }
 
 type LiveTarget = { stream: string } | { subjects: string[]; limits?: SubjectSessionLimits }
 
 function targetKey(target: LiveTarget): string {
   if ('stream' in target) return `stream:${target.stream}`
-  const { maxPayloadBytes = '', maxDisplayRate = '' } = target.limits ?? {}
-  return `subjects:${target.subjects.join('\n')}|${maxPayloadBytes}|${maxDisplayRate}`
+  const { maxPayloadBytes = '', maxDisplayRate = '', exclude = [] } = target.limits ?? {}
+  return `subjects:${target.subjects.join('\n')}|${maxPayloadBytes}|${maxDisplayRate}|${exclude.join('\n')}`
 }
 
 function targetSubscriptions(target: LiveTarget): Pick<LiveSubscription, 'subject' | 'streamName'>[] {
@@ -186,6 +187,7 @@ export class LiveStreamClient {
           subscriptions: targetSubscriptions(target),
           ...(limits?.maxPayloadBytes !== undefined && { maxPayloadBytes: limits.maxPayloadBytes }),
           ...(limits?.maxDisplayRate !== undefined && { maxDisplayRate: limits.maxDisplayRate }),
+          ...(limits?.exclude !== undefined && { excludeSubjects: limits.exclude }),
         },
         { signal: this.abortController.signal },
       )

@@ -38,15 +38,17 @@ copy per subscription.
 The line under the toolbar says how many messages arrived, how many the feed keeps, how many match the
 search, and how many were skipped. Next to it, a counter per subject; click one to show only that
 subject, or click its eye to **mute** it. Muted subjects stay out of the feed and the counters until you
-unmute them.
+unmute them, and they do not use up the display rate. Muting or unmuting restarts the subscription, and
+messages published in that moment are missed, as core NATS keeps no copy.
 
 - **Search** filters the received messages by subject and payload text.
 - **Pause** freezes the feed; messages keep arriving in the background, and **Resume** shows how many
   wait. A very busy subject can outrun the pause buffer, which then keeps the latest ones.
 - **Clear** empties the feed and the counters.
 - **Keep** sets how many of the latest messages the feed holds, from 25 to 1,000.
-- **Display rate** shows at most that many messages per second; the rest are skipped, not queued, and
-  counted as skipped. It applies to this subscription only.
+- **Display rate** shows at most that many messages per second; the server skips the rest, does not
+  queue them, and counts them as skipped. It applies to this subscription only, and changing it restarts
+  the subscription.
 
 **Stop** ends the subscription and keeps the messages on screen; **Start** listens again and adds to
 them.

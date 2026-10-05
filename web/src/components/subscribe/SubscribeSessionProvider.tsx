@@ -33,14 +33,16 @@ export function SubscribeSessionProvider({ connectionId, children }: Props) {
   const liveSettings = useLivePolicy()
   const displayRate = rateOverride ?? liveSettings.maxDisplayRate ?? 0
 
-  const subjectLimits = useMemo(() => ({ maxPayloadBytes: SUBSCRIBE_PAYLOAD_CAP, maxDisplayRate: displayRate }), [displayRate])
+  const subjectLimits = useMemo(
+    () => ({ maxPayloadBytes: SUBSCRIBE_PAYLOAD_CAP, maxDisplayRate: displayRate, exclude: muted }),
+    [displayRate, muted],
+  )
 
   const live = useLiveSubscription({
     connectionId,
     streamName: null,
     subjects: running ? draft.subjects : undefined,
     enabled: running,
-    maxDisplayRate: displayRate,
     initialLimit: 100,
     globalStats: false,
     subjectLimits,

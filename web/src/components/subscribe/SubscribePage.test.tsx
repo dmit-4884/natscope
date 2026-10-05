@@ -260,7 +260,9 @@ describe('SubscribePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Mute metrics.cpu' }))
     expect(within(screen.getByTestId('feed')).queryByText('metrics.cpu')).not.toBeInTheDocument()
-    expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ exclude: ['metrics.cpu'] }))
+    expect(mockedLive).toHaveBeenLastCalledWith(
+      expect.objectContaining({ exclude: ['metrics.cpu'], subjectLimits: expect.objectContaining({ exclude: ['metrics.cpu'] }) }),
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Unmute metrics.cpu' }))
     expect(within(screen.getByTestId('feed')).getByText('metrics.cpu')).toBeInTheDocument()
@@ -283,9 +285,8 @@ describe('SubscribePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Display rate' }))
     fireEvent.click(screen.getByRole('option', { name: 'At most 5 msg/s' }))
 
-    expect(mockedLive).toHaveBeenLastCalledWith(
-      expect.objectContaining({ maxDisplayRate: 5, subjectLimits: expect.objectContaining({ maxDisplayRate: 5 }) }),
-    )
+    expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ subjectLimits: expect.objectContaining({ maxDisplayRate: 5 }) }))
+    expect(mockedLive.mock.lastCall?.[0].maxDisplayRate).toBeUndefined()
     expect(updateSettings).not.toHaveBeenCalled()
   })
 

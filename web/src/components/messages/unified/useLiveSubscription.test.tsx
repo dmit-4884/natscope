@@ -266,3 +266,53 @@ describe('useLiveSubscription subjects', () => {
     expect(setStats).not.toHaveBeenCalled()
   })
 })
+
+describe('useLiveSubscription subject sessions and the server', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    clients.length = 0
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const core = (subject: string): WSMessagePayload => ({ stream_name: '', subject, timestamp: 1, data_base64: '', data_size: 0 })
+
+  it('reopens the subscription with the muted subjects so the server leaves them out', () => {
+    const { rerender } = renderHook(
+      ({ exclude }) =>
+        useLiveSubscription({
+          connectionId: 'conn-1',
+          streamName: null,
+          subjects: ['>'],
+          enabled: true,
+          initialLimit: 100,
+          subjectLimits: { maxDisplayRate: 10, exclude },
+        }),
+      { initialProps: { exclude: [] as string[] } },
+    )
+
+    rerender({ exclude: ['metrics.>'] })
+
+    expect(clients[clients.length - 1].subscribeSubjects).toHaveBeenLastCalledWith(['>'], { maxDisplayRate: 10, exclude: ['metrics.>'] })
+  })
+
+  it('shows what the server sends at once, as the server applies the display rate', () => {
+    const { result } = renderHook(() =>
+      useLiveSubscription({
+        connectionId: 'conn-1',
+        streamName: null,
+        subjects: ['>'],
+        enabled: true,
+        initialLimit: 100,
+        maxDisplayRate: 1,
+        subjectLimits: { maxDisplayRate: 1 },
+      }),
+    )
+
+    act(() => clients[clients.length - 1].deliver({ messages: [core('a'), core('b'), core('c')], count: 3 }))
+
+    expect(result.current.liveMessages).toHaveLength(3)
+  })
+})

@@ -56,6 +56,19 @@ describe('LiveStreamClient', () => {
     client.disconnect()
   })
 
+  it('sends the muted subjects to the server and reopens when they change', () => {
+    const client = new LiveStreamClient('conn-1')
+    client.connect()
+    client.subscribeSubjects(['>'], { maxDisplayRate: 10, exclude: ['metrics.>'] })
+    client.subscribeSubjects(['>'], { maxDisplayRate: 10, exclude: ['metrics.>'] })
+    client.subscribeSubjects(['>'], { maxDisplayRate: 10, exclude: [] })
+
+    expect(subscribeCall).toHaveBeenCalledTimes(2)
+    expect(subscribeCall.mock.calls[0][0]).toMatchObject({ excludeSubjects: ['metrics.>'] })
+    expect(subscribeCall.mock.calls[1][0]).toMatchObject({ excludeSubjects: [] })
+    client.disconnect()
+  })
+
   it('reports how many messages wait while paused', async () => {
     let push: ((value: IteratorResult<unknown>) => void) | undefined
     subscribeCall.mockImplementation(() => ({
