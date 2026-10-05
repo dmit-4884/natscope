@@ -39,6 +39,7 @@ type mockConnService struct {
 	layoutErr    error
 	layoutUpdate *entities.SidebarLayoutUpdate
 	cliContexts  *entities.CliContexts
+	testRequest  *entities.TestConnectionRequest
 }
 
 func (m *mockConnService) ListCliContexts(context.Context, []entities.CliContextFile) (*entities.CliContexts, error) {
@@ -95,7 +96,8 @@ func (m *mockConnService) Duplicate(_ context.Context, _ string, _ string) (*ent
 	return entities.SavedConnectionNew(), m.dupErr
 }
 
-func (m *mockConnService) TestConnection(_ context.Context, _ *entities.TestConnectionRequest) (*entities.TestConnectionResult, error) {
+func (m *mockConnService) TestConnection(_ context.Context, in *entities.TestConnectionRequest) (*entities.TestConnectionResult, error) {
+	m.testRequest = in
 	if m.testResult != nil {
 		return m.testResult, nil
 	}
@@ -268,6 +270,40 @@ func TestHandler_TestConnection_OptionalFields(t *testing.T) {
 		assert.Nil(t, resp.Msg.Error)
 		require.NotNil(t, resp.Msg.RttMs)
 		assert.Equal(t, "2.14.2", resp.Msg.GetServerVersion())
+	})
+}
+
+func TestHandler_TestConnection_Checks(t *testing.T) {
+	t.Parallel()
+	checks := []entities.ConnectionCheck{
+		{Step: entities.CheckStepDNS, Status: entities.CheckStatusOK, Detail: "127.0.0.1 is an IP address"},
+		{Step: entities.CheckStepTCP, Status: entities.CheckStatusFailed, Detail: "refused", Hint: "Is the NATS server running?", DurationMs: 3},
+	}
+
+	t.Run("a failed test still explains every step", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockConnService{testResult: &entities.TestConnectionResult{Error: "refused", Checks: checks}}
+		resp, err := New(svc).TestConnection(t.Context(), connect.NewRequest(&connectionspb.TestConnectionRequest{
+			Urls:       []string{"nats://127.0.0.1:1"},
+			Connection: &natspb.ConnectionConfig{JetstreamDomain: ptr.Wrap("hub")},
+		}))
+		require.NoError(t, err)
+		require.Len(t, resp.Msg.GetChecks(), 2)
+		tcp := resp.Msg.GetChecks()[1]
+		assert.Equal(t, connectionspb.ConnectionCheckStep_CONNECTION_CHECK_STEP_TCP, tcp.GetStep())
+		assert.Equal(t, connectionspb.ConnectionCheckStatus_CONNECTION_CHECK_STATUS_FAILED, tcp.GetStatus())
+		assert.Equal(t, "Is the NATS server running?", tcp.GetHint())
+		assert.Equal(t, int64(3), tcp.GetDurationMs())
+		assert.Equal(t, "hub", *svc.testRequest.Connection.JetstreamDomain)
+	})
+
+	t.Run("a successful test carries them too", func(t *testing.T) {
+		t.Parallel()
+		h := New(&mockConnService{testResult: &entities.TestConnectionResult{Success: true, Checks: checks[:1]}})
+		resp, err := h.TestConnection(t.Context(), connect.NewRequest(&connectionspb.TestConnectionRequest{}))
+		require.NoError(t, err)
+		require.Len(t, resp.Msg.GetChecks(), 1)
+		assert.Equal(t, connectionspb.ConnectionCheckStatus_CONNECTION_CHECK_STATUS_OK, resp.Msg.GetChecks()[0].GetStatus())
 	})
 }
 

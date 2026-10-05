@@ -120,10 +120,10 @@ func (h *Handler) TestConnection(
 	if err != nil {
 		return nil, err
 	}
-	if !result.Success {
-		return connect.NewResponse(&connectionspb.TestConnectionResponse{Error: &result.Error}), nil
-	}
 	resp := converter.Convert(result, &connectionspb.TestConnectionResponse{})
+	if !result.Success {
+		return connect.NewResponse(&connectionspb.TestConnectionResponse{Error: &result.Error, Checks: resp.Checks}), nil
+	}
 	resp.Error = nil
 	return connect.NewResponse(resp), nil
 }

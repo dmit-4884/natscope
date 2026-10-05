@@ -207,6 +207,69 @@ message TestConnectionRequest {
   // (version / RTT / JetStream / error) is persisted to that connection's
   // meta after the test, success or fail.
   optional string connection_id = 13 [(buf.validate.field).string.uuid = true];
+
+  // Optional. Connection settings; the JetStream domain or API prefix is used for the JetStream check.
+  optional .natscope.types.nats.ConnectionConfig connection = 14;
+}
+
+// A step of the connection diagnosis.
+enum ConnectionCheckStep {
+  // Unknown step.
+  CONNECTION_CHECK_STEP_UNSPECIFIED = 0;
+
+  // Resolving the server host name.
+  CONNECTION_CHECK_STEP_DNS = 1;
+
+  // Opening a TCP connection to the server port.
+  CONNECTION_CHECK_STEP_TCP = 2;
+
+  // Reading the NATS INFO greeting.
+  CONNECTION_CHECK_STEP_PROTOCOL = 3;
+
+  // The TLS handshake and the server certificate.
+  CONNECTION_CHECK_STEP_TLS = 4;
+
+  // Authentication.
+  CONNECTION_CHECK_STEP_AUTH = 5;
+
+  // The account's JetStream, in the configured domain or API prefix.
+  CONNECTION_CHECK_STEP_JETSTREAM = 6;
+}
+
+// The outcome of a diagnosis step.
+enum ConnectionCheckStatus {
+  // Unknown outcome.
+  CONNECTION_CHECK_STATUS_UNSPECIFIED = 0;
+
+  // The step passed.
+  CONNECTION_CHECK_STATUS_OK = 1;
+
+  // The step passed with something to look at.
+  CONNECTION_CHECK_STATUS_WARNING = 2;
+
+  // The step failed.
+  CONNECTION_CHECK_STATUS_FAILED = 3;
+
+  // The step did not run, because an earlier one failed or it does not apply.
+  CONNECTION_CHECK_STATUS_SKIPPED = 4;
+}
+
+// One step of a connection test.
+message ConnectionCheck {
+  // Required. Step.
+  ConnectionCheckStep step = 1;
+
+  // Required. Outcome.
+  ConnectionCheckStatus status = 2;
+
+  // Required. What happened.
+  string detail = 3;
+
+  // Optional. What to do about it; empty when nothing went wrong.
+  string hint = 4;
+
+  // Required. How long the step took, in milliseconds.
+  int64 duration_ms = 5;
 }
 
 // Defines the response message for testing a NATS connection.
@@ -243,6 +306,9 @@ message TestConnectionResponse {
 
   // Optional. Additional server URLs discovered via cluster INFO.
   repeated string discovered_servers = 11;
+
+  // Required. The diagnosis, step by step.
+  repeated ConnectionCheck checks = 12;
 }
 
 // Defines the request message for duplicating a saved connection.

@@ -377,6 +377,7 @@ type TestConnectionRequest struct {
 	URLs           []string
 	Auth           *AuthConfig
 	TLS            *TlsConfig
+	Connection     *ConnectionConfig
 	ConnectTimeout *time.Duration
 	ConnectionID   string
 }
@@ -394,4 +395,40 @@ type TestConnectionResult struct {
 	JetstreamEnabled  bool
 	ConnectedURL      string
 	DiscoveredServers []string
+	Checks            []ConnectionCheck
+}
+
+// ConnectionCheckStep is a step of the connection diagnosis; values match proto enum
+// natscope.nats.connections.v1.ConnectionCheckStep.
+type ConnectionCheckStep int32
+
+const (
+	CheckStepUnspecified ConnectionCheckStep = 0
+	CheckStepDNS         ConnectionCheckStep = 1
+	CheckStepTCP         ConnectionCheckStep = 2
+	CheckStepProtocol    ConnectionCheckStep = 3
+	CheckStepTLS         ConnectionCheckStep = 4
+	CheckStepAuth        ConnectionCheckStep = 5
+	CheckStepJetStream   ConnectionCheckStep = 6
+)
+
+// ConnectionCheckStatus is the outcome of a diagnosis step; values match proto enum
+// natscope.nats.connections.v1.ConnectionCheckStatus.
+type ConnectionCheckStatus int32
+
+const (
+	CheckStatusUnspecified ConnectionCheckStatus = 0
+	CheckStatusOK          ConnectionCheckStatus = 1
+	CheckStatusWarning     ConnectionCheckStatus = 2
+	CheckStatusFailed      ConnectionCheckStatus = 3
+	CheckStatusSkipped     ConnectionCheckStatus = 4
+)
+
+// ConnectionCheck is one step of a connection test: what happened and, when it went wrong, what to do.
+type ConnectionCheck struct {
+	Step       ConnectionCheckStep
+	Status     ConnectionCheckStatus
+	Detail     string
+	Hint       string
+	DurationMs int64
 }

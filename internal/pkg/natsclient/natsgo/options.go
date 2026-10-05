@@ -62,19 +62,22 @@ func buildOptions(saved *entities.SavedConnection) ([]nats.Option, error) {
 
 // buildTestOptions builds nats.Option from an ad-hoc test request (only
 // Auth/TLS; connect-timeout default always applies).
-func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, error) {
+func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, entities.ConnectionCheckStep, error) {
 	var opts []nats.Option //nolint:prealloc // fan-in from variadic helpers; final size unknown
 
 	authOpts, err := buildAuthOptions(in.Auth)
 	if err != nil {
-		return nil, err
+		return nil, entities.CheckStepAuth, err
 	}
 	opts = append(opts, authOpts...)
 	tlsOpts, err := buildTLSOptions(in.TLS)
 	if err != nil {
-		return nil, err
+		return nil, entities.CheckStepTLS, err
 	}
 	opts = append(opts, tlsOpts...)
+	if in.Connection != nil && in.Connection.InboxPrefix != nil && *in.Connection.InboxPrefix != "" {
+		opts = append(opts, nats.CustomInboxPrefix(*in.Connection.InboxPrefix))
+	}
 
 	timeout := defaultConnectTimeout
 	if in.ConnectTimeout != nil {
@@ -82,7 +85,7 @@ func buildTestOptions(in *entities.TestConnectionRequest) ([]nats.Option, error)
 	}
 	opts = append(opts, nats.Timeout(timeout))
 
-	return opts, nil
+	return opts, entities.CheckStepUnspecified, nil
 }
 
 // buildAuthOptions translates the auth config into nats.Options; an unparsable NKey seed is an error.
@@ -130,19 +133,33 @@ func buildAuthOptions(auth *entities.AuthConfig) ([]nats.Option, error) {
 }
 
 func buildTLSOptions(tlsCfg *entities.TlsConfig) ([]nats.Option, error) {
-	if tlsCfg == nil {
-		return nil, nil
+	tlsConfig, hasTLS, err := buildTLSConfig(tlsCfg)
+	if err != nil {
+		return nil, err
 	}
 
 	var opts []nats.Option
+	if hasTLS {
+		opts = append(opts, nats.Secure(tlsConfig))
+	}
+	if tlsCfg != nil && tlsCfg.TlsFirst {
+		opts = append(opts, nats.TLSHandshakeFirst())
+	}
+	return opts, nil
+}
 
+// buildTLSConfig builds the client TLS config and reports whether the connection sets any TLS material.
+func buildTLSConfig(tlsCfg *entities.TlsConfig) (*tls.Config, bool, error) {
 	tlsConfig := &tls.Config{} //nolint:gosec // user-controlled skip_verify is intentional
+	if tlsCfg == nil {
+		return tlsConfig, false, nil
+	}
 	hasTLS := false
 
 	if tlsCfg.CaCert != nil && *tlsCfg.CaCert != "" {
 		pool := x509.NewCertPool()
 		if !pool.AppendCertsFromPEM([]byte(*tlsCfg.CaCert)) {
-			return nil, errors.New("invalid TLS CA certificate: no PEM certificates found")
+			return nil, false, errors.New("invalid TLS CA certificate: no PEM certificates found")
 		}
 		tlsConfig.RootCAs = pool
 		hasTLS = true
@@ -152,7 +169,7 @@ func buildTLSOptions(tlsCfg *entities.TlsConfig) ([]nats.Option, error) {
 		*tlsCfg.ClientCert != "" && *tlsCfg.ClientKey != "" {
 		cert, err := tlsutils.LoadFromBytes([]byte(*tlsCfg.ClientCert), []byte(*tlsCfg.ClientKey), "")
 		if err != nil {
-			return nil, coreerrs.Wrap(err, "invalid TLS client certificate/key")
+			return nil, false, coreerrs.Wrap(err, "invalid TLS client certificate/key")
 		}
 		tlsConfig.Certificates = []tls.Certificate{*cert}
 		hasTLS = true
@@ -163,15 +180,7 @@ func buildTLSOptions(tlsCfg *entities.TlsConfig) ([]nats.Option, error) {
 		hasTLS = true
 	}
 
-	if hasTLS {
-		opts = append(opts, nats.Secure(tlsConfig))
-	}
-
-	if tlsCfg.TlsFirst {
-		opts = append(opts, nats.TLSHandshakeFirst())
-	}
-
-	return opts, nil
+	return tlsConfig, hasTLS, nil
 }
 
 func buildConnectionOptions(connCfg *entities.ConnectionConfig) []nats.Option {

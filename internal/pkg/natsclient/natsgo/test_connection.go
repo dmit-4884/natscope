@@ -12,6 +12,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 
+	"github.com/altessa-s/go-atlas/core/types/ptr"
+
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
@@ -29,9 +31,12 @@ func (d *Dialer) TestConnection(
 ) (*entities.TestConnectionResult, error) {
 	result := &entities.TestConnectionResult{}
 
-	natsOpts, err := buildTestOptions(in)
+	natsOpts, badStep, err := buildTestOptions(in)
 	if err != nil {
 		result.Error = err.Error()
+		diag := newDiagnosis(defaultConnectTimeout)
+		diag.add(badStep, entities.CheckStatusFailed, err.Error(), "Fix this setting of the connection.", time.Now())
+		result.Checks = diag.result()
 		return result, nil
 	}
 
@@ -46,12 +51,20 @@ func (d *Dialer) TestConnection(
 
 	url := strings.Join(in.URLs, ",")
 
-	conn, err := nats.Connect(url, natsOpts...)
-	if err != nil {
-		result.Error = sanitizeTestError(err)
+	start := time.Now()
+	conn, connErr := nats.Connect(url, natsOpts...)
+	probed := in.URLs[0]
+	if connErr == nil {
+		defer conn.Close()
+		probed = conn.ConnectedUrl()
+	}
+	diag := diagnoseNetwork(ctx, probed, in.TLS, ptr.Unwrap(in.ConnectTimeout, defaultConnectTimeout))
+	authCheck(diag, connErr, in.Auth, start)
+	if connErr != nil {
+		result.Error = sanitizeTestError(connErr)
+		result.Checks = diag.result()
 		return result, nil
 	}
-	defer conn.Close()
 
 	result.Success = true
 	result.ConnectedURL = natsutil.MaskURL(conn.ConnectedUrl())
@@ -62,19 +75,13 @@ func (d *Dialer) TestConnection(
 	result.MaxPayload = conn.MaxPayload()
 	result.DiscoveredServers = conn.DiscoveredServers()
 
-	// Measure RTT
-	start := time.Now()
+	rttStart := time.Now()
 	if flushErr := conn.Flush(); flushErr == nil {
-		result.RTTMs = time.Since(start).Milliseconds()
+		result.RTTMs = time.Since(rttStart).Milliseconds()
 	}
 
-	// Check JetStream availability
-	js, err := conn.JetStream()
-	if err == nil {
-		_, err = js.AccountInfo()
-		result.JetstreamEnabled = err == nil
-	}
-
+	result.JetstreamEnabled = jetStreamCheck(ctx, diag, conn, in.Connection)
+	result.Checks = diag.result()
 	return result, nil
 }
 
