@@ -75,8 +75,15 @@ const DEFAULT_RECONNECT: ReconnectConfig = {
   maxDelay: 30000,
 }
 
-/** Max messages retained in the paused buffer before oldest batches are dropped. */
+/** Max messages, and characters of payload, retained in the paused buffer before oldest batches are dropped. */
 const MAX_PAUSED_MESSAGES = 5000
+const MAX_PAUSED_CHARS = 32 << 20
+
+function batchChars(batch: WSBatchPayload): number {
+  let chars = 0
+  for (const m of batch.messages) chars += m.data_base64.length + (m.decoded !== undefined ? m.data_size : 0)
+  return chars
+}
 
 /**
  * gRPC server-streaming wrapper for live NATS subscriptions.
@@ -327,10 +334,16 @@ export class LiveStreamClient {
    */
   private trimPausedBatches(): void {
     let total = 0
-    for (const b of this.pausedBatches) total += b.count
-    while (total > MAX_PAUSED_MESSAGES && this.pausedBatches.length > 1) {
+    let chars = 0
+    for (const b of this.pausedBatches) {
+      total += b.count
+      chars += batchChars(b)
+    }
+    while ((total > MAX_PAUSED_MESSAGES || chars > MAX_PAUSED_CHARS) && this.pausedBatches.length > 1) {
       const dropped = this.pausedBatches.shift()
-      total -= dropped?.count ?? 0
+      if (!dropped) break
+      total -= dropped.count
+      chars -= batchChars(dropped)
     }
   }
 

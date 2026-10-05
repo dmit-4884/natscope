@@ -93,6 +93,35 @@ describe('LiveStreamClient', () => {
     client.disconnect()
   })
 
+  it('bounds the paused buffer by size as well as by count', async () => {
+    let push: ((value: IteratorResult<unknown>) => void) | undefined
+    subscribeCall.mockImplementation(() => ({
+      [Symbol.asyncIterator]: () => ({
+        next: () => new Promise((resolve) => (push = resolve)),
+      }),
+    }))
+    const client = new LiveStreamClient('conn-1')
+    const buffered = vi.fn()
+    client.onBuffered = buffered
+    client.connect()
+    client.subscribeSubjects(['orders.>'])
+    client.pause()
+
+    const big = 'A'.repeat(1 << 20)
+    for (let i = 0; i < 40; i++) {
+      await vi.waitFor(() => expect(push).toBeDefined())
+      const next = push
+      push = undefined
+      next?.({ value: { event: { case: 'batch', value: { messages: [create(NatsMessageSchema, { subject: 'orders.a', dataBase64: big })] } } }, done: false })
+      await vi.waitFor(() => expect(buffered).toHaveBeenCalledTimes(i + 1))
+    }
+
+    const kept = buffered.mock.lastCall?.[0] as number
+    expect(kept).toBeGreaterThan(0)
+    expect(kept).toBeLessThan(40)
+    client.disconnect()
+  })
+
   it('opens no stream once disconnected', () => {
     const client = new LiveStreamClient('conn-1')
     client.connect()
