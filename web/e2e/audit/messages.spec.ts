@@ -55,8 +55,8 @@ test.describe('messages: filters', () => {
     expect(messages.every((m) => (m.subject ?? '').includes('.even.'))).toBe(true)
   })
 
-  test('CHK contentFilter matches payload substring', async () => {
-    const { messages } = await A.listMessages(cid, N.stream, { contentFilter: 'seed3', limit: '10' })
+  test('CHK a payload search finds the substring across the stream', async () => {
+    const messages = await A.searchMessages(cid, N.stream, { text: 'seed3' })
     expect(messages.length).toBe(1)
     expect(A.msgText(messages[0])).toContain('seed3')
   })

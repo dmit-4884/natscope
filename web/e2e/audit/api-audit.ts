@@ -168,7 +168,6 @@ export interface ListMessagesOpts {
   direction?: 'DIRECTION_FORWARD' | 'DIRECTION_BACKWARD' | 'DIRECTION_UNSPECIFIED'
   startSeq?: string
   limit?: string
-  contentFilter?: string
   maxPayloadBytes?: number
   startTime?: string // RFC3339
 }
@@ -193,6 +192,35 @@ export async function listMessages(connectionId: string, streamName: string, opt
   const r = await call<{ messages?: NatsMessage[]; hasMore?: boolean; nextSeq?: string }>(SVC.messages, 'ListMessages', { connectionId, streamName, ...opts })
   return { messages: r.messages ?? [], hasMore: !!r.hasMore, nextSeq: r.nextSeq ?? '0' }
 }
+const BACKEND = process.env.NATSCOPE_BACKEND_URL ?? 'http://localhost:4280'
+
+/** SearchMessages is server-streaming: Connect JSON frames each message as a flag byte, a length and the JSON. */
+export async function searchMessages(connectionId: string, streamName: string, opts: { text: string; regex?: boolean }): Promise<NatsMessage[]> {
+  const body = Buffer.from(JSON.stringify({ connectionId, streamName, ...opts }))
+  const frame = Buffer.alloc(5 + body.length)
+  frame.writeUInt32BE(body.length, 1)
+  body.copy(frame, 5)
+  const res = await fetch(`${BACKEND}/${SVC.messages}/SearchMessages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/connect+json' },
+    body: frame,
+  })
+  const buf = Buffer.from(await res.arrayBuffer())
+  const found: NatsMessage[] = []
+  for (let at = 0; at + 5 <= buf.length; ) {
+    const flags = buf[at]
+    const len = buf.readUInt32BE(at + 1)
+    const msg = JSON.parse(buf.subarray(at + 5, at + 5 + len).toString('utf8')) as { matches?: { messages?: NatsMessage[] }; error?: { message?: string } }
+    at += 5 + len
+    if (flags & 0x02) {
+      if (msg.error) throw new ConnectError('search', msg.error.message ?? 'search failed')
+      continue
+    }
+    found.push(...(msg.matches?.messages ?? []))
+  }
+  return found
+}
+
 export const getMessage = (connectionId: string, streamName: string, sequence: number) =>
   call<{ message?: NatsMessage }>(SVC.messages, 'GetMessage', { connectionId, streamName, sequence: String(sequence) })
 
