@@ -28,6 +28,7 @@ import {
 import { useMappingItems, useBulkSaveMappings } from '@/contexts/mappings'
 import { useConnectionImportExport } from '@/components/connections/manager/useConnectionImportExport'
 import { ConnectionCard } from '@/components/connections/manager/ConnectionCard'
+import { CliContextImportDialog } from '@/components/connections/manager/CliContextImportDialog'
 import type { ConnectionOutletContext } from '@/components/common/ConnectedLayout'
 import { SettingsPage } from './SettingsPage'
 
@@ -52,6 +53,7 @@ export default function ConnectionsPage() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const pingingAll = progress !== null
   const [pendingDelete, setPendingDelete] = useState<SavedConnection | null>(null)
+  const [cliImportOpen, setCliImportOpen] = useState(false)
 
   const { fileInputRef, triggerImport, handleExport, handleImport } = useConnectionImportExport({
     connections,
@@ -183,6 +185,11 @@ export default function ConnectionsPage() {
               {pingingAll ? `Pinging ${progress?.done}/${progress?.total}…` : 'Ping all'}
             </Button>
           </Tooltip>
+          <Tooltip content="Create connections from the contexts of the nats command-line tool">
+            <Button variant="secondary" onClick={() => setCliImportOpen(true)} icon={<UploadIcon />}>
+              From nats CLI
+            </Button>
+          </Tooltip>
           <Button variant="secondary" onClick={triggerImport} icon={<UploadIcon />}>
             Import
           </Button>
@@ -243,6 +250,7 @@ export default function ConnectionsPage() {
         onCancel={() => setPendingDelete(null)}
         onConfirm={confirmDelete}
       />
+      {cliImportOpen && <CliContextImportDialog isOpen onClose={() => setCliImportOpen(false)} />}
     </SettingsPage>
   )
 }

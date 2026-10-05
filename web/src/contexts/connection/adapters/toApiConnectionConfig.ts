@@ -3,12 +3,20 @@ import { ConnectionConfigSchema, type ConnectionConfig as ProtoConnectionConfig 
 import type { SavedConnection } from '@/api/connections'
 import { millisToDur } from '@/utils/timestamp'
 
+export interface ConnectionConfigEdits {
+  inboxPrefix: string
+  jetstreamDomain: string
+  jetstreamApiPrefix: string
+}
+
 export function toApiConnectionConfig(
   saved: SavedConnection['connection'],
-  inboxPrefix: string,
+  edits: ConnectionConfigEdits,
 ): ProtoConnectionConfig | undefined {
-  const prefix = inboxPrefix.trim()
-  if (!saved && !prefix) return undefined
+  const prefix = edits.inboxPrefix.trim()
+  const domain = edits.jetstreamDomain.trim()
+  const apiPrefix = edits.jetstreamApiPrefix.trim()
+  if (!saved && !prefix && !domain && !apiPrefix) return undefined
   return create(ConnectionConfigSchema, {
     connectTimeout: millisToDur(saved?.connectTimeout),
     connectionName: saved?.connectionName,
@@ -16,7 +24,18 @@ export function toApiConnectionConfig(
     noEcho: saved?.noEcho ?? false,
     noRandomize: saved?.noRandomize ?? false,
     ignoreDiscoveredServers: saved?.ignoreDiscoveredServers ?? false,
+    jetstreamDomain: domain,
+    jetstreamApiPrefix: apiPrefix,
   })
+}
+
+export function jetStreamTargetErrors(domain: string, apiPrefix: string): { domain?: string; prefix?: string } {
+  const d = domain.trim()
+  const p = apiPrefix.trim()
+  if (d && !/^[A-Za-z0-9_-]+$/.test(d)) return { domain: 'A domain is one word: letters, digits, - and _' }
+  if (p && /[\s*>]/.test(p)) return { prefix: 'The API prefix cannot contain spaces or wildcards' }
+  if (d && p) return { prefix: 'Set a JetStream domain or an API prefix, not both' }
+  return {}
 }
 
 export function inboxPrefixError(inboxPrefix: string): string | undefined {

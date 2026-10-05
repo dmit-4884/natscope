@@ -26,6 +26,8 @@ export interface ConnectionFormData {
     tlsFirst: boolean
   }
   inboxPrefix: string
+  jetstreamDomain: string
+  jetstreamApiPrefix: string
   readOnly: boolean
   labelText: string
   labelColor: LabelColor

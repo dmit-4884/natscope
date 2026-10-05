@@ -9,3 +9,4 @@ export {
   type CapabilityKey,
   type UseServerCapabilitiesResult,
 } from './useServerCapabilities'
+export { useCliContexts } from './useCliContexts'

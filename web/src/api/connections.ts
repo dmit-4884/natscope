@@ -98,6 +98,8 @@ export interface SavedConnection {
     noEcho: boolean
     noRandomize: boolean
     ignoreDiscoveredServers: boolean
+    jetstreamDomain?: string
+    jetstreamApiPrefix?: string
   }
   reconnect?: {
     maxReconnects?: number
@@ -199,6 +201,8 @@ function toSavedConnection(proto: ProtoSavedConnection): SavedConnection {
       noEcho: proto.connection.noEcho,
       noRandomize: proto.connection.noRandomize,
       ignoreDiscoveredServers: proto.connection.ignoreDiscoveredServers,
+      jetstreamDomain: proto.connection.jetstreamDomain,
+      jetstreamApiPrefix: proto.connection.jetstreamApiPrefix,
     }
   }
 
@@ -336,4 +340,63 @@ export async function updateSidebarLayout(
 ): Promise<SidebarLayout> {
   const response = await connectionsClient.updateSidebarLayout({ connectionId, ...patch })
   return toSidebarLayout(response.layout)
+}
+
+export interface CliContextFile {
+  name: string
+  content: Uint8Array
+}
+
+export interface CliContextSummary {
+  name: string
+  selected: boolean
+  exists: boolean
+  importable: boolean
+  description?: string
+  urls: string[]
+  authMethod: AuthMethod
+  tls: boolean
+  jetstreamDomain?: string
+  jetstreamApiPrefix?: string
+  inboxPrefix?: string
+  warnings: string[]
+}
+
+export interface CliContexts {
+  directory: string
+  contexts: CliContextSummary[]
+}
+
+export interface CliContextImport {
+  created: SavedConnection[]
+  skipped: { name: string; reason: string }[]
+}
+
+export async function listCliContexts(files: CliContextFile[] = []): Promise<CliContexts> {
+  const response = await connectionsClient.listCliContexts({ files })
+  return {
+    directory: response.directory,
+    contexts: response.contexts.map((c) => ({
+      name: c.name,
+      selected: c.selected,
+      exists: c.exists,
+      importable: c.importable,
+      description: c.description,
+      urls: c.urls,
+      authMethod: PROTO_TO_DOMAIN_AUTH_METHOD[c.authMethod] ?? 'none',
+      tls: c.tls,
+      jetstreamDomain: c.jetstreamDomain,
+      jetstreamApiPrefix: c.jetstreamApiPrefix,
+      inboxPrefix: c.inboxPrefix,
+      warnings: c.warnings,
+    })),
+  }
+}
+
+export async function importCliContexts(names: string[], files: CliContextFile[] = []): Promise<CliContextImport> {
+  const response = await connectionsClient.importCliContexts({ names, files })
+  return {
+    created: response.connections.map(toSavedConnection),
+    skipped: response.skipped.map((s) => ({ name: s.name, reason: s.reason })),
+  }
 }

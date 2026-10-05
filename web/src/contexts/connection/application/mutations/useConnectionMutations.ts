@@ -5,6 +5,8 @@ import {
   deleteConnection,
   testConnection,
   duplicateConnection,
+  importCliContexts,
+  type CliContextFile,
   type CreateConnectionRequest,
   type UpdateConnectionRequest,
   type TestConnectionRequest,
@@ -64,6 +66,17 @@ export function useDuplicateConnection() {
 
   return useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) => duplicateConnection(id, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: connectionKeys.all })
+    },
+  })
+}
+
+export function useImportCliContexts() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ names, files }: { names: string[]; files: CliContextFile[] }) => importCliContexts(names, files),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: connectionKeys.all })
     },

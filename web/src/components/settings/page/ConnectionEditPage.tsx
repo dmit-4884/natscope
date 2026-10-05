@@ -9,6 +9,7 @@ import {
   AuthConfig,
   NatsUrl,
   inboxPrefixError,
+  jetStreamTargetErrors,
   toApiAuthConfig,
   toApiConnectionConfig,
   toApiTlsConfig,
@@ -37,6 +38,8 @@ const blankFormData: ConnectionFormData = {
   credentials: '',
   tls: { ...emptyTls },
   inboxPrefix: '',
+  jetstreamDomain: '',
+  jetstreamApiPrefix: '',
   readOnly: false,
   labelText: '',
   labelColor: 'gray',
@@ -66,6 +69,8 @@ function formFromConnection(c: SavedConnection): ConnectionFormData {
       tlsFirst: c.tls?.tlsFirst ?? false,
     },
     inboxPrefix: c.connection?.inboxPrefix ?? '',
+    jetstreamDomain: c.connection?.jetstreamDomain ?? '',
+    jetstreamApiPrefix: c.connection?.jetstreamApiPrefix ?? '',
     readOnly: c.readOnly,
     labelText: c.label?.text ?? '',
     labelColor: c.label?.color ?? 'gray',
@@ -77,6 +82,10 @@ function formFromConnection(c: SavedConnection): ConnectionFormData {
       clientKey: c.tls?.hasClientKey ?? false,
     },
   }
+}
+
+function connectionConfigChanged(form: ConnectionFormData, snapshot: ConnectionFormData): boolean {
+  return (['inboxPrefix', 'jetstreamDomain', 'jetstreamApiPrefix'] as const).some((k) => form[k].trim() !== snapshot[k].trim())
 }
 
 /** Full-page editor for a saved NATS connection. */
@@ -101,6 +110,7 @@ export default function ConnectionEditPage({ mode }: Props) {
   const [nameError, setNameError] = useState<string | undefined>(undefined)
   const [urlErrors, setUrlErrors] = useState<(string | undefined)[]>([])
   const [inboxError, setInboxError] = useState<string | undefined>(undefined)
+  const [jetStreamErrors, setJetStreamErrors] = useState<{ domain?: string; prefix?: string }>({})
   const [testResult, setTestResult] = useState<{ ok: boolean; data: TestConnectionResponse } | null>(null)
   // Snapshot right after pre-fill (or blank for create) — lets us tell a real
   // edit from an incidental re-render, for the Discard prompt and stale-test flag.
@@ -225,8 +235,10 @@ export default function ConnectionEditPage({ mode }: Props) {
     const urlsOk = validateUrls()
     const nextInboxError = inboxPrefixError(form.inboxPrefix)
     setInboxError(nextInboxError)
+    const nextJetStreamErrors = jetStreamTargetErrors(form.jetstreamDomain, form.jetstreamApiPrefix)
+    setJetStreamErrors(nextJetStreamErrors)
 
-    return !nextNameError && urlsOk && !nextInboxError
+    return !nextNameError && urlsOk && !nextInboxError && !nextJetStreamErrors.domain && !nextJetStreamErrors.prefix
   }
 
   const handleSave = async () => {
@@ -249,8 +261,8 @@ export default function ConnectionEditPage({ mode }: Props) {
             urls,
             auth: toApiAuthConfig(buildAuth({ explicit: true }), { explicit: true }),
             tls: toApiTlsConfig(form.tls, { explicit: true }),
-            connection: form.inboxPrefix.trim() !== snapshot.inboxPrefix.trim()
-              ? toApiConnectionConfig(existing?.connection, form.inboxPrefix)
+            connection: connectionConfigChanged(form, snapshot)
+              ? toApiConnectionConfig(existing?.connection, form)
               : undefined,
             readOnly: form.readOnly,
             label: label ?? null,
@@ -264,7 +276,7 @@ export default function ConnectionEditPage({ mode }: Props) {
           urls,
           auth: toApiAuthConfig(buildAuth({ explicit: false })),
           tls: toApiTlsConfig(form.tls, { explicit: false }),
-          connection: toApiConnectionConfig(undefined, form.inboxPrefix),
+          connection: toApiConnectionConfig(undefined, form),
           readOnly: form.readOnly,
           label,
         })
@@ -350,6 +362,7 @@ export default function ConnectionEditPage({ mode }: Props) {
               nameError={nameError}
               urlErrors={urlErrors}
               inboxPrefixError={inboxError}
+              jetStreamErrors={jetStreamErrors}
             />
           </div>
 

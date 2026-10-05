@@ -32,8 +32,29 @@ Go to **Settings → Connections** (or click **New Connection** on the start scr
 5. Optional: set an **Inbox prefix** when your account may only receive replies on a private inbox,
    such as `_INBOX_alice` (the same as `--inbox-prefix` in the NATS CLI). Request / Reply and Services
    use it for their replies.
-6. Click **Test** to check round-trip time, server version and JetStream availability.
-7. Click **Connect**.
+6. Optional: set a **JetStream domain** to manage JetStream in another domain than the server's own,
+   such as the hub's streams from a leaf node (`--js-domain` in the NATS CLI), or a **JetStream API
+   prefix** when another account exports its JetStream API to yours under a prefix such as
+   `JS.orders.API` (`--js-api-prefix`). Set one or the other, not both.
+7. Click **Test** to check round-trip time, server version and JetStream availability.
+8. Click **Connect**.
+
+## Import from the nats CLI
+
+If you already use the `nats` command-line tool, click **From nats CLI** in **Settings → Connections**.
+Natscope lists the contexts in `~/.config/nats/context` (or `$XDG_CONFIG_HOME/nats/context`) on the
+machine it runs on and marks the one the CLI currently uses. Pick the ones you want and click
+**Import**. Each context becomes a connection with its servers, description, inbox prefix, JetStream
+domain or API prefix, and its credentials: the `.creds` file, NKey seed, token or user and password,
+plus the TLS certificates and keys. They go to the secret vault like any other credential.
+
+Natscope running in Docker or on another host cannot see your contexts. Click **Upload context files**
+and pick the `.json` files from that folder instead. The credential and certificate files they point at
+stay on your machine, so add them to each connection after the import.
+
+Contexts whose name is already taken are skipped, so an import never overwrites a connection. Settings
+Natscope cannot carry over are listed under each context: `nsc` references, SOCKS proxies and the
+Windows certificate store.
 
 ## Manage saved connections
 

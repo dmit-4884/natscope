@@ -2,20 +2,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { create } from '@bufbuild/protobuf'
 import {
   CreateConnectionResponseSchema,
+  ImportCliContextsResponseSchema,
+  ListCliContextsResponseSchema,
   ListConnectionsResponseSchema,
   UpdateConnectionResponseSchema,
 } from '../gen/services/grpc/nats/v1/connections/nats_connections_service_pb'
-import { LabelColor } from '../gen/types/nats/nats_connection_pb'
+import { AuthMethod, LabelColor } from '../gen/types/nats/nats_connection_pb'
 
 const client = vi.hoisted(() => ({
   listConnections: vi.fn(),
   createConnection: vi.fn(),
   updateConnection: vi.fn(),
+  listCliContexts: vi.fn(),
+  importCliContexts: vi.fn(),
 }))
 
 vi.mock('./grpc/clients', () => ({ connectionsClient: client }))
 
-import { createConnection, getConnections, updateConnection } from './connections'
+import { createConnection, getConnections, importCliContexts, listCliContexts, updateConnection } from './connections'
 
 describe('connections api', () => {
   beforeEach(() => {
@@ -55,5 +59,59 @@ describe('connections api', () => {
     expect(client.updateConnection).toHaveBeenCalledWith(
       expect.objectContaining({ readOnly: false, label: { text: '', color: LabelColor.UNSPECIFIED } }),
     )
+  })
+})
+
+describe('nats CLI contexts api', () => {
+  it('lists contexts with their settings and warnings', async () => {
+    client.listCliContexts.mockResolvedValue(
+      create(ListCliContextsResponseSchema, {
+        directory: '/home/me/.config/nats/context',
+        contexts: [
+          {
+            name: 'prod',
+            selected: true,
+            importable: true,
+            urls: ['tls://p:4222'],
+            authMethod: AuthMethod.CREDENTIALS,
+            tls: true,
+            jetstreamDomain: 'hub',
+            warnings: ['SOCKS proxies are not supported'],
+          },
+        ],
+      }),
+    )
+    const upload = { name: 'prod.json', content: new Uint8Array([123, 125]) }
+
+    const found = await listCliContexts([upload])
+
+    expect(client.listCliContexts).toHaveBeenCalledWith({ files: [upload] })
+    expect(found.directory).toBe('/home/me/.config/nats/context')
+    expect(found.contexts[0]).toMatchObject({
+      name: 'prod',
+      selected: true,
+      exists: false,
+      importable: true,
+      urls: ['tls://p:4222'],
+      authMethod: 'credentials',
+      tls: true,
+      jetstreamDomain: 'hub',
+      warnings: ['SOCKS proxies are not supported'],
+    })
+  })
+
+  it('imports the chosen contexts and reports the skipped ones', async () => {
+    client.importCliContexts.mockResolvedValue(
+      create(ImportCliContextsResponseSchema, {
+        connections: [{ id: 'a', name: 'prod' }],
+        skipped: [{ name: 'dev', reason: 'a connection with this name already exists' }],
+      }),
+    )
+
+    const res = await importCliContexts(['prod', 'dev'])
+
+    expect(client.importCliContexts).toHaveBeenCalledWith({ names: ['prod', 'dev'], files: [] })
+    expect(res.created.map((c) => c.name)).toEqual(['prod'])
+    expect(res.skipped).toEqual([{ name: 'dev', reason: 'a connection with this name already exists' }])
   })
 })

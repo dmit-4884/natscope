@@ -20,6 +20,7 @@ interface Props {
   nameError?: string
   urlErrors?: (string | undefined)[]
   inboxPrefixError?: string
+  jetStreamErrors?: { domain?: string; prefix?: string }
 }
 
 const COLOR_NAMES: Record<LabelColor, string> = {
@@ -65,6 +66,7 @@ export function ConnectionForm({
   nameError,
   urlErrors,
   inboxPrefixError,
+  jetStreamErrors,
 }: Props) {
   const [showPassword, setShowPassword] = useState(false)
   const [showToken, setShowToken] = useState(false)
@@ -468,6 +470,45 @@ export function ConnectionForm({
             Request / Reply and Services use it for replies.
           </span>
         </label>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="block">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              JetStream domain <span className="text-content-muted font-normal">(optional)</span>
+            </span>
+            <Input
+              type="text"
+              aria-label="JetStream domain"
+              value={value.jetstreamDomain}
+              onChange={(e) => update({ jetstreamDomain: e.target.value })}
+              placeholder="hub"
+              className="font-mono"
+              error={!!jetStreamErrors?.domain}
+              errorMessage={jetStreamErrors?.domain}
+            />
+            <span className="block mt-1 text-2xs text-content-tertiary">
+              Manage another JetStream domain than the server&apos;s own, such as the hub from a leaf node.
+            </span>
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              JetStream API prefix <span className="text-content-muted font-normal">(optional)</span>
+            </span>
+            <Input
+              type="text"
+              aria-label="JetStream API prefix"
+              value={value.jetstreamApiPrefix}
+              onChange={(e) => update({ jetstreamApiPrefix: e.target.value })}
+              placeholder="JS.orders.API"
+              className="font-mono"
+              error={!!jetStreamErrors?.prefix}
+              errorMessage={jetStreamErrors?.prefix}
+            />
+            <span className="block mt-1 text-2xs text-content-tertiary">
+              For JetStream another account exports to yours under a prefix instead of <code>$JS.API</code>.
+            </span>
+          </label>
+        </div>
 
         <div className="flex gap-2">
           <button

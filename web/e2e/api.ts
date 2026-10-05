@@ -451,3 +451,12 @@ export async function ensureReadOnlyCopy(sourceId: string, name: string): Promis
   await call(service, 'UpdateConnection', { id, readOnly: true, label: { text: 'PROD', color: 'LABEL_COLOR_RED' } })
   return id
 }
+
+/** Delete every saved connection whose name starts with the prefix. */
+export async function deleteConnectionsByPrefix(prefix: string): Promise<void> {
+  const service = 'natscope.nats.connections.v1.ConnectionsService'
+  const res = await call<{ connections?: SavedConnection[] }>(service, 'ListConnections', { pageSize: 500 })
+  for (const c of res.connections ?? []) {
+    if (c.name.startsWith(prefix)) await call(service, 'DeleteConnection', { id: c.id })
+  }
+}

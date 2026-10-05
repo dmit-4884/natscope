@@ -16,6 +16,8 @@ const blank: ConnectionFormData = {
   credentials: '',
   tls: { ...emptyTls },
   inboxPrefix: '',
+  jetstreamDomain: '',
+  jetstreamApiPrefix: '',
   readOnly: false,
   labelText: '',
   labelColor: 'gray',
@@ -50,5 +52,29 @@ describe('ConnectionForm environment', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ labelText: 'PROD', labelColor: 'red', readOnly: true }))
     expect(screen.getByTestId('label-preview')).toHaveTextContent('PROD')
     expect(screen.getByLabelText('Label')).toHaveAttribute('maxLength', '16')
+  })
+})
+
+describe('ConnectionForm JetStream target', () => {
+  it('edits the domain and the API prefix and shows their errors', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<Harness onChange={onChange} />)
+
+    fireEvent.change(screen.getByLabelText('JetStream domain'), { target: { value: 'hub' } })
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ jetstreamDomain: 'hub' }))
+    fireEvent.change(screen.getByLabelText('JetStream API prefix'), { target: { value: 'JS.A.API' } })
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ jetstreamApiPrefix: 'JS.A.API' }))
+
+    rerender(
+      <ConnectionForm
+        value={blank}
+        onChange={vi.fn()}
+        onCancel={vi.fn()}
+        onTest={vi.fn()}
+        isTesting={false}
+        jetStreamErrors={{ prefix: 'Set a JetStream domain or an API prefix, not both' }}
+      />,
+    )
+    expect(screen.getByText('Set a JetStream domain or an API prefix, not both')).toBeInTheDocument()
   })
 })
