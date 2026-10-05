@@ -745,3 +745,19 @@ func TestClient_OwnConsumersAreTrackedByName(t *testing.T) {
 	forget()
 	assert.False(t, c.isOwnConsumer("natscope-live-abc"))
 }
+
+func TestToConsumerInfo_Pause(t *testing.T) {
+	t.Parallel()
+	until := time.Date(2026, 10, 5, 13, 0, 0, 0, time.UTC)
+
+	paused := toConsumerInfo(&jetstream.ConsumerInfo{
+		Name: "audit", Paused: true, Config: jetstream.ConsumerConfig{PauseUntil: &until},
+	}, "ORDERS")
+	assert.True(t, paused.Paused)
+	require.NotNil(t, paused.PauseUntil)
+	assert.Equal(t, until, *paused.PauseUntil)
+
+	running := toConsumerInfo(&jetstream.ConsumerInfo{Name: "billing"}, "ORDERS")
+	assert.False(t, running.Paused)
+	assert.Nil(t, running.PauseUntil)
+}

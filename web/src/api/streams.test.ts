@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { create } from '@bufbuild/protobuf'
 import { DurationSchema, TimestampSchema } from '@bufbuild/protobuf/wkt'
 import { ConsumerInfoSchema, StreamInfoSchema } from '../gen/types/nats/nats_stream_pb'
-import { readConsumerPauseState, toConsumerInfo, toStreamInfo } from './streams'
+import { toConsumerInfo, toStreamInfo } from './streams'
 
 describe('toStreamInfo cluster replicas', () => {
   it('maps whether each replica is offline and how far it lags', () => {
@@ -26,30 +26,22 @@ describe('toStreamInfo cluster replicas', () => {
   })
 })
 
-describe('readConsumerPauseState', () => {
-  it('reports not paused without raw consumer info', () => {
-    expect(readConsumerPauseState(undefined)).toEqual({ paused: false, pauseUntil: undefined })
+describe('toConsumerInfo pause', () => {
+  it('reads the pause and when it lifts from the contract, without the raw JSON', () => {
+    const info = toConsumerInfo(
+      create(ConsumerInfoSchema, { name: 'audit', paused: true, pauseUntil: create(TimestampSchema, { seconds: 1_785_492_000n }) }),
+    )
+
+    expect(info.paused).toBe(true)
+    expect(info.pause_until).toBe('2026-07-31T10:00:00.000Z')
+    expect(info.raw).toBeUndefined()
   })
 
-  it('reads paused plus the pause deadline from the server payload', () => {
-    expect(
-      readConsumerPauseState({
-        paused: true,
-        config: { pause_until: '2026-07-31T10:00:00Z' },
-      }),
-    ).toEqual({ paused: true, pauseUntil: '2026-07-31T10:00:00Z' })
-  })
+  it('reports a running consumer as not paused', () => {
+    const info = toConsumerInfo(create(ConsumerInfoSchema, { name: 'billing' }))
 
-  it('treats a missing or non-boolean paused flag as not paused', () => {
-    expect(readConsumerPauseState({ config: {} }).paused).toBe(false)
-    expect(readConsumerPauseState({ paused: 'yes' }).paused).toBe(false)
-  })
-
-  it('ignores an empty or malformed pause_until', () => {
-    expect(readConsumerPauseState({ paused: true, config: { pause_until: '' } }).pauseUntil)
-      .toBeUndefined()
-    expect(readConsumerPauseState({ paused: true, config: null }).pauseUntil).toBeUndefined()
-    expect(readConsumerPauseState({ paused: true }).pauseUntil).toBeUndefined()
+    expect(info.paused).toBe(false)
+    expect(info.pause_until).toBeUndefined()
   })
 })
 

@@ -43,7 +43,8 @@ func (c *Client) isOwnConsumer(name string) bool {
 }
 
 // GetConsumersOverview lists every stream, then the consumers of each in parallel; a stream whose consumers
-// cannot be listed is reported in UnreadableStreams instead of failing the call.
+// cannot be listed is reported in UnreadableStreams instead of failing the call. Raw JSON is left out to keep
+// a frequent poll small.
 func (c *Client) GetConsumersOverview(ctx context.Context) (*entities.ConsumersOverview, error) {
 	streams, err := c.ListStreams(ctx)
 	if err != nil {
@@ -77,8 +78,12 @@ func (c *Client) GetConsumersOverview(ctx context.Context) (*entities.ConsumersO
 		case listed.err != nil:
 			overview.UnreadableStreams = append(overview.UnreadableStreams, unreadableStream(stream.Config.Name, listed.err))
 		default:
-			overview.Consumers = append(overview.Consumers, listed.consumers...)
+			for _, consumer := range listed.consumers {
+				consumer.Raw = ""
+				overview.Consumers = append(overview.Consumers, consumer)
+			}
 		}
+		stream.Raw = ""
 		overview.Streams = append(overview.Streams, stream)
 	}
 	return overview, nil

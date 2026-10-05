@@ -46,6 +46,12 @@ type ConsumerInfo struct {
 	// PriorityGroups is the live state of each priority group (NATS 2.11+).
 	PriorityGroups []PriorityGroupState
 
+	// Paused reports whether delivery is paused (NATS 2.11+).
+	Paused bool
+
+	// PauseUntil is when a pause lifts; nil when the consumer is not paused.
+	PauseUntil *time.Time
+
 	// TimeStamp is the timestamp when this info was fetched.
 	TimeStamp *time.Time
 

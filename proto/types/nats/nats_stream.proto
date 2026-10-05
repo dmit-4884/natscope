@@ -337,6 +337,12 @@ message ConsumerInfo {
 
   // Optional. Live state of each priority group (NATS 2.11+).
   repeated PriorityGroupState priority_groups = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Whether delivery is paused (NATS 2.11+).
+  bool paused = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. When a pause lifts; unset when the consumer is not paused.
+  google.protobuf.Timestamp pause_until = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the live state of one consumer priority group.

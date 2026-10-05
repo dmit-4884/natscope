@@ -90,6 +90,9 @@ func toConsumerInfo(info *jetstream.ConsumerInfo, streamName string) *entities.C
 	if info.Config.OptStartTime != nil && result.Config != nil {
 		result.Config.OptStartTime = info.Config.OptStartTime.Format(time.RFC3339)
 	}
+	if info.Paused && info.Config.PauseUntil != nil {
+		result.PauseUntil = new(*info.Config.PauseUntil)
+	}
 	return result
 }
 

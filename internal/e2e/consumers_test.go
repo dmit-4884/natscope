@@ -81,6 +81,11 @@ func TestConsumersOverview(t *testing.T) {
 	require.NoError(t, err)
 	_, err = stream.CreateConsumer(ctx, jetstream.ConsumerConfig{Name: "natscope-browse-e2e", AckPolicy: jetstream.AckNonePolicy})
 	require.NoError(t, err)
+	_, err = stream.CreateConsumer(ctx, jetstream.ConsumerConfig{Durable: "sleeper", AckPolicy: jetstream.AckExplicitPolicy})
+	require.NoError(t, err)
+	pauseUntil := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
+	_, err = stream.PauseConsumer(ctx, "sleeper", pauseUntil)
+	require.NoError(t, err)
 	publishAll(t, js, "overview.created", "overview.paid", "overview.created", "overview.created")
 
 	batch, err := billing.Fetch(2, jetstream.FetchMaxWait(2*time.Second))
@@ -95,6 +100,7 @@ func TestConsumersOverview(t *testing.T) {
 	got := consumersOverview(t, env, connID)
 
 	c := findConsumer(t, got.GetConsumers(), "OVERVIEW", "billing")
+	assert.Empty(t, c.GetRaw(), "the overview leaves the raw JSON out")
 	assert.Equal(t, uint64(1), c.GetNumPending())
 	assert.Equal(t, int32(1), c.GetNumAckPending())
 	assert.Equal(t, uint64(3), c.GetDelivered().GetStream())
@@ -102,8 +108,14 @@ func TestConsumersOverview(t *testing.T) {
 	recentTimestamp(t, c.GetDelivered().GetLastActive(), "delivered.last_active")
 	recentTimestamp(t, c.GetAckFloor().GetLastActive(), "ack_floor.last_active")
 	assert.Equal(t, "overview.created", c.GetConfig().GetFilterSubject())
-	assert.Contains(t, c.GetRaw(), `"name":"billing"`)
 	findConsumer(t, got.GetConsumers(), "OVERVIEW", "natscope-browse-e2e")
+	sleeper := findConsumer(t, got.GetConsumers(), "OVERVIEW", "sleeper")
+	assert.True(t, sleeper.GetPaused())
+	assert.Equal(t, pauseUntil, sleeper.GetPauseUntil().AsTime())
+	assert.False(t, c.GetPaused())
+	for _, s := range got.GetStreams() {
+		assert.Empty(t, s.GetRaw(), "the overview leaves the raw JSON out")
+	}
 
 	names := make([]string, 0, len(got.GetStreams()))
 	for _, s := range got.GetStreams() {
