@@ -6,6 +6,7 @@ package natsclient
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -99,5 +100,76 @@ func TestPool_OnDisconnect_UnknownConnectionDoesNotNotify(t *testing.T) {
 
 	if called {
 		t.Fatalf("expected no notification for a connection that was never dialed")
+	}
+}
+
+// blockingDeadClient is a dead client whose first Status call waits, so a caller can be held right before it
+// drops the client.
+type blockingDeadClient struct {
+	fakeClient
+	held    atomic.Bool
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (c *blockingDeadClient) Status() string {
+	if c.held.CompareAndSwap(false, true) {
+		close(c.entered)
+		<-c.release
+	}
+	return "closed"
+}
+
+type countingDialer struct {
+	mu    sync.Mutex
+	dials []*fakeClient
+}
+
+func (d *countingDialer) Dial(context.Context, *entities.SavedConnection) (Client, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	c := &fakeClient{connected: true}
+	d.dials = append(d.dials, c)
+	return c, nil
+}
+
+func (d *countingDialer) TestConnection(context.Context, *entities.TestConnectionRequest) (*entities.TestConnectionResult, error) {
+	return nil, nil //nolint:nilnil // unused by this test
+}
+
+// TestPool_ALateCallerDoesNotDropTheFreshClient checks that a caller who saw the old dead client removes only that one.
+func TestPool_ALateCallerDoesNotDropTheFreshClient(t *testing.T) {
+	dialer := &countingDialer{}
+	pool := NewPool(dialer, func(context.Context, string) (*entities.SavedConnection, error) {
+		return &entities.SavedConnection{}, nil
+	})
+	dead := &blockingDeadClient{entered: make(chan struct{}), release: make(chan struct{})}
+	pool.clients["c1"] = dead
+
+	late := make(chan Client, 1)
+	go func() {
+		c, err := pool.Client(t.Context(), "c1")
+		if err != nil {
+			t.Errorf("late caller: %v", err)
+		}
+		late <- c
+	}()
+	<-dead.entered
+
+	fresh, err := pool.Client(t.Context(), "c1")
+	if err != nil {
+		t.Fatalf("Client() error = %v", err)
+	}
+	close(dead.release)
+	got := <-late
+
+	if got != fresh {
+		t.Errorf("late caller got %p, want the fresh client %p", got, fresh)
+	}
+	if !fresh.IsConnected() {
+		t.Error("the fresh client was closed by a caller that saw the old dead one")
+	}
+	if n := len(dialer.dials); n != 1 {
+		t.Errorf("dials = %d, want 1", n)
 	}
 }

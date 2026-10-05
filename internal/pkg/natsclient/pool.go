@@ -73,7 +73,7 @@ func (p *Pool) Client(ctx context.Context, connectionID string) (Client, error) 
 		p.logger.Warn("NATS connection is dead, reconnecting",
 			slogx.String("connection_id", connectionID),
 			slogx.String("status", c.Status()))
-		p.Disconnect(connectionID)
+		p.drop(connectionID, c)
 	} else {
 		p.mu.RUnlock()
 	}
@@ -154,7 +154,8 @@ func (p *Pool) OnDisconnect(fn func(connectionID string)) {
 	p.mu.Unlock()
 }
 
-// Disconnect closes and removes a live client, then notifies OnDisconnect listeners.
+// Disconnect closes and removes a live client, then notifies OnDisconnect listeners. A dial in flight is discarded
+// too, as it read the configuration this disconnect makes stale.
 func (p *Pool) Disconnect(connectionID string) {
 	p.mu.Lock()
 	p.gens[connectionID]++
@@ -163,7 +164,21 @@ func (p *Pool) Disconnect(connectionID string) {
 		p.mu.Unlock()
 		return
 	}
+	p.removeLocked(connectionID, c)
+}
 
+// drop removes dead, a client found dead, unless another caller already replaced it.
+func (p *Pool) drop(connectionID string, dead Client) {
+	p.mu.Lock()
+	if c, ok := p.clients[connectionID]; !ok || c != dead {
+		p.mu.Unlock()
+		return
+	}
+	p.removeLocked(connectionID, dead)
+}
+
+// removeLocked closes and removes c, unlocks the pool and notifies OnDisconnect listeners.
+func (p *Pool) removeLocked(connectionID string, c Client) {
 	c.Close()
 	delete(p.clients, connectionID)
 	listeners := slices.Clone(p.listeners)
