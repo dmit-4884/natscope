@@ -221,7 +221,7 @@ export function useLiveSubscription({
       const rate = maxDisplayRateRef.current
 
       if (!rate || rate <= 0 || resumingRef.current || subjectMode) {
-        flush(converted)
+        flush(converted.reverse())
         return
       }
 

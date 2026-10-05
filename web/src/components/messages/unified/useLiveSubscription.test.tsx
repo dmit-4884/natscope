@@ -133,15 +133,16 @@ describe('useLiveSubscription display rate', () => {
     expect(sequences(result)).toEqual([3, 2, 1])
 
     act(() => result.current.togglePause())
-    expect(sequences(result)).toEqual([4, 5, 3, 2, 1])
+    expect(sequences(result)).toEqual([5, 4, 3, 2, 1])
   })
 
-  it('flushes every batch without a display rate', () => {
+  it('flushes every batch without a display rate, newest first', () => {
     const { result } = render(0)
 
     deliver(1, 2, 3)
+    deliver(4, 5)
 
-    expect(sequences(result)).toEqual([1, 2, 3])
+    expect(sequences(result)).toEqual([5, 4, 3, 2, 1])
   })
 })
 
