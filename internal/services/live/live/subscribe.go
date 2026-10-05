@@ -37,6 +37,9 @@ func (s *Service) Subscribe(
 	if in.MaxPayloadBytes != nil && *in.MaxPayloadBytes > 0 {
 		payloadCap = *in.MaxPayloadBytes
 	}
+	if in.MaxDisplayRate != nil {
+		maxDisplayRate = *in.MaxDisplayRate
+	}
 
 	msgChan := make(chan *entities.NatsMessage, messageBufferSize)
 

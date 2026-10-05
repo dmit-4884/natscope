@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+
+	"golang.org/x/mod/semver"
 )
 
 type instanceKey struct{ name, id string }
@@ -20,6 +22,10 @@ func groupServices(infos, stats []entities.MicroReport) []entities.MicroService 
 	statsByInstance := make(map[instanceKey]entities.MicroReport, len(stats))
 	for _, r := range stats {
 		statsByInstance[instanceKey{r.Name, r.ID}] = r
+	}
+	infoByInstance := make(map[instanceKey]entities.MicroReport, len(infos))
+	for _, r := range infos {
+		infoByInstance[instanceKey{r.Name, r.ID}] = r
 	}
 
 	seen := make(map[instanceKey]struct{}, len(infos))
@@ -41,8 +47,11 @@ func groupServices(infos, stats []entities.MicroReport) []entities.MicroService 
 		svc := entities.MicroService{Name: name}
 		versions := make(map[string]struct{})
 		for _, r := range reports {
-			st, hasStats := statsByInstance[instanceKey{r.Name, r.ID}]
+			k := instanceKey{r.Name, r.ID}
+			st, hasStats := statsByInstance[k]
 			instance := buildInstance(r, st, hasStats)
+			instance.RTT = cmp.Or(infoByInstance[k].RTT, st.RTT)
+			instance.InfoJSON = infoByInstance[k].Raw
 			svc.Instances = append(svc.Instances, instance)
 			if svc.Description == "" {
 				svc.Description = r.Description
@@ -51,7 +60,7 @@ func groupServices(infos, stats []entities.MicroReport) []entities.MicroService 
 				versions[instance.Version] = struct{}{}
 			}
 		}
-		svc.Versions = slices.Sorted(maps.Keys(versions))
+		svc.Versions = slices.SortedFunc(maps.Keys(versions), compareVersions)
 		svc.Endpoints = mergeEndpoints(svc.Instances)
 		services = append(services, svc)
 	}
@@ -74,6 +83,7 @@ func buildInstance(info, stats entities.MicroReport, hasStats bool) entities.Mic
 
 	started := stats.Started
 	instance.Started = &started
+	instance.StatsJSON = stats.Raw
 	statsByEndpoint := make(map[endpointKey]*entities.MicroEndpointStats, len(stats.Endpoints))
 	for _, e := range stats.Endpoints {
 		statsByEndpoint[endpointKey{e.Name, e.Subject}] = e.Stats
@@ -124,4 +134,19 @@ func addStats(acc, s *entities.MicroEndpointStats) *entities.MicroEndpointStats 
 	acc.ProcessingTime += s.ProcessingTime
 	acc.LastError = cmp.Or(acc.LastError, s.LastError)
 	return acc
+}
+
+func compareVersions(a, b string) int {
+	va, vb := "v"+a, "v"+b
+	switch validA, validB := semver.IsValid(va), semver.IsValid(vb); {
+	case validA && validB:
+		return cmp.Or(semver.Compare(va, vb), cmp.Compare(a, b))
+	case validA != validB:
+		if validA {
+			return -1
+		}
+		return 1
+	default:
+		return cmp.Compare(a, b)
+	}
 }

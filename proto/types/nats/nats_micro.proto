@@ -40,6 +40,15 @@ message MicroInstance {
 
   // Required. Endpoints of this instance.
   repeated MicroEndpoint endpoints = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Time the instance took to answer $SRV.INFO.
+  google.protobuf.Duration rtt = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. The instance's raw $SRV.INFO reply.
+  string info_json = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. The instance's raw $SRV.STATS reply, including custom endpoint data; empty when stats are unavailable.
+  string stats_json = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines an endpoint of a NATS Micro service.

@@ -81,7 +81,12 @@ func TestDiscovery(t *testing.T) {
 		assert.Equal(t, "orders", svc.GetName())
 		assert.Equal(t, "Order API", svc.GetDescription())
 		assert.Equal(t, []string{"1.0.0", "1.1.0"}, svc.GetVersions())
-		assert.Len(t, svc.GetInstances(), 2)
+		require.Len(t, svc.GetInstances(), 2)
+		for _, instance := range svc.GetInstances() {
+			assert.Positive(t, instance.GetRtt().AsDuration(), "each instance reports how long it took to answer")
+			assert.Contains(t, instance.GetInfoJson(), `"type":"io.nats.micro.v1.info_response"`)
+			assert.Contains(t, instance.GetStatsJson(), `"type":"io.nats.micro.v1.stats_response"`)
+		}
 		require.Len(t, svc.GetEndpoints(), 1)
 		ep := svc.GetEndpoints()[0]
 		assert.Equal(t, "orders.create", ep.GetSubject())

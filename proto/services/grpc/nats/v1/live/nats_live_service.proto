@@ -31,6 +31,10 @@ message SubscribeRequest {
   // the full payload on demand. Zero or omitted falls back to user settings
   // (Messages.maxPayloadBytesInList). Negative values are rejected.
   optional int32 max_payload_bytes = 3 [(buf.validate.field).int32.gte = 0];
+
+  // Optional. Messages delivered per second; the rest are skipped and counted as dropped.
+  // Zero means no limit; omitted falls back to user settings (Live.maxDisplayRate).
+  optional int32 max_display_rate = 4 [(buf.validate.field).int32 = {gte: 0, lte: 10000}];
 }
 
 // Defines a single subscription target for live message delivery.

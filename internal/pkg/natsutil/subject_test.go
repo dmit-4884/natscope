@@ -20,8 +20,10 @@ func TestIsInternalSubject(t *testing.T) {
 		{name: "EmptyString", subject: "", want: true},
 		{name: "DollarPrefix", subject: "$SYS.monitor", want: true},
 		{name: "DollarOnly", subject: "$", want: true},
-		{name: "UnderscorePrefix", subject: "_INBOX.abc.def", want: true},
-		{name: "UnderscoreOnly", subject: "_", want: true},
+		{name: "InboxPrefix", subject: "_INBOX.abc.def", want: true},
+		{name: "InboxOnly", subject: "_INBOX", want: true},
+		{name: "UnderscoreApplicationSubject", subject: "_audit.login", want: false},
+		{name: "InboxLookalike", subject: "_INBOXES.x", want: false},
 		// "handler." is an application prefix, not a NATS namespace: it must be
 		// delivered like any other user subject.
 		{name: "HandlerDotPrefix", subject: "handler.something", want: false},

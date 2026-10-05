@@ -10,6 +10,7 @@ type LiveSubscribeRequest struct {
 	// MaxPayloadBytes caps each emitted payload; nil → user-settings default
 	// (Messages.MaxPayloadBytesInList), 0 → unlimited.
 	MaxPayloadBytes *int32
+	MaxDisplayRate  *int32
 }
 
 // LiveSubscriptionTarget is one subject (with optional stream binding) to

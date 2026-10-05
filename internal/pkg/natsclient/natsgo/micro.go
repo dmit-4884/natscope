@@ -35,6 +35,11 @@ func (c *Client) MicroStats(ctx context.Context) ([]entities.MicroReport, error)
 	return c.gatherMicro(ctx, micro.StatsVerb, parseMicroStats)
 }
 
+type microReply struct {
+	data []byte
+	rtt  time.Duration
+}
+
 func (c *Client) gatherMicro(
 	ctx context.Context,
 	verb micro.Verb,
@@ -49,19 +54,20 @@ func (c *Client) gatherMicro(
 		return nil, widenInboxDenial(wrapErr(err), c.inboxPrefix())
 	}
 	reports := make([]entities.MicroReport, 0, len(replies))
-	for _, data := range replies {
-		if report, ok := parse(data); ok {
+	for _, reply := range replies {
+		if report, ok := parse(reply.data); ok {
+			report.RTT = reply.rtt
 			reports = append(reports, report)
 		}
 	}
 	return reports, nil
 }
 
-func (c *Client) gather(ctx context.Context, subject string) ([][]byte, error) {
+func (c *Client) gather(ctx context.Context, subject string) ([]microReply, error) {
 	ctx, cancel := context.WithTimeout(ctx, microDiscoveryTimeout)
 	defer cancel()
 
-	var replies [][]byte
+	var replies []microReply
 	err := c.permWatch.Watch(ctx, []string{subject, c.inboxPrefix()}, func(ctx context.Context) error {
 		inbox := c.conn.NewRespInbox()
 		sub, err := c.conn.SubscribeSync(inbox)
@@ -70,6 +76,7 @@ func (c *Client) gather(ctx context.Context, subject string) ([][]byte, error) {
 		}
 		defer sub.Unsubscribe() //nolint:errcheck // one-shot inbox
 
+		sent := time.Now()
 		if err := c.conn.PublishRequest(subject, inbox, nil); err != nil {
 			return err
 		}
@@ -89,7 +96,7 @@ func (c *Client) gather(ctx context.Context, subject string) ([][]byte, error) {
 			if msg.Header.Get(statusHeader) == noRespondersStatus {
 				return nil
 			}
-			replies = append(replies, msg.Data)
+			replies = append(replies, microReply{data: msg.Data, rtt: time.Since(sent)})
 		}
 	})
 	if err != nil {
@@ -100,7 +107,7 @@ func (c *Client) gather(ctx context.Context, subject string) ([][]byte, error) {
 
 func parseMicroInfo(data []byte) (entities.MicroReport, bool) {
 	var info micro.Info
-	if err := json.Unmarshal(data, &info); err != nil || info.Name == "" {
+	if err := json.Unmarshal(data, &info); err != nil || info.Name == "" || info.Type != micro.InfoResponseType {
 		return entities.MicroReport{}, false
 	}
 	report := *converter.Convert(info.ServiceIdentity, &entities.MicroReport{})
@@ -108,16 +115,48 @@ func parseMicroInfo(data []byte) (entities.MicroReport, bool) {
 	report.Endpoints = slices.To(info.Endpoints, func(e micro.EndpointInfo) entities.MicroEndpoint {
 		return *converter.Convert(e, &entities.MicroEndpoint{})
 	})
+	report.Raw = string(data)
 	return report, true
 }
 
+type statsReply struct {
+	micro.ServiceIdentity
+	Type      string                `json:"type"`
+	Started   string                `json:"started"`
+	Endpoints []*endpointStatsReply `json:"endpoints"`
+}
+
+type endpointStatsReply struct {
+	Name                  string  `json:"name"`
+	Subject               string  `json:"subject"`
+	QueueGroup            string  `json:"queue_group"`
+	NumRequests           flexInt `json:"num_requests"`
+	NumErrors             flexInt `json:"num_errors"`
+	LastError             string  `json:"last_error"`
+	ProcessingTime        flexInt `json:"processing_time"`
+	AverageProcessingTime flexInt `json:"average_processing_time"`
+}
+
+type flexInt int64
+
+func (n *flexInt) UnmarshalJSON(data []byte) error {
+	var f float64
+	if err := json.Unmarshal(data, &f); err != nil {
+		return err
+	}
+	*n = flexInt(f)
+	return nil
+}
+
 func parseMicroStats(data []byte) (entities.MicroReport, bool) {
-	var stats micro.Stats
-	if err := json.Unmarshal(data, &stats); err != nil || stats.Name == "" {
+	var stats statsReply
+	if err := json.Unmarshal(data, &stats); err != nil || stats.Name == "" || stats.Type != micro.StatsResponseType {
 		return entities.MicroReport{}, false
 	}
 	report := *converter.Convert(stats.ServiceIdentity, &entities.MicroReport{})
-	report.Started = stats.Started
+	if started, err := time.Parse(time.RFC3339Nano, stats.Started); err == nil {
+		report.Started = started
+	}
 	for _, e := range stats.Endpoints {
 		if e == nil {
 			continue
@@ -126,5 +165,6 @@ func parseMicroStats(data []byte) (entities.MicroReport, bool) {
 		endpoint.Stats = converter.Convert(e, &entities.MicroEndpointStats{})
 		report.Endpoints = append(report.Endpoints, *endpoint)
 	}
+	report.Raw = string(data)
 	return report, true
 }

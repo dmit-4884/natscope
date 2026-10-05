@@ -14,6 +14,8 @@ type MicroReport struct {
 	Metadata    map[string]string
 	Started     time.Time
 	Endpoints   []MicroEndpoint
+	RTT         time.Duration
+	Raw         string
 }
 
 // MicroDiscovery is the discovered services with the user's access to their info and stats.
@@ -39,6 +41,9 @@ type MicroInstance struct {
 	Metadata  map[string]string
 	Started   *time.Time
 	Endpoints []MicroEndpoint
+	RTT       time.Duration
+	InfoJSON  string
+	StatsJSON string
 }
 
 // MicroEndpoint is an endpoint of a NATS Micro service.

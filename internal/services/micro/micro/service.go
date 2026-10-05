@@ -58,7 +58,8 @@ func (s *Service) ListServices(ctx context.Context, connectionID string, skipSta
 		stats, err = s.nats.MicroStats(ctx, connectionID)
 		statsAccess, accessErr := accessOf(statsSubject, err)
 		if accessErr != nil {
-			return nil, coreerrs.WrapOperation(accessErr, "read service statistics")
+			s.logger.Warn("failed to read service statistics", slog.String("error", accessErr.Error()))
+			statsAccess = entities.AccessCheck{Status: entities.AccessUnspecified, Operation: errs.PermissionOperationPublish, Subject: statsSubject}
 		}
 		result.StatsAccess = &statsAccess
 	}

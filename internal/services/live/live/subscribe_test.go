@@ -232,32 +232,69 @@ func TestSubscribe_TheNextSubjectDeliversWhenAnOverlappingOneIsDenied(t *testing
 	assert.Equal(t, map[string]int{"end": 1}, collectPayloads(t, events, "end"))
 }
 
+func TestSubscribe_ARequestedDisplayRateOverridesTheSetting(t *testing.T) {
+	t.Parallel()
+
+	rate := int32(1)
+	sub, events, stop := startFakeSessionWith(t, &entities.LiveSubscribeRequest{
+		ConnectionId:   "conn",
+		Subscriptions:  []*entities.LiveSubscriptionTarget{{Subject: "orders.>"}},
+		MaxDisplayRate: &rate,
+	})
+	defer stop()
+
+	for range 3 {
+		sub.deliver(t, "orders.>", &entities.NatsMessage{Subject: "orders.created", Data: []byte("burst")})
+	}
+	sub.deliver(t, "orders.>", &entities.NatsMessage{Subject: "orders.created", Data: []byte("end")})
+
+	seen := map[string]int{}
+	deadline := time.After(700 * time.Millisecond)
+	for collecting := true; collecting; {
+		select {
+		case ev := <-events:
+			if ev.Batch == nil {
+				continue
+			}
+			for _, m := range ev.Batch.Messages {
+				seen[string(m.NatsMessage.Data)]++
+			}
+		case <-deadline:
+			collecting = false
+		}
+	}
+	assert.Equal(t, map[string]int{"burst": 1}, seen, "a rate of 1 msg/s shows the first message of a burst and skips the rest")
+}
+
 func startFakeSession(t *testing.T, subjects ...string) (*fakeSubscriber, <-chan *entities.LiveEvent, func()) {
+	t.Helper()
+	targets := make([]*entities.LiveSubscriptionTarget, 0, len(subjects))
+	for _, subject := range subjects {
+		targets = append(targets, &entities.LiveSubscriptionTarget{Subject: subject})
+	}
+	return startFakeSessionWith(t, &entities.LiveSubscribeRequest{ConnectionId: "conn", Subscriptions: targets})
+}
+
+func startFakeSessionWith(t *testing.T, req *entities.LiveSubscribeRequest) (*fakeSubscriber, <-chan *entities.LiveEvent, func()) {
 	t.Helper()
 
 	sub := &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}
 	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
 	ctx, cancel := context.WithCancel(t.Context())
 
-	targets := make([]*entities.LiveSubscriptionTarget, 0, len(subjects))
-	for _, subject := range subjects {
-		targets = append(targets, &entities.LiveSubscriptionTarget{Subject: subject})
-	}
-
 	events := make(chan *entities.LiveEvent, 64)
 	done := make(chan error, 1)
 	go func() {
-		done <- svc.Subscribe(ctx, &entities.LiveSubscribeRequest{ConnectionId: "conn", Subscriptions: targets},
-			func(ev *entities.LiveEvent) error {
-				events <- ev
-				return nil
-			})
+		done <- svc.Subscribe(ctx, req, func(ev *entities.LiveEvent) error {
+			events <- ev
+			return nil
+		})
 	}()
 
 	require.Eventually(t, func() bool {
 		sub.mu.Lock()
 		defer sub.mu.Unlock()
-		return len(sub.handlers) == len(subjects)
+		return len(sub.handlers) == len(req.Subscriptions)
 	}, 5*time.Second, 10*time.Millisecond)
 
 	return sub, events, func() {

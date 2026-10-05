@@ -170,9 +170,51 @@ func TestListServices_OtherFailuresAreErrors(t *testing.T) {
 	_, err := New(&fakeDiscoverer{infoErr: errs.ErrNATSConnectionClosed}, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
 	require.ErrorIs(t, err, errs.ErrNATSConnectionClosed)
 
+}
+
+func TestListServices_UnreadableStatsKeepTheServices(t *testing.T) {
+	t.Parallel()
+
 	nats := &fakeDiscoverer{infos: []entities.MicroReport{{Name: "orders", ID: "a"}}, statsErr: errors.New("boom")}
-	_, err = New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
-	require.Error(t, err)
+	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
+	require.NoError(t, err)
+
+	require.NotNil(t, got.StatsAccess)
+	assert.Equal(t, entities.AccessUnspecified, got.StatsAccess.Status)
+	assert.Equal(t, "$SRV.STATS", got.StatsAccess.Subject)
+	require.Len(t, got.Services, 1)
+}
+
+func TestListServices_SortsVersionsBySemver(t *testing.T) {
+	t.Parallel()
+
+	nats := &fakeDiscoverer{infos: []entities.MicroReport{
+		{Name: "orders", ID: "a", Version: "1.10.0"},
+		{Name: "orders", ID: "b", Version: "dev"},
+		{Name: "orders", ID: "c", Version: "1.9.0"},
+		{Name: "orders", ID: "d", Version: "1.2.0"},
+	}}
+	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", true)
+	require.NoError(t, err)
+
+	require.Len(t, got.Services, 1)
+	assert.Equal(t, []string{"1.2.0", "1.9.0", "1.10.0", "dev"}, got.Services[0].Versions)
+}
+
+func TestListServices_InstancesCarryRoundTripAndRawReplies(t *testing.T) {
+	t.Parallel()
+
+	nats := &fakeDiscoverer{
+		infos: []entities.MicroReport{{Name: "orders", ID: "a", RTT: 3 * time.Millisecond, Raw: `{"info":1}`}},
+		stats: []entities.MicroReport{{Name: "orders", ID: "a", Started: started, Raw: `{"stats":1}`}},
+	}
+	got, err := New(nats, &fakeRegistry{}).ListServices(t.Context(), "conn", false)
+	require.NoError(t, err)
+
+	instance := got.Services[0].Instances[0]
+	assert.Equal(t, 3*time.Millisecond, instance.RTT)
+	assert.JSONEq(t, `{"info":1}`, instance.InfoJSON)
+	assert.JSONEq(t, `{"stats":1}`, instance.StatsJSON)
 }
 
 func TestListServices_MatchesEndpointsToProtoMethods(t *testing.T) {

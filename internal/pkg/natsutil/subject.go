@@ -11,14 +11,16 @@ import (
 )
 
 // IsInternalSubject reports whether a subject belongs to NATS itself: the "$"
-// system namespaces ($JS, $SYS) and the "_" inbox namespace. Application
-// subjects are never filtered here.
+// system namespaces ($JS, $SYS, $KV, $SRV, ...) and the "_INBOX" reply namespace.
+// Application subjects are never filtered here.
 func IsInternalSubject(subject string) bool {
 	if len(subject) == 0 {
 		return true
 	}
-	return subject[0] == '$' || subject[0] == '_'
+	return subject[0] == '$' || subject == inboxNamespace || strings.HasPrefix(subject, inboxNamespace+".")
 }
+
+const inboxNamespace = "_INBOX"
 
 // ValidateSubjectPattern validates a subscription or mapping pattern: non-empty tokens, whole-token
 // wildcards, ">" only as the last token, and no whitespace or control characters.
