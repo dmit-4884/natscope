@@ -173,8 +173,7 @@ func (c *Client) UpdateConsumer(
 		return nil, wrapErr(err)
 	}
 
-	subject := fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", streamName, consumerName)
-	msg, err := c.request(ctx, subject, nil)
+	msg, err := c.request(ctx, c.apiSubject("CONSUMER.INFO."+streamName+"."+consumerName), nil)
 	if err != nil {
 		return nil, wrapErr(coreerrs.WrapOperation(err, "get consumer info"))
 	}

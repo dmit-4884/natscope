@@ -60,6 +60,8 @@ type connectionConfigDoc struct {
 	NoEcho                  bool           `json:"noEcho,omitempty"`
 	NoRandomize             bool           `json:"noRandomize,omitempty"`
 	IgnoreDiscoveredServers bool           `json:"ignoreDiscoveredServers,omitempty"`
+	JetstreamDomain         *string        `json:"jetstreamDomain,omitempty"`
+	JetstreamAPIPrefix      *string        `json:"jetstreamApiPrefix,omitempty"`
 }
 
 type reconnectConfigDoc struct {

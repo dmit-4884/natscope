@@ -33,6 +33,12 @@ service ConnectionsService {
 
   // Replaces the arrangement of the sidebar sections that are set; the others are kept.
   rpc UpdateSidebarLayout(UpdateSidebarLayoutRequest) returns (UpdateSidebarLayoutResponse) {}
+
+  // Lists the nats CLI contexts on the host running Natscope, or in uploaded context files, without their secrets.
+  rpc ListCliContexts(ListCliContextsRequest) returns (ListCliContextsResponse) {}
+
+  // Creates saved connections from nats CLI contexts; their secrets go to the vault.
+  rpc ImportCliContexts(ImportCliContextsRequest) returns (ImportCliContextsResponse) {}
 }
 
 // Defines the request message for creating a new saved connection.
@@ -311,4 +317,100 @@ message UpdateSidebarLayoutRequest {
 message UpdateSidebarLayoutResponse {
   // Required. The layout after the update.
   SidebarLayout layout = 1;
+}
+
+// An uploaded nats CLI context file.
+message CliContextFile {
+  // Required. File name, e.g. "prod.json"; the context is named after it.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string = {min_len: 1, max_len: 256, pattern: "^[^/\\\\\\p{Cc}]+$"}
+  ];
+
+  // Required. File content.
+  bytes content = 2 [(buf.validate.field).bytes.max_len = 65536];
+}
+
+// Defines the request message for listing nats CLI contexts.
+message ListCliContextsRequest {
+  // Optional. Uploaded context files; when empty, the contexts on the host running Natscope are read.
+  repeated CliContextFile files = 1 [(buf.validate.field).repeated.max_items = 200];
+}
+
+// A nats CLI context as it would be imported, without its secrets.
+message CliContext {
+  // Required. Context name.
+  string name = 1;
+
+  // Required. Whether the nats CLI currently uses this context.
+  bool selected = 2;
+
+  // Required. Whether a saved connection already has this name.
+  bool exists = 3;
+
+  // Required. Whether the context can become a connection.
+  bool importable = 4;
+
+  // Optional. Context description.
+  optional string description = 5;
+
+  // Optional. Server URLs.
+  repeated string urls = 6;
+
+  // Required. Authentication method the connection gets.
+  .natscope.types.nats.AuthMethod auth_method = 7;
+
+  // Required. Whether the connection gets TLS material or TLS-first.
+  bool tls = 8;
+
+  // Optional. JetStream domain.
+  optional string jetstream_domain = 9;
+
+  // Optional. JetStream API prefix.
+  optional string jetstream_api_prefix = 10;
+
+  // Optional. Inbox prefix.
+  optional string inbox_prefix = 11;
+
+  // Optional. Settings that cannot be carried over.
+  repeated string warnings = 12;
+}
+
+// Defines the response message for listing nats CLI contexts.
+message ListCliContextsResponse {
+  // Optional. Directory the contexts were read from; empty for uploads.
+  string directory = 1;
+
+  // Required. Contexts, by name.
+  repeated CliContext contexts = 2;
+}
+
+// Defines the request message for importing nats CLI contexts.
+message ImportCliContextsRequest {
+  // Required. Names of the contexts to import.
+  repeated string names = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated = {min_items: 1, max_items: 200, items: {string: {min_len: 1, max_len: 256}}}
+  ];
+
+  // Optional. Uploaded context files; when empty, the contexts on the host running Natscope are read.
+  repeated CliContextFile files = 2 [(buf.validate.field).repeated.max_items = 200];
+}
+
+// A context that was not imported.
+message SkippedCliContext {
+  // Required. Context name.
+  string name = 1;
+
+  // Required. Why it was skipped.
+  string reason = 2;
+}
+
+// Defines the response message for importing nats CLI contexts.
+message ImportCliContextsResponse {
+  // Required. Connections created, in the order of the requested names.
+  repeated .natscope.types.nats.SavedConnection connections = 1;
+
+  // Optional. Contexts that were not imported.
+  repeated SkippedCliContext skipped = 2;
 }

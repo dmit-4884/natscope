@@ -72,6 +72,7 @@ func TestConnections_AllGroupsRoundTrip(t *testing.T) {
 		c.Connection = &entities.ConnectionConfig{
 			ConnectTimeout: &ct, ConnectionName: ptr.Wrap("cn"), InboxPrefix: ptr.Wrap("_INBOX"),
 			NoEcho: true, NoRandomize: true, IgnoreDiscoveredServers: true,
+			JetstreamDomain: ptr.Wrap("hub"), JetstreamAPIPrefix: ptr.Wrap("JS.acc.API"),
 		}
 		rw := 3 * time.Second
 		c.Reconnect = &entities.ReconnectConfig{
@@ -111,7 +112,8 @@ func TestConnections_AllGroupsRoundTrip(t *testing.T) {
 	}
 	if *got.Connection.ConnectTimeout != 7*time.Second || *got.Connection.ConnectionName != "cn" ||
 		*got.Connection.InboxPrefix != "_INBOX" || !got.Connection.NoEcho || !got.Connection.NoRandomize ||
-		!got.Connection.IgnoreDiscoveredServers {
+		!got.Connection.IgnoreDiscoveredServers || *got.Connection.JetstreamDomain != "hub" ||
+		*got.Connection.JetstreamAPIPrefix != "JS.acc.API" {
 		t.Fatalf("connection mismatch: %+v", got.Connection)
 	}
 	if *got.Reconnect.MaxReconnects != 10 || *got.Reconnect.ReconnectWait != 3*time.Second ||

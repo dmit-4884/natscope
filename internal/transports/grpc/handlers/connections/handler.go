@@ -203,3 +203,68 @@ func redactSecrets(pb *natspb.SavedConnection) {
 		t.ClientKey = nil
 	}
 }
+
+// ListCliContexts lists nats CLI contexts on this host or in uploaded files, without their secrets.
+func (h *Handler) ListCliContexts(
+	ctx context.Context,
+	req *connect.Request[connectionspb.ListCliContextsRequest],
+) (*connect.Response[connectionspb.ListCliContextsResponse], error) {
+	found, err := h.connService.ListCliContexts(ctx, toCliContextFiles(req.Msg.GetFiles()))
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&connectionspb.ListCliContextsResponse{
+		Directory: found.Dir,
+		Contexts:  slices.To(found.Contexts, toProtoCliContext),
+	}), nil
+}
+
+// ImportCliContexts creates connections from nats CLI contexts.
+func (h *Handler) ImportCliContexts(
+	ctx context.Context,
+	req *connect.Request[connectionspb.ImportCliContextsRequest],
+) (*connect.Response[connectionspb.ImportCliContextsResponse], error) {
+	res, err := h.connService.ImportCliContexts(ctx, req.Msg.GetNames(), toCliContextFiles(req.Msg.GetFiles()))
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&connectionspb.ImportCliContextsResponse{
+		Connections: slices.To(res.Created, toProtoConnection),
+		Skipped: slices.To(res.Skipped, func(s entities.CliContextSkip) *connectionspb.SkippedCliContext {
+			return &connectionspb.SkippedCliContext{Name: s.Name, Reason: s.Reason}
+		}),
+	}), nil
+}
+
+func toCliContextFiles(files []*connectionspb.CliContextFile) []entities.CliContextFile {
+	return slices.To(files, func(f *connectionspb.CliContextFile) entities.CliContextFile {
+		return entities.CliContextFile{Name: f.GetName(), Content: f.GetContent()}
+	})
+}
+
+// toProtoCliContext describes the connection a context becomes; its secrets stay on the server.
+func toProtoCliContext(c entities.CliContext) *connectionspb.CliContext {
+	pb := &connectionspb.CliContext{
+		Name:       c.Name,
+		Selected:   c.Selected,
+		Exists:     c.Exists,
+		Importable: c.Connection != nil,
+		Warnings:   c.Warnings,
+	}
+	conn := c.Connection
+	if conn == nil {
+		return pb
+	}
+	pb.Description = conn.Description
+	pb.Urls = conn.URLs
+	if conn.Auth != nil {
+		pb.AuthMethod = natspb.AuthMethod(conn.Auth.Method)
+	}
+	pb.Tls = !conn.TLS.IsEmpty()
+	if cfg := conn.Connection; cfg != nil {
+		pb.JetstreamDomain = cfg.JetstreamDomain
+		pb.JetstreamApiPrefix = cfg.JetstreamAPIPrefix
+		pb.InboxPrefix = cfg.InboxPrefix
+	}
+	return pb
+}

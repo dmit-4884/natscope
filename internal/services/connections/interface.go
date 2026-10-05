@@ -41,4 +41,10 @@ type Service interface {
 	// UpdateSidebarLayout replaces the sections set in `in` and keeps the others;
 	// errs.ErrSavedConnectionNotFound for an unknown connection.
 	UpdateSidebarLayout(ctx context.Context, in *entities.SidebarLayoutUpdate) (*entities.SidebarLayout, error)
+
+	// ListCliContexts reads the nats CLI contexts on this host, or the uploaded files when any are given.
+	ListCliContexts(ctx context.Context, files []entities.CliContextFile) (*entities.CliContexts, error)
+
+	// ImportCliContexts creates a connection per named context; a missing, unusable or already saved one is skipped.
+	ImportCliContexts(ctx context.Context, names []string, files []entities.CliContextFile) (*entities.CliContextImport, error)
 }

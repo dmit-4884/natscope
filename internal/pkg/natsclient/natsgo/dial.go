@@ -7,9 +7,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+
+	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -93,14 +96,16 @@ func (d *Dialer) Dial(_ context.Context, saved *entities.SavedConnection) (natsc
 		return nil, wrapErr(fmt.Errorf("%w: %w", errs.ErrNATSConnectionFailed, err))
 	}
 
-	jsNew, err := jetstream.New(conn)
+	domain, prefix := jetStreamTarget(saved.Connection)
+	jsNew, err := newJetStream(conn, domain, prefix)
 	if err != nil {
 		conn.Close()
 		return nil, wrapErr(coreerrs.WrapOperation(err, "get JetStream API"))
 	}
 
 	client.conn = conn
-	client.jetStream = watchJetStream(jsNew, client.permWatch)
+	client.api = apiPrefix(domain, prefix)
+	client.jetStream = watchJetStream(jsNew, client.permWatch, client.api)
 
 	d.logger.Info("connected to NATS",
 		slogx.String("connection_id", saved.Id),
@@ -109,4 +114,24 @@ func (d *Dialer) Dial(_ context.Context, saved *entities.SavedConnection) (natsc
 		slogx.String("version", conn.ConnectedServerVersion()))
 
 	return client, nil
+}
+
+// jetStreamTarget returns the JetStream domain and API prefix a connection is configured for.
+func jetStreamTarget(cfg *entities.ConnectionConfig) (domain, prefix string) {
+	if cfg == nil {
+		return "", ""
+	}
+	return strings.TrimSpace(ptr.Unwrap(cfg.JetstreamDomain)), strings.TrimSpace(ptr.Unwrap(cfg.JetstreamAPIPrefix))
+}
+
+// newJetStream opens the JetStream API for a domain, an imported API prefix, or the default.
+func newJetStream(conn *nats.Conn, domain, prefix string) (jetstream.JetStream, error) {
+	switch {
+	case domain != "":
+		return jetstream.NewWithDomain(conn, domain)
+	case prefix != "":
+		return jetstream.NewWithAPIPrefix(conn, prefix)
+	default:
+		return jetstream.New(conn)
+	}
 }

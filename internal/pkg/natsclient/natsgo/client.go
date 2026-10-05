@@ -4,6 +4,7 @@
 package natsgo
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"runtime"
@@ -67,6 +68,7 @@ type Client struct {
 	conn      *nats.Conn
 	jetStream jetstream.JetStream
 	url       string
+	api       string
 
 	// permWatch correlates out-of-band async errors (e.g. permissions
 	// violations) with in-flight requests so they fail fast instead of
@@ -119,6 +121,11 @@ func (c *Client) takeAsyncError(within time.Duration) error {
 		return wrapErr(err)
 	}
 	return nil
+}
+
+// apiSubject returns a JetStream API subject on the client's API prefix, e.g. apiSubject("STREAM.LIST").
+func (c *Client) apiSubject(suffix string) string {
+	return cmp.Or(c.api, defaultAPIPrefix) + "." + suffix
 }
 
 // request performs a raw JetStream API request bounded by the default timeout

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,11 +42,31 @@ const (
 	subjDirectGetPrefix       = "$JS.API.DIRECT.GET.%s."
 )
 
-// subjectsFor renders subject templates for one stream name.
-func subjectsFor(name string, templates ...string) []string {
+// defaultAPIPrefix is the JetStream API prefix without a domain or an imported prefix.
+const defaultAPIPrefix = "$JS.API"
+
+// apiPrefix returns the JetStream API prefix, without the trailing dot, for a domain or an imported prefix.
+func apiPrefix(domain, prefix string) string {
+	switch {
+	case domain != "":
+		return "$JS." + domain + ".API"
+	case prefix != "":
+		return strings.TrimSuffix(prefix, ".")
+	default:
+		return defaultAPIPrefix
+	}
+}
+
+// subject moves a default-prefixed API subject onto the watched client's API prefix.
+func (w *jetStreamWatch) subject(s string) string {
+	return w.api + strings.TrimPrefix(s, defaultAPIPrefix)
+}
+
+// subjectsFor renders subject templates for one stream name on the client's API prefix.
+func (w *jetStreamWatch) subjectsFor(name string, templates ...string) []string {
 	subjects := make([]string, 0, len(templates))
 	for _, t := range templates {
-		subjects = append(subjects, fmt.Sprintf(t, name))
+		subjects = append(subjects, w.subject(fmt.Sprintf(t, name)))
 	}
 	return subjects
 }
@@ -55,15 +76,16 @@ func subjectsFor(name string, templates ...string) []string {
 // translated through wrapErr exactly once, at this boundary. Streams,
 // consumers, listers and fetch batches returned by the wrapped client are
 // wrapped transitively.
-func watchJetStream(js jetstream.JetStream, pw *PermissionWatcher) jetstream.JetStream {
-	return &jetStreamWatch{JetStream: js, pw: pw}
+func watchJetStream(js jetstream.JetStream, pw *PermissionWatcher, api string) jetstream.JetStream {
+	return &jetStreamWatch{JetStream: js, pw: pw, api: api}
 }
 
 // jetStreamWatch decorates [jetstream.JetStream]; methods not overridden pass
 // through unwatched.
 type jetStreamWatch struct {
 	jetstream.JetStream
-	pw *PermissionWatcher
+	pw  *PermissionWatcher
+	api string
 }
 
 var _ jetstream.JetStream = (*jetStreamWatch)(nil)
@@ -131,47 +153,47 @@ func (w *jetStreamWatch) consumer(c jetstream.Consumer, stream string) jetstream
 }
 
 func (w *jetStreamWatch) CreateStream(ctx context.Context, cfg jetstream.StreamConfig) (jetstream.Stream, error) {
-	s, err := watchCall(ctx, w, subjectsFor(cfg.Name, subjStreamCreate), func(ctx context.Context) (jetstream.Stream, error) {
+	s, err := watchCall(ctx, w, w.subjectsFor(cfg.Name, subjStreamCreate), func(ctx context.Context) (jetstream.Stream, error) {
 		return w.JetStream.CreateStream(ctx, cfg)
 	})
 	return w.stream(s, cfg.Name), err
 }
 
 func (w *jetStreamWatch) UpdateStream(ctx context.Context, cfg jetstream.StreamConfig) (jetstream.Stream, error) {
-	s, err := watchCall(ctx, w, subjectsFor(cfg.Name, subjStreamUpdate), func(ctx context.Context) (jetstream.Stream, error) {
+	s, err := watchCall(ctx, w, w.subjectsFor(cfg.Name, subjStreamUpdate), func(ctx context.Context) (jetstream.Stream, error) {
 		return w.JetStream.UpdateStream(ctx, cfg)
 	})
 	return w.stream(s, cfg.Name), err
 }
 
 func (w *jetStreamWatch) CreateOrUpdateStream(ctx context.Context, cfg jetstream.StreamConfig) (jetstream.Stream, error) {
-	s, err := watchCall(ctx, w, subjectsFor(cfg.Name, subjStreamCreate, subjStreamUpdate), func(ctx context.Context) (jetstream.Stream, error) {
+	s, err := watchCall(ctx, w, w.subjectsFor(cfg.Name, subjStreamCreate, subjStreamUpdate), func(ctx context.Context) (jetstream.Stream, error) {
 		return w.JetStream.CreateOrUpdateStream(ctx, cfg)
 	})
 	return w.stream(s, cfg.Name), err
 }
 
 func (w *jetStreamWatch) Stream(ctx context.Context, name string) (jetstream.Stream, error) {
-	s, err := watchCall(ctx, w, subjectsFor(name, subjStreamInfo), func(ctx context.Context) (jetstream.Stream, error) {
+	s, err := watchCall(ctx, w, w.subjectsFor(name, subjStreamInfo), func(ctx context.Context) (jetstream.Stream, error) {
 		return w.JetStream.Stream(ctx, name)
 	})
 	return w.stream(s, name), err
 }
 
 func (w *jetStreamWatch) DeleteStream(ctx context.Context, name string) error {
-	err := w.pw.Watch(ctx, subjectsFor(name, subjStreamDelete), func(ctx context.Context) error {
+	err := w.pw.Watch(ctx, w.subjectsFor(name, subjStreamDelete), func(ctx context.Context) error {
 		return w.JetStream.DeleteStream(ctx, name)
 	})
 	return w.translate(err)
 }
 
 func (w *jetStreamWatch) ListStreams(ctx context.Context, opts ...jetstream.StreamListOpt) jetstream.StreamInfoLister {
-	ctx, end := w.watchLister(ctx, []string{subjStreamList})
+	ctx, end := w.watchLister(ctx, []string{w.subject(subjStreamList)})
 	return &streamInfoLister{StreamInfoLister: w.JetStream.ListStreams(ctx, opts...), w: w, end: end}
 }
 
 func (w *jetStreamWatch) StreamNames(ctx context.Context, opts ...jetstream.StreamListOpt) jetstream.StreamNameLister {
-	ctx, end := w.watchLister(ctx, []string{subjStreamNames})
+	ctx, end := w.watchLister(ctx, []string{w.subject(subjStreamNames)})
 	return &streamNameLister{StreamNameLister: w.JetStream.StreamNames(ctx, opts...), w: w, end: end}
 }
 
@@ -197,91 +219,93 @@ type streamWatch struct {
 var _ jetstream.Stream = (*streamWatch)(nil)
 
 func (s *streamWatch) Info(ctx context.Context, opts ...jetstream.StreamInfoOpt) (*jetstream.StreamInfo, error) {
-	return watchCall(ctx, s.w, subjectsFor(s.name, subjStreamInfo), func(ctx context.Context) (*jetstream.StreamInfo, error) {
+	return watchCall(ctx, s.w, s.w.subjectsFor(s.name, subjStreamInfo), func(ctx context.Context) (*jetstream.StreamInfo, error) {
 		return s.Stream.Info(ctx, opts...)
 	})
 }
 
 func (s *streamWatch) Purge(ctx context.Context, opts ...jetstream.StreamPurgeOpt) error {
-	err := s.w.pw.Watch(ctx, subjectsFor(s.name, subjStreamPurge), func(ctx context.Context) error {
+	err := s.w.pw.Watch(ctx, s.w.subjectsFor(s.name, subjStreamPurge), func(ctx context.Context) error {
 		return s.Stream.Purge(ctx, opts...)
 	})
 	return s.w.translate(err)
 }
 
 func (s *streamWatch) CreateConsumer(ctx context.Context, cfg jetstream.ConsumerConfig) (jetstream.Consumer, error) {
-	c, err := watchCall(ctx, s.w, subjectsFor(s.name, subjConsumerCreate, subjConsumerDurableCreate), func(ctx context.Context) (jetstream.Consumer, error) {
+	c, err := watchCall(ctx, s.w, s.w.subjectsFor(s.name, subjConsumerCreate, subjConsumerDurableCreate), func(ctx context.Context) (jetstream.Consumer, error) {
 		return s.Stream.CreateConsumer(ctx, cfg)
 	})
 	return s.w.consumer(c, s.name), err
 }
 
 func (s *streamWatch) CreateOrUpdateConsumer(ctx context.Context, cfg jetstream.ConsumerConfig) (jetstream.Consumer, error) {
-	c, err := watchCall(ctx, s.w, subjectsFor(s.name, subjConsumerCreate, subjConsumerDurableCreate), func(ctx context.Context) (jetstream.Consumer, error) {
+	c, err := watchCall(ctx, s.w, s.w.subjectsFor(s.name, subjConsumerCreate, subjConsumerDurableCreate), func(ctx context.Context) (jetstream.Consumer, error) {
 		return s.Stream.CreateOrUpdateConsumer(ctx, cfg)
 	})
 	return s.w.consumer(c, s.name), err
 }
 
 func (s *streamWatch) UpdateConsumer(ctx context.Context, cfg jetstream.ConsumerConfig) (jetstream.Consumer, error) {
-	c, err := watchCall(ctx, s.w, subjectsFor(s.name, subjConsumerCreate, subjConsumerDurableCreate), func(ctx context.Context) (jetstream.Consumer, error) {
+	c, err := watchCall(ctx, s.w, s.w.subjectsFor(s.name, subjConsumerCreate, subjConsumerDurableCreate), func(ctx context.Context) (jetstream.Consumer, error) {
 		return s.Stream.UpdateConsumer(ctx, cfg)
 	})
 	return s.w.consumer(c, s.name), err
 }
 
 func (s *streamWatch) OrderedConsumer(ctx context.Context, cfg jetstream.OrderedConsumerConfig) (jetstream.Consumer, error) {
-	c, err := watchCall(ctx, s.w, subjectsFor(s.name, subjConsumerCreate, subjConsumerDurableCreate), func(ctx context.Context) (jetstream.Consumer, error) {
+	c, err := watchCall(ctx, s.w, s.w.subjectsFor(s.name, subjConsumerCreate, subjConsumerDurableCreate), func(ctx context.Context) (jetstream.Consumer, error) {
 		return s.Stream.OrderedConsumer(ctx, cfg)
 	})
 	return s.w.consumer(c, s.name), err
 }
 
 func (s *streamWatch) Consumer(ctx context.Context, name string) (jetstream.Consumer, error) {
-	c, err := watchCall(ctx, s.w, subjectsFor(s.name, subjConsumerInfo), func(ctx context.Context) (jetstream.Consumer, error) {
+	c, err := watchCall(ctx, s.w, s.w.subjectsFor(s.name, subjConsumerInfo), func(ctx context.Context) (jetstream.Consumer, error) {
 		return s.Stream.Consumer(ctx, name)
 	})
 	return s.w.consumer(c, s.name), err
 }
 
 func (s *streamWatch) DeleteConsumer(ctx context.Context, name string) error {
-	err := s.w.pw.Watch(ctx, subjectsFor(s.name, subjConsumerDelete), func(ctx context.Context) error {
+	err := s.w.pw.Watch(ctx, s.w.subjectsFor(s.name, subjConsumerDelete), func(ctx context.Context) error {
 		return s.Stream.DeleteConsumer(ctx, name)
 	})
 	return s.w.translate(err)
 }
 
 func (s *streamWatch) ConsumerNames(ctx context.Context) jetstream.ConsumerNameLister {
-	ctx, end := s.w.watchLister(ctx, subjectsFor(s.name, subjConsumerNames))
+	ctx, end := s.w.watchLister(ctx, s.w.subjectsFor(s.name, subjConsumerNames))
 	return &consumerNameLister{ConsumerNameLister: s.Stream.ConsumerNames(ctx), w: s.w, end: end}
 }
 
 func (s *streamWatch) ListConsumers(ctx context.Context) jetstream.ConsumerInfoLister {
-	ctx, end := s.w.watchLister(ctx, subjectsFor(s.name, subjConsumerList))
+	ctx, end := s.w.watchLister(ctx, s.w.subjectsFor(s.name, subjConsumerList))
 	return &consumerInfoLister{ConsumerInfoLister: s.Stream.ListConsumers(ctx), w: s.w, end: end}
 }
 
 func (s *streamWatch) GetMsg(ctx context.Context, seq uint64, opts ...jetstream.GetMsgOpt) (*jetstream.RawStreamMsg, error) {
-	return watchCall(ctx, s.w, subjectsFor(s.name, subjMsgGet, subjDirectGet, subjDirectGetPrefix), func(ctx context.Context) (*jetstream.RawStreamMsg, error) {
+	subjects := s.w.subjectsFor(s.name, subjMsgGet, subjDirectGet, subjDirectGetPrefix)
+	return watchCall(ctx, s.w, subjects, func(ctx context.Context) (*jetstream.RawStreamMsg, error) {
 		return s.Stream.GetMsg(ctx, seq, opts...)
 	})
 }
 
 func (s *streamWatch) GetLastMsgForSubject(ctx context.Context, subject string) (*jetstream.RawStreamMsg, error) {
-	return watchCall(ctx, s.w, subjectsFor(s.name, subjMsgGet, subjDirectGet, subjDirectGetPrefix), func(ctx context.Context) (*jetstream.RawStreamMsg, error) {
+	subjects := s.w.subjectsFor(s.name, subjMsgGet, subjDirectGet, subjDirectGetPrefix)
+	return watchCall(ctx, s.w, subjects, func(ctx context.Context) (*jetstream.RawStreamMsg, error) {
 		return s.Stream.GetLastMsgForSubject(ctx, subject)
 	})
 }
 
 func (s *streamWatch) DeleteMsg(ctx context.Context, seq uint64) error {
-	err := s.w.pw.Watch(ctx, subjectsFor(s.name, subjMsgDelete), func(ctx context.Context) error {
+	err := s.w.pw.Watch(ctx, s.w.subjectsFor(s.name, subjMsgDelete), func(ctx context.Context) error {
 		return s.Stream.DeleteMsg(ctx, seq)
 	})
 	return s.w.translate(err)
 }
 
 func (s *streamWatch) SecureDeleteMsg(ctx context.Context, seq uint64) error {
-	err := s.w.pw.Watch(ctx, subjectsFor(s.name, subjMsgDelete), func(ctx context.Context) error {
+	err := s.w.pw.Watch(ctx, s.w.subjectsFor(s.name, subjMsgDelete), func(ctx context.Context) error {
 		return s.Stream.SecureDeleteMsg(ctx, seq)
 	})
 	return s.w.translate(err)
@@ -313,7 +337,7 @@ func (c *consumerWatch) FetchNoWait(batch int) (jetstream.MessageBatch, error) {
 }
 
 func (c *consumerWatch) Info(ctx context.Context) (*jetstream.ConsumerInfo, error) {
-	return watchCall(ctx, c.w, subjectsFor(c.stream, subjConsumerInfo), func(ctx context.Context) (*jetstream.ConsumerInfo, error) {
+	return watchCall(ctx, c.w, c.w.subjectsFor(c.stream, subjConsumerInfo), func(ctx context.Context) (*jetstream.ConsumerInfo, error) {
 		return c.Consumer.Info(ctx)
 	})
 }

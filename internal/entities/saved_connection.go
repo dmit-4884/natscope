@@ -118,6 +118,8 @@ type ConnectionConfig struct {
 	NoEcho                  bool
 	NoRandomize             bool
 	IgnoreDiscoveredServers bool
+	JetstreamDomain         *string `normalize:"trim"`
+	JetstreamAPIPrefix      *string `normalize:"trim"`
 }
 
 // IsEmpty reports no user-provided settings; folds "user cleared connection
@@ -132,7 +134,9 @@ func (c *ConnectionConfig) IsEmpty() bool {
 		emptyOrNil(c.InboxPrefix) &&
 		!c.NoEcho &&
 		!c.NoRandomize &&
-		!c.IgnoreDiscoveredServers
+		!c.IgnoreDiscoveredServers &&
+		emptyOrNil(c.JetstreamDomain) &&
+		emptyOrNil(c.JetstreamAPIPrefix)
 }
 
 // ReconnectConfig holds reconnection behavior settings.

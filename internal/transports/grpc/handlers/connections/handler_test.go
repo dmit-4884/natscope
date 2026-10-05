@@ -17,6 +17,7 @@ import (
 
 	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
+	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
 // --- Mocks ---
@@ -37,6 +38,15 @@ type mockConnService struct {
 	layout       *entities.SidebarLayout
 	layoutErr    error
 	layoutUpdate *entities.SidebarLayoutUpdate
+	cliContexts  *entities.CliContexts
+}
+
+func (m *mockConnService) ListCliContexts(context.Context, []entities.CliContextFile) (*entities.CliContexts, error) {
+	return m.cliContexts, nil
+}
+
+func (m *mockConnService) ImportCliContexts(context.Context, []string, []entities.CliContextFile) (*entities.CliContextImport, error) {
+	return &entities.CliContextImport{}, nil
 }
 
 func (m *mockConnService) GetSidebarLayout(_ context.Context, _ string) (*entities.SidebarLayout, error) {
@@ -310,4 +320,29 @@ func TestHandler_SidebarLayout(t *testing.T) {
 		_, err := h.GetSidebarLayout(t.Context(), connect.NewRequest(&connectionspb.GetSidebarLayoutRequest{ConnectionId: "conn-1"}))
 		assert.ErrorIs(t, err, errs.ErrSavedConnectionNotFound)
 	})
+}
+
+func TestHandler_ListCliContexts_DescribesWithoutSecrets(t *testing.T) {
+	t.Parallel()
+	token := "s3cret"
+	svc := &mockConnService{cliContexts: &entities.CliContexts{Dir: "/cfg/nats/context", Contexts: []entities.CliContext{
+		{Name: "prod", Selected: true, Warnings: []string{"SOCKS proxies are not supported"}, Connection: &entities.SavedConnectionCreate{
+			URLs: []string{"tls://p:4222"},
+			Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: &token},
+			TLS:  &entities.TlsConfig{TlsFirst: true},
+		}},
+		{Name: "garbage", Warnings: []string{"this is not a nats CLI context"}},
+	}}}
+
+	resp, err := New(svc).ListCliContexts(t.Context(), connect.NewRequest(&connectionspb.ListCliContextsRequest{}))
+	require.NoError(t, err)
+
+	assert.Equal(t, "/cfg/nats/context", resp.Msg.GetDirectory())
+	prod := resp.Msg.GetContexts()[0]
+	assert.True(t, prod.GetImportable())
+	assert.True(t, prod.GetSelected())
+	assert.True(t, prod.GetTls())
+	assert.Equal(t, natspb.AuthMethod_AUTH_METHOD_TOKEN, prod.GetAuthMethod())
+	assert.NotContains(t, prod.String(), token)
+	assert.False(t, resp.Msg.GetContexts()[1].GetImportable())
 }

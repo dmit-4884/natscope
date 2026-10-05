@@ -59,9 +59,6 @@ func (c *Client) ListStreamNames(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// streamListSubject is the JetStream API that pages full stream infos.
-const streamListSubject = "$JS.API.STREAM.LIST"
-
 // streamListPage is one page of the STREAM.LIST response; streams stay raw so each keeps the server's JSON.
 type streamListPage struct {
 	Total   int                 `json:"total"`
@@ -121,7 +118,7 @@ func (c *Client) streamListPage(ctx context.Context, offset int) (*streamListPag
 		return nil, wrapErr(coreerrs.WrapOperation(err, "marshal stream list request"))
 	}
 
-	msg, err := c.request(ctx, streamListSubject, reqData)
+	msg, err := c.request(ctx, c.apiSubject("STREAM.LIST"), reqData)
 	if err != nil {
 		return nil, wrapErr(coreerrs.WrapOperation(err, "list streams"))
 	}
@@ -382,8 +379,7 @@ func (c *Client) PurgeStream(ctx context.Context, name string, req entities.Stre
 		return 0, wrapErr(coreerrs.WrapOperation(err, "marshal purge request"))
 	}
 
-	subject := fmt.Sprintf("$JS.API.STREAM.PURGE.%s", name)
-	msg, err := c.request(ctx, subject, reqData)
+	msg, err := c.request(ctx, c.apiSubject("STREAM.PURGE."+name), reqData)
 	if err != nil {
 		return 0, wrapErr(coreerrs.WrapOperation(err, "purge stream"))
 	}
