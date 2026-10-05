@@ -90,32 +90,39 @@ func (t *Toolset) listConsumers(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return nil, listConsumersOutput{}, err
 	}
 
-	views, err := t.consumers(ctx, connID, strings.TrimSpace(in.Stream))
+	views, unreadable, err := t.consumers(ctx, connID, strings.TrimSpace(in.Stream))
 	if err != nil {
 		return nil, listConsumersOutput{}, err
 	}
 	sort.SliceStable(views, func(i, j int) bool { return views[i].NumPending > views[j].NumPending })
 	return nil, listConsumersOutput{
-		Consumers: mcptransport.Items(views[:min(len(views), mcptransport.Limit(in.Limit, defaultConsumersLimit, maxConsumersLimit))]),
-		Total:     len(views),
+		Consumers:         mcptransport.Items(views[:min(len(views), mcptransport.Limit(in.Limit, defaultConsumersLimit, maxConsumersLimit))]),
+		Total:             len(views),
+		UnreadableStreams: unreadable,
 	}, nil
 }
 
-func (t *Toolset) consumers(ctx context.Context, connID, stream string) ([]consumerView, error) {
+func (t *Toolset) consumers(ctx context.Context, connID, stream string) ([]consumerView, []unreadableStreamView, error) {
 	if stream != "" {
 		infos, err := t.streams.GetStreamConsumers(ctx, connID, stream)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return slices.To(infos, consumerViewOf), nil
+		return slices.To(infos, consumerViewOf), nil, nil
 	}
-	stats, err := t.stats.GetAllConsumers(ctx, connID)
+	overview, err := t.stats.GetConsumersOverview(ctx, connID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return slices.To(stats, func(c entities.ConsumerStats) consumerView {
-		return *converter.Convert(&c, &consumerView{}, mcptransport.ViewCodecs)
-	}), nil
+	return slices.To(overview.Consumers, consumerViewOf), slices.To(overview.UnreadableStreams, unreadableStreamViewOf), nil
+}
+
+// unreadableStreamViewOf names the refused permission, or the failure, that hid a stream's consumers.
+func unreadableStreamViewOf(u entities.UnreadableStream) unreadableStreamView {
+	if u.Access != nil {
+		return unreadableStreamView{Stream: u.Stream, Reason: "no permission to " + u.Access.Operation + " to " + u.Access.Subject}
+	}
+	return unreadableStreamView{Stream: u.Stream, Reason: u.Error}
 }
 
 // consumerViewOf merges a consumer's state and config into one view.

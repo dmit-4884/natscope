@@ -201,3 +201,25 @@ func TestPermissionWatcher_TakeRecentExpiresOutsideWindow(t *testing.T) {
 	assert.NoError(t, pw.TakeRecent(-time.Nanosecond))
 	assert.NoError(t, pw.TakeRecent(time.Minute))
 }
+
+func TestPermissionWatcher_BeginWatchesUntilEnd(t *testing.T) {
+	t.Parallel()
+
+	pw := NewPermissionWatcher()
+	subjects := []string{"$JS.API.CONSUMER.LIST.SECRET"}
+	violation := errors.New(`nats: Permissions Violation for Publish to "$JS.API.CONSUMER.LIST.SECRET"`)
+
+	ctx, end := pw.Begin(t.Context(), subjects)
+	pw.HandleAsyncError(violation)
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("the violation must cancel the watched context")
+	}
+	require.ErrorIs(t, end(), violation)
+
+	_, end = pw.Begin(t.Context(), subjects)
+	require.NoError(t, end())
+	pw.HandleAsyncError(violation)
+	assert.ErrorIs(t, pw.TakeRecent(time.Minute), violation, "after end the subject is no longer watched")
+}

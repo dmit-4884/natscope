@@ -76,6 +76,22 @@ func (h *Handler) GetMessage(
 	return connect.NewResponse(&messagespb.GetMessageResponse{Message: messageToProto(msg)}), nil
 }
 
+// GetNextMessage returns the first message at or after a sequence that matches the filters.
+func (h *Handler) GetNextMessage(
+	ctx context.Context,
+	req *connect.Request[messagespb.GetNextMessageRequest],
+) (*connect.Response[messagespb.GetNextMessageResponse], error) {
+	msg, err := h.service.Next(ctx, converter.Convert(req.Msg, &entities.MessageNextRequest{}))
+	if err != nil {
+		return nil, err
+	}
+	resp := &messagespb.GetNextMessageResponse{}
+	if msg != nil {
+		resp.Message = messageToProto(msg)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // directionFromProto maps the Direction enum to the entity string; UNSPECIFIED
 // becomes empty for the settings-driven default.
 func directionFromProto(d messagespb.Direction) string {

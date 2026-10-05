@@ -37,6 +37,21 @@ func (s *Service) GetMessage(
 	return c.GetMessage(ctx, streamName, sequence)
 }
 
+// GetNextMessage returns the first message at or after startSeq on any of subjects, or nil.
+func (s *Service) GetNextMessage(
+	ctx context.Context,
+	connectionID string,
+	streamName string,
+	startSeq uint64,
+	subjects []string,
+) (*entities.Message, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.GetNextMessage(ctx, streamName, startSeq, subjects)
+}
+
 // Publish sends a core NATS message and flushes it.
 func (s *Service) Publish(
 	ctx context.Context,

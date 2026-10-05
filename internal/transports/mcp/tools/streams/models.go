@@ -151,8 +151,14 @@ type sequenceView struct {
 }
 
 type listConsumersOutput struct {
-	Consumers []consumerView `json:"consumers"`
-	Total     int            `json:"total" jsonschema:"consumers found before the limit"`
+	Consumers         []consumerView         `json:"consumers"`
+	Total             int                    `json:"total" jsonschema:"consumers found before the limit"`
+	UnreadableStreams []unreadableStreamView `json:"unreadableStreams,omitempty" jsonschema:"streams whose consumers could not be listed"`
+}
+
+type unreadableStreamView struct {
+	Stream string `json:"stream"`
+	Reason string `json:"reason"`
 }
 
 type relationsInput struct {

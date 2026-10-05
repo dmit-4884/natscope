@@ -37,9 +37,11 @@ var streamConvertOpts = []converter.Option{
 }
 
 // consumerConvertOpts ignores time fields the converter can't bridge, so
-// Created/TimeStamp/OptStartTime are handled explicitly.
+// Created/TimeStamp/OptStartTime are handled explicitly, and renames the
+// sequence Last onto LastActive.
 var consumerConvertOpts = []converter.Option{
 	converter.WithIgnoreFields("OptStartTime", "Created", "TimeStamp"),
+	converter.WithFieldMappings(map[string]string{"Last": "LastActive"}),
 }
 
 // toStreamInfo converts info and sets Raw, TimeStamp and Republish (see streamConvertOpts).

@@ -9,13 +9,13 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 )
 
-// GetAllConsumers returns all consumers across all streams.
-func (s *Service) GetAllConsumers(ctx context.Context, connectionID string) ([]entities.ConsumerStats, error) {
+// GetConsumersOverview returns every readable consumer across all streams, with the streams.
+func (s *Service) GetConsumersOverview(ctx context.Context, connectionID string) (*entities.ConsumersOverview, error) {
 	c, err := s.client(ctx, connectionID)
 	if err != nil {
 		return nil, err
 	}
-	return c.GetAllConsumers(ctx)
+	return c.GetConsumersOverview(ctx)
 }
 
 // CreateConsumer creates a new consumer on a stream.

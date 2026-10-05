@@ -3,9 +3,7 @@ package natscope.types.nats;
 option go_package = "github.com/dmit-4884/natscope/proto/gen/types/nats;natspb";
 
 import "google/api/field_behavior.proto";
-import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
-import "types/nats/nats_stream.proto";
 
 // Defines the aggregated statistics for a NATS JetStream stream.
 message StreamStats {
@@ -47,55 +45,6 @@ message ClusterStats {
 
   // Optional. List of replica node names in the cluster.
   repeated string replicas = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// Defines the detailed statistics and configuration for a NATS JetStream consumer.
-// Uses int32 enums and well-known Timestamp/Duration types matching ConsumerConfig.
-message ConsumerStats {
-  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
-  string stream = 2 [(google.api.field_behavior) = IDENTIFIER];
-  google.protobuf.Timestamp created = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  uint64 num_pending = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 num_ack_pending = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 num_redelivered = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 num_waiting = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  SequenceInfo delivered = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
-  SequenceInfo ack_floor = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  bool push_bound = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Enums (int32, same values as ConsumerConfig)
-  int32 deliver_policy = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
-  uint64 opt_start_seq = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp opt_start_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY]; // unset = not set
-  string filter_subject = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  repeated string filter_subjects = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  int32 ack_policy = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Duration ack_wait = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 max_ack_pending = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 max_deliver = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 replay_policy = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
-  repeated google.protobuf.Duration back_off = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
-  uint64 rate_limit = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  int32 max_waiting = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 max_request_batch = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Duration max_request_expires = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int64 max_request_max_bytes = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  string durable = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string description = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string sample_frequency = 30 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Duration inactive_threshold = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool headers_only = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
-  int32 replicas = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool memory_storage = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
-  map<string, string> metadata = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  optional ClusterInfo cluster = 36 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the NATS server information and cluster topology.

@@ -358,6 +358,9 @@ message SequenceInfo {
 
   // Required. Corresponding stream sequence number.
   uint64 stream = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. When this sequence last moved; unset until the first delivery or ack.
+  google.protobuf.Timestamp last_active = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the configuration parameters for a NATS JetStream consumer.

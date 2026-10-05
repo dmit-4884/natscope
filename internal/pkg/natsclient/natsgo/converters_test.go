@@ -609,134 +609,6 @@ func TestConsumerUpdateMerge_BackOff(t *testing.T) {
 	assert.Equal(t, 10*time.Second, result.BackOff[1])
 }
 
-// TestConsumerStatsConversion verifies the full ConsumerInfo → ConsumerStats mapping
-// used by fetchStreamConsumersStats: two converter.Convert calls (top-level + Config flat).
-func TestConsumerStatsConversion(t *testing.T) {
-	created := time.Now().UTC().Truncate(time.Millisecond)
-	startTime := created.Add(-time.Hour)
-
-	info := &jetstream.ConsumerInfo{
-		Name:   "my-consumer",
-		Stream: "my-stream",
-		Config: jetstream.ConsumerConfig{
-			Name:               "my-consumer",
-			Durable:            "my-consumer",
-			Description:        "test desc",
-			DeliverPolicy:      jetstream.DeliverByStartSequencePolicy,
-			OptStartSeq:        42,
-			OptStartTime:       &startTime,
-			AckPolicy:          jetstream.AckAllPolicy,
-			AckWait:            30 * time.Second,
-			MaxDeliver:         5,
-			BackOff:            []time.Duration{time.Second, 5 * time.Second},
-			FilterSubject:      "orders.>",
-			FilterSubjects:     []string{"orders.created", "orders.updated"},
-			ReplayPolicy:       jetstream.ReplayOriginalPolicy,
-			RateLimit:          1024,
-			SampleFrequency:    "50%",
-			MaxWaiting:         100,
-			MaxAckPending:      200,
-			HeadersOnly:        true,
-			MaxRequestBatch:    25,
-			MaxRequestExpires:  10 * time.Second,
-			MaxRequestMaxBytes: 4096,
-			InactiveThreshold:  5 * time.Minute,
-			Replicas:           3,
-			MemoryStorage:      true,
-			Metadata:           map[string]string{"team": "backend"},
-		},
-		Created: created,
-		Delivered: jetstream.SequenceInfo{
-			Consumer: 50,
-			Stream:   100,
-		},
-		AckFloor: jetstream.SequenceInfo{
-			Consumer: 45,
-			Stream:   90,
-		},
-		NumPending:     10,
-		NumAckPending:  5,
-		NumRedelivered: 2,
-		NumWaiting:     3,
-		PushBound:      false,
-		Cluster: &jetstream.ClusterInfo{
-			Name:   "nats-cluster",
-			Leader: "node-1",
-			Replicas: []*jetstream.PeerInfo{
-				{Name: "node-2"},
-				{Name: "node-3"},
-			},
-		},
-	}
-
-	// Replicate the same logic as fetchStreamConsumersStats
-	consumer := converter.Convert(info, &entities.ConsumerStats{})
-	consumer.Stream = "override-stream"
-
-	// Config → flat. OptStartTime (*time.Time) is set explicitly because the
-	// converter can't bridge it to the entity's time.Time value.
-	converter.Convert(&info.Config, consumer,
-		converter.WithIgnoreFields("Name", "OptStartTime"),
-	)
-	if info.Config.OptStartTime != nil {
-		consumer.OptStartTime = *info.Config.OptStartTime
-	}
-
-	// === Assert top-level fields (first converter.Convert) ===
-	assert.Equal(t, "my-consumer", consumer.Name)
-	assert.Equal(t, "override-stream", consumer.Stream)
-	assert.Equal(t, created, consumer.Created)
-	assert.Equal(t, uint64(10), consumer.NumPending)
-	assert.Equal(t, 5, consumer.NumAckPending)
-	assert.Equal(t, 2, consumer.NumRedelivered)
-	assert.Equal(t, 3, consumer.NumWaiting)
-	assert.Equal(t, uint64(50), consumer.Delivered.Consumer)
-	assert.Equal(t, uint64(100), consumer.Delivered.Stream)
-	assert.Equal(t, uint64(45), consumer.AckFloor.Consumer)
-	assert.Equal(t, uint64(90), consumer.AckFloor.Stream)
-	assert.False(t, consumer.PushBound)
-
-	// === Assert Config fields auto-mapped (second converter.Convert) ===
-	assert.Equal(t, "my-consumer", consumer.Durable, "Durable: auto")
-	assert.Equal(t, "test desc", consumer.Description, "Description: auto")
-	assert.Equal(t, 5, consumer.MaxDeliver, "MaxDeliver: auto")
-	assert.Equal(t, "orders.>", consumer.FilterSubject, "FilterSubject: auto")
-	assert.Equal(t, []string{"orders.created", "orders.updated"}, consumer.FilterSubjects, "FilterSubjects: auto")
-	assert.Equal(t, uint64(1024), consumer.RateLimit, "RateLimit: auto")
-	assert.Equal(t, "50%", consumer.SampleFrequency, "SampleFrequency: auto")
-	assert.Equal(t, 200, consumer.MaxAckPending, "MaxAckPending: auto")
-	assert.True(t, consumer.HeadersOnly, "HeadersOnly: auto")
-	assert.Equal(t, 25, consumer.MaxRequestBatch, "MaxRequestBatch: auto")
-	assert.Equal(t, 4096, consumer.MaxRequestMaxBytes, "MaxRequestMaxBytes: auto")
-	assert.Equal(t, 3, consumer.Replicas, "Replicas: auto")
-	assert.True(t, consumer.MemoryStorage, "MemoryStorage: auto")
-	assert.Equal(t, map[string]string{"team": "backend"}, consumer.Metadata, "Metadata: auto")
-
-	// === Assert Config fields now auto-mapped (same types) ===
-	assert.Equal(t, 100, consumer.MaxWaiting, "MaxWaiting: auto (name matches now)")
-	assert.Equal(t, entities.DeliverByStartSequence, consumer.DeliverPolicy, "DeliverPolicy: enum auto")
-	assert.Equal(t, entities.AckAll, consumer.AckPolicy, "AckPolicy: enum auto")
-	assert.Equal(t, entities.ReplayOriginal, consumer.ReplayPolicy, "ReplayPolicy: enum auto")
-	assert.Equal(t, 30*time.Second, consumer.AckWait, "AckWait: Duration passthrough auto")
-	assert.Equal(t, 5*time.Minute, consumer.InactiveThreshold, "InactiveThreshold: Duration passthrough auto")
-	assert.Equal(t, 10*time.Second, consumer.MaxRequestExpires, "MaxRequestExpires: Duration passthrough auto")
-
-	assert.Equal(t, uint64(42), consumer.OptStartSeq, "OptStartSeq: auto")
-	assert.Equal(t, startTime, consumer.OptStartTime, "OptStartTime: *time.Time→time.Time deref auto")
-
-	require.Len(t, consumer.BackOff, 2)
-	assert.Equal(t, time.Second, consumer.BackOff[0], "BackOff: []Duration passthrough auto")
-	assert.Equal(t, 5*time.Second, consumer.BackOff[1])
-
-	// === Assert Cluster (auto-converted, full PeerInfo) ===
-	require.NotNil(t, consumer.Cluster)
-	assert.Equal(t, "nats-cluster", consumer.Cluster.Name)
-	assert.Equal(t, "node-1", consumer.Cluster.Leader)
-	require.Len(t, consumer.Cluster.Replicas, 2)
-	assert.Equal(t, "node-2", consumer.Cluster.Replicas[0].Name)
-	assert.Equal(t, "node-3", consumer.Cluster.Replicas[1].Name)
-}
-
 // TestConsumerUpdateMerge_MaxRequestMaxBytes verifies int64→int narrowing.
 func TestConsumerUpdateMerge_MaxRequestMaxBytes(t *testing.T) {
 	svc := &Client{}
@@ -838,4 +710,26 @@ func TestConsumerConversion_PriorityGroups(t *testing.T) {
 		require.NotNil(t, info.Config)
 		assert.Equal(t, entities.AckFlowControl, info.Config.AckPolicy)
 	})
+}
+
+func TestToConsumerInfo_LastActive(t *testing.T) {
+	t.Parallel()
+	delivered := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
+	acked := delivered.Add(-time.Minute)
+
+	info := toConsumerInfo(&jetstream.ConsumerInfo{
+		Name:      "worker",
+		Delivered: jetstream.SequenceInfo{Consumer: 5, Stream: 9, Last: &delivered},
+		AckFloor:  jetstream.SequenceInfo{Consumer: 4, Stream: 8, Last: &acked},
+	}, "ORDERS")
+
+	require.NotNil(t, info.Delivered.LastActive)
+	assert.Equal(t, delivered, *info.Delivered.LastActive)
+	require.NotNil(t, info.AckFloor.LastActive)
+	assert.Equal(t, acked, *info.AckFloor.LastActive)
+	assert.Equal(t, uint64(9), info.Delivered.Stream)
+
+	idle := toConsumerInfo(&jetstream.ConsumerInfo{Name: "idle"}, "ORDERS")
+	assert.Nil(t, idle.Delivered.LastActive, "a consumer that never delivered has no activity time")
+	assert.Nil(t, idle.AckFloor.LastActive)
 }

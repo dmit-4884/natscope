@@ -6,12 +6,12 @@ package natsgo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/altessa-s/go-atlas/core/errors"
 	"github.com/altessa-s/go-atlas/core/runtime/concurrency"
 	"github.com/altessa-s/go-atlas/core/runtime/panics"
 	"github.com/altessa-s/go-atlas/domain/converter"
@@ -20,76 +20,59 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 
-	slogx "github.com/altessa-s/go-atlas/observability/slog"
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
-// GetAllConsumers returns all consumers across all streams using parallel
-// fetching.
-func (c *Client) GetAllConsumers(ctx context.Context) ([]entities.ConsumerStats, error) {
-	streamLister := c.jetStream.ListStreams(ctx)
-	var streamNames []string //nolint:prealloc
-	for streamInfo := range streamLister.Info() {
-		streamNames = append(streamNames, streamInfo.Config.Name)
-	}
-	if err := streamLister.Err(); err != nil {
-		return nil, wrapErr(errors.WrapOperation(err, "list streams"))
+// GetConsumersOverview lists every stream, then the consumers of each in parallel; a stream whose consumers
+// cannot be listed is reported in UnreadableStreams instead of failing the call.
+func (c *Client) GetConsumersOverview(ctx context.Context) (*entities.ConsumersOverview, error) {
+	streams, err := c.ListStreams(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	// Best-effort: a stream whose consumers fail to load is logged and skipped
-	// (fn returns nil), never aborting the batch.
-	perStream, collectErr := concurrency.ProcessCollect(ctx, streamNames,
-		func(ctx context.Context, streamName string) ([]entities.ConsumerStats, error) {
+	type streamConsumers struct {
+		consumers []entities.ConsumerInfo
+		err       error
+	}
+	perStream, err := concurrency.ProcessCollect(ctx, streams,
+		func(ctx context.Context, stream entities.StreamInfo) (streamConsumers, error) {
 			defer panics.Handle(ctx)
-			consumers, err := c.fetchStreamConsumersStats(ctx, streamName)
-			if err != nil {
-				c.logger.Warn("error fetching consumers", slogx.Error(err))
-				return nil, nil
-			}
-			return consumers, nil
+			consumers, listErr := c.GetStreamConsumers(ctx, stream.Config.Name)
+			return streamConsumers{consumers: consumers, err: listErr}, nil
 		},
 	)
-	if collectErr != nil {
-		return nil, wrapErr(collectErr)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, wrapErr(err)
 	}
 
-	var allConsumers []entities.ConsumerStats //nolint:prealloc
-	for _, consumers := range perStream {
-		allConsumers = append(allConsumers, consumers...)
+	overview := &entities.ConsumersOverview{Consumers: []entities.ConsumerInfo{}, Streams: []entities.StreamInfo{}}
+	for i, listed := range perStream {
+		stream := streams[i]
+		switch {
+		case errors.Is(listed.err, errs.ErrStreamNotFound):
+			continue
+		case listed.err != nil:
+			overview.UnreadableStreams = append(overview.UnreadableStreams, unreadableStream(stream.Config.Name, listed.err))
+		default:
+			overview.Consumers = append(overview.Consumers, listed.consumers...)
+		}
+		overview.Streams = append(overview.Streams, stream)
 	}
-
-	return allConsumers, nil
+	return overview, nil
 }
 
-func (c *Client) fetchStreamConsumersStats(ctx context.Context, streamName string) ([]entities.ConsumerStats, error) {
-	stream, err := c.jetStream.Stream(ctx, streamName)
-	if err != nil {
-		return nil, wrapErr(errors.Wrapf(err, "failed to get stream %s", streamName))
-	}
-
-	var consumers []entities.ConsumerStats //nolint:prealloc
-	consumerLister := stream.ListConsumers(ctx)
-
-	for info := range consumerLister.Info() {
-		consumer := converter.Convert(info, &entities.ConsumerStats{})
-		consumer.Stream = streamName
-
-		// OptStartTime (*time.Time in SDK config) can't be bridged by the converter,
-		// so it's set explicitly below.
-		converter.Convert(&info.Config, consumer,
-			converter.WithIgnoreFields("Name", "OptStartTime"),
-		)
-		if info.Config.OptStartTime != nil {
-			consumer.OptStartTime = *info.Config.OptStartTime
+func unreadableStream(name string, err error) entities.UnreadableStream {
+	if permErr, ok := errors.AsType[*errs.NATSPermissionError](err); ok {
+		return entities.UnreadableStream{
+			Stream: name,
+			Access: &entities.AccessCheck{Status: entities.AccessDenied, Operation: permErr.Operation, Subject: permErr.Subject},
 		}
-
-		consumers = append(consumers, *consumer)
 	}
-
-	if err := consumerLister.Err(); err != nil {
-		return consumers, wrapErr(errors.Wrapf(err, "failed to list consumers for stream %s", streamName))
-	}
-
-	return consumers, nil
+	return entities.UnreadableStream{Stream: name, Error: err.Error()}
 }
 
 // CreateConsumer creates a new consumer on a stream.
@@ -169,7 +152,7 @@ func (c *Client) UpdateConsumer(
 	subject := fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", streamName, consumerName)
 	msg, err := c.request(ctx, subject, nil)
 	if err != nil {
-		return nil, wrapErr(errors.WrapOperation(err, "get consumer info"))
+		return nil, wrapErr(coreerrs.WrapOperation(err, "get consumer info"))
 	}
 
 	var infoResp struct {
@@ -177,7 +160,7 @@ func (c *Client) UpdateConsumer(
 		Error  *jetstream.APIError       `json:"error,omitempty"`
 	}
 	if err = json.Unmarshal(msg.Data, &infoResp); err != nil {
-		return nil, wrapErr(errors.WrapOperation(err, "unmarshal consumer info"))
+		return nil, wrapErr(coreerrs.WrapOperation(err, "unmarshal consumer info"))
 	}
 	if infoResp.Error != nil {
 		// The hand-built subject bypasses the SDK's not-found translation.

@@ -85,9 +85,9 @@ func TestConsumerViewMergesConfig(t *testing.T) {
 	assert.Equal(t, "30s", v.AckWait)
 	assert.Equal(t, "orders.eu.>", v.FilterSubject)
 
-	stats := converter.Convert(&entities.ConsumerStats{Name: "w2", Stream: "S", AckPolicy: entities.AckNone}, &consumerView{}, mcptransport.ViewCodecs)
-	assert.Equal(t, "none", stats.AckPolicy)
-	assert.Equal(t, "all", stats.DeliverPolicy)
+	bare := consumerViewOf(entities.ConsumerInfo{Name: "w2", Stream: "S", Config: &entities.ConsumerConfig{AckPolicy: entities.AckNone}})
+	assert.Equal(t, "none", bare.AckPolicy)
+	assert.Equal(t, "all", bare.DeliverPolicy)
 }
 
 func TestConsumerViewRendersPriorityGroups(t *testing.T) {
@@ -164,4 +164,16 @@ func TestRelationsView(t *testing.T) {
 	assert.Len(t, all.Nodes, 5)
 	assert.Equal(t, "republish", all.Relations[2].Kind)
 	assert.Equal(t, "t.>", all.Relations[2].Republish.Dest)
+}
+
+func TestUnreadableStreamViewNamesTheReason(t *testing.T) {
+	t.Parallel()
+	denied := unreadableStreamViewOf(entities.UnreadableStream{
+		Stream: "SECRET",
+		Access: &entities.AccessCheck{Status: entities.AccessDenied, Operation: "publish", Subject: "$JS.API.CONSUMER.LIST.SECRET"},
+	})
+	assert.Equal(t, unreadableStreamView{Stream: "SECRET", Reason: "no permission to publish to $JS.API.CONSUMER.LIST.SECRET"}, denied)
+
+	broken := unreadableStreamViewOf(entities.UnreadableStream{Stream: "BROKEN", Error: "stream offline"})
+	assert.Equal(t, unreadableStreamView{Stream: "BROKEN", Reason: "stream offline"}, broken)
 }

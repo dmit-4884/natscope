@@ -100,6 +100,16 @@ func (s *Service) Get(ctx context.Context, in *entities.MessageGetRequest) (*ent
 	return msg, nil
 }
 
+// Next fetches and decodes the first matching message at or after the start sequence, with the full payload like Get.
+func (s *Service) Next(ctx context.Context, in *entities.MessageNextRequest) (*entities.Message, error) {
+	msg, err := s.natsService.GetNextMessage(ctx, in.ConnectionID, in.StreamName, in.StartSeq, in.Subjects)
+	if err != nil || msg == nil {
+		return nil, err
+	}
+	s.protoService.DecodeMessages(ctx, []*entities.Message{msg}, s.detectsTypes(ctx))
+	return msg, nil
+}
+
 func (s *Service) detectsTypes(ctx context.Context) bool {
 	cfg, err := s.settingsService.Get(ctx)
 	return err != nil || cfg.DetectsTypes()

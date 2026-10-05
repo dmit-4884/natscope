@@ -238,3 +238,41 @@ func (c *Client) getMessagesForWildcardSubject(
 		NextSeq:  nextSeq,
 	}, nil
 }
+
+// GetNextMessage asks the server for the next message on each subject (next_by_subj) and keeps the earliest.
+func (c *Client) GetNextMessage(ctx context.Context, streamName string, startSeq uint64, subjects []string) (*entities.Message, error) {
+	if err := validateNATSNameLength("stream name", streamName); err != nil {
+		return nil, wrapErr(err)
+	}
+	for _, subject := range subjects {
+		if err := validateNATSSubjectLength("subject", subject); err != nil {
+			return nil, wrapErr(err)
+		}
+	}
+	if len(subjects) == 0 {
+		subjects = []string{">"}
+	}
+
+	stream, err := c.jetStream.Stream(ctx, streamName)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+
+	var next *jetstream.RawStreamMsg
+	for _, subject := range subjects {
+		msg, err := stream.GetMsg(ctx, startSeq, jetstream.WithGetMsgSubject(subject))
+		if errors.Is(err, jetstream.ErrMsgNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, wrapErr(err)
+		}
+		if next == nil || msg.Sequence < next.Sequence {
+			next = msg
+		}
+	}
+	if next == nil {
+		return nil, nil //nolint:nilnil // nil, nil means no message matches
+	}
+	return toMessageWithHex(next), nil
+}

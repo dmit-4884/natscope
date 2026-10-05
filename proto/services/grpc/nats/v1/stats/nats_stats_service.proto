@@ -4,7 +4,9 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/
 
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
+import "types/nats/nats_access.proto";
 import "types/nats/nats_stats.proto";
+import "types/nats/nats_stream.proto";
 
 // Provides stream and consumer statistics and connection health checks for NATS JetStream.
 service StatsService {
@@ -59,8 +61,26 @@ message GetAllConsumersRequest {
 
 // Defines the response message for retrieving all consumer statistics.
 message GetAllConsumersResponse {
-  // Required. List of consumer statistics across all streams.
-  repeated .natscope.types.nats.ConsumerStats consumers = 1;
+  // Required. Every consumer the user can read, across all streams.
+  repeated .natscope.types.nats.ConsumerInfo consumers = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. The streams the consumers belong to, with their limits and current state.
+  repeated .natscope.types.nats.StreamInfo streams = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Streams whose consumers could not be listed.
+  repeated UnreadableStream unreadable_streams = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines a stream whose consumers could not be listed.
+message UnreadableStream {
+  // Required. Name of the stream.
+  string stream = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Optional. The permission the server refused, when the reason is a permissions violation.
+  optional .natscope.types.nats.AccessCheck access = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Why listing failed, when the reason is not a permissions violation.
+  string error = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the request message for checking NATS connection health.

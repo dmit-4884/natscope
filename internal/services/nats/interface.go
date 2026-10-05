@@ -71,6 +71,16 @@ type StreamReader interface {
 		streamName string,
 		sequence uint64,
 	) (*entities.Message, error)
+
+	// GetNextMessage returns the first message at or after startSeq on any of subjects (every subject when empty),
+	// or nil when none matches; it reads the stream directly.
+	GetNextMessage(
+		ctx context.Context,
+		connectionID string,
+		streamName string,
+		startSeq uint64,
+		subjects []string,
+	) (*entities.Message, error)
 }
 
 // StreamManager creates, mutates, and deletes JetStream streams and their
@@ -260,8 +270,9 @@ type StatsReader interface {
 		streamName string,
 	) (*entities.StreamStats, error)
 
-	// GetAllConsumers returns all consumers across all streams.
-	GetAllConsumers(ctx context.Context, connectionID string) ([]entities.ConsumerStats, error)
+	// GetConsumersOverview returns every readable consumer across all streams, the streams, and the streams
+	// whose consumers could not be listed.
+	GetConsumersOverview(ctx context.Context, connectionID string) (*entities.ConsumersOverview, error)
 
 	// GetServerInfo returns server detail incl. cluster and JetStream account
 	// stats.

@@ -34,3 +34,12 @@ type MessageGetRequest struct {
 	StreamName   string
 	Sequence     uint64
 }
+
+// MessageNextRequest is the input for the messages service's Next method.
+type MessageNextRequest struct {
+	ConnectionID string
+	StreamName   string
+	StartSeq     uint64
+	// Subjects are the filters to match, wildcards allowed; empty matches every subject.
+	Subjects []string
+}

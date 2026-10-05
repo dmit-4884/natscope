@@ -6,6 +6,7 @@ package stats
 import (
 	"context"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,7 @@ import (
 
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
 	statspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/stats"
+	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
 // --- Mocks ---
@@ -164,4 +166,57 @@ func TestHandler_GetServerInfo(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, resp)
 	})
+}
+
+type overviewNATSSvc struct {
+	natssvc.StatsReader
+	natssvc.ConnectionManager
+	overview *entities.ConsumersOverview
+}
+
+func (m *overviewNATSSvc) GetConsumersOverview(_ context.Context, _ string) (*entities.ConsumersOverview, error) {
+	return m.overview, nil
+}
+
+func TestHandler_GetAllConsumers(t *testing.T) {
+	t.Parallel()
+	active := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
+	svc := &overviewNATSSvc{overview: &entities.ConsumersOverview{
+		Consumers: []entities.ConsumerInfo{{
+			Name: "worker", Stream: "ORDERS", NumPending: 3,
+			Delivered: entities.SequenceInfo{Consumer: 2, Stream: 7, LastActive: &active},
+			Config:    &entities.ConsumerConfig{FilterSubject: "orders.created", MaxAckPending: 10},
+		}},
+		Streams: []entities.StreamInfo{{Config: entities.StreamConfig{Name: "ORDERS", MaxMsgs: 100}, State: &entities.StreamState{Msgs: 95}}},
+		UnreadableStreams: []entities.UnreadableStream{
+			{Stream: "SECRET", Access: &entities.AccessCheck{Status: entities.AccessDenied, Operation: "publish", Subject: "$JS.API.CONSUMER.LIST.SECRET"}},
+			{Stream: "BROKEN", Error: "stream offline"},
+		},
+	}}
+
+	resp, err := New(svc, svc).GetAllConsumers(t.Context(), connect.NewRequest(&statspb.GetAllConsumersRequest{ConnectionId: "conn1"}))
+	require.NoError(t, err)
+
+	require.Len(t, resp.Msg.GetConsumers(), 1)
+	c := resp.Msg.GetConsumers()[0]
+	assert.Equal(t, "worker", c.GetName())
+	assert.Equal(t, "ORDERS", c.GetStream())
+	assert.Equal(t, uint64(3), c.GetNumPending())
+	assert.Equal(t, uint64(7), c.GetDelivered().GetStream())
+	assert.Equal(t, active, c.GetDelivered().GetLastActive().AsTime())
+	assert.Nil(t, c.GetAckFloor().GetLastActive())
+	assert.Equal(t, int32(10), c.GetConfig().GetMaxAckPending())
+
+	require.Len(t, resp.Msg.GetStreams(), 1)
+	assert.Equal(t, "ORDERS", resp.Msg.GetStreams()[0].GetConfig().GetName())
+	assert.Equal(t, uint64(95), resp.Msg.GetStreams()[0].GetState().GetMsgs())
+
+	require.Len(t, resp.Msg.GetUnreadableStreams(), 2)
+	denied := resp.Msg.GetUnreadableStreams()[0]
+	assert.Equal(t, "SECRET", denied.GetStream())
+	assert.Equal(t, natspb.AccessStatus_ACCESS_STATUS_DENIED, denied.GetAccess().GetStatus())
+	assert.Equal(t, "$JS.API.CONSUMER.LIST.SECRET", denied.GetAccess().GetSubject())
+	broken := resp.Msg.GetUnreadableStreams()[1]
+	assert.Nil(t, broken.Access)
+	assert.Equal(t, "stream offline", broken.GetError())
 }

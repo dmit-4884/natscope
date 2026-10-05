@@ -15,6 +15,10 @@ service MessagesService {
 
   // Returns a single message from a JetStream stream by its sequence number.
   rpc GetMessage(GetMessageRequest) returns (GetMessageResponse) {}
+
+  // Returns the first message at or after a sequence whose subject matches one of the filters.
+  // Reads the stream directly, so no consumer state changes.
+  rpc GetNextMessage(GetNextMessageRequest) returns (GetNextMessageResponse) {}
 }
 
 // Defines the direction for sequential message retrieval.
@@ -105,4 +109,28 @@ message GetMessageRequest {
 message GetMessageResponse {
   // Required. The requested NATS message, optionally decoded from protobuf if a mapping exists.
   .natscope.types.nats.NatsMessage message = 1;
+}
+
+// Defines the request message for finding the next matching JetStream message.
+message GetNextMessageRequest {
+  // Required. Identifier of the NATS connection to read the message from.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Name of the JetStream stream to search.
+  string stream_name = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. Sequence number to start the search at, inclusive.
+  uint64 start_seq = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).uint64.gt = 0];
+
+  // Optional. Subject filters, wildcards allowed; empty matches every subject.
+  repeated string subjects = 4 [(buf.validate.field).repeated = {
+    max_items: 64
+    items: {string: {min_len: 1}}
+  }];
+}
+
+// Defines the response message for finding the next matching JetStream message.
+message GetNextMessageResponse {
+  // Optional. The first matching message, decoded like GetMessage; unset when nothing matches.
+  optional .natscope.types.nats.NatsMessage message = 1;
 }

@@ -78,20 +78,16 @@ func (h *Handler) GetStreamStats(
 	}), nil
 }
 
-// GetAllConsumers returns all consumers across all streams.
+// GetAllConsumers returns every readable consumer across all streams, with the streams and the unreadable ones.
 func (h *Handler) GetAllConsumers(
 	ctx context.Context,
 	req *connect.Request[statspb.GetAllConsumersRequest],
 ) (*connect.Response[statspb.GetAllConsumersResponse], error) {
-	consumers, err := h.natsService.GetAllConsumers(ctx, req.Msg.ConnectionId)
+	overview, err := h.natsService.GetConsumersOverview(ctx, req.Msg.ConnectionId)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&statspb.GetAllConsumersResponse{
-		Consumers: slices.To(consumers, func(c entities.ConsumerStats) *natspb.ConsumerStats {
-			return converter.Convert(&c, &natspb.ConsumerStats{}, grpchelpers.ProtoCodecs)
-		}),
-	}), nil
+	return connect.NewResponse(converter.Convert(overview, &statspb.GetAllConsumersResponse{}, grpchelpers.ProtoCodecs)), nil
 }
 
 // GetHealth returns connection health status.

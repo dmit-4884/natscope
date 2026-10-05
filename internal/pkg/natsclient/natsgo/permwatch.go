@@ -168,25 +168,31 @@ func (pw *PermissionWatcher) HandleAsyncError(err error) {
 // violation for one of the subjects arrives; the violation replaces fn's
 // error. Subject entries ending in "." match as prefixes, others exactly.
 func (pw *PermissionWatcher) Watch(ctx context.Context, subjects []string, fn func(ctx context.Context) error) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, end := pw.Begin(ctx, subjects)
+	err := fn(ctx)
+	if violation := end(); violation != nil {
+		return violation
+	}
+	return err
+}
 
+// Begin watches subjects for an operation that outlives one call, such as a lister: the returned context is
+// canceled as soon as a matching violation arrives. end stops the watch and returns that violation, if any.
+func (pw *PermissionWatcher) Begin(ctx context.Context, subjects []string) (context.Context, func() error) {
+	ctx, cancel := context.WithCancel(ctx)
 	waiter := &permissionWaiter{subjects: subjects, cancel: cancel}
 	pw.mu.Lock()
 	pw.waiters[waiter] = struct{}{}
 	pw.mu.Unlock()
 
-	err := fn(ctx)
-
-	pw.mu.Lock()
-	delete(pw.waiters, waiter)
-	violation := waiter.err
-	pw.mu.Unlock()
-
-	if violation != nil {
+	return ctx, func() error {
+		pw.mu.Lock()
+		delete(pw.waiters, waiter)
+		violation := waiter.err
+		pw.mu.Unlock()
+		cancel()
 		return violation
 	}
-	return err
 }
 
 // TakeRecent returns and clears the last uncorrelated async error when it

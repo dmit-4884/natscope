@@ -18,4 +18,7 @@ type Service interface {
 
 	// Get fetches and decodes a single message by sequence number.
 	Get(ctx context.Context, in *entities.MessageGetRequest) (*entities.Message, error)
+
+	// Next fetches and decodes the first message at or after a sequence that matches the filters; nil when none does.
+	Next(ctx context.Context, in *entities.MessageNextRequest) (*entities.Message, error)
 }

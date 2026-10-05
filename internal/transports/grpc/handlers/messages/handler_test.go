@@ -25,6 +25,8 @@ type mockMsgService struct {
 	listErr    error
 	getResult  *entities.Message
 	getErr     error
+	nextIn     *entities.MessageNextRequest
+	nextResult *entities.Message
 }
 
 func (m *mockMsgService) List(_ context.Context, _ *entities.MessageListRequest) (*entities.MessagesResponse, error) {
@@ -33,6 +35,11 @@ func (m *mockMsgService) List(_ context.Context, _ *entities.MessageListRequest)
 
 func (m *mockMsgService) Get(_ context.Context, _ *entities.MessageGetRequest) (*entities.Message, error) {
 	return m.getResult, m.getErr
+}
+
+func (m *mockMsgService) Next(_ context.Context, in *entities.MessageNextRequest) (*entities.Message, error) {
+	m.nextIn = in
+	return m.nextResult, nil
 }
 
 // --- Tests ---
@@ -105,5 +112,33 @@ func TestHandler_GetMessage(t *testing.T) {
 			Sequence:     999,
 		}))
 		assert.ErrorIs(t, err, errs.ErrMsgNotFound)
+	})
+}
+
+func TestHandler_GetNextMessage(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns the match for the requested filters", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockMsgService{nextResult: &entities.Message{Sequence: 7, Subject: "orders.paid"}}
+
+		resp, err := New(svc).GetNextMessage(t.Context(), connect.NewRequest(&messagespb.GetNextMessageRequest{
+			ConnectionId: "conn1", StreamName: "ORDERS", StartSeq: 5, Subjects: []string{"orders.paid", "orders.*"},
+		}))
+		require.NoError(t, err)
+		require.NotNil(t, resp.Msg.Message)
+		assert.Equal(t, uint64(7), resp.Msg.GetMessage().GetSequence())
+		assert.Equal(t, &entities.MessageNextRequest{
+			ConnectionID: "conn1", StreamName: "ORDERS", StartSeq: 5, Subjects: []string{"orders.paid", "orders.*"},
+		}, svc.nextIn)
+	})
+
+	t.Run("no match leaves the message unset", func(t *testing.T) {
+		t.Parallel()
+		resp, err := New(&mockMsgService{}).GetNextMessage(t.Context(), connect.NewRequest(&messagespb.GetNextMessageRequest{
+			ConnectionId: "conn1", StreamName: "ORDERS", StartSeq: 99,
+		}))
+		require.NoError(t, err)
+		assert.Nil(t, resp.Msg.Message)
 	})
 }

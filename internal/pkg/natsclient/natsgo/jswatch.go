@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -94,6 +95,22 @@ func watchCall[T any](ctx context.Context, w *jetStreamWatch, subjects []string,
 	return out, w.translate(err)
 }
 
+// watchLister watches subjects while a lister pages in the background; end runs once, from Err or when ctx ends.
+func (w *jetStreamWatch) watchLister(ctx context.Context, subjects []string) (context.Context, func() error) {
+	watched, end := w.pw.Begin(ctx, subjects)
+	end = sync.OnceValue(end)
+	context.AfterFunc(ctx, func() { _ = end() }) //nolint:errcheck // releasing the watch; Err reports the violation
+	return watched, end
+}
+
+// listerErr reports the violation that stopped a lister in place of the cancellation the lister saw.
+func (w *jetStreamWatch) listerErr(end func() error, err error) error {
+	if violation := end(); violation != nil {
+		return w.translate(violation)
+	}
+	return w.translate(err)
+}
+
 // stream wraps a returned stream handle so its own API calls are watched too.
 func (w *jetStreamWatch) stream(s jetstream.Stream, name string) jetstream.Stream {
 	if s == nil {
@@ -146,11 +163,13 @@ func (w *jetStreamWatch) DeleteStream(ctx context.Context, name string) error {
 }
 
 func (w *jetStreamWatch) ListStreams(ctx context.Context, opts ...jetstream.StreamListOpt) jetstream.StreamInfoLister {
-	return &streamInfoLister{StreamInfoLister: w.JetStream.ListStreams(ctx, opts...), w: w}
+	ctx, end := w.watchLister(ctx, []string{subjStreamList})
+	return &streamInfoLister{StreamInfoLister: w.JetStream.ListStreams(ctx, opts...), w: w, end: end}
 }
 
 func (w *jetStreamWatch) StreamNames(ctx context.Context, opts ...jetstream.StreamListOpt) jetstream.StreamNameLister {
-	return &streamNameLister{StreamNameLister: w.JetStream.StreamNames(ctx, opts...), w: w}
+	ctx, end := w.watchLister(ctx, []string{subjStreamNames})
+	return &streamNameLister{StreamNameLister: w.JetStream.StreamNames(ctx, opts...), w: w, end: end}
 }
 
 func (w *jetStreamWatch) Publish(ctx context.Context, subject string, payload []byte, opts ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
@@ -230,11 +249,13 @@ func (s *streamWatch) DeleteConsumer(ctx context.Context, name string) error {
 }
 
 func (s *streamWatch) ConsumerNames(ctx context.Context) jetstream.ConsumerNameLister {
-	return &consumerNameLister{ConsumerNameLister: s.Stream.ConsumerNames(ctx), w: s.w}
+	ctx, end := s.w.watchLister(ctx, subjectsFor(s.name, subjConsumerNames))
+	return &consumerNameLister{ConsumerNameLister: s.Stream.ConsumerNames(ctx), w: s.w, end: end}
 }
 
 func (s *streamWatch) ListConsumers(ctx context.Context) jetstream.ConsumerInfoLister {
-	return &consumerInfoLister{ConsumerInfoLister: s.Stream.ListConsumers(ctx), w: s.w}
+	ctx, end := s.w.watchLister(ctx, subjectsFor(s.name, subjConsumerList))
+	return &consumerInfoLister{ConsumerInfoLister: s.Stream.ListConsumers(ctx), w: s.w, end: end}
 }
 
 func (s *streamWatch) GetMsg(ctx context.Context, seq uint64, opts ...jetstream.GetMsgOpt) (*jetstream.RawStreamMsg, error) {
@@ -317,31 +338,35 @@ func (b *batchWatch) Error() error {
 // retained by the fallback slot.
 type streamInfoLister struct {
 	jetstream.StreamInfoLister
-	w *jetStreamWatch
+	w   *jetStreamWatch
+	end func() error
 }
 
-func (l *streamInfoLister) Err() error { return l.w.translate(l.StreamInfoLister.Err()) }
+func (l *streamInfoLister) Err() error { return l.w.listerErr(l.end, l.StreamInfoLister.Err()) }
 
 type streamNameLister struct {
 	jetstream.StreamNameLister
-	w *jetStreamWatch
+	w   *jetStreamWatch
+	end func() error
 }
 
-func (l *streamNameLister) Err() error { return l.w.translate(l.StreamNameLister.Err()) }
+func (l *streamNameLister) Err() error { return l.w.listerErr(l.end, l.StreamNameLister.Err()) }
 
 type consumerNameLister struct {
 	jetstream.ConsumerNameLister
-	w *jetStreamWatch
+	w   *jetStreamWatch
+	end func() error
 }
 
-func (l *consumerNameLister) Err() error { return l.w.translate(l.ConsumerNameLister.Err()) }
+func (l *consumerNameLister) Err() error { return l.w.listerErr(l.end, l.ConsumerNameLister.Err()) }
 
 type consumerInfoLister struct {
 	jetstream.ConsumerInfoLister
-	w *jetStreamWatch
+	w   *jetStreamWatch
+	end func() error
 }
 
-func (l *consumerInfoLister) Err() error { return l.w.translate(l.ConsumerInfoLister.Err()) }
+func (l *consumerInfoLister) Err() error { return l.w.listerErr(l.end, l.ConsumerInfoLister.Err()) }
 
 // Request performs a core NATS request under a permissions watch for its
 // subject, so a denied request fails fast instead of waiting out its deadline.
