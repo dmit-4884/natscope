@@ -101,7 +101,8 @@ holds for AI agents over [MCP](/guide/mcp) too. The UI hides those actions, and 
 such as **Publish** and **Request / Reply**, explain why and link to the connection settings.
 
 Reading still works the way it does elsewhere: browsing and searching messages may create short-lived
-ordered consumers that the server removes on its own.
+consumers without acks. Natscope deletes them after use; the server removes one on its own only when that
+cleanup fails.
 
 ## Where credentials live
 
