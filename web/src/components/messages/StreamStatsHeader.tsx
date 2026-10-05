@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useStreamDetail } from '@/contexts/streams'
 import { useLiveStatsStore } from '@/contexts/live'
 import { cn } from '@/utils/cn'
@@ -102,7 +103,7 @@ export default function StreamStatsHeader({ streamName, connectionId }: StreamSt
     }
     fit()
     if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(fit)
+    const observer = new ResizeObserver(() => flushSync(fit))
     observer.observe(container)
     return () => observer.disconnect()
   }, [stats])

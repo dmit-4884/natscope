@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { MicroEndpoint, MicroService } from '@/api/discovery'
-import { healthOf, sampleOf, sumWindows, windowsBetween } from './serviceRates'
+import { renderHook } from '@testing-library/react'
+import type { MicroDiscovery, MicroEndpoint, MicroService } from '@/api/discovery'
+import { healthOf, sampleOf, sumWindows, useServiceWindows, windowsBetween } from './serviceRates'
 
 function endpoint(name: string, requests: number, errors: number, processingNs: number): MicroEndpoint {
   return {
@@ -79,5 +80,27 @@ describe('healthOf', () => {
     expect(healthOf({ requests: 1000, errors: 5, processingNs: 0, seconds: 5 })).toBe('ok')
     expect(healthOf({ requests: 100, errors: 5, processingNs: 0, seconds: 5 })).toBe('degraded')
     expect(healthOf({ requests: 10, errors: 3, processingNs: 0, seconds: 5 })).toBe('failing')
+  })
+})
+
+describe('useServiceWindows', () => {
+  const discovery = (requests: number): MicroDiscovery => ({
+    info_access: { status: 'allowed', operation: 'publish', subject: '$SRV.INFO' },
+    services: [service({ a: [endpoint('add', requests, 0, 0)] })],
+  })
+
+  it('keeps the last rates when the page comes back, instead of measuring again', () => {
+    const first = renderHook(({ data, at }) => useServiceWindows('conn-remember', data, at), {
+      initialProps: { data: discovery(10), at: 1000 },
+    })
+    first.rerender({ data: discovery(30), at: 6000 })
+    expect(sumWindows(first.result.current!, () => true)?.requests).toBe(20)
+    first.unmount()
+
+    const again = renderHook(() => useServiceWindows('conn-remember', discovery(30), 6000))
+    expect(sumWindows(again.result.current!, () => true)?.requests).toBe(20)
+
+    const other = renderHook(() => useServiceWindows('conn-other', discovery(30), 6000))
+    expect(other.result.current).toBeNull()
   })
 })

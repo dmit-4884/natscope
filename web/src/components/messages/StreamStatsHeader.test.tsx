@@ -61,6 +61,29 @@ describe('StreamStatsHeader', () => {
     expect(screen.getByTestId('stream-stats')).not.toHaveClass('flex-wrap')
   })
 
+  it('refits before the next paint when its width changes', () => {
+    const resized: Array<() => void> = []
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resized.push(callback)
+        }
+        observe() {}
+        disconnect() {}
+      },
+    )
+    containerWidth = 800
+    render(<StreamStatsHeader streamName="ORDERS" connectionId="conn-1" />)
+
+    containerWidth = 500
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    resized.forEach((callback) => callback())
+
+    expect(labels()[0]?.textContent).toBe('Msgs')
+    vi.unstubAllGlobals()
+  })
+
   it('wraps as a last resort', () => {
     containerWidth = 200
     render(<StreamStatsHeader streamName="ORDERS" connectionId="conn-1" />)

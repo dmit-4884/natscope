@@ -96,3 +96,44 @@ describe('StreamTabs', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/streams/ORDERS/relations')
   })
 })
+
+describe('StreamTabs on a resize', () => {
+  const resized: Array<() => void> = []
+
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === 'stream-tabs' ? rowWidth : 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.tab ? TAB_WIDTH : 0
+    })
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resized.push(callback)
+        }
+        observe() {}
+        disconnect() {}
+      },
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    resized.length = 0
+  })
+
+  it('refits before the next paint, so the row never shows the old set of tabs', () => {
+    rowWidth = 1000
+    renderAt('/streams/ORDERS/messages')
+    expect(screen.queryByRole('button', { name: 'More tabs' })).not.toBeInTheDocument()
+
+    rowWidth = 300
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    resized.forEach((callback) => callback())
+
+    expect(tabNames()).toEqual(['Messages', 'Config'])
+  })
+})

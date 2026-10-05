@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { MicroDiscovery, MicroService } from '@/api/discovery'
 
 interface Counters {
@@ -92,16 +92,27 @@ export function healthOf(window: WindowTotal | undefined): Health {
   return 'ok'
 }
 
-export function useServiceWindows(data: MicroDiscovery | undefined, updatedAt: number): EndpointWindow[] | null {
-  const previous = useRef<Sample | null>(null)
-  const [windows, setWindows] = useState<EndpointWindow[] | null>(null)
+const remembered = new Map<string, { sample: Sample; windows: EndpointWindow[] | null }>()
+
+export function useServiceWindows(
+  connectionId: string,
+  data: MicroDiscovery | undefined,
+  updatedAt: number,
+): EndpointWindow[] | null {
+  const [shown, setShown] = useState(() => ({ connectionId, windows: remembered.get(connectionId)?.windows ?? null }))
 
   useEffect(() => {
     if (!data || !updatedAt) return
+    const last = remembered.get(connectionId)
+    if (last?.sample.at === updatedAt) {
+      setShown((prev) => (prev.connectionId === connectionId && prev.windows === last.windows ? prev : { connectionId, windows: last.windows }))
+      return
+    }
     const next = sampleOf(data.services, updatedAt)
-    setWindows(previous.current && next.counters.size > 0 ? windowsBetween(previous.current, next) : null)
-    previous.current = next
-  }, [data, updatedAt])
+    const windows = last && next.counters.size > 0 ? windowsBetween(last.sample, next) : null
+    remembered.set(connectionId, { sample: next, windows })
+    setShown({ connectionId, windows })
+  }, [connectionId, data, updatedAt])
 
-  return windows
+  return shown.connectionId === connectionId ? shown.windows : (remembered.get(connectionId)?.windows ?? null)
 }

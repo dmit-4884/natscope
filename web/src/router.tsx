@@ -1,9 +1,10 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
-import { lazy } from 'react'
 import RootLayout from './components/common/RootLayout'
 import ConnectedLayout from './components/common/ConnectedLayout'
 import NotFoundPage from './components/common/NotFoundPage'
 import { LazyRoute } from './components/common/LazyRoute'
+import { KeyedByParam } from './components/common/KeyedByParam'
+import { lazyPage } from './components/common/lazyPage'
 import StreamView from './components/streams/StreamView'
 import ConnectionSelector from './components/connections/ConnectionSelector'
 import { ReadOnlyGate } from './components/connections/ReadOnlyGate'
@@ -13,19 +14,40 @@ import MessagesTab from './components/streams/MessagesTab'
 import PublishTab from './components/streams/PublishTab'
 
 // Lazy loaded components for better initial bundle size
-const CreateStreamPage = lazy(() => import('./components/streams/CreateStreamPage'))
-const StreamConfigTab = lazy(() => import('./components/streams/StreamConfigTab'))
-const StreamConsumersTab = lazy(() => import('./components/streams/StreamConsumersTab'))
-const StreamRelationsTab = lazy(() => import('./components/streams/StreamRelationsTab'))
-const KVStorePage = lazy(() => import('./components/kv/KVStorePage'))
-const CreateKVPage = lazy(() => import('./components/kv/CreateKVPage'))
-const KVOverviewPage = lazy(() => import('./components/kv/KVOverviewPage'))
-const ObjectsTab = lazy(() => import('./components/management/objects/ObjectsTab'))
-const ObjectsOverviewPage = lazy(() => import('./components/objects/ObjectsOverviewPage'))
-const RequestPage = lazy(() => import('./components/request/RequestPage'))
-const SubscribePage = lazy(() => import('./components/subscribe/SubscribePage'))
-const ServicesPage = lazy(() => import('./components/services/ServicesPage'))
-const ConsumersPage = lazy(() => import('./components/consumers/ConsumersPage'))
+const CreateStreamPage = lazyPage(() => import('./components/streams/CreateStreamPage'))
+const StreamConfigTab = lazyPage(() => import('./components/streams/StreamConfigTab'))
+const StreamConsumersTab = lazyPage(() => import('./components/streams/StreamConsumersTab'))
+const StreamRelationsTab = lazyPage(() => import('./components/streams/StreamRelationsTab'))
+const KVStorePage = lazyPage(() => import('./components/kv/KVStorePage'))
+const CreateKVPage = lazyPage(() => import('./components/kv/CreateKVPage'))
+const KVOverviewPage = lazyPage(() => import('./components/kv/KVOverviewPage'))
+const ObjectsTab = lazyPage(() => import('./components/management/objects/ObjectsTab'))
+const ObjectsOverviewPage = lazyPage(() => import('./components/objects/ObjectsOverviewPage'))
+const RequestPage = lazyPage(() => import('./components/request/RequestPage'))
+const SubscribePage = lazyPage(() => import('./components/subscribe/SubscribePage'))
+const ServicesPage = lazyPage(() => import('./components/services/ServicesPage'))
+const ConsumersPage = lazyPage(() => import('./components/consumers/ConsumersPage'))
+
+export function preloadRoutes() {
+  for (const page of [
+    CreateStreamPage,
+    StreamConfigTab,
+    StreamConsumersTab,
+    StreamRelationsTab,
+    KVStorePage,
+    CreateKVPage,
+    KVOverviewPage,
+    ObjectsTab,
+    ObjectsOverviewPage,
+    RequestPage,
+    SubscribePage,
+    ServicesPage,
+    ConsumersPage,
+  ]) {
+    void page.preload().catch(() => undefined)
+  }
+}
+
 // Settings pages are eager-loaded: lazy-load + Suspense caused a
 // "Loading..." flash on every tab switch.
 import SettingsLayout from './components/settings/page/SettingsLayout'
@@ -68,7 +90,7 @@ export const router = createBrowserRouter([
               { path: 'new', element: <ReadOnlyGate><LazyRoute><CreateStreamPage /></LazyRoute></ReadOnlyGate> },
               {
                 path: ':streamName',
-                element: <StreamView />,
+                element: <KeyedByParam param="streamName"><StreamView /></KeyedByParam>,
                 children: [
                   { index: true, element: <Navigate to="messages" replace /> },
                   { path: 'messages', element: <MessagesTab /> },
@@ -91,7 +113,7 @@ export const router = createBrowserRouter([
               // Create new KV store - must be before :bucketName
               { path: 'new', element: <ReadOnlyGate><LazyRoute><CreateKVPage /></LazyRoute></ReadOnlyGate> },
               // KV store view
-              { path: ':bucketName', element: <LazyRoute><KVStorePage /></LazyRoute> },
+              { path: ':bucketName', element: <KeyedByParam param="bucketName"><LazyRoute><KVStorePage /></LazyRoute></KeyedByParam> },
             ]
           },
 
@@ -103,7 +125,7 @@ export const router = createBrowserRouter([
               // Create new bucket - must be before :bucketName
               { path: 'new', element: <ReadOnlyGate><LazyRoute><ObjectsTab createMode /></LazyRoute></ReadOnlyGate> },
               // Object store view
-              { path: ':bucketName', element: <LazyRoute><ObjectsTab /></LazyRoute> },
+              { path: ':bucketName', element: <KeyedByParam param="bucketName"><LazyRoute><ObjectsTab /></LazyRoute></KeyedByParam> },
             ]
           },
 

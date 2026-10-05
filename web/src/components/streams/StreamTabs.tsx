@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useConnectionPolicy } from '@/contexts/connection'
 import { ChevronDownIcon, OverflowMenu, RelationsIcon, UsersIcon } from '@/components/ui'
@@ -87,7 +88,7 @@ export default function StreamTabs({ baseUrl }: { baseUrl: string }) {
     }
     fit()
     if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(fit)
+    const observer = new ResizeObserver(() => flushSync(fit))
     observer.observe(row)
     return () => observer.disconnect()
   }, [tabs])

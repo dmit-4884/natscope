@@ -18,7 +18,7 @@ interface StreamListProps {
   connectionId: string
 }
 
-const streamHref = (name: string) => `/streams/${encodeURIComponent(name)}`
+const streamHref = (name: string) => `/streams/${encodeURIComponent(name)}/messages`
 
 export default function StreamList({ connectionId }: StreamListProps) {
   const { streamName: selectedStream } = useParams()

@@ -57,7 +57,7 @@ export default function ServicesPage() {
     query: { data, error, isLoading, isFetching, dataUpdatedAt },
     recheck,
   } = useMicroServices(connectionId, { autoRefresh })
-  const windows = useServiceWindows(data, dataUpdatedAt)
+  const windows = useServiceWindows(connectionId, data, dataUpdatedAt)
 
   const infoDenied = isDenied(data?.info_access)
   const statsDenied = isDenied(data?.stats_access)

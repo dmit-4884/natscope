@@ -6,7 +6,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { getErrorMessage } from './api/errors'
 import { toast } from './utils/toast'
 import { shouldToastMutationError } from './utils/mutationErrorPolicy'
-import { router } from './router'
+import { preloadRoutes, router } from './router'
 import './index.css'
 
 // Global error handlers for uncaught errors
@@ -46,3 +46,5 @@ createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </React.StrictMode>,
 )
+
+window.setTimeout(preloadRoutes, 500)
