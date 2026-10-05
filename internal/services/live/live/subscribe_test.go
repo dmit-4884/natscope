@@ -339,3 +339,35 @@ func nextEvent(t *testing.T, events <-chan *entities.LiveEvent, match func(*enti
 		}
 	}
 }
+
+func TestSubscribe_ExcludedSubjectsDoNotUseTheDisplayRate(t *testing.T) {
+	t.Parallel()
+
+	rate := int32(1)
+	sub, events, stop := startFakeSessionWith(t, &entities.LiveSubscribeRequest{
+		ConnectionId:    "conn",
+		Subscriptions:   []*entities.LiveSubscriptionTarget{{Subject: ">"}},
+		MaxDisplayRate:  &rate,
+		ExcludeSubjects: []string{"metrics.>"},
+	})
+	defer stop()
+
+	for range 5 {
+		sub.deliver(t, ">", &entities.NatsMessage{Subject: "metrics.cpu", Data: []byte("noise")})
+	}
+	sub.deliver(t, ">", &entities.NatsMessage{Subject: "orders.created", Data: []byte("wanted")})
+
+	assert.Equal(t, map[string]int{"wanted": 1}, collectPayloads(t, events, "wanted"))
+	var stats *entities.LiveStats
+	deadline := time.After(2*statsInterval + 2*time.Second)
+	for stats == nil {
+		select {
+		case ev := <-events:
+			stats = ev.Stats
+		case <-deadline:
+			t.Fatal("no stats")
+		}
+	}
+	assert.Zero(t, stats.MessagesDropped, "a muted message is not a skipped one")
+	assert.Equal(t, int64(5), stats.SubjectCounts["metrics.cpu"], "muted subjects still count")
+}

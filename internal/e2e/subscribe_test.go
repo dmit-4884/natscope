@@ -204,6 +204,44 @@ func TestSubscribeCoreSubjects(t *testing.T) {
 		assert.Equal(t, 1, seen)
 	})
 
+	t.Run("excluded subjects stay out of the feed", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		stream, err := env.live.Subscribe(ctx, connect.NewRequest(&livepb.SubscribeRequest{
+			ConnectionId:    connID,
+			Subscriptions:   []*livepb.LiveSubscription{{Subject: "mute.>"}},
+			ExcludeSubjects: []string{"mute.noise.>"},
+		}))
+		require.NoError(t, err)
+		defer stream.Close()
+		events := make(chan *livepb.LiveEvent, 64)
+		go func() {
+			defer close(events)
+			for stream.Receive() {
+				events <- stream.Msg()
+			}
+		}()
+
+		stop := make(chan struct{})
+		defer close(stop)
+		publishUntil(t, stop, func() {
+			_ = nc.Publish("mute.noise.cpu", nil)
+			_ = nc.Publish("mute.wanted", nil)
+		})
+
+		noise := 0
+		var wanted *natstypes.NatsMessage
+		waitLive(t, events, 10*time.Second, func(ev *livepb.LiveEvent) bool {
+			for _, m := range ev.GetBatch().GetMessages() {
+				if m.GetSubject() == "mute.noise.cpu" {
+					noise++
+				}
+			}
+			return batchMessage("mute.wanted", &wanted)(ev)
+		})
+		assert.Zero(t, noise)
+	})
+
 	t.Run("core publish may carry no body", func(t *testing.T) {
 		resp, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
 			ConnectionId: connID, Subject: "core.empty", Core: true,

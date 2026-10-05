@@ -61,7 +61,8 @@ func (s *Service) Subscribe(
 		}
 	}
 
-	return s.runLoop(ctx, sess, msgChan, loopLimits{maxDisplayRate: maxDisplayRate, maxPayloadBytes: payloadCap, detect: detect}, emit)
+	limits := loopLimits{maxDisplayRate: maxDisplayRate, maxPayloadBytes: payloadCap, detect: detect, exclude: in.ExcludeSubjects}
+	return s.runLoop(ctx, sess, msgChan, limits, emit)
 }
 
 // validateSubscriptionTargets rejects a malformed subject pattern before any NATS work happens.
