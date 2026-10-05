@@ -48,9 +48,21 @@ export default function FilterChips({ filters, onRemoveFilter, onClearAll }: Fil
   if (filters.contentFilter) {
     activeFilters.push({
       key: 'contentFilter',
-      label: 'Content',
+      label: filters.contentRegex ? 'Regex' : 'Content',
       value: filters.contentFilter,
     })
+  }
+
+  if (filters.header) {
+    activeFilters.push({ key: 'header', label: 'Header', value: filters.header })
+  }
+
+  if (filters.stopSequence !== null) {
+    activeFilters.push({ key: 'stopSequence', label: 'Stop at Seq', value: filters.stopSequence.toString() })
+  }
+
+  if (filters.stopDate) {
+    activeFilters.push({ key: 'stopDate', label: 'Stop at', value: formatFilterDate(filters.stopDate) })
   }
 
   if (activeFilters.length === 0) {

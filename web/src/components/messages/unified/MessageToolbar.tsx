@@ -70,7 +70,15 @@ export function MessageToolbar(props: Props) {
     onOpenExport,
   } = props
 
-  const hasActiveFilters = !!(filters.subject || filters.startSequence || filters.startDate || filters.contentFilter)
+  const hasActiveFilters = !!(
+    filters.subject ||
+    filters.startSequence ||
+    filters.startDate ||
+    filters.contentFilter ||
+    filters.header ||
+    filters.stopSequence ||
+    filters.stopDate
+  )
 
   return (
     <div className="px-4 py-2 bg-surface-secondary border-b">

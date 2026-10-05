@@ -5,7 +5,7 @@ import { createStreamScopedStore, type StreamScope } from './index'
  *  UnifiedMessageList so arrow navigation fetches with identical filters. */
 export interface NavQuery {
   subjectFilter?: string
-  contentFilter?: string
+  sequences?: number[]
   direction: 'backward' | 'forward'
 }
 

@@ -15,7 +15,6 @@ export function useMessages(
       params.start_time ?? null,
       params.limit ?? null,
       params.subject_filter ?? null,
-      params.content_filter ?? null,
       params.direction ?? null,
       params.max_payload_bytes ?? null,
     ],

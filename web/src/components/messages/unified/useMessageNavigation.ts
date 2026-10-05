@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getMessages } from '@/api/messages'
+import { getMessage, getMessages } from '@/api/messages'
 import type { SelectedMessage } from '@/types/messages'
 import type { NavQuery } from '@/stores/streamTabState/messagesViewStore'
 import { toast } from '@/utils/toast'
@@ -68,8 +68,10 @@ export function useMessageNavigation({
   const step = useCallback(
     async (visual: VisualDirection) => {
       if (!canNavigate || inFlightRef.current) return
-      const target = resolveNavTarget(visual, navQuery?.direction ?? 'backward', sequence!)
-      if (target === 'edge') {
+      const matches = navQuery?.sequences
+      const matchIndex = matches ? matches.indexOf(sequence!) + (visual === 'up' ? -1 : 1) : -1
+      const target = matches ? null : resolveNavTarget(visual, navQuery?.direction ?? 'backward', sequence!)
+      if (target === 'edge' || (matches && (matchIndex < 0 || matchIndex >= matches.length))) {
         setEdges((prev) => ({ ...prev, [visual]: true }))
         return
       }
@@ -77,20 +79,23 @@ export function useMessageNavigation({
       inFlightRef.current = true
       setLoadingDir(visual)
       try {
-        const res = await getMessages(streamName!, {
-          connection_id: connectionId!,
-          start_seq: target.startSeq,
-          direction: target.apiDirection,
-          limit: 1,
-          subject_filter: navQuery?.subjectFilter,
-          content_filter: navQuery?.contentFilter,
-        })
+        const next = matches
+          ? await getMessage(connectionId!, streamName!, matches[matchIndex])
+          : (
+              await getMessages(streamName!, {
+                connection_id: connectionId!,
+                start_seq: target!.startSeq,
+                direction: target!.apiDirection,
+                limit: 1,
+                subject_filter: navQuery?.subjectFilter,
+              })
+            ).messages[0]
         if (selectedIdRef.current !== idAtCall) return // selection moved on
-        if (res.messages.length === 0) {
+        if (!next) {
           setEdges((prev) => ({ ...prev, [visual]: true }))
           return
         }
-        onSelectMessage(toSelectedHistoryMessage(res.messages[0]))
+        onSelectMessage(toSelectedHistoryMessage(next))
       } catch (err) {
         if (selectedIdRef.current === idAtCall) toast.error(getErrorMessage(err))
       } finally {

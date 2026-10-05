@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Code, ConnectError } from '@connectrpc/connect'
 import { create, toBinary } from '@bufbuild/protobuf'
 import { ErrorInfoSchema } from '@/gen/google/rpc/error_details_pb'
@@ -39,6 +39,14 @@ vi.mock('@/hooks/useConnectionQuery', () => ({
   },
 }))
 
+vi.mock('@/api/messages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/messages')>()),
+  searchMessages: vi.fn(async function* () {
+    yield { kind: 'matches', messages: [{ sequence: 41, subject: 'orders.paid', timestamp: 0, data_base64: '', data_size: 0, content_type: 'text' }] }
+    yield { kind: 'done', done: { scanned: 120, matched: 1, reason: 'complete', range_first: 1, range_last: 120 } }
+  }),
+}))
+
 vi.mock('@/contexts/settings', () => ({
   useDisplayPreferences: () => ({
     density: 'comfortable',
@@ -60,6 +68,7 @@ vi.mock('@/contexts/settings', () => ({
   useSettings: () => ({ isSuccess: true, data: undefined }),
 }))
 
+import { searchMessages } from '@/api/messages'
 import UnifiedMessageList from './UnifiedMessageList'
 
 function workQueueConsumerError(): ConnectError {
@@ -106,5 +115,24 @@ describe('UnifiedMessageList WorkQueue history error banner', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect(screen.getByText('Stream not found')).toBeInTheDocument()
     expect(screen.getByText(/WorkQueue stream:/)).toBeInTheDocument()
+  })
+})
+
+describe('UnifiedMessageList search', () => {
+  it('searches the whole stream on the server once a text filter is applied', async () => {
+    fixtures.messagesError = null
+    renderList()
+
+    fireEvent.click(screen.getByRole('button', { name: /filters/i }))
+    fireEvent.change(screen.getByLabelText(/payload search/i), { target: { value: 'needle' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(screen.getByTestId('search-status')).toHaveTextContent('120 messages read · 1 found'))
+    expect(vi.mocked(searchMessages)).toHaveBeenCalledWith(
+      'ORDERS_WORKQUEUE',
+      expect.objectContaining({ connection_id: 'conn-1', text: 'needle', direction: 'backward' }),
+      expect.any(AbortSignal),
+    )
+    expect(screen.queryByTestId('search-empty')).not.toBeInTheDocument()
   })
 })

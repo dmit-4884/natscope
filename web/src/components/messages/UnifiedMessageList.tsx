@@ -23,6 +23,7 @@ import ExportDialog from './ExportDialog'
 import { parseStartDate } from './jumpToTime'
 import StreamStatsHeader from './StreamStatsHeader'
 import type { FilterValues } from './AdvancedFilters'
+import { EMPTY_FILTERS, toSearchQuery } from './searchQuery'
 import { MessageToolbar } from './unified/MessageToolbar'
 import { CompareModeBar } from './unified/CompareModeBar'
 import {
@@ -37,6 +38,8 @@ import { MessageVirtualTable } from './unified/MessageVirtualTable'
 import { useHistoryRefreshOnModeChange } from './unified/useHistoryRefreshOnModeChange'
 import { useLiveSubscription } from './unified/useLiveSubscription'
 import { useLoadMoreMessages } from './unified/useLoadMoreMessages'
+import { useMessageSearch } from './unified/useMessageSearch'
+import { SearchStatusBar } from './unified/SearchStatusBar'
 import { toSelectedHistoryMessage } from './unified/selectedMessage'
 import {
   liveToMessage,
@@ -58,13 +61,6 @@ interface UnifiedMessageListProps {
 // Re-export: SelectedMessage lives in @/types/messages (so stores avoid the
 // stores->ui boundary); keeps existing imports working.
 export type { SelectedMessage } from '@/types/messages'
-
-const emptyFilters: FilterValues = {
-  subject: '',
-  startSequence: null,
-  startDate: null,
-  contentFilter: '',
-}
 
 export default function UnifiedMessageList({
   streamName,
@@ -99,7 +95,7 @@ export default function UnifiedMessageList({
     if (msgSettings.defaultPageSize) setLimit(msgSettings.defaultPageSize)
   }, [settingsLoaded, display.defaultViewMode, msgSettings.defaultPageSize])
 
-  const [filters, setFilters] = useState<FilterValues>(emptyFilters)
+  const [filters, setFilters] = useState<FilterValues>(EMPTY_FILTERS)
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)
 
   const [showExportDialog, setShowExportDialog] = useState(false)
@@ -108,7 +104,7 @@ export default function UnifiedMessageList({
   const [showDiffViewer, setShowDiffViewer] = useState(false)
 
   const debouncedSubjectFilter = useDebouncedValue(filters.subject, 300)
-  const debouncedContentFilter = useDebouncedValue(filters.contentFilter, 300)
+  const debouncedFilters = useDebouncedValue(filters, 300)
 
   // Jump-to-time: a startDate switches paging from sequence to a time anchor
   // (mutually exclusive server-side; reads forward).
@@ -119,26 +115,33 @@ export default function UnifiedMessageList({
     ? ('forward' as const)
     : (msgSettings.defaultDirection as 'backward' | 'forward')
 
+  const searchQuery = useMemo(
+    () => (mode === 'history' ? toSearchQuery(debouncedFilters, msgSettings.defaultDirection as 'backward' | 'forward') : null),
+    [mode, debouncedFilters, msgSettings.defaultDirection],
+  )
+  const searchActive = searchQuery != null
+  const search = useMessageSearch(connectionId, streamName, searchQuery)
+  const searchSequences = useMemo(() => search.messages.map((m) => m.sequence), [search.messages])
+
   // Publish the effective query context for arrow navigation (StreamView) —
   // it must fetch with exactly the filters/direction the list shows.
   useEffect(() => {
     if (!scope || !isScopeReady(scope)) return
     setNavQuery(scope, {
       subjectFilter: debouncedSubjectFilter || undefined,
-      contentFilter: debouncedContentFilter || undefined,
-      direction: effectiveDirection,
+      sequences: searchQuery ? searchSequences : undefined,
+      direction: searchQuery?.direction ?? effectiveDirection,
     })
-  }, [scope, debouncedSubjectFilter, debouncedContentFilter, effectiveDirection])
+  }, [scope, debouncedSubjectFilter, effectiveDirection, searchQuery, searchSequences])
 
   const { data: historyData, isLoading, error, refetch, isFetching } = useMessages(streamName, {
     connection_id: connectionId,
     limit,
     subject_filter: debouncedSubjectFilter || undefined,
-    content_filter: debouncedContentFilter || undefined,
     start_seq: jumpActive ? undefined : (filters.startSequence ?? undefined),
     start_time: jumpActive ? jumpStartMs : undefined,
     direction: effectiveDirection,
-  }, { enabled: mode === 'history' })
+  }, { enabled: mode === 'history' && !searchActive })
 
   // Follow-up pages chained off the base query; reset whenever it changes.
   const {
@@ -152,7 +155,6 @@ export default function UnifiedMessageList({
     baseData: historyData,
     limit,
     subjectFilter: debouncedSubjectFilter || undefined,
-    contentFilter: debouncedContentFilter || undefined,
     direction: effectiveDirection,
   })
 
@@ -209,26 +211,28 @@ export default function UnifiedMessageList({
     return liveMessages.filter((msg) => msg.subject.toLowerCase().includes(lower))
   }, [liveMessages, filters.subject])
 
-  const historyLoading = mode === 'history' && (isLoading || (isFetching && !historyData))
+  const historyLoading = mode === 'history' && !searchActive && (isLoading || (isFetching && !historyData))
+  const shownHistory = searchActive ? search.messages : historyMessages
   const displayMessages: Array<Message | LiveMessage> =
-    mode === 'history' ? historyMessages : filteredLiveMessages
+    mode === 'history' ? shownHistory : filteredLiveMessages
 
   const exportMessages: Message[] = useMemo(
     () =>
-      (mode === 'history' ? historyMessages : filteredLiveMessages.map(liveToMessage)).filter(
+      (mode === 'history' ? shownHistory : filteredLiveMessages.map(liveToMessage)).filter(
         isExportableMessage,
       ),
-    [mode, historyMessages, filteredLiveMessages],
+    [mode, shownHistory, filteredLiveMessages],
   )
 
   const handleFilterChange = (key: keyof FilterValues) => {
     setFilters((prev) => ({
       ...prev,
-      [key]: key === 'startSequence' ? null : key === 'startDate' ? null : '',
+      [key]: EMPTY_FILTERS[key],
+      ...(key === 'contentFilter' ? { contentRegex: false } : {}),
     }))
   }
 
-  const handleClearAllFilters = () => setFilters(emptyFilters)
+  const handleClearAllFilters = () => setFilters(EMPTY_FILTERS)
 
   const handleClearLive = () => {
     clearLive()
@@ -292,7 +296,8 @@ export default function UnifiedMessageList({
   }
 
   const handleRefetch = () => {
-    refetch()
+    if (searchActive) search.restart()
+    else refetch()
     if (!connectionId || !streamName) return
     queryClient.invalidateQueries({ queryKey: streamKeys.detail(connectionId, streamName) })
   }
@@ -371,7 +376,9 @@ export default function UnifiedMessageList({
 
       {historyLoading && <MessagesLoading />}
 
-      {mode === 'history' && jumpActive && !historyLoading && (
+      {searchActive && searchQuery && <SearchStatusBar search={search} direction={searchQuery.direction} />}
+
+      {mode === 'history' && jumpActive && !searchActive && !historyLoading && (
         <div
           data-testid="jump-resolved"
           className="px-4 py-2 bg-accent-light border-b border-blue-100 text-xs text-blue-800 flex items-center gap-1.5"
@@ -398,7 +405,13 @@ export default function UnifiedMessageList({
 
       {!historyLoading &&
         (displayMessages.length === 0 ? (
-          <EmptyMessagesState subjectFilter={filters.subject} isRealtime={mode === 'realtime'} />
+          searchActive ? (
+            <div className="flex-1 flex items-center justify-center p-6 text-sm text-content-tertiary" data-testid="search-empty">
+              {search.status === 'running' ? 'Looking for matching messages…' : 'No message matched in the part searched so far.'}
+            </div>
+          ) : (
+            <EmptyMessagesState subjectFilter={filters.subject} isRealtime={mode === 'realtime'} />
+          )
         ) : (
           <>
             <MessageVirtualTable
@@ -418,7 +431,7 @@ export default function UnifiedMessageList({
               onSelectLive={handleSelectLiveMessage}
               onCompareSelect={handleCompareSelect}
             />
-            {mode === 'history' && hasMore && (
+            {mode === 'history' && !searchActive && hasMore && (
               <div className="p-2 bg-surface-secondary border-t flex items-center justify-center gap-3 text-sm text-content-secondary">
                 <span>Showing {displayMessages.length} messages.</span>
                 <button

@@ -1,13 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { CloseIcon, SearchIcon } from '@/components/ui'
+import { CloseIcon, SearchIcon, Toggle } from '@/components/ui'
+import { parseIntOr } from '@/utils/numbers'
 import { toDatetimeLocal, minutesAgoLocal } from './jumpToTime'
+import { EMPTY_FILTERS, type FilterValues } from './searchQuery'
 
-export interface FilterValues {
-  subject: string
-  startSequence: number | null
-  startDate: string | null
-  contentFilter: string
-}
+export type { FilterValues } from './searchQuery'
 
 interface AdvancedFiltersProps {
   filters: FilterValues
@@ -64,14 +61,8 @@ export default function AdvancedFilters({
   }
 
   const handleReset = () => {
-    const emptyFilters: FilterValues = {
-      subject: '',
-      startSequence: null,
-      startDate: null,
-      contentFilter: '',
-    }
-    setLocalFilters(emptyFilters)
-    onFiltersChange(emptyFilters)
+    setLocalFilters(EMPTY_FILTERS)
+    onFiltersChange(EMPTY_FILTERS)
   }
 
   return (
@@ -92,7 +83,7 @@ export default function AdvancedFilters({
       </div>
 
       {/* Filters */}
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 max-h-[min(70vh,40rem)] overflow-auto">
         {/* Subject Filter */}
         <div>
           <label htmlFor="filter-subject" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
@@ -163,10 +154,39 @@ export default function AdvancedFilters({
             type="text"
             value={localFilters.contentFilter}
             onChange={(e) => setLocalFilters({ ...localFilters, contentFilter: e.target.value })}
-            placeholder="Search in message content..."
+            placeholder={localFilters.contentRegex ? 'e.g., order-\\d+' : 'Search in message content...'}
             className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:ring-2 focus:ring-border-focus focus:border-border-focus"
           />
-          <p className="mt-1 text-xs text-content-muted">Case-insensitive search in decoded or raw payload</p>
+          <label className="mt-2 flex items-center gap-2 text-xs text-content-secondary">
+            <Toggle
+              checked={localFilters.contentRegex}
+              onChange={(contentRegex) => setLocalFilters({ ...localFilters, contentRegex })}
+              size="xs"
+              label="Regular expression"
+            />
+            Regular expression
+          </label>
+          <p className="mt-1 text-xs text-content-muted">
+            {localFilters.contentRegex
+              ? 'RE2 syntax, matched as written; start with (?i) to ignore case.'
+              : 'Ignores case. Looks in the decoded and the raw payload.'}{' '}
+            The server searches the whole stream.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="filter-header" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+            Header
+          </label>
+          <input
+            id="filter-header"
+            type="text"
+            value={localFilters.header}
+            onChange={(e) => setLocalFilters({ ...localFilters, header: e.target.value })}
+            placeholder="e.g., X-Trace or X-Trace=abc"
+            className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:ring-2 focus:ring-border-focus focus:border-border-focus"
+          />
+          <p className="mt-1 text-xs text-content-muted">The name ignores case; a value must match exactly.</p>
         </div>
 
         {/* Start Sequence Filter */}
@@ -190,6 +210,27 @@ export default function AdvancedFilters({
             placeholder="e.g., 1000"
             className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:ring-2 focus:ring-border-focus focus:border-border-focus"
           />
+        </div>
+
+        <div>
+          <label htmlFor="filter-stop-sequence" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+            Stop at Sequence
+          </label>
+          <input
+            id="filter-stop-sequence"
+            type="number"
+            min={1}
+            value={localFilters.stopSequence ?? ''}
+            onChange={(e) =>
+              setLocalFilters({
+                ...localFilters,
+                stopSequence: e.target.value ? Math.max(1, parseIntOr(e.target.value, 1)) : null,
+              })
+            }
+            placeholder="e.g., 500"
+            className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:ring-2 focus:ring-border-focus focus:border-border-focus"
+          />
+          <p className="mt-1 text-xs text-content-muted">The search reads from the start toward this sequence, then stops.</p>
         </div>
 
         {/* Start Date Filter */}
@@ -275,6 +316,20 @@ export default function AdvancedFilters({
               </button>
             )}
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="filter-stop-date" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+            Stop at Date & Time
+          </label>
+          <input
+            id="filter-stop-date"
+            type="datetime-local"
+            value={localFilters.stopDate ?? ''}
+            onChange={(e) => setLocalFilters({ ...localFilters, stopDate: e.target.value || null })}
+            className="w-full px-3 py-2 text-sm border border-border-strong rounded-md focus:ring-2 focus:ring-border-focus focus:border-border-focus"
+          />
+          <p className="mt-1 text-xs text-content-muted">Messages published after this minute (or before it, newest first) are left out.</p>
         </div>
       </div>
 

@@ -12,7 +12,6 @@ interface UseLoadMoreMessagesOptions {
   baseData: MessagesResponse | undefined
   limit: number
   subjectFilter?: string
-  contentFilter?: string
   direction: 'forward' | 'backward'
 }
 
@@ -28,7 +27,6 @@ export function useLoadMoreMessages({
   baseData,
   limit,
   subjectFilter,
-  contentFilter,
   direction,
 }: UseLoadMoreMessagesOptions) {
   const [extraPages, setExtraPages] = useState<MessagesResponse[]>([])
@@ -60,7 +58,6 @@ export function useLoadMoreMessages({
         start_seq: nextSeq,
         limit,
         subject_filter: subjectFilter,
-        content_filter: contentFilter,
         direction,
       })
       if (generationRef.current === generation) {
@@ -75,7 +72,7 @@ export function useLoadMoreMessages({
         setIsLoadingMore(false)
       }
     }
-  }, [streamName, connectionId, hasMore, nextSeq, isLoadingMore, limit, subjectFilter, contentFilter, direction])
+  }, [streamName, connectionId, hasMore, nextSeq, isLoadingMore, limit, subjectFilter, direction])
 
   const messages = useMemo<Message[]>(() => {
     if (!baseData) return []

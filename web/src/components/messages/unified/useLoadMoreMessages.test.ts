@@ -62,7 +62,6 @@ describe('useLoadMoreMessages', () => {
       start_seq: 8,
       limit: 2,
       subject_filter: undefined,
-      content_filter: undefined,
       direction: 'backward',
     })
     expect(result.current.messages.map((m) => m.sequence)).toEqual([10, 9, 8, 7])

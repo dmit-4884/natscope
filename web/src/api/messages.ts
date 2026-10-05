@@ -1,11 +1,9 @@
 import { timestampFromDate } from '@bufbuild/protobuf/wkt'
 import { tsToMillis } from '@/utils/timestamp'
-import { Direction } from '../gen/services/grpc/nats/v1/messages/nats_messages_service_pb'
+import { Direction, SearchStopReason as ProtoSearchStopReason } from '../gen/services/grpc/nats/v1/messages/nats_messages_service_pb'
 import type { NatsMessage } from '../gen/types/nats/nats_message_pb'
 import type { Message } from '../types/nats'
 import { messagesClient } from './grpc/clients'
-
-export { Direction } from '../gen/services/grpc/nats/v1/messages/nats_messages_service_pb'
 
 export interface GetMessagesParams {
   connection_id: string
@@ -17,7 +15,6 @@ export interface GetMessagesParams {
   start_time?: number
   limit?: number
   subject_filter?: string
-  content_filter?: string
   direction?: 'forward' | 'backward'
   /**
    * Preview cap (bytes) per message. 0 = unlimited; unset falls back to
@@ -83,7 +80,6 @@ export async function getMessages(
     connectionId: params.connection_id,
     streamName,
     subjectFilter: params.subject_filter,
-    contentFilter: params.content_filter,
     direction,
     // Mutually exclusive; start_time wins so we never send both.
     startSeq:
@@ -131,4 +127,111 @@ export async function getNextMessage(
     { signal },
   )
   return response.message ? toMessage(response.message) : null
+}
+
+export interface SearchParams {
+  connection_id: string
+  subject_filter?: string
+  direction?: 'forward' | 'backward'
+  from_seq?: number
+  to_seq?: number
+  from_time?: number
+  to_time?: number
+  cursor_seq?: number
+  text?: string
+  regex?: boolean
+  header_name?: string
+  header_value?: string
+  max_payload_bytes?: number
+}
+
+export type SearchStopReason = 'complete' | 'scan_limit' | 'time_limit' | 'match_limit'
+
+export interface SearchProgress {
+  scanned: number
+  matched: number
+  current_seq: number
+  range_first: number
+  range_last: number
+}
+
+export interface SearchDone {
+  scanned: number
+  matched: number
+  reason: SearchStopReason
+  range_first: number
+  range_last: number
+  next_seq?: number
+}
+
+export type SearchEvent =
+  | { kind: 'progress'; progress: SearchProgress }
+  | { kind: 'matches'; messages: Message[] }
+  | { kind: 'done'; done: SearchDone }
+
+const STOP_REASON: Record<ProtoSearchStopReason, SearchStopReason> = {
+  [ProtoSearchStopReason.UNSPECIFIED]: 'complete',
+  [ProtoSearchStopReason.COMPLETE]: 'complete',
+  [ProtoSearchStopReason.SCAN_LIMIT]: 'scan_limit',
+  [ProtoSearchStopReason.TIME_LIMIT]: 'time_limit',
+  [ProtoSearchStopReason.MATCH_LIMIT]: 'match_limit',
+}
+
+const toBig = (value: number | undefined) => (value != null ? BigInt(value) : undefined)
+const toStamp = (ms: number | undefined) => (ms != null ? timestampFromDate(new Date(ms)) : undefined)
+
+export async function* searchMessages(streamName: string, params: SearchParams, signal?: AbortSignal): AsyncGenerator<SearchEvent> {
+  const stream = messagesClient.searchMessages(
+    {
+      connectionId: params.connection_id,
+      streamName,
+      subjectFilter: params.subject_filter,
+      direction:
+        params.direction === 'forward' ? Direction.FORWARD : params.direction === 'backward' ? Direction.BACKWARD : Direction.UNSPECIFIED,
+      fromSeq: toBig(params.from_seq),
+      toSeq: toBig(params.to_seq),
+      fromTime: toStamp(params.from_time),
+      toTime: toStamp(params.to_time),
+      cursorSeq: toBig(params.cursor_seq),
+      text: params.text ?? '',
+      regex: params.regex ?? false,
+      headerName: params.header_name ?? '',
+      headerValue: params.header_value ?? '',
+      maxPayloadBytes: params.max_payload_bytes,
+    },
+    { signal },
+  )
+  for await (const response of stream) {
+    const event = response.event
+    switch (event.case) {
+      case 'progress':
+        yield {
+          kind: 'progress',
+          progress: {
+            scanned: Number(event.value.scanned),
+            matched: Number(event.value.matched),
+            current_seq: Number(event.value.currentSeq),
+            range_first: Number(event.value.rangeFirstSeq),
+            range_last: Number(event.value.rangeLastSeq),
+          },
+        }
+        break
+      case 'matches':
+        yield { kind: 'matches', messages: event.value.messages.map(toMessage) }
+        break
+      case 'done':
+        yield {
+          kind: 'done',
+          done: {
+            scanned: Number(event.value.scanned),
+            matched: Number(event.value.matched),
+            reason: STOP_REASON[event.value.reason] ?? 'complete',
+            range_first: Number(event.value.rangeFirstSeq),
+            range_last: Number(event.value.rangeLastSeq),
+            next_seq: event.value.nextSeq != null ? Number(event.value.nextSeq) : undefined,
+          },
+        }
+        break
+    }
+  }
 }

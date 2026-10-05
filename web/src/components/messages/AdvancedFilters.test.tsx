@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import AdvancedFilters, { type FilterValues } from './AdvancedFilters'
+import { EMPTY_FILTERS } from './searchQuery'
 
-const baseFilters: FilterValues = { subject: '', startSequence: null, startDate: null, contentFilter: '' }
+const baseFilters: FilterValues = { ...EMPTY_FILTERS }
 
 describe('AdvancedFilters', () => {
   afterEach(() => {

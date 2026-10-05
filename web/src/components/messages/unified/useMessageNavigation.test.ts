@@ -8,6 +8,7 @@ import { useMessageNavigation, type UseMessageNavigationOptions } from './useMes
 
 vi.mock('@/api/messages', () => ({
   getMessages: vi.fn(),
+  getMessage: vi.fn(),
 }))
 
 vi.mock('@/utils/toast', () => ({
@@ -47,7 +48,7 @@ function opts(over: Partial<UseMessageNavigationOptions> = {}): UseMessageNaviga
     streamName: 'ORDERS',
     connectionId: 'conn-1',
     selectedMessage: selected(10),
-    navQuery: { direction: 'backward', subjectFilter: 'orders.*', contentFilter: undefined },
+    navQuery: { direction: 'backward', subjectFilter: 'orders.*' },
     onSelectMessage: vi.fn(),
     keyboardEnabled: false,
     ...over,
@@ -73,7 +74,6 @@ describe('useMessageNavigation', () => {
       direction: 'backward',
       limit: 1,
       subject_filter: 'orders.*',
-      content_filter: undefined,
     })
     expect(o.onSelectMessage).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'history-9', sequence: 9, isLive: false }),
@@ -197,5 +197,33 @@ describe('useMessageNavigation', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
 
     expect(api.getMessages).not.toHaveBeenCalled()
+  })
+})
+
+describe('useMessageNavigation over search matches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('steps to the neighbouring match in list order, not the next stored message', async () => {
+    api.getMessage.mockResolvedValueOnce(msg(40))
+    const o = opts({ selectedMessage: selected(90), navQuery: { direction: 'backward', sequences: [120, 90, 40] } })
+    const { result } = renderHook(() => useMessageNavigation(o))
+
+    act(() => { result.current.goNext() })
+
+    await waitFor(() => expect(o.onSelectMessage).toHaveBeenCalledWith(expect.objectContaining({ sequence: 40 })))
+    expect(api.getMessage).toHaveBeenCalledWith('conn-1', 'ORDERS', 40)
+    expect(api.getMessages).not.toHaveBeenCalled()
+  })
+
+  it('stops at the first and the last match', async () => {
+    const o = opts({ selectedMessage: selected(120), navQuery: { direction: 'backward', sequences: [120, 90] } })
+    const { result } = renderHook(() => useMessageNavigation(o))
+
+    act(() => { result.current.goPrev() })
+
+    await waitFor(() => expect(result.current.prevDisabled).toBe(true))
+    expect(api.getMessage).not.toHaveBeenCalled()
   })
 })
