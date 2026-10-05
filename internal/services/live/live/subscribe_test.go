@@ -445,3 +445,19 @@ func TestSubscribe_AnInboxSubjectShowsWhatTheFullWildcardHides(t *testing.T) {
 	assert.Equal(t, map[string]int{"other": 1, "reply": 1}, collectPayloads(t, events, "reply"))
 	assert.Less(t, time.Since(start), time.Second)
 }
+
+func TestSubscribe_HoldsNoMoreThanItsByteBudget(t *testing.T) {
+	t.Parallel()
+
+	sub, events, stop := startFakeSession(t, ">", "orders.created")
+	defer stop()
+
+	big := make([]byte, maxHeldBytes/2+1)
+	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: big})
+	start := time.Now()
+	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: append([]byte("over"), big...)})
+
+	batch := nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Batch != nil })
+	assert.Less(t, time.Since(start), holdTimeout/2, "a copy past the byte budget is shown, not held")
+	require.NotEmpty(t, batch.Batch.Messages)
+}

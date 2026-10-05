@@ -86,8 +86,9 @@ type sessionState struct {
 	// liveSubjects are the subjects whose subscription has delivered, so the server did not refuse it.
 	liveSubjects map[string]struct{}
 	// held are copies waiting to learn whether an earlier subject delivers them.
-	held  []*heldMessage
-	ended bool
+	held      []*heldMessage
+	heldBytes int
+	ended     bool
 }
 
 func newSessionState(connectionID string) *sessionState {

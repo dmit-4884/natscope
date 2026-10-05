@@ -11,10 +11,11 @@ import (
 )
 
 // A copy of a message that an earlier subject may also deliver waits up to holdTimeout to learn whether that subject
-// delivers it; at most maxHeldMessages copies wait at once, the rest are shown.
+// delivers it; at most maxHeldMessages copies and maxHeldBytes of payload wait at once, the rest are shown.
 const (
 	holdTimeout     = time.Second
 	maxHeldMessages = 1000
+	maxHeldBytes    = 4 << 20
 )
 
 // coreTarget is a core subscription listed before others in a session; it takes the messages it delivers.
@@ -70,10 +71,11 @@ func (sess *sessionState) route(earlier []coreTarget, msg *entities.NatsMessage,
 		sess.silentMu.Unlock()
 		return
 	case coverageUnknown:
-		if !sess.ended && len(sess.held) < maxHeldMessages {
+		if !sess.ended && len(sess.held) < maxHeldMessages && sess.heldBytes+len(msg.Data) <= maxHeldBytes {
 			held := &heldMessage{msg: msg, earlier: earlier, deliver: deliver}
 			held.timer = time.AfterFunc(holdTimeout, func() { sess.release(held) })
 			sess.held = append(sess.held, held)
+			sess.heldBytes += len(msg.Data)
 			sess.silentMu.Unlock()
 			return
 		}
@@ -90,15 +92,14 @@ func (sess *sessionState) settleLocked() []*heldMessage {
 	sess.held = slices.DeleteFunc(sess.held, func(h *heldMessage) bool {
 		switch sess.coverageLocked(h.earlier, h.msg.Subject) {
 		case coverageTaken:
-			h.timer.Stop()
-			return true
 		case coverageNone:
-			h.timer.Stop()
 			shown = append(shown, h)
-			return true
 		case coverageUnknown:
+			return false
 		}
-		return false
+		h.timer.Stop()
+		sess.heldBytes -= len(h.msg.Data)
+		return true
 	})
 	return shown
 }
@@ -112,6 +113,7 @@ func (sess *sessionState) release(held *heldMessage) {
 		return
 	}
 	sess.held = slices.Delete(sess.held, at, at+1)
+	sess.heldBytes -= len(held.msg.Data)
 	sess.silentMu.Unlock()
 	held.deliver(held.msg)
 }
@@ -125,6 +127,7 @@ func (sess *sessionState) endHolding() {
 		h.timer.Stop()
 	}
 	sess.held = nil
+	sess.heldBytes = 0
 }
 
 func deliverHeld(shown []*heldMessage) {
