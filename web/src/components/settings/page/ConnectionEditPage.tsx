@@ -8,7 +8,9 @@ import { getErrorMessage, stripErrorCodePrefix } from '@/api/errors'
 import {
   AuthConfig,
   NatsUrl,
+  inboxPrefixError,
   toApiAuthConfig,
+  toApiConnectionConfig,
   toApiTlsConfig,
   useConnections,
   useCreateConnection,
@@ -34,6 +36,7 @@ const blankFormData: ConnectionFormData = {
   nkeySeed: '',
   credentials: '',
   tls: { ...emptyTls },
+  inboxPrefix: '',
   secretsSet: { ...noSecretsSet },
 }
 
@@ -59,6 +62,7 @@ function formFromConnection(c: SavedConnection): ConnectionFormData {
       skipVerify: c.tls?.skipVerify ?? false,
       tlsFirst: c.tls?.tlsFirst ?? false,
     },
+    inboxPrefix: c.connection?.inboxPrefix ?? '',
     secretsSet: {
       password: c.auth?.hasPassword ?? false,
       token: c.auth?.hasToken ?? false,
@@ -90,6 +94,7 @@ export default function ConnectionEditPage({ mode }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [nameError, setNameError] = useState<string | undefined>(undefined)
   const [urlErrors, setUrlErrors] = useState<(string | undefined)[]>([])
+  const [inboxError, setInboxError] = useState<string | undefined>(undefined)
   const [testResult, setTestResult] = useState<{ ok: boolean; data: TestConnectionResponse } | null>(null)
   // Snapshot right after pre-fill (or blank for create) — lets us tell a real
   // edit from an incidental re-render, for the Discard prompt and stale-test flag.
@@ -212,8 +217,10 @@ export default function ConnectionEditPage({ mode }: Props) {
     const nextNameError = form.name.trim() ? undefined : 'Name is required'
     setNameError(nextNameError)
     const urlsOk = validateUrls()
+    const nextInboxError = inboxPrefixError(form.inboxPrefix)
+    setInboxError(nextInboxError)
 
-    return !nextNameError && urlsOk
+    return !nextNameError && urlsOk && !nextInboxError
   }
 
   const handleSave = async () => {
@@ -234,6 +241,9 @@ export default function ConnectionEditPage({ mode }: Props) {
             urls,
             auth: toApiAuthConfig(buildAuth({ explicit: true }), { explicit: true }),
             tls: toApiTlsConfig(form.tls, { explicit: true }),
+            connection: form.inboxPrefix.trim() !== snapshot.inboxPrefix.trim()
+              ? toApiConnectionConfig(existing?.connection, form.inboxPrefix)
+              : undefined,
           },
         })
         toast.success('Connection updated')
@@ -244,6 +254,7 @@ export default function ConnectionEditPage({ mode }: Props) {
           urls,
           auth: toApiAuthConfig(buildAuth({ explicit: false })),
           tls: toApiTlsConfig(form.tls, { explicit: false }),
+          connection: toApiConnectionConfig(undefined, form.inboxPrefix),
         })
         toast.success('Connection saved')
       }
@@ -326,6 +337,7 @@ export default function ConnectionEditPage({ mode }: Props) {
               mode={mode}
               nameError={nameError}
               urlErrors={urlErrors}
+              inboxPrefixError={inboxError}
             />
           </div>
 

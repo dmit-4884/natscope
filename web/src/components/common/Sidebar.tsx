@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
 import { PlusIcon, ServicesIcon, SignalIcon, SwitchHorizontalIcon } from '@/components/ui'
-import { useSubscribeRunning } from '../subscribe/subscribeSession'
+import { useSubscribeStatus, type SubscribeStatus } from '../subscribe/subscribeSession'
 import StreamList from '../streams/StreamList'
 import KVList from '../kv/KVList'
 import ObjectList from '../objects/ObjectList'
@@ -41,32 +41,38 @@ const PAGE_ENTRIES: PageEntry[] = [
   { to: '/services', label: 'Services', icon: <ServicesIcon /> },
 ]
 
-const LISTENING = 'Subscription is running'
+type Listening = Extract<SubscribeStatus, 'live' | 'connecting'> | null
 
-function ListeningDot({ className }: { className?: string }) {
-  return <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse ${className ?? ''}`} />
+const LISTENING_TEXT: Record<NonNullable<Listening>, string> = {
+  live: 'Subscription is running',
+  connecting: 'Subscription is reconnecting',
+}
+
+function ListeningDot({ state, className }: { state: NonNullable<Listening>; className?: string }) {
+  const color = state === 'live' ? 'bg-status-success-border' : 'bg-status-warning-border'
+  return <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full animate-pulse ${color} ${className ?? ''}`} />
 }
 
 interface PageEntryProps {
   entry: PageEntry
   active: boolean
-  listening: boolean
+  listening: Listening
 }
 
 function RailButton({ entry, active, listening, onClick }: PageEntryProps & { onClick: () => void }) {
   return (
-    <Tooltip content={listening ? `${entry.label} · ${LISTENING}` : entry.label}>
+    <Tooltip content={listening ? `${entry.label} · ${LISTENING_TEXT[listening]}` : entry.label}>
       <button
         type="button"
         onClick={onClick}
         className={`relative p-1.5 rounded transition-colors ${
           active ? 'text-accent bg-accent-muted/70' : 'text-content-tertiary hover:text-content-primary hover:bg-surface-hover/60'
         }`}
-        aria-label={listening ? `${entry.label}, ${LISTENING.toLowerCase()}` : entry.label}
+        aria-label={listening ? `${entry.label}, ${LISTENING_TEXT[listening].toLowerCase()}` : entry.label}
         aria-current={active ? 'page' : undefined}
       >
         {entry.icon}
-        {listening && <ListeningDot className="absolute top-1 right-1" />}
+        {listening && <ListeningDot state={listening} className="absolute top-1 right-1" />}
       </button>
     </Tooltip>
   )
@@ -84,10 +90,10 @@ function PageLink({ entry, active, listening }: PageEntryProps) {
       {entry.icon}
       <span className="text-xs font-semibold uppercase tracking-wide">{entry.label}</span>
       {listening && (
-        <Tooltip content={LISTENING}>
-          <span className="ml-auto flex items-center p-1" data-testid="subscribe-listening">
-            <ListeningDot />
-            <span className="sr-only">{LISTENING}</span>
+        <Tooltip content={LISTENING_TEXT[listening]}>
+          <span className="ml-auto flex items-center p-1" data-testid="subscribe-listening" data-state={listening}>
+            <ListeningDot state={listening} />
+            <span className="sr-only">{LISTENING_TEXT[listening]}</span>
           </span>
         </Tooltip>
       )}
@@ -140,8 +146,9 @@ export default function Sidebar({ connectionId }: SidebarProps) {
   const isKV = location.pathname.includes('/kv')
   const isObjects = location.pathname.includes('/objects')
   const isPage = (entry: PageEntry) => location.pathname.startsWith(entry.to)
-  const subscribing = useSubscribeRunning()
-  const isListening = (entry: PageEntry) => entry.to === '/subscribe' && subscribing
+  const subscribeStatus = useSubscribeStatus()
+  const isListening = (entry: PageEntry): Listening =>
+    entry.to === '/subscribe' && (subscribeStatus === 'live' || subscribeStatus === 'connecting') ? subscribeStatus : null
 
   // Mini-rail mode: narrow strip of section icons that navigate on click.
   if (collapsed) {

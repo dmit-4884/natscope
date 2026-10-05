@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 interface Props {
   value: string
@@ -33,6 +33,7 @@ export function SubjectAutocomplete({
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const listId = useId()
 
   // Close on outside click.
   useEffect(() => {
@@ -106,7 +107,13 @@ export function SubjectAutocomplete({
           setOpen(true)
         }}
         onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
+        role="combobox"
+        aria-expanded={showDropdown}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={showDropdown && highlight >= 0 ? `${listId}-${highlight}` : undefined}
         placeholder={placeholder}
         disabled={disabled}
         aria-invalid={invalid || undefined}
@@ -119,11 +126,17 @@ export function SubjectAutocomplete({
         }
       />
       {showDropdown && (
-        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-surface-primary shadow-lg">
+        <ul
+          id={listId}
+          role="listbox"
+          className="absolute z-dropdown mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-surface-primary shadow-lg"
+        >
           {filtered.map((opt, i) => (
-            <button
+            <li
               key={opt}
-              type="button"
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === highlight}
               onMouseDown={(e) => {
                 // mousedown so the input doesn't lose focus + dropdown re-close
                 // before click.
@@ -131,14 +144,14 @@ export function SubjectAutocomplete({
                 choose(opt)
               }}
               onMouseEnter={() => setHighlight(i)}
-              className={`block w-full text-left px-3 py-1.5 text-xs font-mono ${
+              className={`block w-full cursor-pointer text-left px-3 py-1.5 text-xs font-mono ${
                 i === highlight ? 'bg-accent-light text-accent-text' : 'text-gray-700 hover:bg-surface-secondary'
               }`}
             >
               {opt}
-            </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { memo, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/utils/toast'
 import { copyText } from '@/utils/clipboard'
@@ -7,7 +7,7 @@ import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { useStreamDetail } from '@/contexts/streams'
 import { useCreateMapping, useMappingItems, type MappingItem } from '@/contexts/mappings'
 import ErrorAlert from '@/components/ui/ErrorAlert'
-import { Badge, Button, RefreshIcon, ReplyIcon, TrashIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon, DocumentIcon } from '@/components/ui'
+import { Badge, Button, CloseIcon, RefreshIcon, ReplyIcon, TrashIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon, DocumentIcon } from '@/components/ui'
 import Tooltip from '@/components/common/Tooltip'
 import { decodeMessage, type TypeCandidate } from '@/api/decode'
 import type { Framing } from '@/api/framing'
@@ -15,6 +15,7 @@ import { getMessage } from '@/api/messages'
 import { deleteMessage } from '@/api/management'
 import { getSubjectPattern as getPatternFromSubject, matchesPattern as subjectMatchesPattern } from '@/contexts/messages'
 import { resolveMapping } from '@/shared/domain/resolveMapping'
+import { isJetStreamControlReply } from '@/shared/domain/replySubject'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
 import { getErrorMessage } from '@/api/errors'
 import { useDisplayPreferences, useConfirmation, useBehaviorPolicy } from '@/contexts/settings'
@@ -42,6 +43,7 @@ interface UnifiedMessageViewerProps {
    */
   onResend?: (draft: ResendDraft) => void
   onReply?: (message: SelectedMessage) => void
+  onClose?: () => void
   /** Prev/next stepping controls; buttons render only when provided. */
   navigation?: MessageNavigation
 }
@@ -63,7 +65,7 @@ const findMappingMatch = (subject: string, mappings: MappingItem[]): MappingItem
     (m) => m.createdAt,
   )
 
-export default function UnifiedMessageViewer({
+function UnifiedMessageViewer({
   streamName,
   connectionId,
   selectedMessage,
@@ -71,6 +73,7 @@ export default function UnifiedMessageViewer({
   onDeleted,
   onResend,
   onReply,
+  onClose,
   navigation,
 }: UnifiedMessageViewerProps) {
   const display = useDisplayPreferences()
@@ -119,6 +122,8 @@ export default function UnifiedMessageViewer({
   // data, no re-fetch.
   const message = (fullMessage ?? selectedMessage) as SelectedMessage | null
   const isTruncated = (selectedMessage?.truncated && !fullMessage) === true
+  const canLoadFull = !!streamName && !!selectedMessage?.sequence
+  const truncatedForGood = isTruncated && !canLoadFull
 
   const jsonData = useMemo(
     () =>
@@ -530,26 +535,40 @@ export default function UnifiedMessageViewer({
               />
             )}
             {onResend && displayMessage?.subject && (
-              <Tooltip content="Edit & resend: load this message into the publish form">
+              <Tooltip
+                content={
+                  truncatedForGood
+                    ? 'Only the start of this message reached the feed, so it cannot be resent intact'
+                    : 'Edit & resend: load this message into the publish form'
+                }
+              >
                 <button
                   type="button"
                   onClick={() => void handleResend()}
+                  disabled={truncatedForGood}
                   aria-label="Resend message"
                   data-testid="resend-message"
-                  className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent-light transition-colors"
+                  className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent-light transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-content-muted"
                 >
                   <RefreshIcon className="w-4 h-4" />
                 </button>
               </Tooltip>
             )}
             {onReply && displayMessage?.reply && (
-              <Tooltip content={`Reply to the waiting request on ${displayMessage.reply}`}>
+              <Tooltip
+                content={
+                  isJetStreamControlReply(displayMessage.reply)
+                    ? 'This message came from a JetStream consumer: a reply would acknowledge it, so Reply is off'
+                    : `Reply to the waiting request on ${displayMessage.reply}`
+                }
+              >
                 <button
                   type="button"
                   onClick={() => onReply(displayMessage)}
+                  disabled={isJetStreamControlReply(displayMessage.reply)}
                   aria-label="Reply to message"
                   data-testid="reply-message"
-                  className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent-light transition-colors"
+                  className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent-light transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-content-muted"
                 >
                   <ReplyIcon className="w-4 h-4" />
                 </button>
@@ -566,6 +585,18 @@ export default function UnifiedMessageViewer({
                   className="p-1.5 rounded-md text-content-muted hover:text-status-error-text hover:bg-status-error-bg transition-colors disabled:opacity-50"
                 >
                   <TrashIcon className="w-4 h-4" />
+                </button>
+              </Tooltip>
+            )}
+            {onClose && (
+              <Tooltip content="Close the details">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Close details"
+                  className="p-1.5 rounded-md text-content-muted hover:text-content-secondary hover:bg-surface-hover transition-colors"
+                >
+                  <CloseIcon className="w-4 h-4" />
                 </button>
               </Tooltip>
             )}
@@ -595,18 +626,24 @@ export default function UnifiedMessageViewer({
               <span className="mx-2">•</span>
               <span
                 className="px-2 py-0.5 text-xs font-medium bg-status-warning-light text-amber-800 rounded-full"
-                title={`Server truncated this preview to keep the list response small. Original size: ${formatBytes(displayMessage?.data_size ?? 0)}.`}
+                title={
+                  canLoadFull
+                    ? `Server truncated this preview to keep the list response small. Original size: ${formatBytes(displayMessage?.data_size ?? 0)}.`
+                    : `The live feed keeps only the start of large messages, and core NATS keeps no copy. Original size: ${formatBytes(displayMessage?.data_size ?? 0)}.`
+                }
               >
                 Preview
               </span>
-              <button
-                type="button"
-                disabled={loadingFull}
-                onClick={handleLoadFull}
-                className="ml-2 text-xs font-medium text-accent hover:text-accent-text disabled:opacity-50"
-              >
-                {loadingFull ? 'Loading…' : 'Load full payload'}
-              </button>
+              {canLoadFull && (
+                <button
+                  type="button"
+                  disabled={loadingFull}
+                  onClick={handleLoadFull}
+                  className="ml-2 text-xs font-medium text-accent hover:text-accent-text disabled:opacity-50"
+                >
+                  {loadingFull ? 'Loading…' : 'Load full payload'}
+                </button>
+              )}
               {loadFullError && (
                 <span className="ml-2 text-xs text-status-error-text" title={loadFullError}>
                   failed
@@ -746,3 +783,4 @@ export default function UnifiedMessageViewer({
   )
 }
 
+export default memo(UnifiedMessageViewer)

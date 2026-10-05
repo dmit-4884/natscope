@@ -285,6 +285,7 @@ export default function TemplateJsonEditor({
             onSubmit={onSubmit}
             onFormat={handleFormat}
             schema={schema}
+            ariaLabel={title ?? 'Payload'}
           />
         </Suspense>
       </div>

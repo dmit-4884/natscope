@@ -40,7 +40,15 @@ describe('listServices', () => {
             description: 'Order API',
             versions: ['1.0.0'],
             instances: [
-              { id: 'a', version: '1.0.0', started: create(TimestampSchema, { seconds: 1_790_000_000n }), endpoints: [endpoint] },
+              {
+                id: 'a',
+                version: '1.0.0',
+                started: create(TimestampSchema, { seconds: 1_790_000_000n }),
+                endpoints: [endpoint],
+                rtt: create(DurationSchema, { nanos: 3_000_000 }),
+                infoJson: '{"type":"io.nats.micro.v1.info_response"}',
+                statsJson: '{"type":"io.nats.micro.v1.stats_response"}',
+              },
               { id: 'b', version: '1.0.0', endpoints: [{ name: 'Create', subject: 'orders.create' }] },
             ],
             endpoints: [endpoint],
@@ -57,7 +65,12 @@ describe('listServices', () => {
     expect(got.services).toHaveLength(1)
     const svc = got.services[0]
     expect(svc.instances[0].started).toBe(1_790_000_000_000)
+    expect(svc.instances[0].rtt_ns).toBe(3_000_000)
+    expect(svc.instances[0].info_json).toBe('{"type":"io.nats.micro.v1.info_response"}')
+    expect(svc.instances[0].stats_json).toBe('{"type":"io.nats.micro.v1.stats_response"}')
     expect(svc.instances[1].started).toBeUndefined()
+    expect(svc.instances[1].rtt_ns).toBeUndefined()
+    expect(svc.instances[1].stats_json).toBeUndefined()
     expect(svc.instances[1].endpoints[0].stats).toBeUndefined()
     expect(svc.endpoints[0]).toEqual({
       name: 'Create',

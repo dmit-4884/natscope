@@ -27,6 +27,9 @@ test.describe('subscribe', () => {
 
     await feed(page).getByText(`${base}.orders`).first().click()
     await expect(page.getByRole('complementary', { name: 'Details panel' })).toContainText('Object (1 key)')
+
+    await page.getByRole('button', { name: 'Close details' }).click()
+    await expect(page.getByRole('complementary', { name: 'Details panel' })).toBeHidden()
   })
 
   test('stop keeps the received messages and start listens again', async ({ page, env }) => {

@@ -20,6 +20,7 @@ interface Props {
   onFormat?: () => void
   /** When set, completes field names and enum values of this message type. */
   schema?: ProtoSchema
+  ariaLabel?: string
 }
 
 // Dark theme matching the app's gray-900 editor chrome.
@@ -80,6 +81,7 @@ export default function JsonCodeMirror({
   onSubmit,
   onFormat,
   schema,
+  ariaLabel,
 }: Props) {
   // Keymap handlers go through refs so the extensions array stays stable and
   // CodeMirror isn't reconfigured on every parent render.
@@ -119,11 +121,12 @@ export default function JsonCodeMirror({
       ),
     ]
     if (placeholder) ext.push(cmPlaceholder(placeholder))
+    if (ariaLabel) ext.push(EditorView.contentAttributes.of({ 'aria-label': ariaLabel }))
     if (schema) {
       ext.push(autocompletion({ override: [protoCompletionSource(schema.description, schema.messageType)] }))
     }
     return ext
-  }, [schema, placeholder])
+  }, [schema, placeholder, ariaLabel])
 
   return (
     <CodeMirror

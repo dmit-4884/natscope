@@ -187,7 +187,7 @@ export default function ConnectedLayout() {
       />
 
       {/* Main Content Area */}
-      <SubscribeSessionProvider key={connectionId} connectionId={connectionId}>
+      <SubscribeSessionProvider connectionId={connectionId}>
         <div className="flex-1 flex overflow-hidden">
           {!location.pathname.startsWith('/settings') && <Sidebar connectionId={connectionId} />}
 

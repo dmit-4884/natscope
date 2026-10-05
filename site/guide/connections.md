@@ -27,8 +27,11 @@ Go to **Settings → Connections** (or click **New Connection** on the start scr
 4. Optional: click **Add TLS configuration** for a **CA certificate (PEM)**, a **Client certificate**
    and **Client key** (mutual TLS), **Skip certificate verification** for self-signed dev certs, and
    **TLS handshake first** for NATS 2.10+ servers running `tls_handshake_first`.
-5. Click **Test** to check round-trip time, server version and JetStream availability.
-6. Click **Connect**.
+5. Optional: set an **Inbox prefix** when your account may only receive replies on a private inbox,
+   such as `_INBOX_alice` (the same as `--inbox-prefix` in the NATS CLI). Request / Reply and Services
+   use it for their replies.
+6. Click **Test** to check round-trip time, server version and JetStream availability.
+7. Click **Connect**.
 
 ## Manage saved connections
 

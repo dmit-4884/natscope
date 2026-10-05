@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { LiveMessage } from '../messages/unified/messageListUtils'
-import { filterReceived, isSystemPattern, publishSubjectError, subscribeSubjectError } from './subscribeUtils'
+import { filterReceived, publishSubjectError, subscribeSubjectError } from './subscribeUtils'
 
 describe('subscribeSubjectError', () => {
   it('accepts literal subjects and whole-token wildcards', () => {
@@ -25,13 +25,6 @@ describe('publishSubjectError', () => {
   })
 })
 
-describe('isSystemPattern', () => {
-  it('flags patterns that name a system namespace', () => {
-    expect(isSystemPattern('$JS.EVENT.>')).toBe(true)
-    expect(isSystemPattern('_INBOX.>')).toBe(true)
-    expect(isSystemPattern('orders.>')).toBe(false)
-  })
-})
 
 describe('filterReceived', () => {
   const msg = (subject: string, text: string): LiveMessage => ({
@@ -48,6 +41,11 @@ describe('filterReceived', () => {
     expect(filterReceived(messages, 'ORDERS').map((m) => m.subject)).toEqual(['orders.new'])
     expect(filterReceived(messages, 'bob').map((m) => m.subject)).toEqual(['audit.login'])
     expect(filterReceived(messages, '')).toBe(messages)
+  })
+
+  it('leaves out muted subjects', () => {
+    expect(filterReceived(messages, '', null, ['audit.>']).map((m) => m.subject)).toEqual(['orders.new'])
+    expect(filterReceived(messages, 'bob', null, ['audit.login'])).toEqual([])
   })
 
   it('narrows to one subject', () => {

@@ -18,9 +18,11 @@ vi.mock('@/contexts/mappings', () => ({
   useMappingItems: () => mappingItems,
 }))
 
+const updateSettings = vi.hoisted(() => vi.fn())
+
 vi.mock('@/contexts/settings', () => ({
   useLivePolicy: () => ({ maxDisplayRate: 0 }),
-  useUpdateSettings: () => ({ mutate: vi.fn() }),
+  useUpdateSettings: () => ({ mutate: updateSettings }),
   useDisplayPreferences: () => ({ density: 'comfortable', timestampFormat: 'relative' }),
 }))
 
@@ -58,6 +60,8 @@ function liveState(over: Partial<ReturnType<typeof useLiveSubscription>> = {}): 
     subjectCounts: {},
     deniedSubjects: [],
     msgPerSecond: undefined,
+    messagesDropped: undefined,
+    pausedCount: 0,
     ...over,
   }
 }
@@ -128,7 +132,7 @@ describe('SubscribePage', () => {
   it('explains core NATS before the first subscription', () => {
     renderPage()
     expect(screen.getByText('Subscribe to any subject')).toBeInTheDocument()
-    expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Stopped')
+    expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Not subscribed')
   })
 
   it('asks for a subject instead of starting with none', () => {
@@ -241,6 +245,72 @@ describe('SubscribePage', () => {
 
     expect(screen.getByTestId('subscribe-stopped')).toBeInTheDocument()
     expect(within(screen.getByTestId('feed')).getByText('orders.new')).toBeInTheDocument()
+  })
+
+  it('mutes a noisy subject and lets it back in', () => {
+    mockedLive.mockReturnValue(
+      liveState({
+        liveMessages: [message('1', 'metrics.cpu'), message('2', 'orders.new')],
+        subjectCounts: { 'metrics.cpu': 1, 'orders.new': 1 },
+      }),
+    )
+    renderPage()
+    addSubject('>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mute metrics.cpu' }))
+    expect(within(screen.getByTestId('feed')).queryByText('metrics.cpu')).not.toBeInTheDocument()
+    expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ exclude: ['metrics.cpu'] }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unmute metrics.cpu' }))
+    expect(within(screen.getByTestId('feed')).getByText('metrics.cpu')).toBeInTheDocument()
+  })
+
+  it('opens the details only for a selected message', () => {
+    mockedLive.mockReturnValue(liveState({ liveMessages: [message('1', 'orders.new')] }))
+    renderPage()
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    expect(screen.queryByTestId('viewer')).not.toBeInTheDocument()
+  })
+
+  it('keeps the display rate to this subscription', () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    renderPage()
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Display rate' }))
+    fireEvent.click(screen.getByRole('option', { name: 'At most 5 msg/s' }))
+
+    expect(mockedLive).toHaveBeenLastCalledWith(
+      expect.objectContaining({ maxDisplayRate: 5, subjectLimits: expect.objectContaining({ maxDisplayRate: 5 }) }),
+    )
+    expect(updateSettings).not.toHaveBeenCalled()
+  })
+
+  it('shows how many messages wait while paused', () => {
+    mockedLive.mockReturnValue(liveState({ isPaused: true, pausedCount: 8, liveMessages: [message('1', 'orders.new')] }))
+    renderPage()
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    expect(screen.getByRole('button', { name: 'Resume (+8)' })).toBeInTheDocument()
+  })
+
+  it('says how much of the feed is shown and how much was skipped', () => {
+    mockedLive.mockReturnValue(
+      liveState({
+        liveMessages: [message('1', 'orders.new')],
+        subjectCounts: { 'orders.new': 250 },
+        messagesDropped: 12,
+      }),
+    )
+    renderPage()
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    expect(screen.getByTestId('feed-counts')).toHaveTextContent('250 messages received · showing the last 100 · 12 skipped')
   })
 
   it('offers quick-add presets and remembers started subjects as recents', () => {

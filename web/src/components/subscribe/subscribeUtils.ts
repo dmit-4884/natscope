@@ -1,3 +1,4 @@
+import { matchSubject } from '@/shared/domain/subjectMatch'
 import { decodeBase64ToUtf8 } from '@/utils/base64'
 import type { LiveMessage } from '../messages/unified/messageListUtils'
 
@@ -32,24 +33,33 @@ export function publishSubjectError(subject: string): string | null {
   return null
 }
 
-export function isSystemPattern(subject: string): boolean {
-  return subject.startsWith('$') || subject.startsWith('_')
-}
+const payloadTexts = new WeakMap<LiveMessage, string>()
 
 function payloadText(message: LiveMessage): string {
-  try {
-    return decodeBase64ToUtf8(message.data_base64)
-  } catch {
-    return ''
+  let text = payloadTexts.get(message)
+  if (text === undefined) {
+    try {
+      text = decodeBase64ToUtf8(message.data_base64).toLowerCase()
+    } catch {
+      text = ''
+    }
+    payloadTexts.set(message, text)
   }
+  return text
 }
 
-export function filterReceived(messages: LiveMessage[], query: string, subject?: string | null): LiveMessage[] {
+export function filterReceived(
+  messages: LiveMessage[],
+  query: string,
+  subject?: string | null,
+  muted: string[] = [],
+): LiveMessage[] {
   const q = query.trim().toLowerCase()
-  if (!q && !subject) return messages
+  if (!q && !subject && muted.length === 0) return messages
   return messages.filter((m) => {
     if (subject && m.subject !== subject) return false
+    if (muted.some((pattern) => matchSubject(m.subject, pattern))) return false
     if (!q) return true
-    return m.subject.toLowerCase().includes(q) || payloadText(m).toLowerCase().includes(q)
+    return m.subject.toLowerCase().includes(q) || payloadText(m).includes(q)
   })
 }

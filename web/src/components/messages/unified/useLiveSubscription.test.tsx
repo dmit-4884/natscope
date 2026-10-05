@@ -9,6 +9,7 @@ interface FakeClient {
   deliver: (payload: WSBatchPayload) => void
   onError?: (payload: WSErrorPayload) => void
   onStats?: (payload: WSStatsPayload) => void
+  onBuffered?: (count: number) => void
   subscribe: ReturnType<typeof vi.fn>
   subscribeSubjects: ReturnType<typeof vi.fn>
 }
@@ -170,7 +171,7 @@ describe('useLiveSubscription subjects', () => {
     const { result } = renderSubjects(['orders.>', 'audit.*'])
     const client = clients[clients.length - 1]
 
-    expect(client.subscribeSubjects).toHaveBeenCalledWith(['orders.>', 'audit.*'])
+    expect(client.subscribeSubjects).toHaveBeenCalledWith(['orders.>', 'audit.*'], undefined)
     expect(client.subscribe).not.toHaveBeenCalled()
 
     act(() => client.deliver({ messages: [core('orders.new')], count: 1 }))
@@ -202,8 +203,47 @@ describe('useLiveSubscription subjects', () => {
     expect(result.current.wsError).toBeNull()
 
     rerender({ list: ['open.>'] })
-    expect(client.subscribeSubjects).toHaveBeenLastCalledWith(['open.>'])
+    expect(client.subscribeSubjects).toHaveBeenLastCalledWith(['open.>'], undefined)
     expect(result.current.deniedSubjects).toEqual([])
+  })
+
+  it('passes the session limits to the subject subscription', () => {
+    renderHook(() =>
+      useLiveSubscription({
+        connectionId: 'conn-1',
+        streamName: null,
+        subjects: ['>'],
+        enabled: true,
+        initialLimit: 100,
+        subjectLimits: { maxPayloadBytes: 65536, maxDisplayRate: 5 },
+      }),
+    )
+    expect(clients[clients.length - 1].subscribeSubjects).toHaveBeenCalledWith(['>'], { maxPayloadBytes: 65536, maxDisplayRate: 5 })
+  })
+
+  it('leaves muted subjects out of the feed and the counters', () => {
+    const { result } = renderHook(() =>
+      useLiveSubscription({ connectionId: 'conn-1', streamName: null, subjects: ['>'], enabled: true, initialLimit: 100, exclude: ['metrics.>'] }),
+    )
+    const client = clients[clients.length - 1]
+
+    act(() => client.deliver({ messages: [core('metrics.cpu'), core('orders.new'), core('metrics.mem')], count: 3 }))
+
+    expect(result.current.liveMessages.map((m) => m.subject)).toEqual(['orders.new'])
+    expect(result.current.subjectCounts).toEqual({ 'orders.new': 1 })
+  })
+
+  it('reports messages the server skipped and messages waiting while paused', () => {
+    const { result } = renderHook(() =>
+      useLiveSubscription({ connectionId: 'conn-1', streamName: null, subjects: ['>'], enabled: true, initialLimit: 100, globalStats: false }),
+    )
+    const client = clients[clients.length - 1]
+
+    act(() => client.onStats?.({ messages_received: 20, messages_dropped: 4, msg_per_second: 2 }))
+    act(() => client.onBuffered?.(7))
+
+    expect(result.current.messagesDropped).toBe(4)
+    expect(result.current.pausedCount).toBe(7)
   })
 
   it('keeps its own message rate and leaves the shared stream stats alone', () => {

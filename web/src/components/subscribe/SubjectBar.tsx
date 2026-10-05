@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { SubjectAutocomplete } from '@/components/common/SubjectAutocomplete'
 import Tooltip from '@/components/common/Tooltip'
 import { Button, CloseIcon, LockClosedIcon, PlayIcon, StopIcon } from '@/components/ui'
@@ -17,9 +17,10 @@ interface Props {
   running: boolean
   onStart: (subjects: string[]) => void
   onStop: () => void
+  showQuickAdd: boolean
 }
 
-export function SubjectBar({
+export const SubjectBar = memo(function SubjectBar({
   subjects,
   onSubjectsChange,
   deniedSubjects,
@@ -28,6 +29,7 @@ export function SubjectBar({
   running,
   onStart,
   onStop,
+  showQuickAdd,
 }: Props) {
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -161,7 +163,7 @@ export function SubjectBar({
           {error}
         </p>
       )}
-      {quickAdd.length > 0 && (
+      {showQuickAdd && quickAdd.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-content-tertiary">Quick add:</span>
           {quickAdd.map((o) => (
@@ -179,4 +181,4 @@ export function SubjectBar({
       )}
     </div>
   )
-}
+})

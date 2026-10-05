@@ -21,7 +21,7 @@ export function getPayloadPreview(dataBase64: string, maxLength = 50): string {
   }
 }
 
-export const LIVE_MESSAGE_LIMITS = [25, 50, 100] as const
+export const LIVE_MESSAGE_LIMITS = [25, 50, 100, 250, 500, 1000] as const
 export type LiveMessageLimit = (typeof LIVE_MESSAGE_LIMITS)[number]
 
 /** Internal shape used by the live list (same as the adapter output + id). */
@@ -40,6 +40,7 @@ export interface LiveMessage {
   decodedAuto?: boolean
   decodedSourceId?: string
   decodeError?: string
+  truncated?: boolean
   reply?: string
 }
 
@@ -77,6 +78,15 @@ export function isExportableMessage(msg: unknown): msg is Message {
     (m.headers === undefined ||
       (typeof m.headers === 'object' && m.headers !== null && !Array.isArray(m.headers)))
   )
+}
+
+export function livePayloadPreview(msg: Pick<LiveMessage, 'decoded' | 'data_base64'>, maxLength = 160): string {
+  if (msg.decoded !== undefined && msg.decoded !== null) {
+    const text = typeof msg.decoded === 'string' ? msg.decoded : JSON.stringify(msg.decoded)
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+  }
+  if (!msg.data_base64) return ''
+  return getPayloadPreview(msg.data_base64, maxLength).replace(/\s+/g, ' ')
 }
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'

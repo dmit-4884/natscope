@@ -108,7 +108,7 @@ export const router = createBrowserRouter([
           // Request / Reply
           { path: 'request', element: <LazyRoute><RequestPage /></LazyRoute> },
           { path: 'subscribe', element: <LazyRoute><SubscribePage /></LazyRoute> },
-          { path: 'services', element: <LazyRoute><ServicesPage /></LazyRoute> },
+          { path: 'services/:name?', element: <LazyRoute><ServicesPage /></LazyRoute> },
 
           // Settings (full-page version of the modal)
           {

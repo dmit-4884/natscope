@@ -2,11 +2,19 @@ import { createContext, useContext } from 'react'
 import type { SelectedMessage } from '@/types/messages'
 import type { LiveSubscription } from '../messages/unified/useLiveSubscription'
 
+export type SubscribeStatus = 'idle' | 'live' | 'connecting' | 'denied'
+
 export interface SubscribeSession {
   running: boolean
+  allDenied: boolean
   start: (subjects: string[]) => void
   stop: () => void
   live: LiveSubscription
+  displayRate: number
+  setDisplayRate: (rate: number) => void
+  muted: string[]
+  mute: (subject: string) => void
+  unmute: (subject: string) => void
   query: string
   setQuery: (query: string) => void
   subjectFilter: string | null
@@ -17,7 +25,7 @@ export interface SubscribeSession {
 
 export const SubscribeSessionContext = createContext<SubscribeSession | null>(null)
 
-export const SubscribeRunningContext = createContext(false)
+export const SubscribeStatusContext = createContext<SubscribeStatus>('idle')
 
 export function useSubscribeSession(): SubscribeSession {
   const session = useContext(SubscribeSessionContext)
@@ -25,6 +33,8 @@ export function useSubscribeSession(): SubscribeSession {
   return session
 }
 
-export function useSubscribeRunning(): boolean {
-  return useContext(SubscribeRunningContext)
+export function useSubscribeStatus(): SubscribeStatus {
+  return useContext(SubscribeStatusContext)
 }
+
+export const SUBSCRIBE_PAYLOAD_CAP = 64 * 1024

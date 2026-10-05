@@ -8,4 +8,5 @@ export {
   type WSSubscribedPayload,
   type WSConnectedPayload,
   type WSProtoReloadPayload,
+  type SubjectSessionLimits,
 } from './LiveStreamClient'

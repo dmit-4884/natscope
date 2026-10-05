@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { create } from '@bufbuild/protobuf'
+import { NatsMessageSchema } from '@/gen/types/nats/nats_message_pb'
 
 const subscribeCall = vi.hoisted(() => vi.fn())
 
@@ -33,6 +35,48 @@ describe('LiveStreamClient', () => {
 
     expect(subscribeCall).toHaveBeenCalledTimes(1)
     expect(subscribeCall.mock.calls[0][0]).toEqual({ connectionId: 'conn-1', subscriptions: [{ subject: 'orders.>' }] })
+    client.disconnect()
+  })
+
+  it('sends the subject session limits and reopens when they change', () => {
+    const client = new LiveStreamClient('conn-1')
+    client.connect()
+    client.subscribeSubjects(['orders.>'], { maxPayloadBytes: 65536, maxDisplayRate: 10 })
+    client.subscribeSubjects(['orders.>'], { maxPayloadBytes: 65536, maxDisplayRate: 10 })
+    client.subscribeSubjects(['orders.>'], { maxPayloadBytes: 65536, maxDisplayRate: 0 })
+
+    expect(subscribeCall).toHaveBeenCalledTimes(2)
+    expect(subscribeCall.mock.calls[0][0]).toEqual({
+      connectionId: 'conn-1',
+      subscriptions: [{ subject: 'orders.>' }],
+      maxPayloadBytes: 65536,
+      maxDisplayRate: 10,
+    })
+    expect(subscribeCall.mock.calls[1][0]).toMatchObject({ maxDisplayRate: 0 })
+    client.disconnect()
+  })
+
+  it('reports how many messages wait while paused', async () => {
+    let push: ((value: IteratorResult<unknown>) => void) | undefined
+    subscribeCall.mockImplementation(() => ({
+      [Symbol.asyncIterator]: () => ({
+        next: () => new Promise((resolve) => (push = resolve)),
+      }),
+    }))
+    const client = new LiveStreamClient('conn-1')
+    const buffered = vi.fn()
+    client.onBuffered = buffered
+    client.connect()
+    client.subscribeSubjects(['orders.>'])
+    client.pause()
+
+    const messages = [create(NatsMessageSchema, { subject: 'orders.a' }), create(NatsMessageSchema, { subject: 'orders.b' })]
+    const batch = { event: { case: 'batch', value: { messages } } }
+    push?.({ value: batch, done: false })
+    await vi.waitFor(() => expect(buffered).toHaveBeenLastCalledWith(2))
+
+    client.resume()
+    expect(buffered).toHaveBeenLastCalledWith(0)
     client.disconnect()
   })
 

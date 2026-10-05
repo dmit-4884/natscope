@@ -24,6 +24,7 @@ export interface ConnectionFormData {
     skipVerify: boolean
     tlsFirst: boolean
   }
+  inboxPrefix: string
   /**
    * Presence of stored secrets, from the server's read-only `has_*` flags. The
    * API never returns secret values, so on edit these drive a "leave blank to

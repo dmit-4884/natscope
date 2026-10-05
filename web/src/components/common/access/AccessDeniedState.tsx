@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Button, LockClosedIcon } from '@/components/ui'
 import { describePermission, type AccessCheck } from '@/shared/domain/access'
 
@@ -7,9 +8,10 @@ interface Props {
   description: string
   onRetry?: () => void
   retrying?: boolean
+  hint?: ReactNode
 }
 
-export function AccessDeniedState({ check, title, description, onRetry, retrying }: Props) {
+export function AccessDeniedState({ check, title, description, onRetry, retrying, hint }: Props) {
   return (
     <div className="flex-1 flex items-center justify-center p-8" role="status" data-testid="access-denied">
       <div className="max-w-md text-center">
@@ -23,7 +25,7 @@ export function AccessDeniedState({ check, title, description, onRetry, retrying
           <code className="mt-0.5 block text-sm text-content-primary break-all">{describePermission(check)}</code>
         </div>
         <p className="mt-3 text-xs text-content-tertiary">
-          Ask the operator of this NATS account to grant it. Everything else on this connection keeps working.
+          {hint ?? 'Ask the operator of this NATS account to grant it. Everything else on this connection keeps working.'}
         </p>
         {onRetry && (
           <Button variant="secondary" size="sm" className="mt-4" onClick={onRetry} loading={retrying}>

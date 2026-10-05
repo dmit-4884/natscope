@@ -28,10 +28,17 @@ export interface WSErrorPayload {
   access?: AccessCheck
 }
 
-type LiveTarget = { stream: string } | { subjects: string[] }
+export interface SubjectSessionLimits {
+  maxPayloadBytes?: number
+  maxDisplayRate?: number
+}
+
+type LiveTarget = { stream: string } | { subjects: string[]; limits?: SubjectSessionLimits }
 
 function targetKey(target: LiveTarget): string {
-  return 'stream' in target ? `stream:${target.stream}` : `subjects:${target.subjects.join('\n')}`
+  if ('stream' in target) return `stream:${target.stream}`
+  const { maxPayloadBytes = '', maxDisplayRate = '' } = target.limits ?? {}
+  return `subjects:${target.subjects.join('\n')}|${maxPayloadBytes}|${maxDisplayRate}`
 }
 
 function targetSubscriptions(target: LiveTarget): Pick<LiveSubscription, 'subject' | 'streamName'>[] {
@@ -95,6 +102,7 @@ export class LiveStreamClient {
   public onDisconnect?: () => void
   public onReconnecting?: (attempt: number, maxRetries: number) => void
   public onProtoReload?: (payload: WSProtoReloadPayload) => void
+  public onBuffered?: (count: number) => void
 
   constructor(connectionId: string, _token?: string, config?: Partial<ReconnectConfig>) {
     this.connectionId = connectionId
@@ -123,8 +131,8 @@ export class LiveStreamClient {
     this.subscribeTarget({ stream })
   }
 
-  subscribeSubjects(subjects: string[]): void {
-    this.subscribeTarget({ subjects })
+  subscribeSubjects(subjects: string[], limits?: SubjectSessionLimits): void {
+    this.subscribeTarget({ subjects, limits })
   }
 
   private subscribeTarget(target: LiveTarget): void {
@@ -171,10 +179,13 @@ export class LiveStreamClient {
     const streamName = 'stream' in target ? target.stream : ''
 
     try {
+      const limits = 'subjects' in target ? target.limits : undefined
       const stream = liveClient.subscribe(
         {
           connectionId: this.connectionId,
           subscriptions: targetSubscriptions(target),
+          ...(limits?.maxPayloadBytes !== undefined && { maxPayloadBytes: limits.maxPayloadBytes }),
+          ...(limits?.maxDisplayRate !== undefined && { maxDisplayRate: limits.maxDisplayRate }),
         },
         { signal: this.abortController.signal },
       )
@@ -235,6 +246,7 @@ export class LiveStreamClient {
         if (this.paused) {
           this.pausedBatches.push(payload)
           this.trimPausedBatches()
+          this.onBuffered?.(this.pausedBatches.reduce((total, b) => total + b.count, 0))
         } else {
           this.onBatch?.(payload)
         }
@@ -324,6 +336,7 @@ export class LiveStreamClient {
     this.paused = false
     const buffered = this.pausedBatches
     this.pausedBatches = []
+    this.onBuffered?.(0)
     for (const batch of buffered) {
       this.onBatch?.(batch)
     }

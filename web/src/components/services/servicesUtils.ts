@@ -1,6 +1,8 @@
+import type { MicroEndpoint, MicroService } from '@/api/discovery'
 import { schemaTypeId } from '@/api/proto'
 import type { RequestDraft } from '@/stores/requestDraftStore'
-import type { MicroEndpoint, MicroService } from '@/api/discovery'
+import { formatNanoseconds } from '@/utils/formatters'
+import type { WindowTotal } from './serviceRates'
 
 export interface ServiceTotals {
   requests: number
@@ -45,4 +47,28 @@ export function callDraftPatch(
     patch.replyTypes = { ...draft.replyTypes, [endpoint.subject]: schemaTypeId(method.source_id, method.output_type) }
   }
   return patch
+}
+
+export function formatRequestRate(window: WindowTotal): string {
+  const rate = window.requests / window.seconds
+  if (rate === 0) return '0 req/s'
+  return `${rate < 10 ? rate.toFixed(1) : Math.round(rate)} req/s`
+}
+
+export function formatErrorShare(window: WindowTotal): string {
+  if (window.requests === 0) return '—'
+  const share = (window.errors / window.requests) * 100
+  return `${share === 0 || share >= 10 ? Math.round(share) : share.toFixed(1)}%`
+}
+
+export function formatWindowAverage(window: WindowTotal): string {
+  return window.requests > 0 ? formatNanoseconds(window.processingNs / window.requests) : '—'
+}
+
+export function shortInstanceId(id: string): string {
+  return id.length > 8 ? `…${id.slice(-6)}` : id
+}
+
+export function hasWildcard(subject: string): boolean {
+  return subject.split('.').some((token) => token === '*' || token === '>')
 }

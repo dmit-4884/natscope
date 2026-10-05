@@ -17,6 +17,7 @@ interface Props {
   mode?: 'create' | 'edit'
   nameError?: string
   urlErrors?: (string | undefined)[]
+  inboxPrefixError?: string
 }
 
 function uploadFile(onChange: (value: string) => void) {
@@ -53,6 +54,7 @@ export function ConnectionForm({
   mode = 'create',
   nameError,
   urlErrors,
+  inboxPrefixError,
 }: Props) {
   const [showPassword, setShowPassword] = useState(false)
   const [showToken, setShowToken] = useState(false)
@@ -387,6 +389,25 @@ export function ConnectionForm({
             </div>
           </div>
         )}
+
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">
+            Inbox prefix <span className="text-content-muted font-normal">(optional)</span>
+          </span>
+          <Input
+            type="text"
+            value={value.inboxPrefix}
+            onChange={(e) => update({ inboxPrefix: e.target.value })}
+            placeholder="_INBOX"
+            className="font-mono"
+            error={!!inboxPrefixError}
+            errorMessage={inboxPrefixError}
+          />
+          <span className="block mt-1 text-2xs text-content-tertiary">
+            Set it when your account may only receive replies on a private inbox, such as <code>_INBOX_alice</code>.
+            Request / Reply and Services use it for replies.
+          </span>
+        </label>
 
         <div className="flex gap-2">
           <button

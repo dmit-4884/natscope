@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import type { MicroEndpoint, MicroService } from '@/api/discovery'
-import { callDraftPatch, filterServices, serviceTotals } from './servicesUtils'
+import {
+  callDraftPatch,
+  filterServices,
+  formatErrorShare,
+  formatRequestRate,
+  formatWindowAverage,
+  hasWildcard,
+  serviceTotals,
+  shortInstanceId,
+} from './servicesUtils'
 
 const endpoint = (over: Partial<MicroEndpoint> = {}): MicroEndpoint => ({
   name: 'Create',
@@ -69,5 +78,34 @@ describe('callDraftPatch', () => {
       requestTypes: { 'orders.create': { messageType: 'shop.In', sourceId: 'src' } },
       replyTypes: { x: 'y', 'orders.create': 'src|shop.Out' },
     })
+  })
+})
+
+describe('window formatting', () => {
+  const window = (requests: number, errors: number, processingNs = 0) => ({ requests, errors, processingNs, seconds: 5 })
+
+  it('formats the request rate', () => {
+    expect(formatRequestRate(window(0, 0))).toBe('0 req/s')
+    expect(formatRequestRate(window(2, 0))).toBe('0.4 req/s')
+    expect(formatRequestRate(window(500, 0))).toBe('100 req/s')
+  })
+
+  it('formats the error share', () => {
+    expect(formatErrorShare(window(0, 0))).toBe('—')
+    expect(formatErrorShare(window(10, 0))).toBe('0%')
+    expect(formatErrorShare(window(200, 3))).toBe('1.5%')
+    expect(formatErrorShare(window(3, 1))).toBe('33%')
+  })
+
+  it('formats the average time and short instance ids', () => {
+    expect(formatWindowAverage(window(0, 0))).toBe('—')
+    expect(shortInstanceId('0MzWWnIEvjIRvBQ9tdosdr')).toBe('…tdosdr')
+    expect(shortInstanceId('i-1')).toBe('i-1')
+  })
+
+  it('spots wildcard endpoint subjects', () => {
+    expect(hasWildcard('calc.*')).toBe(true)
+    expect(hasWildcard('calc.>')).toBe(true)
+    expect(hasWildcard('calc.add')).toBe(false)
   })
 })

@@ -45,6 +45,16 @@ describe('buildResendDraft', () => {
     expect(d.messageJson).toBe('{\n  "n": 3\n}')
   })
 
+  it('keeps the original text of a plain JSON or text payload', () => {
+    expect(buildResendDraft({ subject: 'e2e.plain', dataBase64: b64('{"n":2}'), decoded: { n: 2 } }, resolve).verbatim).toBe('{"n":2}')
+    expect(buildResendDraft({ subject: 'e2e.plain', dataBase64: b64('hello world') }, resolve).verbatim).toBe('hello world')
+  })
+
+  it('has no original text when the payload was decoded from Protobuf', () => {
+    const proto = btoa(String.fromCharCode(0x08, 0x96, 0x01))
+    expect(buildResendDraft({ subject: 'e2e.plain', dataBase64: proto, decoded: { a: 150 } }, resolve).verbatim).toBeUndefined()
+  })
+
   it('drops NATS-reserved headers but keeps user headers', () => {
     const d = buildResendDraft(
       {

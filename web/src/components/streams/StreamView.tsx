@@ -20,6 +20,7 @@ import type { SelectedMessage } from '../messages/UnifiedMessageList'
 import { useMessageNavigation } from '../messages/unified/useMessageNavigation'
 import UnifiedMessageViewer from '../messages/UnifiedMessageViewer'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
+import { ResizeHandle } from '../common/ResizeHandle'
 import PublishHistory from './PublishHistory'
 import StreamNotFoundState from './StreamNotFoundState'
 import StreamTabs from './StreamTabs'
@@ -256,13 +257,7 @@ export default function StreamView() {
       {!isFullWidthTab && (
         <>
           {/* Resize handle */}
-          <div
-            {...separatorProps}
-            className="flex-shrink-0 cursor-col-resize group flex items-stretch focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-            style={{ padding: '0 2px' }}
-          >
-            <div className="w-px bg-surface-hover group-hover:bg-blue-400 group-active:bg-blue-500 group-focus-visible:bg-blue-500 transition-colors" />
-          </div>
+          <ResizeHandle {...separatorProps} />
           <aside
             className="bg-surface-secondary flex flex-col overflow-hidden"
             style={{ width: `${rightPanelPct}%` }}

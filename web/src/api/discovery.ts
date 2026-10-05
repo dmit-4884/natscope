@@ -38,6 +38,9 @@ export interface MicroInstance {
   metadata: Record<string, string>
   started?: number
   endpoints: MicroEndpoint[]
+  rtt_ns?: number
+  info_json?: string
+  stats_json?: string
 }
 
 export interface MicroService {
@@ -92,6 +95,9 @@ function toService(s: ProtoMicroService): MicroService {
       metadata: i.metadata,
       started: i.started ? tsToMillis(i.started) : undefined,
       endpoints: i.endpoints.map(toEndpoint),
+      rtt_ns: i.rtt ? durToNanos(i.rtt) : undefined,
+      info_json: i.infoJson || undefined,
+      stats_json: i.statsJson || undefined,
     })),
     endpoints: s.endpoints.map(toEndpoint),
   }

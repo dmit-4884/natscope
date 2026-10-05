@@ -3,10 +3,10 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Message } from '@/types/nats'
 import { formatBytes, formatTimeWithMs, formatTimestamp } from '@/utils/formatters'
 import { getSubjectColor } from '@/utils/subjectColors'
-import { CheckIcon } from '@/components/ui'
+import { CheckIcon, ReplyIcon } from '@/components/ui'
 import { useBookmarkStore } from '@/stores/bookmarkStore'
 import { BookmarkButton } from '../Bookmarks'
-import { getPayloadPreview, type LiveMessage, type ViewMode } from './messageListUtils'
+import { getPayloadPreview, livePayloadPreview, type LiveMessage, type ViewMode } from './messageListUtils'
 
 type AnyMessage = Message | LiveMessage
 
@@ -24,6 +24,7 @@ interface RowProps {
   connectionId: string | null
   timestampFormat: 'relative' | 'absolute' | 'iso'
   showSequence: boolean
+  showPayload: boolean
   translateY: number
   /**
    * Roving tabindex: exactly one row has tabIndex=0 (Tab enters grid; arrows
@@ -51,6 +52,7 @@ const MessageRow = memo(function MessageRow({
   connectionId,
   timestampFormat,
   showSequence,
+  showPayload,
   translateY,
   isFocused,
   canPullFocus,
@@ -104,7 +106,7 @@ const MessageRow = memo(function MessageRow({
       tabIndex={isFocused ? 0 : -1}
       onFocus={() => onFocusIndex(index)}
       onKeyDown={handleKeyDown}
-      className={`flex items-center cursor-pointer transition-all duration-300 border-b border-l-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-inset ${
+      className={`flex items-center cursor-pointer transition-all duration-300 motion-reduce:transition-none border-b border-l-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-inset ${
         isCompareHighlighted
           ? 'bg-indigo-100 border-l-indigo-500'
           : isSelected
@@ -125,6 +127,7 @@ const MessageRow = memo(function MessageRow({
       }}
       onClick={() => onActivateIndex(index)}
     >
+      {!showPayload && (
       <div className="w-8 flex items-center justify-center" role="gridcell">
         {compareMode && isHistory ? (
           <div
@@ -150,20 +153,36 @@ const MessageRow = memo(function MessageRow({
           />
         ) : null}
       </div>
+      )}
       {showSequence && (isHistory || msg.sequence) && (
         <div className={`${cellPadding} text-sm font-mono text-content-primary w-20`} role="gridcell">
           {msg.sequence}
         </div>
       )}
-      <div className={`${cellPadding} text-sm flex-1 truncate ${subjectColor?.text || 'text-content-primary'}`} role="gridcell">
+      <div
+        className={`${cellPadding} text-sm truncate ${showPayload ? 'flex-[2] min-w-0' : 'flex-1'} ${subjectColor?.text || 'text-content-primary'}`}
+        role="gridcell"
+        title={showPayload ? msg.subject : undefined}
+      >
         <span className="font-mono">{msg.subject}</span>
       </div>
-      <div className={`${cellPadding} text-sm text-content-secondary w-28 font-mono`} role="gridcell">
+      {showPayload && (
+        <div className={`${cellPadding} flex-[3] min-w-0 flex items-center gap-1.5 text-xs font-mono text-content-secondary`} role="gridcell">
+          {(msg as LiveMessage).reply && (
+            <span className="shrink-0 text-accent" title="Waits for a reply">
+              <ReplyIcon className="w-3.5 h-3.5" />
+              <span className="sr-only">Waits for a reply</span>
+            </span>
+          )}
+          <span className="truncate">{livePayloadPreview(msg as LiveMessage)}</span>
+        </div>
+      )}
+      <div className={`${cellPadding} text-sm text-content-secondary w-28 shrink-0 font-mono`} role="gridcell">
         {isHistory
           ? formatTimestamp(msg.timestamp, timestampFormat)
           : formatTimeWithMs(msg.timestamp)}
       </div>
-      <div className={`${cellPadding} text-sm text-content-secondary w-24 whitespace-nowrap text-right`} role="gridcell">
+      <div className={`${cellPadding} text-sm text-content-secondary w-24 shrink-0 whitespace-nowrap text-right`} role="gridcell">
         {formatBytes(msg.data_size)}
       </div>
     </div>
@@ -183,6 +202,7 @@ interface Props {
   connectionId: string | null
   timestampFormat: 'relative' | 'absolute' | 'iso'
   showSequence?: boolean
+  showPayload?: boolean
   autoScrollRef: React.MutableRefObject<boolean>
   onSelectHistory: (msg: Message) => void
   onSelectLive: (msg: LiveMessage) => void
@@ -202,6 +222,7 @@ export function MessageVirtualTable({
   connectionId,
   timestampFormat,
   showSequence = true,
+  showPayload = false,
   autoScrollRef,
   onSelectHistory,
   onSelectLive,
@@ -350,11 +371,12 @@ export function MessageVirtualTable({
   return (
     <>
       <div className="bg-surface-secondary flex border-b text-xs font-medium text-content-secondary uppercase" role="row">
-        <div className="w-8" />
+        {!showPayload && <div className="w-8" />}
         {showSequence && <div className="px-3 py-2 w-20" role="columnheader">Seq</div>}
-        <div className="px-3 py-2 flex-1" role="columnheader">Subject</div>
-        <div className="px-3 py-2 w-28" role="columnheader">Received</div>
-        <div className="px-3 py-2 w-24 text-right" role="columnheader">Size</div>
+        <div className={`px-3 py-2 ${showPayload ? 'flex-[2] min-w-0' : 'flex-1'}`} role="columnheader">Subject</div>
+        {showPayload && <div className="px-3 py-2 flex-[3] min-w-0" role="columnheader">Payload</div>}
+        <div className="px-3 py-2 w-28 shrink-0" role="columnheader">Received</div>
+        <div className="px-3 py-2 w-24 shrink-0 text-right" role="columnheader">Size</div>
       </div>
 
       <div
@@ -390,6 +412,7 @@ export function MessageVirtualTable({
                 connectionId={connectionId}
                 timestampFormat={timestampFormat}
                 showSequence={showSequence}
+                showPayload={showPayload}
                 translateY={virtualItem.start}
                 isFocused={isFocused}
                 canPullFocus={canPullFocus}

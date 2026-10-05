@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   LiveStreamClient,
   useLiveStatsStore,
   useProtoReloadInvalidation,
+  type SubjectSessionLimits,
   type WSBatchPayload,
   type WSMessagePayload,
   type WSStatsPayload,
 } from '@/contexts/live'
 import { matchesPattern } from '@/contexts/messages'
+import { matchSubject } from '@/shared/domain/subjectMatch'
 import type { LiveMessage, LiveMessageLimit, WsStatus } from './messageListUtils'
 
 interface Options {
@@ -19,6 +21,8 @@ interface Options {
   initialLimit: LiveMessageLimit
   subjectFilter?: string
   globalStats?: boolean
+  subjectLimits?: SubjectSessionLimits
+  exclude?: string[]
 }
 
 export interface LiveSubscription {
@@ -34,6 +38,8 @@ export interface LiveSubscription {
   subjectCounts: Record<string, number>
   deniedSubjects: string[]
   msgPerSecond: number | undefined
+  messagesDropped: number | undefined
+  pausedCount: number
 }
 
 const MAX_COUNTED_SUBJECTS = 1000
@@ -65,6 +71,8 @@ export function useLiveSubscription({
   initialLimit,
   subjectFilter,
   globalStats = true,
+  subjectLimits,
+  exclude,
 }: Options): LiveSubscription {
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([])
   const [liveLimit, setLiveLimit] = useState<LiveMessageLimit>(initialLimit)
@@ -75,6 +83,8 @@ export function useLiveSubscription({
   const [subjectCounts, setSubjectCounts] = useState<Record<string, number>>({})
   const [deniedSubjects, setDeniedSubjects] = useState<string[]>([])
   const [msgPerSecond, setMsgPerSecond] = useState<number | undefined>(undefined)
+  const [messagesDropped, setMessagesDropped] = useState<number | undefined>(undefined)
+  const [pausedCount, setPausedCount] = useState(0)
 
   const [ws, setWs] = useState<LiveStreamClient | null>(null)
   const liveLimitRef = useRef(liveLimit)
@@ -82,6 +92,15 @@ export function useLiveSubscription({
   const subjectsKey = subjects && subjects.length > 0 ? subjects.join('\n') : null
   const subjectsKeyRef = useRef(subjectsKey)
   const subjectFilterRef = useRef(subjectFilter)
+  const limitsKey = subjectLimits ? `${subjectLimits.maxPayloadBytes ?? ''}|${subjectLimits.maxDisplayRate ?? ''}` : ''
+  const limitsRef = useRef(subjectLimits)
+  const excludeRef = useRef(exclude)
+  useEffect(() => {
+    limitsRef.current = subjectLimits
+  }, [subjectLimits])
+  useEffect(() => {
+    excludeRef.current = exclude
+  }, [exclude])
   const setGlobalStats = useLiveStatsStore((s) => s.setStats)
 
   const maxDisplayRateRef = useRef(maxDisplayRate)
@@ -177,8 +196,10 @@ export function useLiveSubscription({
     (batch: WSBatchPayload) => {
       const pattern = subjectFilterRef.current
       const subjectMode = subjectsKeyRef.current !== null
+      const muted = excludeRef.current ?? []
       const relevant = batch.messages.filter((msg) => {
         if (!subjectMode && msg.stream_name !== streamNameRef.current) return false
+        if (muted.some((m) => matchSubject(msg.subject, m))) return false
         if (!pattern) return true
         if (pattern.includes('*') || pattern.includes('>')) return matchesPattern(msg.subject, pattern)
         return msg.subject.toLowerCase().includes(pattern.toLowerCase())
@@ -220,7 +241,7 @@ export function useLiveSubscription({
     socket.onConnected = () => {
       setWsStatus('connected')
       setWsError(null)
-      if (subjectsKeyRef.current) socket.subscribeSubjects(subjectsKeyRef.current.split('\n'))
+      if (subjectsKeyRef.current) socket.subscribeSubjects(subjectsKeyRef.current.split('\n'), limitsRef.current)
       else if (streamNameRef.current) socket.subscribe(streamNameRef.current)
     }
     socket.onSubscribed = () => {
@@ -230,6 +251,7 @@ export function useLiveSubscription({
     socket.onBatch = processBatch
     socket.onStats = (payload: WSStatsPayload) => {
       setMsgPerSecond(payload.msg_per_second)
+      setMessagesDropped(payload.messages_dropped)
       if (!globalStats) return
       setGlobalStats({
         messagesReceived: payload.messages_received,
@@ -252,6 +274,7 @@ export function useLiveSubscription({
       if (globalStats) setGlobalStats(null)
     }
     socket.onReconnecting = () => setWsStatus('reconnecting')
+    socket.onBuffered = setPausedCount
 
     setWs(socket)
     socket.connect()
@@ -260,6 +283,8 @@ export function useLiveSubscription({
       socket.disconnect()
       setWs(null)
       setMsgPerSecond(undefined)
+      setMessagesDropped(undefined)
+      setPausedCount(0)
       setIsPaused(false)
       stopDrip()
       clearHighlightTimers()
@@ -270,10 +295,10 @@ export function useLiveSubscription({
   // Subscribe / unsubscribe when stream changes on an open connection.
   useEffect(() => {
     if (!ws || wsStatus !== 'connected') return
-    if (subjectsKey) ws.subscribeSubjects(subjectsKey.split('\n'))
+    if (subjectsKey) ws.subscribeSubjects(subjectsKey.split('\n'), limitsRef.current)
     else if (streamName) ws.subscribe(streamName)
     else ws.unsubscribe()
-  }, [ws, streamName, subjectsKey, wsStatus])
+  }, [ws, streamName, subjectsKey, limitsKey, wsStatus])
 
   // Clear on stream change
   useEffect(() => {
@@ -306,18 +331,37 @@ export function useLiveSubscription({
     setSubjectCounts({})
   }, [stopDrip])
 
-  return {
-    liveMessages,
-    liveLimit,
-    setLiveLimit,
-    wsStatus,
-    wsError,
-    isPaused,
-    togglePause,
-    newMessageIds,
-    clearMessages,
-    subjectCounts,
-    deniedSubjects,
-    msgPerSecond,
-  }
+  return useMemo(
+    () => ({
+      liveMessages,
+      liveLimit,
+      setLiveLimit,
+      wsStatus,
+      wsError,
+      isPaused,
+      togglePause,
+      newMessageIds,
+      clearMessages,
+      subjectCounts,
+      deniedSubjects,
+      msgPerSecond,
+      messagesDropped,
+      pausedCount,
+    }),
+    [
+      liveMessages,
+      liveLimit,
+      wsStatus,
+      wsError,
+      isPaused,
+      togglePause,
+      newMessageIds,
+      clearMessages,
+      subjectCounts,
+      deniedSubjects,
+      msgPerSecond,
+      messagesDropped,
+      pausedCount,
+    ],
+  )
 }

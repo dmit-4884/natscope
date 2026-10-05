@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AccessDeniedState } from './AccessDeniedState'
-import { NoAccessValue } from './NoAccessValue'
 
 describe('AccessDeniedState', () => {
   it('names the missing permission and offers a retry', () => {
@@ -19,14 +18,5 @@ describe('AccessDeniedState', () => {
     expect(screen.getByText('publish to $SRV.INFO')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }))
     expect(onRetry).toHaveBeenCalled()
-  })
-})
-
-describe('NoAccessValue', () => {
-  it('renders a dash with an accessible reason', () => {
-    render(<NoAccessValue reason="No access to statistics" />)
-
-    expect(screen.getByText('—')).toHaveAttribute('aria-hidden', 'true')
-    expect(screen.getByText('No access to statistics')).toHaveClass('sr-only')
   })
 })

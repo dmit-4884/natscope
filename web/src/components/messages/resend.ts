@@ -11,6 +11,7 @@ export interface ResendDraft {
    * corrupting bytes; `messageJson` is empty when set.
    */
   binaryUndecodable: boolean
+  verbatim?: string
 }
 
 export interface ResendMessage {
@@ -44,6 +45,23 @@ export function buildResendDraft(
     messageJson: payload.binary ? '' : payload.text,
     headers: resendHeaders(msg.headers),
     binaryUndecodable: payload.binary,
+    verbatim: verbatimText(msg),
+  }
+}
+
+function verbatimText(msg: ResendMessage): string | undefined {
+  if (!msg.dataBase64) return undefined
+  let raw: string
+  try {
+    raw = decodeUtf8Strict(msg.dataBase64)
+  } catch {
+    return undefined
+  }
+  if (msg.decoded == null || typeof msg.decoded !== 'object') return raw
+  try {
+    return JSON.stringify(JSON.parse(raw)) === JSON.stringify(msg.decoded) ? raw : undefined
+  } catch {
+    return undefined
   }
 }
 
