@@ -29,6 +29,8 @@ func (m *NatsMessage) DetectContentType() ContentType {
 // Subscription is an active NATS subscription.
 type Subscription interface {
 	Unsubscribe() error
+	// Delivers reports whether a message on subject reaches the subscription's handler.
+	Delivers(subject string) bool
 }
 
 // MessageHandler is a callback function for handling incoming messages.

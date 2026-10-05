@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
-	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	livesvc "github.com/dmit-4884/natscope/internal/services/live"
@@ -86,6 +85,9 @@ type sessionState struct {
 	silentSubjects map[string]struct{}
 	// liveSubjects are the subjects whose subscription has delivered, so the server did not refuse it.
 	liveSubjects map[string]struct{}
+	// held are copies waiting to learn whether an earlier subject delivers them.
+	held  []*heldMessage
+	ended bool
 }
 
 func newSessionState(connectionID string) *sessionState {
@@ -108,7 +110,9 @@ func (sess *sessionState) markLive(subject string) {
 	}
 	sess.silentMu.Lock()
 	sess.liveSubjects[subject] = struct{}{}
+	shown := sess.settleLocked()
 	sess.silentMu.Unlock()
+	deliverHeld(shown)
 }
 
 func (sess *sessionState) reportDenied(subject string, err error) {
@@ -124,31 +128,15 @@ func (sess *sessionState) reportDenied(subject string, err error) {
 // markSilent records that subject delivers nothing; false when it was recorded before.
 func (sess *sessionState) markSilent(subject string) bool {
 	sess.silentMu.Lock()
-	defer sess.silentMu.Unlock()
 	if _, seen := sess.silentSubjects[subject]; seen {
+		sess.silentMu.Unlock()
 		return false
 	}
 	sess.silentSubjects[subject] = struct{}{}
+	shown := sess.settleLocked()
+	sess.silentMu.Unlock()
+	deliverHeld(shown)
 	return true
-}
-
-// takenEarlier reports whether an earlier subject that has proved live delivers subject; one that has not
-// delivered yet may still be refused, so the later subject keeps the message.
-func (sess *sessionState) takenEarlier(earlier []string, subject string) bool {
-	sess.silentMu.RLock()
-	defer sess.silentMu.RUnlock()
-	for _, pattern := range earlier {
-		if _, silent := sess.silentSubjects[pattern]; silent {
-			continue
-		}
-		if _, live := sess.liveSubjects[pattern]; !live {
-			continue
-		}
-		if natsutil.MatchSubject(pattern, subject) && takesInternal(pattern, subject) {
-			return true
-		}
-	}
-	return false
 }
 
 func (sess *sessionState) markLost() {

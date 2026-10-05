@@ -16,6 +16,7 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	corecontext "github.com/altessa-s/go-atlas/core/context"
 )
@@ -25,6 +26,8 @@ import (
 type subscriptionWrapper struct {
 	sub           *nats.Subscription
 	stopObserving func()
+	subject       string
+	hiddenPrefix  string
 }
 
 func (w *subscriptionWrapper) Unsubscribe() error {
@@ -32,6 +35,13 @@ func (w *subscriptionWrapper) Unsubscribe() error {
 		w.stopObserving()
 	}
 	return w.sub.Unsubscribe()
+}
+
+func (w *subscriptionWrapper) Delivers(subject string) bool {
+	if w.hiddenPrefix != "" && strings.HasPrefix(subject, w.hiddenPrefix) {
+		return false
+	}
+	return natsutil.MatchSubject(w.subject, subject)
 }
 
 // Subscribe creates a Core NATS subscription for the given subject. Replies to this connection's own requests,
@@ -46,10 +56,12 @@ func (c *Client) Subscribe(
 		return nil, wrapErr(err)
 	}
 
-	ownInbox := c.inboxPrefix()
-	hidesOwnInbox := !strings.HasPrefix(subject, ownInbox)
+	var hiddenPrefix string
+	if ownInbox := c.inboxPrefix(); !strings.HasPrefix(subject, ownInbox) {
+		hiddenPrefix = ownInbox
+	}
 	natsHandler := func(msg *nats.Msg) {
-		if hidesOwnInbox && strings.HasPrefix(msg.Subject, ownInbox) {
+		if hiddenPrefix != "" && strings.HasPrefix(msg.Subject, hiddenPrefix) {
 			return
 		}
 		// Stamp the receive time at delivery, not at the later batch conversion.
@@ -74,7 +86,7 @@ func (c *Client) Subscribe(
 		return nil, wrapErr(err)
 	}
 
-	return &subscriptionWrapper{sub: sub, stopObserving: stop}, nil
+	return &subscriptionWrapper{sub: sub, stopObserving: stop, subject: subject, hiddenPrefix: hiddenPrefix}, nil
 }
 
 // jsSubscriptionWrapper wraps a jetstream consumer to implement
@@ -88,6 +100,11 @@ type jsSubscriptionWrapper struct {
 	stream       jetstream.Stream
 	consumerName string
 	forget       func()
+	filter       string
+}
+
+func (s *jsSubscriptionWrapper) Delivers(subject string) bool {
+	return s.filter == "" || natsutil.MatchSubject(s.filter, subject)
 }
 
 func (s *jsSubscriptionWrapper) Unsubscribe() error {
@@ -186,6 +203,7 @@ func (c *Client) SubscribeJetStream(
 		stream:       stream,
 		consumerName: consumerName,
 		forget:       forget,
+		filter:       subject,
 	}, nil
 }
 

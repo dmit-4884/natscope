@@ -6,6 +6,7 @@ package live
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,15 +16,23 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	settingssvc "github.com/dmit-4884/natscope/internal/services/settings"
 )
 
-type fakeSubscription struct{}
+type fakeSubscription struct{ pattern, hides string }
 
 func (fakeSubscription) Unsubscribe() error { return nil }
+
+func (f fakeSubscription) Delivers(subject string) bool {
+	if f.hides != "" && !strings.HasPrefix(f.pattern, f.hides) && strings.HasPrefix(subject, f.hides) {
+		return false
+	}
+	return natsutil.MatchSubject(f.pattern, subject)
+}
 
 type fakeSubscriber struct {
 	natssvc.Subscriber
@@ -31,6 +40,8 @@ type fakeSubscriber struct {
 	mu       sync.Mutex
 	onDenied map[string]func(error)
 	handlers map[string]entities.MessageHandler
+	// hides is the inbox prefix whose messages reach only a subject that names it.
+	hides string
 }
 
 func (f *fakeSubscriber) Subscribe(
@@ -44,7 +55,7 @@ func (f *fakeSubscriber) Subscribe(
 	defer f.mu.Unlock()
 	f.onDenied[subject] = onDenied
 	f.handlers[subject] = handler
-	return fakeSubscription{}, nil
+	return fakeSubscription{pattern: subject, hides: f.hides}, nil
 }
 
 func (f *fakeSubscriber) OnDisconnect(func(string)) {}
@@ -277,8 +288,12 @@ func startFakeSession(t *testing.T, subjects ...string) (*fakeSubscriber, <-chan
 
 func startFakeSessionWith(t *testing.T, req *entities.LiveSubscribeRequest) (*fakeSubscriber, <-chan *entities.LiveEvent, func()) {
 	t.Helper()
+	return startFakeSessionOn(t, &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}, req)
+}
 
-	sub := &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}
+func startFakeSessionOn(t *testing.T, sub *fakeSubscriber, req *entities.LiveSubscribeRequest) (*fakeSubscriber, <-chan *entities.LiveEvent, func()) {
+	t.Helper()
+
 	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
 	ctx, cancel := context.WithCancel(t.Context())
 
@@ -382,4 +397,51 @@ func TestSubscribe_AnAllowedSubjectKeepsItsMessagesUntilAnEarlierWildcardProvesL
 
 	assert.Equal(t, map[string]int{"first": 1}, collectPayloads(t, events, "first"),
 		"the wildcard may still be refused, so the covered subject delivers until the wildcard has delivered")
+}
+
+func TestSubscribe_ACopyThatArrivesBeforeTheWildcardsIsShownOnce(t *testing.T) {
+	t.Parallel()
+
+	sub, events, stop := startFakeSession(t, ">", "orders.created")
+	defer stop()
+
+	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: []byte("once")})
+	sub.deliver(t, ">", &entities.NatsMessage{Subject: "orders.created", Data: []byte("once")})
+	sub.deliver(t, ">", &entities.NatsMessage{Subject: "orders.created", Data: []byte("end")})
+	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: []byte("end")})
+
+	assert.Equal(t, map[string]int{"once": 1, "end": 1}, collectPayloads(t, events, "end"))
+}
+
+func TestSubscribe_AHeldCopyIsShownAtOnceWhenTheWildcardIsDenied(t *testing.T) {
+	t.Parallel()
+
+	sub, events, stop := startFakeSession(t, ">", "orders.created")
+	defer stop()
+
+	sub.deliver(t, "orders.created", &entities.NatsMessage{Subject: "orders.created", Data: []byte("held")})
+	start := time.Now()
+	sub.deny(t, ">")
+
+	assert.Equal(t, map[string]int{"held": 1}, collectPayloads(t, events, "held"))
+	assert.Less(t, time.Since(start), time.Second)
+}
+
+func TestSubscribe_AnInboxSubjectShowsWhatTheFullWildcardHides(t *testing.T) {
+	t.Parallel()
+
+	sub, events, stop := startFakeSessionOn(t,
+		&fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}, hides: "_INBOX_alice."},
+		&entities.LiveSubscribeRequest{
+			ConnectionId:  "conn",
+			Subscriptions: []*entities.LiveSubscriptionTarget{{Subject: ">"}, {Subject: "_INBOX_alice.>"}},
+		})
+	defer stop()
+
+	sub.deliver(t, ">", &entities.NatsMessage{Subject: "orders.created", Data: []byte("other")})
+	start := time.Now()
+	sub.deliver(t, "_INBOX_alice.>", &entities.NatsMessage{Subject: "_INBOX_alice.abc", Data: []byte("reply")})
+
+	assert.Equal(t, map[string]int{"other": 1, "reply": 1}, collectPayloads(t, events, "reply"))
+	assert.Less(t, time.Since(start), time.Second)
 }

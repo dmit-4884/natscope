@@ -59,3 +59,24 @@ func TestSubscribe_HidesTheConnectionsOwnInboxUnlessNamed(t *testing.T) {
 	assert.Equal(t, []string{"orders.created"}, got[">"])
 	assert.Equal(t, []string{"_INBOX_alice.abc.1"}, got["_INBOX_alice.>"])
 }
+
+func TestSubscribe_SaysWhichSubjectsItDelivers(t *testing.T) {
+	t.Parallel()
+	_, url := jetStreamServer(t)
+	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
+		URLs:       []string{url},
+		Connection: &entities.ConnectionConfig{InboxPrefix: ptr.Wrap("_INBOX_alice")},
+	})
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+
+	all, err := conn.Subscribe(t.Context(), ">", func(*entities.NatsMessage) {}, nil)
+	require.NoError(t, err)
+	inbox, err := conn.Subscribe(t.Context(), "_INBOX_alice.>", func(*entities.NatsMessage) {}, nil)
+	require.NoError(t, err)
+
+	assert.True(t, all.Delivers("orders.created"))
+	assert.False(t, all.Delivers("_INBOX_alice.abc.1"))
+	assert.True(t, inbox.Delivers("_INBOX_alice.abc.1"))
+	assert.False(t, inbox.Delivers("orders.created"))
+}

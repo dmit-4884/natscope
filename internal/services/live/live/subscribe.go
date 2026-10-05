@@ -31,6 +31,7 @@ func (s *Service) Subscribe(
 	sess := newSessionState(in.ConnectionId)
 	s.registerSession(sess)
 	defer s.unregisterSession(sess)
+	defer sess.endHolding()
 
 	mode, maxDisplayRate, payloadCap, detect := s.resolveSettings(ctx)
 	// A request cap overrides the user setting; 0 means omitted, not unlimited.
@@ -190,19 +191,21 @@ func (s *Service) startSubscriptions(
 	var subs []entities.Subscription
 	var partialErrs []*entities.LiveError
 	var lastErr error
-	var coreBefore []string
+	var coreBefore []coreTarget
 	for _, target := range targets {
 		handler := s.buildMessageHandler(target.Subject, msgChan, sess)
-		if streamNameOf(target) == "" {
+		core := streamNameOf(target) == ""
+		if core {
 			earlier := slices.Clone(coreBefore)
 			subject, deliver := target.Subject, handler
 			handler = func(msg *entities.NatsMessage) {
 				sess.markLive(subject)
-				if len(earlier) == 0 || !sess.takenEarlier(earlier, msg.Subject) {
+				if len(earlier) == 0 {
 					deliver(msg)
+					return
 				}
+				sess.route(earlier, msg, deliver)
 			}
-			coreBefore = append(coreBefore, target.Subject)
 		}
 		targetSubs, err := s.subscribeTarget(ctx, connectionID, target, mode, handler, sess)
 		if err != nil {
@@ -212,6 +215,11 @@ func (s *Service) startSubscriptions(
 			continue
 		}
 		subs = append(subs, targetSubs...)
+		if core {
+			for _, sub := range targetSubs {
+				coreBefore = append(coreBefore, coreTarget{subject: target.Subject, sub: sub})
+			}
+		}
 	}
 
 	if len(subs) == 0 {
