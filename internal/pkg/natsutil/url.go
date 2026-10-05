@@ -50,8 +50,8 @@ func SplitCredentials(urls []string) ([]string, *URLCredentials, error) {
 }
 
 // StripCredentials returns the URLs with any embedded userinfo removed. Unlike
-// [SplitCredentials] it never fails: a URL it cannot confidently parse is
-// returned unchanged.
+// [SplitCredentials] it never fails: a URL it cannot confidently parse comes
+// back masked.
 func StripCredentials(urls []string) []string {
 	if len(urls) == 0 {
 		return urls
@@ -60,7 +60,7 @@ func StripCredentials(urls []string) []string {
 	for i, raw := range urls {
 		cleaned, _, err := splitOne(raw)
 		if err != nil {
-			out[i] = raw
+			out[i] = MaskURL(raw)
 			continue
 		}
 		out[i] = cleaned
@@ -104,7 +104,7 @@ func splitOne(raw string) (string, *URLCredentials, error) {
 
 	u, err := url.Parse(target)
 	if err != nil {
-		return "", nil, fmt.Errorf("%w: %q", errs.ErrConnectionURLInvalid, raw)
+		return "", nil, fmt.Errorf("%w: %q", errs.ErrConnectionURLInvalid, MaskURL(raw))
 	}
 	if u.User == nil {
 		return raw, nil, nil

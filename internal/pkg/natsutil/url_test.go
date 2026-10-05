@@ -137,6 +137,17 @@ func TestSplitCredentialsUnparseableWithUserinfoIsRejected(t *testing.T) {
 	_, _, err := SplitCredentials([]string{"nats://bob:" + secret + "@h1:4222"})
 
 	require.ErrorIs(t, err, errs.ErrConnectionURLInvalid)
+	assert.NotContains(t, err.Error(), secret)
+}
+
+func TestStripCredentialsMasksWhatItCannotParse(t *testing.T) {
+	t.Parallel()
+
+	const secret = "s3cr3t-%zz"
+	got := StripCredentials([]string{"nats://bob:" + secret + "@h1:4222"})
+
+	require.Len(t, got, 1)
+	assert.NotContains(t, got[0], secret)
 }
 
 func TestSplitCredentialsDoesNotAliasInput(t *testing.T) {
