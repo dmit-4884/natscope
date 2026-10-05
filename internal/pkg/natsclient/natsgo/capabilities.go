@@ -4,6 +4,8 @@
 package natsgo
 
 import (
+	"context"
+	"errors"
 	"slices"
 	"strings"
 
@@ -141,14 +143,59 @@ func checkFeatures(level int32, version string, features ...feature) error {
 }
 
 // requireFeatures guards calls that older servers would ignore or not answer
-// with a clear error, using the connected server's API level.
-func (c *Client) requireFeatures(features ...feature) error {
+// with a clear error. The account's own JetStream is gated on the connected
+// server's API level; another domain or API prefix on the level of the
+// JetStream that answers there. An unknown level lets the server decide.
+func (c *Client) requireFeatures(ctx context.Context, features ...feature) error {
+	if len(features) == 0 {
+		return nil
+	}
+	if c.api != "" {
+		level, ok := c.remoteAPILevel(ctx)
+		if !ok {
+			return nil
+		}
+		return checkFeaturesAt(level, c.api, features...)
+	}
 	version := c.conn.ConnectedServerVersion()
 	if version == "" {
 		return nil
 	}
 	_, advertised := c.conn.ConnectedServerJetStream()
 	return checkFeatures(effectiveAPILevel(version, advertised), version, features...)
+}
+
+// checkFeaturesAt is checkFeatures for the JetStream behind an API prefix, whose server version is unknown.
+func checkFeaturesAt(level int32, api string, features ...feature) error {
+	err := checkFeatures(level, "", features...)
+	if featErr, ok := errors.AsType[*errs.FeatureUnsupportedError](err); ok {
+		featErr.Target = api
+	}
+	return err
+}
+
+// remoteAPILevel is the API level of the JetStream behind the client's domain or API prefix, read once.
+func (c *Client) remoteAPILevel(ctx context.Context) (int32, bool) {
+	c.levelMu.Lock()
+	known := c.remoteLevel
+	c.levelMu.Unlock()
+	if known != nil {
+		return *known, true
+	}
+	info, err := c.jetStream.AccountInfo(ctx)
+	if err != nil {
+		return 0, false
+	}
+	return c.rememberRemoteLevel(info.API.Level), true
+}
+
+// rememberRemoteLevel keeps the API level an AccountInfo of the client's domain or API prefix reported.
+func (c *Client) rememberRemoteLevel(level int) int32 {
+	l := int32(level) //nolint:gosec // API levels are small
+	c.levelMu.Lock()
+	c.remoteLevel = &l
+	c.levelMu.Unlock()
+	return l
 }
 
 // headerFeatures lists the version-gated features a publish's headers use.

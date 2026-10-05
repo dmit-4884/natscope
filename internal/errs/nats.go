@@ -95,12 +95,17 @@ type FeatureUnsupportedError struct {
 	Feature       string
 	MinVersion    string
 	ServerVersion string
+	// Target is the JetStream API prefix of another domain or account, whose server version is not known.
+	Target string
 }
 
 // Error implements the error interface.
 func (e *FeatureUnsupportedError) Error() string {
 	server := "connected server version unknown"
-	if e.ServerVersion != "" {
+	switch {
+	case e.Target != "":
+		server = "the JetStream at " + e.Target + " is older"
+	case e.ServerVersion != "":
 		server = "connected server v" + e.ServerVersion
 	}
 	return fmt.Sprintf("%s requires NATS %s+ (%s)", e.Feature, e.MinVersion, server)

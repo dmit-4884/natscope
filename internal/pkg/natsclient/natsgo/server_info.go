@@ -75,6 +75,14 @@ func (c *Client) GetServerInfo(ctx context.Context) (*entities.ServerInfo, error
 			slog.String("connection_id", c.id), slogx.Error(err))
 	}
 
+	if c.api != "" {
+		level := 0
+		if info.Jetstream {
+			level = int(c.rememberRemoteLevel(accountInfo.API.Level))
+		}
+		info.Capabilities = computeCapabilities("", info.Jetstream, level)
+		return info, nil
+	}
 	_, apiLevel := c.conn.ConnectedServerJetStream()
 	info.Capabilities = computeCapabilities(info.Version, info.Jetstream, apiLevel)
 

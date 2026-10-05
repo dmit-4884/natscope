@@ -4,6 +4,7 @@
 package natsgo
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -227,5 +228,62 @@ func TestConsumerConfigFeatures(t *testing.T) {
 // the way while disconnected, so the call fails with its real connection error.
 func TestRequireFeatures_UnknownServerFailsOpen(t *testing.T) {
 	c := &Client{}
-	assert.NoError(t, c.requireFeatures(featConsumerReset, featMsgCounters))
+	assert.NoError(t, c.requireFeatures(t.Context(), featConsumerReset, featMsgCounters))
+}
+
+// remoteJetStream answers AccountInfo for another domain's JetStream with a fixed API level.
+type remoteJetStream struct {
+	jetstream.JetStream
+	level int
+	err   error
+	calls int
+}
+
+func (r *remoteJetStream) AccountInfo(context.Context) (*jetstream.AccountInfo, error) {
+	r.calls++
+	if r.err != nil {
+		return nil, r.err
+	}
+	return &jetstream.AccountInfo{API: jetstream.APIStats{Level: r.level}}, nil
+}
+
+// TestRequireFeatures_AnotherDomainUsesItsOwnLevel checks that a domain or API prefix gates on the JetStream that
+// answers, not on the server the client is connected to.
+func TestRequireFeatures_AnotherDomainUsesItsOwnLevel(t *testing.T) {
+	t.Parallel()
+	_, url := jetStreamServer(t)
+
+	t.Run("an older hub rejects the feature", func(t *testing.T) {
+		t.Parallel()
+		c := dialClient(t, url)
+		remote := &remoteJetStream{level: int(apiLevel211)}
+		c.api, c.jetStream = "$JS.hub.API", remote
+
+		err := c.requireFeatures(t.Context(), featConsumerReset)
+		require.ErrorIs(t, err, errs.ErrFeatureUnsupported)
+		assert.Contains(t, err.Error(), "$JS.hub.API")
+		require.ErrorIs(t, c.requireFeatures(t.Context(), featMsgCounters), errs.ErrFeatureUnsupported)
+		assert.NoError(t, c.requireFeatures(t.Context(), featConsumerPause))
+		assert.Equal(t, 1, remote.calls, "the level is read once")
+	})
+
+	t.Run("an unknown level lets the server decide", func(t *testing.T) {
+		t.Parallel()
+		c := dialClient(t, url)
+		c.api, c.jetStream = "$JS.hub.API", &remoteJetStream{err: errors.New("no responders")}
+
+		assert.NoError(t, c.requireFeatures(t.Context(), featConsumerReset))
+	})
+
+	t.Run("server info reports the hub's capabilities", func(t *testing.T) {
+		t.Parallel()
+		c := dialClient(t, url)
+		c.api, c.jetStream = "$JS.hub.API", &remoteJetStream{level: int(apiLevel211)}
+
+		info, err := c.GetServerInfo(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, apiLevel211, info.Capabilities.ApiLevel)
+		assert.False(t, info.Capabilities.ConsumerReset)
+		assert.True(t, info.Capabilities.ConsumerPause)
+	})
 }

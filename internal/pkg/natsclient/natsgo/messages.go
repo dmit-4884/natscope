@@ -132,7 +132,7 @@ func (c *Client) PublishToStream(
 	if err := validateNATSSubjectLength("subject", subject); err != nil {
 		return nil, wrapErr(err)
 	}
-	if err := c.requireFeatures(headerFeatures(headers)...); err != nil {
+	if err := c.requireFeatures(ctx, headerFeatures(headers)...); err != nil {
 		return nil, err
 	}
 	if _, err := c.jetStream.StreamNameBySubject(ctx, subject); err != nil {

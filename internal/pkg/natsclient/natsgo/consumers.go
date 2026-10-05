@@ -124,7 +124,7 @@ func (c *Client) CreateConsumer(
 	if err != nil {
 		return nil, wrapErr(err)
 	}
-	if err = c.requireFeatures(consumerConfigFeatures(*jsConfig)...); err != nil {
+	if err = c.requireFeatures(ctx, consumerConfigFeatures(*jsConfig)...); err != nil {
 		return nil, err
 	}
 
@@ -201,7 +201,7 @@ func (c *Client) UpdateConsumer(
 	}
 
 	updatedConfig := applyConsumerUpdate(*infoResp.Config, config)
-	if err = c.requireFeatures(consumerConfigFeatures(updatedConfig)...); err != nil {
+	if err = c.requireFeatures(ctx, consumerConfigFeatures(updatedConfig)...); err != nil {
 		return nil, err
 	}
 
@@ -312,7 +312,7 @@ func (c *Client) ResetConsumer(
 	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
 		return nil, wrapErr(err)
 	}
-	if err := c.requireFeatures(featConsumerReset); err != nil {
+	if err := c.requireFeatures(ctx, featConsumerReset); err != nil {
 		return nil, err
 	}
 
@@ -371,7 +371,7 @@ func (c *Client) UnpinConsumer(ctx context.Context, streamName, consumerName, gr
 	if err := validateNATSNameLength("consumer name", consumerName); err != nil {
 		return wrapErr(err)
 	}
-	if err := c.requireFeatures(featPriorityGroups); err != nil {
+	if err := c.requireFeatures(ctx, featPriorityGroups); err != nil {
 		return err
 	}
 
