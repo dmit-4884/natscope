@@ -37,4 +37,22 @@ describe('useConnectionImportExport', () => {
       { pattern: 'orders.>', messageType: 'shop.Order', sourceId: 'src-1', framing: grpcMapping.framing },
     ])
   })
+
+  it('keeps a connection read-only and labelled on import', async () => {
+    const createConnection = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() =>
+      useConnectionImportExport({ connections: [], mappings: [], createConnection, bulkSaveMappings: vi.fn() }),
+    )
+    const config = {
+      version: 2,
+      connections: [{ name: 'prod', urls: ['nats://prod:4222'], readOnly: true, label: { text: 'PROD', color: 'red' } }],
+    }
+
+    result.current.handleImport({
+      target: { files: [new File([JSON.stringify(config)], 'config.json')] },
+    } as unknown as React.ChangeEvent<HTMLInputElement>)
+
+    await waitFor(() => expect(createConnection).toHaveBeenCalled())
+    expect(createConnection.mock.lastCall?.[0]).toMatchObject({ readOnly: true, label: { text: 'PROD', color: 'red' } })
+  })
 })

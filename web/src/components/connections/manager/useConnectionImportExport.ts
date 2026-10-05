@@ -1,11 +1,12 @@
 import { useRef } from 'react'
 import { downloadBlob } from '@/utils/download'
 import { toast } from '@/utils/toast'
-import type { SavedConnection, CreateConnectionRequest } from '@/api/connections'
+import type { ConnectionLabel, CreateConnectionRequest, LabelColor, SavedConnection } from '@/api/connections'
 import type { Framing } from '@/api/framing'
 import { AuthConfig, toApiAuthConfig } from '@/contexts/connection'
 import type { MappingItem } from '@/contexts/mappings'
 import { exportFraming, importFraming } from '@/components/mappings/framingExport'
+import { LABEL_COLORS } from '../labelStyles'
 
 interface MappingRow {
   pattern: string
@@ -19,6 +20,13 @@ interface Options {
   mappings: MappingItem[]
   createConnection: (req: CreateConnectionRequest) => Promise<unknown>
   bulkSaveMappings: (next: MappingRow[]) => Promise<unknown>
+}
+
+function importedLabel(label: unknown): ConnectionLabel | undefined {
+  if (!label || typeof label !== 'object') return undefined
+  const { text, color } = label as Partial<ConnectionLabel>
+  if (typeof text !== 'string' || !text.trim()) return undefined
+  return { text: text.trim(), color: LABEL_COLORS.includes(color as LabelColor) ? (color as LabelColor) : 'gray' }
 }
 
 /** v2 export format; import drops mappings without a `sourceId` or with malformed framing. */
@@ -98,6 +106,8 @@ export function useConnectionImportExport({
               description: conn.description,
               urls: conn.urls,
               auth: authProto,
+              readOnly: conn.readOnly === true,
+              label: importedLabel(conn.label),
               // TLS / connection / reconnect / ping configs are not preserved
               // by the export at this time.
             })
