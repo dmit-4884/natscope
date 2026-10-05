@@ -322,15 +322,17 @@ export default function StreamConsumersTab() {
           <div className="flex-1 flex items-center justify-center text-content-tertiary">
             <div className="text-center">
               <UsersIcon className="mx-auto h-12 w-12 text-content-muted mb-4" />
-              <p className="text-sm mb-4">Select a consumer to edit or create a new one</p>
-              <Button
-                onClick={() => {
-                  setEditorState({ isCreating: true, selectedName: null, formDraft: null })
-                }}
-              >
-                <PlusIcon className="w-4 h-4 mr-2" />
-                Create New Consumer
-              </Button>
+              <p className="text-sm mb-4">{readOnly ? 'Select a consumer to view' : 'Select a consumer to edit or create a new one'}</p>
+              {!readOnly && (
+                <Button
+                  onClick={() => {
+                    setEditorState({ isCreating: true, selectedName: null, formDraft: null })
+                  }}
+                >
+                  <PlusIcon className="w-4 h-4 mr-2" />
+                  Create New Consumer
+                </Button>
+              )}
             </div>
           </div>
         )}

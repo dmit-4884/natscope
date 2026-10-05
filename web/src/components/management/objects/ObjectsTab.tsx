@@ -380,21 +380,23 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                         <span>{obj.chunks} chunks</span>
                       </span>
                     </button>
-                    <div className="shrink-0 py-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-                      <Tooltip content="Delete object">
-                        <button
-                          onClick={() => requestAction({
-                            type: 'delete-object',
-                            name: obj.name,
-                            confirmText: '',
-                          })}
-                          className="p-1 hover:text-status-error-text"
-                          aria-label={`Delete object ${obj.name}`}
-                        >
-                          <CloseIcon className="w-3.5 h-3.5" />
-                        </button>
-                      </Tooltip>
-                    </div>
+                    {!readOnly && (
+                      <div className="shrink-0 py-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                        <Tooltip content="Delete object">
+                          <button
+                            onClick={() => requestAction({
+                              type: 'delete-object',
+                              name: obj.name,
+                              confirmText: '',
+                            })}
+                            className="p-1 hover:text-status-error-text"
+                            aria-label={`Delete object ${obj.name}`}
+                          >
+                            <CloseIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    )}
                   </div>
                 ))}
 

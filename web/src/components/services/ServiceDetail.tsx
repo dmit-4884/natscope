@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { MicroEndpoint, MicroInstance, MicroService } from '@/api/discovery'
 import Tooltip from '@/components/common/Tooltip'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { Badge, Button, CopyButton, DataTable, type DataTableColumn } from '@/components/ui'
 import { formatCount, formatDateTime, formatNanoseconds, formatTimestamp } from '@/utils/formatters'
 import { HealthBadge } from './HealthBadge'
@@ -82,6 +83,7 @@ function statColumns<T>(statsShown: boolean, windowOf: (item: T) => WindowTotal 
 }
 
 export function ServiceDetail({ service, statsShown, windows, onCall }: Props) {
+  const { readOnly } = useConnectionPolicy()
   const [inspected, setInspected] = useState<MicroInstance | null>(null)
   const of = (match: (w: EndpointWindow) => boolean) =>
     windows ? sumWindows(windows, (w) => w.service === service.name && match(w)) : undefined
@@ -224,7 +226,7 @@ export function ServiceDetail({ service, statsShown, windows, onCall }: Props) {
             columns={endpointColumns}
             items={service.endpoints}
             rowKey={(e) => `${e.name} ${e.subject}`}
-            rowActions={(e) => (
+            rowActions={readOnly ? undefined : (e) => (
               <Tooltip
                 content={
                   hasWildcard(e.subject)

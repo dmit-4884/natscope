@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Code } from '@connectrpc/connect'
+import { useConnectionPolicy } from '@/contexts/connection'
 import { isRegularStreamName, useStreamNames } from '@/contexts/streams'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { EmptyState, PlusIcon, RefreshIcon, SkeletonRows } from '@/components/ui'
@@ -22,6 +23,7 @@ const streamHref = (name: string) => `/streams/${encodeURIComponent(name)}`
 export default function StreamList({ connectionId }: StreamListProps) {
   const { streamName: selectedStream } = useParams()
   const { data: allNames, isLoading, error, refetch, isFetching } = useStreamNames(connectionId)
+  const { readOnly } = useConnectionPolicy()
 
   // Filter to only show regular streams (KV and Object stores are in separate sections)
   const streams = useMemo(() => (allNames ?? []).filter(isRegularStreamName), [allNames])
@@ -56,13 +58,15 @@ export default function StreamList({ connectionId }: StreamListProps) {
               <RefreshIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            <Link
-              to={`/streams/new`}
-              className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-text"
-            >
-              <PlusIcon className="w-4 h-4" />
-              Create stream
-            </Link>
+            {!readOnly && (
+              <Link
+                to={`/streams/new`}
+                className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-text"
+              >
+                <PlusIcon className="w-4 h-4" />
+                Create stream
+              </Link>
+            )}
           </div>
         }
       />

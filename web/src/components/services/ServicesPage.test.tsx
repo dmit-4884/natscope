@@ -15,6 +15,13 @@ vi.mock('@/api/discovery', async (importOriginal) => ({
   listServices: vi.fn(),
 }))
 
+const policy = vi.hoisted(() => ({ readOnly: false }))
+
+vi.mock('@/contexts/connection', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/contexts/connection')>()),
+  useConnectionPolicy: () => ({ readOnly: policy.readOnly, label: null }),
+}))
+
 const mockedList = vi.mocked(listServices)
 
 const allowed = { status: 'allowed', operation: 'publish', subject: '$SRV.INFO' } as const
@@ -225,5 +232,18 @@ describe('ServicesPage', () => {
     const draft = getRequestDraft('conn-1')
     expect(draft.subject).toBe('calc.add')
     expect(draft.requestTypes['calc.add']).toEqual({ messageType: 'calc.v1.AddRequest', sourceId: 'src' })
+  })
+
+  it('offers no Call on a read-only connection', async () => {
+    policy.readOnly = true
+    try {
+      mockedList.mockResolvedValue(discovery({ services: [service()] }))
+      renderAt()
+
+      await screen.findByTestId('service-detail')
+      expect(screen.queryByRole('button', { name: 'Call add' })).not.toBeInTheDocument()
+    } finally {
+      policy.readOnly = false
+    }
   })
 })
