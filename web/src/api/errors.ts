@@ -71,6 +71,7 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   CONNECTION_READ_ONLY: 'This connection is read-only. Turn it off in the connection settings to make changes',
   CONNECTION_NAME_REQUIRED: 'Connection name is required',
   CONNECTION_URL_INVALID: 'A server URL is invalid',
+  CONNECTION_LABEL_INVALID: 'A label is at most 16 characters, without control characters, in one of the offered colors',
   CONNECTION_URL_CREDENTIALS_MIXED:
     'Server URLs embed different credentials — use one set, or move them to the auth fields',
   CONNECTION_URL_CREDENTIALS_CONFLICT:

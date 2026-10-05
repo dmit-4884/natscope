@@ -642,3 +642,30 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 func connWith(init func(*entities.SavedConnection)) *entities.SavedConnection {
 	return entities.SavedConnectionNew(init)
 }
+
+func TestService_RejectsALabelTheFormWouldNot(t *testing.T) {
+	t.Parallel()
+	bad := map[string]*entities.ConnectionLabel{
+		"too long":       {Text: "seventeen-chars-x", Color: entities.LabelColorRed},
+		"bidi override":  {Text: "pr‮od", Color: entities.LabelColorRed},
+		"control char":   {Text: "pr\x07od", Color: entities.LabelColorRed},
+		"unknown colour": {Text: "PROD", Color: entities.LabelColor(99)},
+	}
+	for name, label := range bad {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			svc := New(&mockStorage{}, &mockLayouts{}, &mockNATSService{}, true)
+
+			_, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{Name: "c", URLs: []string{"nats://h:4222"}, Label: label})
+			require.ErrorIs(t, err, errs.ErrConnectionLabelInvalid)
+			_, err = svc.Update(t.Context(), &entities.SavedConnectionUpdate{Id: "c1", Label: label})
+			require.ErrorIs(t, err, errs.ErrConnectionLabelInvalid)
+		})
+	}
+
+	svc := New(&mockStorage{}, &mockLayouts{}, &mockNATSService{}, true)
+	_, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{
+		Name: "c", URLs: []string{"nats://h:4222"}, Label: &entities.ConnectionLabel{Text: "PROD", Color: entities.LabelColorRed},
+	})
+	require.NoError(t, err)
+}

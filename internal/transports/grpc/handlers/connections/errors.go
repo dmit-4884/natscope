@@ -23,6 +23,9 @@ func (h *Handler) StatusErrorConvert(ctx context.Context, err error) error {
 		return grpchelpers.NewStatus(codes.AlreadyExists, "connection name already in use", "CONNECTION_NAME_ALREADY_IN_USE")
 	case errors.Is(err, errs.ErrConnectionNameRequired):
 		return grpchelpers.NewStatus(codes.InvalidArgument, "connection name is required", "CONNECTION_NAME_REQUIRED")
+	case errors.Is(err, errs.ErrConnectionLabelInvalid):
+		return grpchelpers.NewStatus(codes.InvalidArgument,
+			"a label is at most 16 characters without control characters, in a known color", "CONNECTION_LABEL_INVALID")
 	case errors.Is(err, errs.ErrConnectionURLCredentialsMixed):
 		return grpchelpers.NewStatus(codes.InvalidArgument,
 			"server URLs embed different credentials", "CONNECTION_URL_CREDENTIALS_MIXED")

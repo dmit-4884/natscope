@@ -8,6 +8,8 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
@@ -55,6 +57,9 @@ func (s *Service) Create(
 	// normalizer so a whitespace-only name can't persist as an empty name.
 	if strings.TrimSpace(in.Name) == "" {
 		return nil, errs.ErrConnectionNameRequired
+	}
+	if err := validateLabel(in.Label); err != nil {
+		return nil, err
 	}
 
 	urls, auth, err := liftURLCredentials(in.URLs, in.Auth)
@@ -106,6 +111,9 @@ func (s *Service) Update(
 	// no buf.validate min_len on name, so this is the only guard).
 	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
 		return nil, errs.ErrConnectionNameRequired
+	}
+	if err := validateLabel(in.Label); err != nil {
+		return nil, err
 	}
 
 	urls, auth, err := liftURLCredentials(in.URLs, in.Auth)
@@ -256,6 +264,24 @@ func (s *Service) recordTestResult(ctx context.Context, id string, result *entit
 			slog.String("id", id),
 			slogx.Error(err))
 	}
+}
+
+// maxLabelText is the longest label text, in characters, a connection takes.
+const maxLabelText = 16
+
+// validateLabel applies the API's label rules to every path, workspace import included.
+func validateLabel(label *entities.ConnectionLabel) error {
+	if label == nil {
+		return nil
+	}
+	formatting := func(r rune) bool { return unicode.In(r, unicode.Cc, unicode.Cf) }
+	switch {
+	case utf8.RuneCountInString(label.Text) > maxLabelText, strings.ContainsFunc(label.Text, formatting):
+		return errs.ErrConnectionLabelInvalid
+	case label.Color < entities.LabelColorUnspecified || label.Color > entities.LabelColorRed:
+		return errs.ErrConnectionLabelInvalid
+	}
+	return nil
 }
 
 // liftURLCredentials moves credentials embedded in server URLs into the auth

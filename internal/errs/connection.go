@@ -17,6 +17,10 @@ var (
 	// whitespace-only name must be rejected again after normalization trims it.
 	ErrConnectionNameRequired = errors.New("connection: name is required")
 
+	// ErrConnectionLabelInvalid is returned when a label is longer than 16 characters, holds control or formatting
+	// characters, or names an unknown color; paths other than the API, such as workspace import, skip its rules.
+	ErrConnectionLabelInvalid = errors.New("connection: label is invalid")
+
 	// ErrConnectionURLCredentialsMixed is returned when a connection's server URLs
 	// embed different credentials, leaving no single set to lift into auth.
 	ErrConnectionURLCredentialsMixed = errors.New("connection: server URLs embed different credentials")
