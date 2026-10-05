@@ -8,7 +8,6 @@ import {
   type WSMessagePayload,
   type WSStatsPayload,
 } from '@/contexts/live'
-import { matchesPattern } from '@/contexts/messages'
 import { matchSubject } from '@/shared/domain/subjectMatch'
 import type { LiveMessage, LiveMessageLimit, WsStatus } from './messageListUtils'
 
@@ -201,7 +200,7 @@ export function useLiveSubscription({
         if (!subjectMode && msg.stream_name !== streamNameRef.current) return false
         if (muted.some((m) => matchSubject(msg.subject, m))) return false
         if (!pattern) return true
-        if (pattern.includes('*') || pattern.includes('>')) return matchesPattern(msg.subject, pattern)
+        if (pattern.includes('*') || pattern.includes('>')) return matchSubject(msg.subject, pattern)
         return msg.subject.toLowerCase().includes(pattern.toLowerCase())
       })
       if (relevant.length === 0) return
