@@ -46,6 +46,9 @@ var commonDomainErrors = []struct {
 	{errs.ErrPermissionDenied, errorMapping{codes.PermissionDenied, "permission denied", "PERMISSION_DENIED"}},
 	{errs.ErrSavedConnectionNotFound, errorMapping{codes.NotFound, "connection not found", "CONNECTION_NOT_FOUND"}},
 	{errs.ErrConnectionReadOnly, errorMapping{codes.FailedPrecondition, "connection is read-only", "CONNECTION_READ_ONLY"}},
+	{errs.ErrCliContextsHostDisabled, errorMapping{
+		codes.FailedPrecondition, "this host's nats CLI contexts are off while remote access is allowed", "CLI_CONTEXTS_HOST_DISABLED",
+	}},
 
 	// NATS — common (not copied into 8+ converters); SDK sentinels translated to
 	// these in services/nats so the transport stays SDK-agnostic.

@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Code, ConnectError } from '@connectrpc/connect'
+import { create, toBinary } from '@bufbuild/protobuf'
+import { ErrorInfoSchema } from '@/gen/google/rpc/error_details_pb'
 import { render, screen, fireEvent, waitFor } from '@/test/utils'
 import { importCliContexts, listCliContexts, type CliContextSummary } from '@/api/connections'
 import { toast } from '@/utils/toast'
@@ -88,5 +91,15 @@ describe('CliContextImportDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Import 1 connection' }))
     await waitFor(() => expect(importCliContexts).toHaveBeenCalledWith(['remote'], files))
+  })
+
+  it('asks for uploads when the server does not read its own contexts', async () => {
+    const err = new ConnectError('off', Code.FailedPrecondition)
+    err.details = [{ type: ErrorInfoSchema.typeName, value: toBinary(ErrorInfoSchema, create(ErrorInfoSchema, { reason: 'CLI_CONTEXTS_HOST_DISABLED' })) }]
+    vi.mocked(listCliContexts).mockRejectedValue(err)
+    render(<CliContextImportDialog isOpen onClose={vi.fn()} />)
+
+    expect(await screen.findByText(/does not read this host's nats CLI contexts/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /try again|retry/i })).not.toBeInTheDocument()
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, EmptyState, Modal, QueryErrorState, SkeletonRows, UploadIcon, WarningIcon } from '@/components/ui'
+import { Alert, Button, EmptyState, Modal, QueryErrorState, SkeletonRows, UploadIcon, WarningIcon } from '@/components/ui'
+import { getErrorMessage, getErrorReason } from '@/api/errors'
 import type { CliContextFile, CliContextSummary } from '@/api/connections'
 import { useCliContexts, useImportCliContexts } from '@/contexts/connection'
 import { toast } from '@/utils/toast'
@@ -10,6 +11,8 @@ interface Props {
   isOpen: boolean
   onClose: () => void
 }
+
+const HOST_DISABLED = 'CLI_CONTEXTS_HOST_DISABLED'
 
 const selectable = (c: CliContextSummary) => c.importable && !c.exists
 
@@ -112,6 +115,8 @@ export function CliContextImportDialog({ isOpen, onClose }: Props) {
 
         {isLoading ? (
           <SkeletonRows count={3} />
+        ) : error && getErrorReason(error) === HOST_DISABLED ? (
+          <Alert variant="info">{getErrorMessage(error)}</Alert>
         ) : error ? (
           <QueryErrorState error={error} onRetry={() => void refetch()} />
         ) : contexts.length === 0 ? (

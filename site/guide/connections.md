@@ -49,7 +49,9 @@ domain or API prefix, and its credentials: the `.creds` file, NKey seed, token o
 plus the TLS certificates and keys. They go to the secret vault like any other credential.
 
 Natscope running in Docker or on another host cannot see your contexts. Click **Upload context files**
-and pick the `.json` files from that folder instead. The credential and certificate files they point at
+and pick the `.json` files from that folder instead. With [remote access](/reference/remote-access) allowed,
+Natscope never reads its own host's contexts, so other people using it cannot pick up that machine's
+credentials: upload the files there too. The credential and certificate files they point at
 stay on your machine, so add them to each connection after the import.
 
 Contexts whose name is already taken are skipped, so an import never overwrites a connection. Settings

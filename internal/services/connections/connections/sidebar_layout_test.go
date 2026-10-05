@@ -19,7 +19,7 @@ func TestService_GetSidebarLayout(t *testing.T) {
 
 	t.Run("empty when nothing was saved", func(t *testing.T) {
 		t.Parallel()
-		svc := New(&mockStorage{exists: true}, &mockLayouts{}, nil)
+		svc := New(&mockStorage{exists: true}, &mockLayouts{}, nil, true)
 
 		got, err := svc.GetSidebarLayout(t.Context(), "conn-1")
 		require.NoError(t, err)
@@ -29,7 +29,7 @@ func TestService_GetSidebarLayout(t *testing.T) {
 	t.Run("saved layout", func(t *testing.T) {
 		t.Parallel()
 		saved := &entities.SidebarLayout{ConnectionID: "conn-1", Streams: entities.SectionLayout{Pinned: []string{"ORDERS"}}}
-		svc := New(&mockStorage{exists: true}, &mockLayouts{layouts: map[string]*entities.SidebarLayout{"conn-1": saved}}, nil)
+		svc := New(&mockStorage{exists: true}, &mockLayouts{layouts: map[string]*entities.SidebarLayout{"conn-1": saved}}, nil, true)
 
 		got, err := svc.GetSidebarLayout(t.Context(), "conn-1")
 		require.NoError(t, err)
@@ -38,7 +38,7 @@ func TestService_GetSidebarLayout(t *testing.T) {
 
 	t.Run("unknown connection", func(t *testing.T) {
 		t.Parallel()
-		svc := New(&mockStorage{}, &mockLayouts{}, nil)
+		svc := New(&mockStorage{}, &mockLayouts{}, nil, true)
 
 		_, err := svc.GetSidebarLayout(t.Context(), "conn-1")
 		require.ErrorIs(t, err, errs.ErrSavedConnectionNotFound)
@@ -53,7 +53,7 @@ func TestService_UpdateSidebarLayout(t *testing.T) {
 		layouts := &mockLayouts{layouts: map[string]*entities.SidebarLayout{
 			"conn-1": {ConnectionID: "conn-1", KV: entities.SectionLayout{Pinned: []string{"config"}}},
 		}}
-		svc := New(&mockStorage{exists: true}, layouts, nil)
+		svc := New(&mockStorage{exists: true}, layouts, nil, true)
 
 		got, err := svc.UpdateSidebarLayout(t.Context(), &entities.SidebarLayoutUpdate{
 			ConnectionID: " conn-1 ",
@@ -68,7 +68,7 @@ func TestService_UpdateSidebarLayout(t *testing.T) {
 
 	t.Run("drops blank and repeated names and pinned names from the order", func(t *testing.T) {
 		t.Parallel()
-		svc := New(&mockStorage{exists: true}, &mockLayouts{}, nil)
+		svc := New(&mockStorage{exists: true}, &mockLayouts{}, nil, true)
 
 		got, err := svc.UpdateSidebarLayout(t.Context(), &entities.SidebarLayoutUpdate{
 			ConnectionID: "conn-1",
@@ -85,7 +85,7 @@ func TestService_UpdateSidebarLayout(t *testing.T) {
 	t.Run("unknown connection", func(t *testing.T) {
 		t.Parallel()
 		layouts := &mockLayouts{}
-		svc := New(&mockStorage{}, layouts, nil)
+		svc := New(&mockStorage{}, layouts, nil, true)
 
 		_, err := svc.UpdateSidebarLayout(t.Context(), &entities.SidebarLayoutUpdate{
 			ConnectionID: "conn-1",
@@ -102,7 +102,7 @@ func TestService_DeleteRemovesSidebarLayout(t *testing.T) {
 	t.Run("layout is deleted with the connection", func(t *testing.T) {
 		t.Parallel()
 		layouts := &mockLayouts{}
-		svc := New(&mockStorage{}, layouts, &mockNATSService{})
+		svc := New(&mockStorage{}, layouts, &mockNATSService{}, true)
 
 		require.NoError(t, svc.Delete(t.Context(), "conn-1"))
 		assert.Equal(t, []string{"conn-1"}, layouts.deleted)
@@ -111,8 +111,22 @@ func TestService_DeleteRemovesSidebarLayout(t *testing.T) {
 	t.Run("a layout failure does not fail the delete", func(t *testing.T) {
 		t.Parallel()
 		layouts := &mockLayouts{deleteErr: errors.New("disk full")}
-		svc := New(&mockStorage{}, layouts, &mockNATSService{})
+		svc := New(&mockStorage{}, layouts, &mockNATSService{}, true)
 
 		require.NoError(t, svc.Delete(t.Context(), "conn-1"))
 	})
+}
+
+func TestCliContexts_HostDirectoryOffForRemoteAccess(t *testing.T) {
+	t.Parallel()
+	svc := New(&mockStorage{listResult: &entities.List[entities.SavedConnections]{}}, &mockLayouts{}, nil, false)
+
+	_, err := svc.ListCliContexts(t.Context(), nil)
+	require.ErrorIs(t, err, errs.ErrCliContextsHostDisabled)
+	_, err = svc.ImportCliContexts(t.Context(), []string{"prod"}, nil)
+	require.ErrorIs(t, err, errs.ErrCliContextsHostDisabled)
+
+	found, err := svc.ListCliContexts(t.Context(), []entities.CliContextFile{{Name: "prod.json", Content: []byte(`{"url":"nats://p:4222"}`)}})
+	require.NoError(t, err)
+	require.Len(t, found.Contexts, 1)
 }

@@ -26,19 +26,21 @@ import (
 
 // Service implements connections.Service.
 type Service struct {
-	storage    storage.Storage
-	layouts    layoutsstorage.Storage
-	natService natssvc.ConnectionManager
-	logger     *slog.Logger
+	storage         storage.Storage
+	layouts         layoutsstorage.Storage
+	natService      natssvc.ConnectionManager
+	hostCliContexts bool
+	logger          *slog.Logger
 }
 
-// New creates a new connections service.
-func New(storage storage.Storage, layouts layoutsstorage.Storage, natService natssvc.ConnectionManager) *Service {
+// New creates a new connections service; hostCliContexts lets it read the nats CLI contexts of the host it runs on.
+func New(storage storage.Storage, layouts layoutsstorage.Storage, natService natssvc.ConnectionManager, hostCliContexts bool) *Service {
 	return &Service{
-		storage:    storage,
-		layouts:    layouts,
-		natService: natService,
-		logger:     slog.Default().With(slogx.Module("service:connections")),
+		storage:         storage,
+		layouts:         layouts,
+		natService:      natService,
+		hostCliContexts: hostCliContexts,
+		logger:          slog.Default().With(slogx.Module("service:connections")),
 	}
 }
 

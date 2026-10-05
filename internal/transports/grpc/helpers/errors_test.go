@@ -65,6 +65,14 @@ func TestStatusErrorConvert(t *testing.T) {
 			wantReason: "CONNECTION_NOT_FOUND",
 		},
 
+		{name: "ErrConnectionReadOnly", err: errs.ErrConnectionReadOnly, wantCode: codes.FailedPrecondition, wantReason: "CONNECTION_READ_ONLY"},
+		{
+			name:       "ErrCliContextsHostDisabled",
+			err:        errs.ErrCliContextsHostDisabled,
+			wantCode:   codes.FailedPrecondition,
+			wantReason: "CLI_CONTEXTS_HOST_DISABLED",
+		},
+
 		// NATS connection domain (service-layer wraps SDK errs into these)
 		{name: "ErrNATSConnectionClosed", err: errs.ErrNATSConnectionClosed, wantCode: codes.Unavailable, wantReason: "NATS_CONNECTION_CLOSED"},
 		{name: "ErrNATSConnectionFailed", err: errs.ErrNATSConnectionFailed, wantCode: codes.Unavailable, wantReason: "NATS_CONNECTION_FAILED"},

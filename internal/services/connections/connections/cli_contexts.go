@@ -14,6 +14,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/natscontext"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 )
 
 const allConnectionsLimit = 10000
@@ -82,18 +83,40 @@ func (s *Service) ImportCliContexts(
 }
 
 func (s *Service) cliContexts(files []entities.CliContextFile) (*entities.CliContexts, error) {
-	if len(files) > 0 {
-		return &entities.CliContexts{Contexts: natscontext.Parse(files)}, nil
+	found := &entities.CliContexts{}
+	switch {
+	case len(files) > 0:
+		found.Contexts = natscontext.Parse(files)
+	case !s.hostCliContexts:
+		return nil, errs.ErrCliContextsHostDisabled
+	default:
+		dir, err := natscontext.Dir()
+		if err != nil {
+			return nil, err
+		}
+		if found.Contexts, err = natscontext.Read(dir); err != nil {
+			return nil, err
+		}
+		found.Dir = dir
 	}
-	dir, err := natscontext.Dir()
+	for i := range found.Contexts {
+		liftContextCredentials(&found.Contexts[i])
+	}
+	return found, nil
+}
+
+// liftContextCredentials moves credentials a context embeds in its URLs into its auth, as Create would.
+func liftContextCredentials(c *entities.CliContext) {
+	if c.Connection == nil {
+		return
+	}
+	urls, auth, err := liftURLCredentials(c.Connection.URLs, c.Connection.Auth)
 	if err != nil {
-		return nil, err
+		c.Connection.URLs = natsutil.StripCredentials(c.Connection.URLs)
+		c.Warnings = append(c.Warnings, err.Error())
+		return
 	}
-	contexts, err := natscontext.Read(dir)
-	if err != nil {
-		return nil, err
-	}
-	return &entities.CliContexts{Dir: dir, Contexts: contexts}, nil
+	c.Connection.URLs, c.Connection.Auth = urls, auth
 }
 
 func (s *Service) savedNames(ctx context.Context) (map[string]struct{}, error) {

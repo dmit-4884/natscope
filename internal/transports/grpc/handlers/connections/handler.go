@@ -14,6 +14,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
 
 	connectionssvc "github.com/dmit-4884/natscope/internal/services/connections"
@@ -256,7 +257,7 @@ func toProtoCliContext(c entities.CliContext) *connectionspb.CliContext {
 		return pb
 	}
 	pb.Description = conn.Description
-	pb.Urls = conn.URLs
+	pb.Urls = natsutil.StripCredentials(conn.URLs)
 	if conn.Auth != nil {
 		pb.AuthMethod = natspb.AuthMethod(conn.Auth.Method)
 	}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/altessa-s/go-atlas/core/errors"
 
+	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
 	"github.com/dmit-4884/natscope/internal/pkg/bsr"
 	"github.com/dmit-4884/natscope/internal/pkg/secrets"
@@ -32,6 +33,7 @@ import (
 	messagesService "github.com/dmit-4884/natscope/internal/services/messages/messages"
 	microsvc "github.com/dmit-4884/natscope/internal/services/micro"
 	microService "github.com/dmit-4884/natscope/internal/services/micro/micro"
+	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	protoService "github.com/dmit-4884/natscope/internal/services/proto/proto"
 	publishsvc "github.com/dmit-4884/natscope/internal/services/publish"
@@ -68,7 +70,7 @@ func ServicesModule() fx.Option {
 		)),
 		fx.Provide(fx.Annotate(newConnectionsStorage, fx.As(new(connectionsStorageIface.Storage)))),
 		fx.Provide(newLayoutsStorage),
-		fx.Provide(fx.Annotate(connectionsService.New, fx.As(new(connectionssvc.Service)))),
+		fx.Provide(fx.Annotate(newConnectionsService, fx.As(new(connectionssvc.Service)))),
 		fx.Provide(fx.Annotate(newMappingsService, fx.As(new(mappingssvc.Service)))),
 		fx.Provide(fx.Annotate(newHistoryService, fx.As(new(historysvc.Service)))),
 		fx.Provide(fx.Annotate(newSettingsService, fx.As(new(settingssvc.Service)))),
@@ -174,6 +176,16 @@ func newLayoutsStorage(db *bbstore.DB) (layoutsStorageIface.Storage, error) {
 }
 
 // newMappingsService creates a new mappings service using bbolt storage.
+// newConnectionsService lets the service read this host's nats CLI contexts only while Natscope serves the local machine alone.
+func newConnectionsService(
+	cfg *appconfig.Config,
+	storage connectionsStorageIface.Storage,
+	layouts layoutsStorageIface.Storage,
+	natService natssvc.ConnectionManager,
+) *connectionsService.Service {
+	return connectionsService.New(storage, layouts, natService, !cfg.AllowRemote)
+}
+
 func newMappingsService(db *bbstore.DB) (mappingssvc.Service, error) {
 	storage, err := mappingsBbolt.New(context.Background(), db)
 	if err != nil {

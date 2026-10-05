@@ -327,7 +327,7 @@ func TestHandler_ListCliContexts_DescribesWithoutSecrets(t *testing.T) {
 	token := "s3cret"
 	svc := &mockConnService{cliContexts: &entities.CliContexts{Dir: "/cfg/nats/context", Contexts: []entities.CliContext{
 		{Name: "prod", Selected: true, Warnings: []string{"SOCKS proxies are not supported"}, Connection: &entities.SavedConnectionCreate{
-			URLs: []string{"tls://p:4222"},
+			URLs: []string{"tls://ops:url-secret@p:4222"},
 			Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: &token},
 			TLS:  &entities.TlsConfig{TlsFirst: true},
 		}},
@@ -344,5 +344,7 @@ func TestHandler_ListCliContexts_DescribesWithoutSecrets(t *testing.T) {
 	assert.True(t, prod.GetTls())
 	assert.Equal(t, natspb.AuthMethod_AUTH_METHOD_TOKEN, prod.GetAuthMethod())
 	assert.NotContains(t, prod.String(), token)
+	assert.NotContains(t, prod.String(), "url-secret")
+	assert.Equal(t, []string{"tls://p:4222"}, prod.GetUrls())
 	assert.False(t, resp.Msg.GetContexts()[1].GetImportable())
 }
