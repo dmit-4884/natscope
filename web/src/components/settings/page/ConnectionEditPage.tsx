@@ -19,8 +19,9 @@ import {
   useTestConnection,
 } from '@/contexts/connection'
 import { ConnectionForm } from '@/components/connections/manager/ConnectionForm'
+import { ConnectionChecks } from '@/components/connections/manager/ConnectionChecks'
 import { emptyTls, noSecretsSet, type ConnectionFormData } from '@/components/connections/manager/connectionFormData'
-import type { SavedConnection, TestConnectionResponse } from '@/api/connections'
+import { connectionChecks, type SavedConnection, type TestConnectionResponse } from '@/api/connections'
 
 interface Props {
   mode: 'create' | 'edit'
@@ -192,6 +193,7 @@ export default function ConnectionEditPage({ mode }: Props) {
         urls,
         auth: toApiAuthConfig(buildAuth({ explicit: false })),
         tls: toApiTlsConfig(form.tls, { explicit: false }),
+        connection: toApiConnectionConfig(existing?.connection, form),
         connectionId: isEdit ? id : undefined,
       })
       setTestResult({ ok: !!result.success, data: result })
@@ -380,6 +382,11 @@ export default function ConnectionEditPage({ mode }: Props) {
                 <div className="mb-2 flex items-start gap-2 px-2 py-1.5 bg-status-warning-bg border border-amber-200 rounded text-2xs text-amber-800">
                   <WarningIcon className="w-3.5 h-3.5 mt-px shrink-0" />
                   <span>Form changed since last test — re-run Test to verify.</span>
+                </div>
+              )}
+              {testResult && connectionChecks(testResult.data).length > 0 && (
+                <div className="mb-3 pb-3 border-b border-gray-100">
+                  <ConnectionChecks checks={connectionChecks(testResult.data)} />
                 </div>
               )}
               {testResult && testResult.ok && (

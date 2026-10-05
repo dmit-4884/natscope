@@ -36,7 +36,19 @@ Go to **Settings → Connections** (or click **New Connection** on the start scr
    such as the hub's streams from a leaf node (`--js-domain` in the NATS CLI), or a **JetStream API
    prefix** when another account exports its JetStream API to yours under a prefix such as
    `JS.orders.API` (`--js-api-prefix`). Set one or the other, not both.
-7. Click **Test** to check round-trip time, server version and JetStream availability.
+7. Click **Test**. Natscope checks the connection step by step and shows what each step found:
+   - **DNS**: the host name resolves
+   - **TCP**: something listens on the port
+   - **NATS protocol**: the server greets like a NATS server, not an HTTP or monitoring port, and
+     whether it waits for a TLS handshake first
+   - **TLS**: the handshake, whether the certificate is trusted, matches the host name and when it expires,
+     and whether the server wants a client certificate
+   - **Authentication**: the credentials are accepted
+   - **JetStream**: the account has JetStream, in the configured domain or API prefix
+
+   A failed step says what to do next, such as adding the CA certificate or turning on **TLS
+   handshake first**. When Natscope runs in Docker and the server is on your machine, it suggests
+   `host.docker.internal` instead of `localhost`. The later steps show as skipped.
 8. Click **Connect**.
 
 ## Import from the nats CLI

@@ -5,7 +5,10 @@ import {
   ImportCliContextsResponseSchema,
   ListCliContextsResponseSchema,
   ListConnectionsResponseSchema,
+  TestConnectionResponseSchema,
   UpdateConnectionResponseSchema,
+  ConnectionCheckStatus,
+  ConnectionCheckStep,
 } from '../gen/services/grpc/nats/v1/connections/nats_connections_service_pb'
 import { AuthMethod, LabelColor } from '../gen/types/nats/nats_connection_pb'
 
@@ -19,7 +22,7 @@ const client = vi.hoisted(() => ({
 
 vi.mock('./grpc/clients', () => ({ connectionsClient: client }))
 
-import { createConnection, getConnections, importCliContexts, listCliContexts, updateConnection } from './connections'
+import { connectionChecks, createConnection, getConnections, importCliContexts, listCliContexts, updateConnection } from './connections'
 
 describe('connections api', () => {
   beforeEach(() => {
@@ -113,5 +116,23 @@ describe('nats CLI contexts api', () => {
     expect(client.importCliContexts).toHaveBeenCalledWith({ names: ['prod', 'dev'], files: [] })
     expect(res.created.map((c) => c.name)).toEqual(['prod'])
     expect(res.skipped).toEqual([{ name: 'dev', reason: 'a connection with this name already exists' }])
+  })
+})
+
+describe('connectionChecks', () => {
+  it('names each step and its outcome', () => {
+    const resp = create(TestConnectionResponseSchema, {
+      checks: [
+        { step: ConnectionCheckStep.DNS, status: ConnectionCheckStatus.OK, detail: '127.0.0.1 is an IP address', durationMs: 0n },
+        { step: ConnectionCheckStep.TCP, status: ConnectionCheckStatus.FAILED, detail: 'refused', hint: 'Is the NATS server running?', durationMs: 4n },
+        { step: ConnectionCheckStep.JETSTREAM, status: ConnectionCheckStatus.SKIPPED, detail: 'Not reached' },
+      ],
+    })
+
+    expect(connectionChecks(resp)).toEqual([
+      { step: 'dns', status: 'ok', detail: '127.0.0.1 is an IP address', hint: '', durationMs: 0 },
+      { step: 'tcp', status: 'failed', detail: 'refused', hint: 'Is the NATS server running?', durationMs: 4 },
+      { step: 'jetstream', status: 'skipped', detail: 'Not reached', hint: '', durationMs: 0 },
+    ])
   })
 })

@@ -2,7 +2,11 @@ import { tsToMillis, durToMillis, millisToDur } from '@/utils/timestamp'
 import type { SavedConnection as ProtoSavedConnection } from '../gen/types/nats/nats_connection_pb'
 import { AuthMethod as ProtoAuthMethod, LabelColor as ProtoLabelColor } from '../gen/types/nats/nats_connection_pb'
 import type { AuthConfig, TlsConfig, ConnectionConfig, ReconnectConfig, PingConfig } from '../gen/types/nats/nats_connection_pb'
-import type { TestConnectionResponse } from '../gen/services/grpc/nats/v1/connections/nats_connections_service_pb'
+import {
+  ConnectionCheckStatus as ProtoCheckStatus,
+  ConnectionCheckStep as ProtoCheckStep,
+  type TestConnectionResponse,
+} from '../gen/services/grpc/nats/v1/connections/nats_connections_service_pb'
 import { connectionsClient } from './grpc/clients'
 
 export type { TestConnectionResponse }
@@ -149,6 +153,7 @@ export interface TestConnectionRequest {
   urls: string[]
   auth?: AuthConfig
   tls?: TlsConfig
+  connection?: ConnectionConfig
   connectTimeout?: number
   /** When set, backend records the probe result into that connection's `meta`. */
   connectionId?: string
@@ -298,6 +303,7 @@ export async function testConnection(req: TestConnectionRequest): Promise<TestCo
     tls: req.tls,
     connectTimeout: millisToDur(req.connectTimeout),
     connectionId: req.connectionId,
+    connection: req.connection,
   })
 }
 
@@ -399,4 +405,39 @@ export async function importCliContexts(names: string[], files: CliContextFile[]
     created: response.connections.map(toSavedConnection),
     skipped: response.skipped.map((s) => ({ name: s.name, reason: s.reason })),
   }
+}
+
+export type ConnectionCheckStep = 'dns' | 'tcp' | 'protocol' | 'tls' | 'auth' | 'jetstream'
+export type ConnectionCheckStatus = 'ok' | 'warning' | 'failed' | 'skipped'
+
+export interface ConnectionCheck {
+  step: ConnectionCheckStep
+  status: ConnectionCheckStatus
+  detail: string
+  hint: string
+  durationMs: number
+}
+
+const CHECK_STEPS: Partial<Record<ProtoCheckStep, ConnectionCheckStep>> = {
+  [ProtoCheckStep.DNS]: 'dns',
+  [ProtoCheckStep.TCP]: 'tcp',
+  [ProtoCheckStep.PROTOCOL]: 'protocol',
+  [ProtoCheckStep.TLS]: 'tls',
+  [ProtoCheckStep.AUTH]: 'auth',
+  [ProtoCheckStep.JETSTREAM]: 'jetstream',
+}
+
+const CHECK_STATUSES: Partial<Record<ProtoCheckStatus, ConnectionCheckStatus>> = {
+  [ProtoCheckStatus.OK]: 'ok',
+  [ProtoCheckStatus.WARNING]: 'warning',
+  [ProtoCheckStatus.FAILED]: 'failed',
+  [ProtoCheckStatus.SKIPPED]: 'skipped',
+}
+
+export function connectionChecks(resp: TestConnectionResponse): ConnectionCheck[] {
+  return resp.checks.flatMap((c) => {
+    const step = CHECK_STEPS[c.step]
+    if (!step) return []
+    return [{ step, status: CHECK_STATUSES[c.status] ?? 'skipped', detail: c.detail, hint: c.hint, durationMs: Number(c.durationMs) }]
+  })
 }
