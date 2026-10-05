@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -212,7 +213,8 @@ func (s *Service) Duplicate(
 }
 
 // TestConnection probes NATS. With ConnectionID set, the saved config
-// overlays the request (blocks credential smuggling); result saved to Meta.
+// overlays the request (blocks credential smuggling); the result is saved to Meta when the request tests the saved
+// connection settings too.
 func (s *Service) TestConnection(
 	ctx context.Context,
 	in *entities.TestConnectionRequest,
@@ -225,6 +227,7 @@ func (s *Service) TestConnection(
 	}
 	in.URLs, in.Auth = urls, auth
 
+	recordable := false
 	if in.ConnectionID != "" {
 		saved, getErr := s.storage.Get(ctx, in.ConnectionID)
 		if getErr != nil {
@@ -234,6 +237,7 @@ func (s *Service) TestConnection(
 		if in.Connection == nil {
 			in.Connection = saved.Connection
 		}
+		recordable = settingsOf(in.Connection) == settingsOf(saved.Connection)
 	}
 	if in.ConnectTimeout == nil && in.Connection != nil {
 		in.ConnectTimeout = in.Connection.ConnectTimeout
@@ -244,11 +248,34 @@ func (s *Service) TestConnection(
 		return nil, err
 	}
 
-	if in.ConnectionID != "" {
+	if recordable {
 		s.recordTestResult(ctx, in.ConnectionID, result)
 	}
 
 	return result, nil
+}
+
+// connectionSettings is what a ConnectionConfig changes about a connection, with unset and empty alike.
+type connectionSettings struct {
+	connectTimeout                             time.Duration
+	name, inboxPrefix, domain, apiPrefix       string
+	noEcho, noRandomize, ignoreDiscoveredHosts bool
+}
+
+func settingsOf(c *entities.ConnectionConfig) connectionSettings {
+	if c == nil {
+		return connectionSettings{}
+	}
+	return connectionSettings{
+		connectTimeout:        ptr.Unwrap(c.ConnectTimeout),
+		name:                  ptr.Unwrap(c.ConnectionName),
+		inboxPrefix:           ptr.Unwrap(c.InboxPrefix),
+		domain:                ptr.Unwrap(c.JetstreamDomain),
+		apiPrefix:             ptr.Unwrap(c.JetstreamAPIPrefix),
+		noEcho:                c.NoEcho,
+		noRandomize:           c.NoRandomize,
+		ignoreDiscoveredHosts: c.IgnoreDiscoveredServers,
+	}
 }
 
 // recordTestResult writes a probe result to Meta in one storage transaction without bumping

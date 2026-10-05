@@ -55,6 +55,8 @@ Go to **Settings → Connections** (or click **New Connection** on the start scr
    could not finish as skipped, not failed. A step that is only slow, such as a greeting that takes
    longer than three seconds through a tunnel, does not stop the test: when the connection itself goes
    through within the connect timeout, the slow step shows as a warning and the test passes.
+   Editing a saved connection, **Test** uses its saved servers, credentials and TLS settings until you
+   save, so they never go to a server you typed in; the other settings come from the form.
 8. Click **Connect**.
 
 ## Import from the nats CLI

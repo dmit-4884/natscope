@@ -451,8 +451,9 @@ func TestService_TestConnection(t *testing.T) {
 			c.URLs = []string{"nats://trusted:4222"}
 			c.Connection = &entities.ConnectionConfig{JetstreamDomain: ptrStr("hub"), ConnectTimeout: new(5 * time.Second)}
 		})
+		store := &mockStorage{getResult: saved}
 		natsSvc := &mockNATSService{testResult: &entities.TestConnectionResult{Success: true}}
-		svc := New(&mockStorage{getResult: saved}, &mockLayouts{}, natsSvc, true)
+		svc := New(store, &mockLayouts{}, natsSvc, true)
 
 		_, err := svc.TestConnection(t.Context(), &entities.TestConnectionRequest{
 			ConnectionID: saved.Id,
@@ -465,6 +466,26 @@ func TestService_TestConnection(t *testing.T) {
 		assert.Equal(t, "leaf", *natsSvc.testInput.Connection.JetstreamDomain)
 		assert.Equal(t, new(2*time.Second), natsSvc.testInput.ConnectTimeout)
 		assert.Equal(t, saved.URLs, natsSvc.testInput.URLs)
+		assert.False(t, store.updateCalled, "a test of unsaved settings is not the saved connection's result")
+	})
+
+	t.Run("ConnectionID_TheSavedSettingsRecordTheResult", func(t *testing.T) {
+		t.Parallel()
+		saved := entities.SavedConnectionNew(func(c *entities.SavedConnection) {
+			c.URLs = []string{"nats://trusted:4222"}
+			c.Connection = &entities.ConnectionConfig{JetstreamDomain: ptrStr("hub")}
+		})
+		store := &mockStorage{getResult: saved}
+		natsSvc := &mockNATSService{testResult: &entities.TestConnectionResult{Success: true}}
+		svc := New(store, &mockLayouts{}, natsSvc, true)
+
+		_, err := svc.TestConnection(t.Context(), &entities.TestConnectionRequest{
+			ConnectionID: saved.Id,
+			Connection:   &entities.ConnectionConfig{JetstreamDomain: ptrStr("hub"), InboxPrefix: ptrStr("")},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, store.updateCalled)
 	})
 
 	t.Run("NoConnectionID_SkipsOverlayAndRecord", func(t *testing.T) {

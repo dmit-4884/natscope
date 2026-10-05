@@ -51,6 +51,11 @@ const blankFormData: ConnectionFormData = {
 // not here.
 
 /** Hydrate the form from a saved connection (edit mode pre-fill). */
+function savedPartsOf(form: ConnectionFormData): string {
+  const { urls, authMethod, username, password, token, nkeySeed, credentials, tls } = form
+  return JSON.stringify({ urls: urls.filter(Boolean), authMethod, username, password, token, nkeySeed, credentials, tls })
+}
+
 function formFromConnection(c: SavedConnection): ConnectionFormData {
   return {
     name: c.name,
@@ -144,6 +149,7 @@ export default function ConnectionEditPage({ mode }: Props) {
   // The sidebar probe reflects the form as it was at Test time; once the user
   // edits again that snapshot is stale, so we flag it instead of hiding the mismatch.
   const [testFormSnapshot, setTestFormSnapshot] = useState<string | null>(null)
+  const [testUsedSaved, setTestUsedSaved] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const isTestStale = !!testResult && testFormSnapshot !== null && testFormSnapshot !== JSON.stringify(form)
 
@@ -203,6 +209,7 @@ export default function ConnectionEditPage({ mode }: Props) {
       })
       setTestResult({ ok: !!result.success, data: result })
       setTestFormSnapshot(snap)
+      setTestUsedSaved(isEdit && savedPartsOf(form) !== savedPartsOf(snapshot))
       if (!result.success) {
         setError(result.error ? stripErrorCodePrefix(result.error) : 'Connection failed')
       }
@@ -387,6 +394,15 @@ export default function ConnectionEditPage({ mode }: Props) {
                 <div className="mb-2 flex items-start gap-2 px-2 py-1.5 bg-status-warning-bg border border-amber-200 rounded text-2xs text-amber-800">
                   <WarningIcon className="w-3.5 h-3.5 mt-px shrink-0" />
                   <span>Form changed since last test — re-run Test to verify.</span>
+                </div>
+              )}
+              {testResult && testUsedSaved && (
+                <div className="mb-2 flex items-start gap-2 px-2 py-1.5 bg-status-warning-bg border border-amber-200 rounded text-2xs text-amber-800">
+                  <WarningIcon className="w-3.5 h-3.5 mt-px shrink-0" />
+                  <span>
+                    This test used the saved servers, credentials and TLS settings, not your edits to them. Save to test those
+                    edits.
+                  </span>
                 </div>
               )}
               {testResult && connectionChecks(testResult.data).length > 0 && (
