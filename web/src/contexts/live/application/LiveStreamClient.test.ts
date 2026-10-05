@@ -147,6 +147,22 @@ describe('LiveStreamClient', () => {
     }
   })
 
+  it('gives up at once on a subject the server rejects', async () => {
+    subscribeCall.mockImplementationOnce(() => ({
+      [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(new ConnectError('invalid subject', Code.InvalidArgument)) }),
+    }))
+    const client = new LiveStreamClient('conn-1')
+    const reconnecting = vi.fn()
+    const disconnected = vi.fn()
+    client.onReconnecting = reconnecting
+    client.onDisconnect = disconnected
+    client.connect()
+    client.subscribeSubjects(['orders.\u0001'])
+
+    await vi.waitFor(() => expect(disconnected).toHaveBeenCalled())
+    expect(reconnecting).not.toHaveBeenCalled()
+  })
+
   it('opens no stream once disconnected', () => {
     const client = new LiveStreamClient('conn-1')
     client.connect()

@@ -7,6 +7,7 @@ const { clients, setStats } = vi.hoisted(() => ({ clients: [] as FakeClient[], s
 
 interface FakeClient {
   deliver: (payload: WSBatchPayload) => void
+  onSubscribed?: () => void
   onError?: (payload: WSErrorPayload) => void
   onStats?: (payload: WSStatsPayload) => void
   onBuffered?: (count: number) => void
@@ -178,6 +179,15 @@ describe('useLiveSubscription subjects', () => {
     act(() => client.deliver({ messages: [core('orders.new')], count: 1 }))
     expect(result.current.liveMessages.map((m) => m.subject)).toEqual(['orders.new'])
     expect(result.current.liveMessages[0].reply).toBe('_INBOX.1')
+  })
+
+  it('calls the subscription live only once the server answers', () => {
+    const { result } = renderSubjects(['>'])
+    const client = clients[clients.length - 1]
+    expect(result.current.wsStatus).toBe('connecting')
+
+    act(() => client.onSubscribed?.())
+    expect(result.current.wsStatus).toBe('connected')
   })
 
   it('counts every received message per subject', () => {

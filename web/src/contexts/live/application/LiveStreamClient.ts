@@ -226,8 +226,9 @@ export class LiveStreamClient {
         code: 'stream_error',
       })
 
-      // Errors that won't be fixed by reconnecting: authz and missing resources.
+      // Errors that won't be fixed by reconnecting: authz, missing resources and rejected requests.
       const isFatal =
+        connectErr.code === Code.InvalidArgument ||
         connectErr.code === Code.PermissionDenied ||
         connectErr.code === Code.Unauthenticated ||
         connectErr.code === Code.NotFound ||

@@ -481,3 +481,15 @@ func TestSubscribe_MutedSubjectsStayOutOfTheRate(t *testing.T) {
 	assert.Zero(t, stats.MessagesPerSecond)
 	assert.Zero(t, stats.TotalMessages)
 }
+
+func TestSubscribe_SaysAtOnceThatTheSubscriptionsStarted(t *testing.T) {
+	t.Parallel()
+
+	start := time.Now()
+	_, events, stop := startFakeSession(t, "orders.>")
+	defer stop()
+
+	first := nextEvent(t, events, func(*entities.LiveEvent) bool { return true })
+	require.NotNil(t, first.Stats)
+	assert.Less(t, time.Since(start), time.Second)
+}

@@ -15,6 +15,8 @@ describe('subscribeSubjectError', () => {
     expect(subscribeSubjectError('orders..x')).toBe('A subject cannot have empty tokens')
     expect(subscribeSubjectError('orders.>.x')).toBe('> must be the last token')
     expect(subscribeSubjectError('orders.ab*')).toBe('Wildcards must fill a whole token, like orders.* or orders.>')
+    expect(subscribeSubjectError('orders.\u0001')).toBe('A subject cannot contain control characters')
+    expect(publishSubjectError('orders.\u007f')).toBe('A subject cannot contain control characters')
   })
 })
 

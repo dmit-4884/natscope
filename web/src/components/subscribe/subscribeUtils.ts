@@ -11,6 +11,8 @@ export const SUBJECT_PRESETS = [
 function commonSubjectError(trimmed: string): string | null {
   if (!trimmed) return 'Enter a subject'
   if (/\s/.test(trimmed)) return 'A subject cannot contain spaces'
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(trimmed)) return 'A subject cannot contain control characters'
   if (trimmed.split('.').some((t) => t === '')) return 'A subject cannot have empty tokens'
   return null
 }

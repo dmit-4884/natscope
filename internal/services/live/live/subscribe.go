@@ -61,6 +61,9 @@ func (s *Service) Subscribe(
 			return err
 		}
 	}
+	if err := emit(&entities.LiveEvent{Stats: &entities.LiveStats{}}); err != nil {
+		return err
+	}
 
 	limits := loopLimits{maxDisplayRate: maxDisplayRate, maxPayloadBytes: payloadCap, detect: detect, exclude: in.ExcludeSubjects}
 	return s.runLoop(ctx, sess, msgChan, limits, emit)

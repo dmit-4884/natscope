@@ -241,7 +241,6 @@ export function useLiveSubscription({
     const socket = new LiveStreamClient(connectionId)
 
     socket.onConnected = () => {
-      setWsStatus('connected')
       setWsError(null)
       if (subjectsKeyRef.current) socket.subscribeSubjects(subjectsKeyRef.current.split('\n'), limitsRef.current)
       else if (streamNameRef.current) socket.subscribe(streamNameRef.current)
@@ -299,7 +298,7 @@ export function useLiveSubscription({
 
   // Subscribe / unsubscribe when stream changes on an open connection.
   useEffect(() => {
-    if (!ws || wsStatus !== 'connected') return
+    if (!ws || wsStatus === 'disconnected') return
     const skipped = skippedRef.current
     skippedRef.current = { carried: skipped.carried + skipped.session - skipped.cleared, session: 0, cleared: 0 }
     if (subjectsKey) ws.subscribeSubjects(subjectsKey.split('\n'), limitsRef.current)
