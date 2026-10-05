@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,19 +28,54 @@ const fetchMethodConsumer = "consumer"
 
 // Consumer scans pull adaptive batches of about scanFetchBytes, waiting up to scanFetchWait for each; a pull that
 // keeps coming back empty while the consumer still has messages ends the scan with an error after scanEmptyFetches.
+// Deliveries lost on a slow link are read again with twice the wait, up to scanFetchWaitMax.
 const (
 	scanFetchFirst   = 32
 	scanFetchMax     = 256
 	scanFetchBytes   = 8 << 20
 	scanFetchWait    = 5 * time.Second
+	scanFetchWaitMax = 4 * scanFetchWait
 	scanEmptyFetches = 3
 )
 
 // scanDirectBatch is how many sequences a direct scan reads per parallel round.
 const scanDirectBatch = 200
 
-// directGetHeaders are the headers the server adds to a direct read; they describe the read, not the message.
-var directGetHeaders = []string{"Nats-Stream", "Nats-Sequence", "Nats-Subject", "Nats-Time-Stamp", "Nats-Last-Sequence", "Nats-Num-Pending"}
+// directReadHeaders are the headers the server appends to a single direct read; they describe the read, and come
+// after any value of the same name the message itself carries.
+var directReadHeaders = []string{jetstream.StreamHeader, jetstream.SubjectHeader, jetstream.SequenceHeader, jetstream.TimeStampHeaer}
+
+// fromDirectRead takes the sequence, subject and time of a direct read from the values the server appended and drops
+// those values, keeping the ones stored with the message.
+func fromDirectRead(stream jetstream.Stream, msg *jetstream.RawStreamMsg) *jetstream.RawStreamMsg {
+	info := stream.CachedInfo()
+	if msg == nil || info == nil || !info.Config.AllowDirect {
+		return msg
+	}
+	read := make(map[string]string, len(directReadHeaders))
+	for _, key := range directReadHeaders {
+		values := msg.Header.Values(key)
+		if len(values) == 0 {
+			continue
+		}
+		read[key] = values[len(values)-1]
+		if len(values) == 1 {
+			msg.Header.Del(key)
+		} else {
+			msg.Header[key] = values[:len(values)-1]
+		}
+	}
+	if seq, err := strconv.ParseUint(read[jetstream.SequenceHeader], 10, 64); err == nil {
+		msg.Sequence = seq
+	}
+	if subject := read[jetstream.SubjectHeader]; subject != "" {
+		msg.Subject = subject
+	}
+	if at, err := time.Parse(time.RFC3339Nano, read[jetstream.TimeStampHeaer]); err == nil {
+		msg.Time = at
+	}
+	return msg
+}
 
 // ScanMessages reads the stored messages from opts.FromSeq to opts.ToSeq oldest first. It reads through a
 // short-lived consumer, or with single-message reads for the "direct" fetch method and for work queues, which a
@@ -81,22 +117,37 @@ func (c *Client) ScanMessages(ctx context.Context, streamName string, opts entit
 // never reached this client shows as a gap in the consumer sequence; the scan then starts a new consumer after the
 // last message it did receive, so a slow link costs time, never messages.
 func (c *Client) scanViaConsumer(ctx context.Context, stream jetstream.Stream, opts entities.ScanOptions, yield func(*entities.Message, error) bool) {
+	wait := scanFetchWait
 	for from := opts.FromSeq; from <= opts.ToSeq; {
-		next, ok := c.scanConsumerFrom(ctx, stream, opts, from, yield)
+		next, ok := c.scanConsumerFrom(ctx, stream, opts, from, wait, yield)
 		if !ok {
 			return
+		}
+		if next == from {
+			if wait >= scanFetchWaitMax {
+				yield(nil, wrapErr(fmt.Errorf("%w: message %d does not arrive within %s on this link", errs.ErrNATSTimeout, from, wait)))
+				return
+			}
+			wait *= 2
 		}
 		from = next
 	}
 }
 
-// scanConsumerFrom reads from seq through one consumer; ok with the next sequence to read means the consumer lost a
-// delivery and the scan should go on with a new one.
+// lostDeliveries reports whether the server delivered more than the client received.
+func lostDeliveries(ctx context.Context, consumer jetstream.Consumer, received uint64) bool {
+	info, err := consumer.Info(ctx)
+	return err == nil && info.Delivered.Consumer > received
+}
+
+// scanConsumerFrom reads from seq through one consumer, waiting up to wait for each pull; ok with the next sequence
+// to read means the consumer lost a delivery and the scan should go on with a new one.
 func (c *Client) scanConsumerFrom(
 	ctx context.Context,
 	stream jetstream.Stream,
 	opts entities.ScanOptions,
 	from uint64,
+	wait time.Duration,
 	yield func(*entities.Message, error) bool,
 ) (next uint64, ok bool) {
 	cfg := jetstream.ConsumerConfig{
@@ -125,10 +176,16 @@ func (c *Client) scanConsumerFrom(
 	}
 
 	var lastConsumerSeq, lastStreamSeq uint64
+	resume := func() uint64 {
+		if lastStreamSeq == 0 {
+			return from
+		}
+		return lastStreamSeq + 1
+	}
 	var bytesRead, msgsRead int
 	batchSize, empty := scanFetchFirst, 0
 	for {
-		batch, err := consumer.Fetch(batchSize, jetstream.FetchMaxWait(scanFetchWait))
+		batch, err := consumer.Fetch(batchSize, jetstream.FetchMaxWait(wait))
 		if err != nil {
 			yield(nil, wrapErr(err))
 			return 0, false
@@ -140,8 +197,8 @@ func (c *Client) scanConsumerFrom(
 			if metaErr != nil || meta == nil {
 				continue
 			}
-			if lastConsumerSeq > 0 && meta.Sequence.Consumer != lastConsumerSeq+1 {
-				return lastStreamSeq + 1, true
+			if meta.Sequence.Consumer != lastConsumerSeq+1 {
+				return resume(), true
 			}
 			lastConsumerSeq, lastStreamSeq = meta.Sequence.Consumer, meta.Sequence.Stream
 			if meta.Sequence.Stream > opts.ToSeq {
@@ -172,8 +229,11 @@ func (c *Client) scanConsumerFrom(
 			}
 			continue
 		}
+		if lostDeliveries(ctx, consumer, lastConsumerSeq) {
+			return resume(), true
+		}
 		if empty++; empty >= scanEmptyFetches {
-			if async := c.takeAsyncError(scanFetchWait * scanEmptyFetches); async != nil {
+			if async := c.takeAsyncError(wait * scanEmptyFetches); async != nil {
 				yield(nil, async)
 			} else {
 				yield(nil, wrapErr(fmt.Errorf("%w: the consumer has messages left but the server sent none", errs.ErrNATSTimeout)))
@@ -197,7 +257,11 @@ func (c *Client) scanBySubject(ctx context.Context, stream jetstream.Stream, opt
 		if msg.Sequence > opts.ToSeq {
 			return
 		}
-		if !yield(scannedRaw(msg), nil) {
+		if msg.Sequence < cursor {
+			yield(nil, wrapErr(fmt.Errorf("the server answered with message %d for a read from %d", msg.Sequence, cursor)))
+			return
+		}
+		if !yield(toMessage(msg), nil) {
 			return
 		}
 		cursor = msg.Sequence + 1
@@ -226,7 +290,7 @@ func (c *Client) scanDirect(ctx context.Context, stream jetstream.Stream, opts e
 			if !ok || (opts.SubjectFilter != "" && !natsutil.MatchSubject(opts.SubjectFilter, msg.Subject)) {
 				continue
 			}
-			if !yield(scannedRaw(msg), nil) {
+			if !yield(toMessage(msg), nil) {
 				return
 			}
 		}
@@ -248,23 +312,15 @@ func (c *Client) scanDirect(ctx context.Context, stream jetstream.Stream, opts e
 		if next.Sequence > opts.ToSeq {
 			return
 		}
-		if !yield(scannedRaw(next), nil) {
+		if next.Sequence < cursor {
+			yield(nil, wrapErr(fmt.Errorf("the server answered with message %d for a read from %d", next.Sequence, cursor)))
+			return
+		}
+		if !yield(toMessage(next), nil) {
 			return
 		}
 		cursor = next.Sequence + 1
 	}
-}
-
-// scannedRaw converts a single-message read, without the headers the server adds to direct reads.
-func scannedRaw(raw *jetstream.RawStreamMsg) *entities.Message {
-	msg := toMessage(raw)
-	for _, h := range directGetHeaders {
-		delete(msg.Headers, h)
-	}
-	if len(msg.Headers) == 0 {
-		msg.Headers = nil
-	}
-	return msg
 }
 
 // scannedMessage builds the entity a scan yields from a delivered consumer message.

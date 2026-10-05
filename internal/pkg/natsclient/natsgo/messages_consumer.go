@@ -104,13 +104,23 @@ func (c *Client) getMessagesViaConsumer(
 	return resp, nil
 }
 
-// fetchBrowseWindow pulls up to limit messages until the consumer has none left; skip drops messages past the window.
-// A delivery lost on the way, seen as a gap in the consumer sequence, fails the read instead of leaving a hole.
-func (c *Client) fetchBrowseWindow(consumer jetstream.Consumer, limit int, skip func(seq uint64) bool) ([]*entities.Message, error) {
+// errLostDelivery means a delivery never reached this client, so the window has a hole.
+var errLostDelivery = fmt.Errorf("%w: a message was lost on a slow link, try again", errs.ErrNATSTimeout)
+
+// fetchBrowseWindow pulls up to limit messages until the consumer has none left, waiting up to wait for each pull;
+// skip drops messages past the window. A delivery lost on the way fails the read with errLostDelivery instead of
+// leaving a hole.
+func (c *Client) fetchBrowseWindow(
+	ctx context.Context,
+	consumer jetstream.Consumer,
+	limit int,
+	wait time.Duration,
+	skip func(seq uint64) bool,
+) ([]*entities.Message, error) {
 	messages := make([]*entities.Message, 0, min(limit, scanFetchMax))
 	var lastConsumerSeq uint64
 	for read := 0; read < limit; {
-		batch, err := consumer.Fetch(min(limit-read, scanFetchMax), jetstream.FetchMaxWait(scanFetchWait))
+		batch, err := consumer.Fetch(min(limit-read, scanFetchMax), jetstream.FetchMaxWait(wait))
 		if err != nil {
 			return nil, wrapErr(coreerrs.Wrap(err, "fetch messages"))
 		}
@@ -121,8 +131,8 @@ func (c *Client) fetchBrowseWindow(consumer jetstream.Consumer, limit int, skip 
 			if metaErr != nil || meta == nil {
 				continue
 			}
-			if lastConsumerSeq > 0 && meta.Sequence.Consumer != lastConsumerSeq+1 {
-				return nil, wrapErr(fmt.Errorf("%w: a message was lost on a slow link, try again", errs.ErrNATSTimeout))
+			if meta.Sequence.Consumer != lastConsumerSeq+1 {
+				return nil, errLostDelivery
 			}
 			lastConsumerSeq = meta.Sequence.Consumer
 			read++
@@ -142,6 +152,9 @@ func (c *Client) fetchBrowseWindow(consumer jetstream.Consumer, limit int, skip 
 			return nil, batchErr
 		}
 		if got == 0 {
+			if lostDeliveries(ctx, consumer, lastConsumerSeq) {
+				return nil, errLostDelivery
+			}
 			break
 		}
 	}
@@ -149,7 +162,8 @@ func (c *Client) fetchBrowseWindow(consumer jetstream.Consumer, limit int, skip 
 }
 
 // consumeBrowseBatch pulls one window from an ephemeral consumer at optStartSeq and shapes it for direction.
-// startSeq is the request's upper bound (0 = LastSeq); backward results past it are dropped.
+// startSeq is the request's upper bound (0 = LastSeq); backward results past it are dropped. A window that lost a
+// delivery on a slow link is read again with twice the wait.
 func (c *Client) consumeBrowseBatch(
 	ctx context.Context,
 	stream jetstream.Stream,
@@ -159,6 +173,29 @@ func (c *Client) consumeBrowseBatch(
 	filterSubjects []string,
 	limit int,
 	direction string,
+) (*entities.MessagesResponse, error) {
+	for wait := scanFetchWait; ; wait *= 2 {
+		resp, err := c.consumeBrowseWindow(ctx, stream, info, optStartSeq, startSeq, filterSubjects, limit, direction, wait)
+		if !errors.Is(err, errLostDelivery) {
+			return resp, err
+		}
+		if wait >= scanFetchWaitMax {
+			return nil, wrapErr(err)
+		}
+	}
+}
+
+// consumeBrowseWindow is one attempt of consumeBrowseBatch, waiting up to wait for each pull.
+func (c *Client) consumeBrowseWindow(
+	ctx context.Context,
+	stream jetstream.Stream,
+	info *jetstream.StreamInfo,
+	optStartSeq uint64,
+	startSeq uint64,
+	filterSubjects []string,
+	limit int,
+	direction string,
+	wait time.Duration,
 ) (*entities.MessagesResponse, error) {
 	ephCfg := jetstream.ConsumerConfig{
 		DeliverPolicy:     jetstream.DeliverByStartSequencePolicy,
@@ -201,7 +238,7 @@ func (c *Client) consumeBrowseBatch(
 		fetchLimit = max(fetchLimit, limit+1)
 	}
 
-	messages, err := c.fetchBrowseWindow(consumer, fetchLimit, func(seq uint64) bool {
+	messages, err := c.fetchBrowseWindow(ctx, consumer, fetchLimit, wait, func(seq uint64) bool {
 		return direction == DefaultDirection && endSeq > 0 && seq > endSeq
 	})
 	if err != nil {

@@ -87,3 +87,14 @@ func TestSearchMatcherRejectsAValueWithoutAHeaderName(t *testing.T) {
 	var validation *errs.NATSValidationError
 	require.True(t, errors.As(err, &validation))
 }
+
+func TestSearchMatcherRejectsAnInvalidSubjectFilter(t *testing.T) {
+	t.Parallel()
+	for _, filter := range []string{"edge..hit", "edge.>.hit", "orders. created"} {
+		_, err := newSearchMatcher(&entities.MessageSearchRequest{SubjectFilter: filter})
+		var validation *errs.NATSValidationError
+		require.True(t, errors.As(err, &validation), "filter %q", filter)
+	}
+	_, err := newSearchMatcher(&entities.MessageSearchRequest{SubjectFilter: "orders.*.created"})
+	require.NoError(t, err)
+}

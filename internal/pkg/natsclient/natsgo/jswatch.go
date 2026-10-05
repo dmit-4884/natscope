@@ -285,16 +285,18 @@ func (s *streamWatch) ListConsumers(ctx context.Context) jetstream.ConsumerInfoL
 
 func (s *streamWatch) GetMsg(ctx context.Context, seq uint64, opts ...jetstream.GetMsgOpt) (*jetstream.RawStreamMsg, error) {
 	subjects := s.w.subjectsFor(s.name, subjMsgGet, subjDirectGet, subjDirectGetPrefix)
-	return watchCall(ctx, s.w, subjects, func(ctx context.Context) (*jetstream.RawStreamMsg, error) {
+	msg, err := watchCall(ctx, s.w, subjects, func(ctx context.Context) (*jetstream.RawStreamMsg, error) {
 		return s.Stream.GetMsg(ctx, seq, opts...)
 	})
+	return fromDirectRead(s.Stream, msg), err
 }
 
 func (s *streamWatch) GetLastMsgForSubject(ctx context.Context, subject string) (*jetstream.RawStreamMsg, error) {
 	subjects := s.w.subjectsFor(s.name, subjMsgGet, subjDirectGet, subjDirectGetPrefix)
-	return watchCall(ctx, s.w, subjects, func(ctx context.Context) (*jetstream.RawStreamMsg, error) {
+	msg, err := watchCall(ctx, s.w, subjects, func(ctx context.Context) (*jetstream.RawStreamMsg, error) {
 		return s.Stream.GetLastMsgForSubject(ctx, subject)
 	})
+	return fromDirectRead(s.Stream, msg), err
 }
 
 func (s *streamWatch) DeleteMsg(ctx context.Context, seq uint64) error {

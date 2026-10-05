@@ -122,7 +122,14 @@ export function useMessageSearch(connectionId: string | null, streamName: string
     setState((prev) => (prev.status === 'running' ? { ...prev, status: 'stopped', resume: resumeAfter(prev) } : prev))
   }, [])
 
-  const cursor = state.status === 'done' ? state.done?.next_seq : state.status === 'stopped' ? state.resume : undefined
+  const cursor =
+    state.status === 'done'
+      ? state.done?.next_seq
+      : state.status === 'stopped'
+        ? state.resume
+        : state.status === 'error'
+          ? resumeAfter(state)
+          : undefined
 
   const more = useCallback(() => {
     if (cursor != null) run(cursor, true)

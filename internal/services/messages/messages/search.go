@@ -14,6 +14,7 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 )
 
 // One search run stops at whichever of these budgets it reaches first; the caller continues with the next run.
@@ -46,6 +47,11 @@ type searchMatcher struct {
 func newSearchMatcher(in *entities.MessageSearchRequest) (*searchMatcher, error) {
 	if strings.TrimSpace(in.HeaderName) == "" && in.HeaderValue != "" {
 		return nil, &errs.NATSValidationError{Description: "a header value needs a header name"}
+	}
+	if in.SubjectFilter != "" {
+		if err := natsutil.ValidateSubjectPattern(in.SubjectFilter); err != nil {
+			return nil, err
+		}
 	}
 	m := &searchMatcher{
 		headerName:  strings.TrimSpace(in.HeaderName),

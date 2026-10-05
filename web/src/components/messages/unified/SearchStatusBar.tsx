@@ -80,13 +80,13 @@ export function SearchStatusBar({ search, direction }: Props) {
             Stop
           </Button>
         )}
-        {search.status !== 'running' && search.canContinue && (
+        {search.status !== 'running' && search.status !== 'error' && search.canContinue && (
           <Button size="sm" variant="secondary" onClick={search.more}>
             Search further
           </Button>
         )}
         {search.status === 'error' && (
-          <Button size="sm" variant="secondary" onClick={search.restart}>
+          <Button size="sm" variant="secondary" onClick={search.canContinue ? search.more : search.restart}>
             Try again
           </Button>
         )}

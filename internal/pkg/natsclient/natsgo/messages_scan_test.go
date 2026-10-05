@@ -5,6 +5,7 @@ package natsgo
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net"
 	"strconv"
@@ -263,4 +264,101 @@ func TestSeqAtTimeViaConsumer_SlowLinkStillFindsTheMessage(t *testing.T) {
 	seq, err := c.SeqAtTime(t.Context(), "TIME", fetchMethodConsumer, between)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(2), seq)
+}
+
+func slowFirstMessageStream(t *testing.T, name string) string {
+	t.Helper()
+	_, url := jetStreamServer(t)
+	nc, err := nats.Connect(url)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+	_, err = js.CreateStream(t.Context(), jetstream.StreamConfig{Name: name, Subjects: []string{"slow.>"}})
+	require.NoError(t, err)
+	_, err = js.Publish(t.Context(), "slow.large", bytes.Repeat([]byte("w"), 700_000))
+	require.NoError(t, err)
+	for i := range 100 {
+		_, err = js.Publish(t.Context(), "slow.small", []byte("small "+strconv.Itoa(i)))
+		require.NoError(t, err)
+	}
+	return throttle(t, strings.TrimPrefix(url, "nats://"), 100_000)
+}
+
+func TestScanViaConsumer_SlowFirstMessageLosesNothing(t *testing.T) {
+	t.Parallel()
+	c := dialClient(t, slowFirstMessageStream(t, "SLOWSCAN"))
+
+	got := scanAll(t, c, "SLOWSCAN", entities.ScanOptions{FromSeq: 1, ToSeq: 101, FetchMethod: fetchMethodConsumer})
+
+	require.Len(t, got, 101)
+	assert.Equal(t, uint64(1), got[0].Sequence)
+	assert.Equal(t, uint64(101), got[100].Sequence)
+}
+
+func TestBrowseViaConsumer_SlowFirstMessageIsNotAnEmptyPage(t *testing.T) {
+	t.Parallel()
+	c := dialClient(t, slowFirstMessageStream(t, "SLOWPAGE"))
+
+	resp, err := c.GetMessages(t.Context(), "SLOWPAGE", entities.GetMessagesOptions{Limit: 10, Direction: "forward", FetchMethod: fetchMethodConsumer})
+
+	require.NoError(t, err)
+	assert.Equal(t, []uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, sequences(resp.Messages))
+}
+
+func republishedStream(t *testing.T) *Client {
+	t.Helper()
+	_, url := jetStreamServer(t)
+	nc, err := nats.Connect(url)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+	_, err = js.CreateStream(t.Context(), jetstream.StreamConfig{Name: "B", Subjects: []string{"b.>"}, AllowDirect: true})
+	require.NoError(t, err)
+	_, err = js.CreateStream(t.Context(), jetstream.StreamConfig{
+		Name: "A", Subjects: []string{"a.>"}, RePublish: &jetstream.RePublish{Source: "a.>", Destination: "b.>"},
+	})
+	require.NoError(t, err)
+	for range 10 {
+		_, err = js.Publish(t.Context(), "b.pre", []byte("pre"))
+		require.NoError(t, err)
+	}
+	for range 5 {
+		_, err = js.Publish(t.Context(), "a.x", []byte("x"))
+		require.NoError(t, err)
+	}
+	require.Eventually(t, func() bool {
+		info, err := js.Stream(t.Context(), "B")
+		return err == nil && info.CachedInfo().State.Msgs == 15
+	}, 5*time.Second, 20*time.Millisecond)
+	return dialClient(t, url)
+}
+
+func TestDirectRead_KeepsTheStoredNatsHeadersApartFromTheReadOnes(t *testing.T) {
+	t.Parallel()
+	c := republishedStream(t)
+
+	msg, err := c.GetMessage(t.Context(), "B", 12)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(12), msg.Sequence)
+	assert.Equal(t, "b.x", msg.Subject)
+	assert.Equal(t, "2", msg.Headers["Nats-Sequence"])
+	assert.Equal(t, "A", msg.Headers["Nats-Stream"])
+	assert.Equal(t, "a.x", msg.Headers["Nats-Subject"])
+	assert.Equal(t, "1", msg.Headers["Nats-Last-Sequence"])
+
+	for _, filter := range []string{"", "b.>"} {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		var got []*entities.Message
+		for m, err := range c.ScanMessages(ctx, "B", entities.ScanOptions{FromSeq: 1, ToSeq: 15, SubjectFilter: filter, FetchMethod: "direct"}) {
+			require.NoError(t, err)
+			got = append(got, m)
+		}
+		cancel()
+		require.Len(t, got, 15, "filter %q", filter)
+		assert.Equal(t, uint64(15), got[14].Sequence, "filter %q", filter)
+		assert.Equal(t, "b.x", got[14].Subject, "filter %q", filter)
+		assert.Equal(t, "5", got[14].Headers["Nats-Sequence"], "filter %q", filter)
+	}
 }

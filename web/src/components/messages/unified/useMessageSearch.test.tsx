@@ -145,6 +145,23 @@ describe('useMessageSearch', () => {
     await waitFor(() => expect(result.current.status).toBe('error'))
     expect((result.current.error as Error).message).toBe('boom')
   })
+
+  it('goes on from where a failed run got to, keeping its matches', async () => {
+    mockedSearch.mockImplementationOnce(async function* () {
+      yield { kind: 'matches', messages: [msg(950)] } satisfies SearchEvent
+      yield progress(800, 200, 799)
+      throw new Error('boom')
+    })
+    const { result } = renderHook(() => useMessageSearch('conn-1', 'ORDERS', query))
+    await waitFor(() => expect(result.current.status).toBe('error'))
+    expect(result.current.canContinue).toBe(true)
+
+    mockedSearch.mockImplementationOnce(scripted([{ kind: 'matches', messages: [msg(10)] }, done()]))
+    act(() => result.current.more())
+    await waitFor(() => expect(result.current.status).toBe('done'))
+    expect(mockedSearch.mock.calls[1][1]).toMatchObject({ cursor_seq: 799 })
+    expect(result.current.messages.map((m) => m.sequence)).toEqual([950, 10])
+  })
 })
 
 describe('useMessageSearch totals', () => {
