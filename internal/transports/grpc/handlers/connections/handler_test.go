@@ -384,3 +384,27 @@ func TestHandler_ListCliContexts_DescribesWithoutSecrets(t *testing.T) {
 	assert.Equal(t, []string{"tls://p:4222"}, prod.GetUrls())
 	assert.False(t, resp.Msg.GetContexts()[1].GetImportable())
 }
+
+func TestHandler_CliContexts_ProxiedRequestsDoNotReadTheHost(t *testing.T) {
+	t.Parallel()
+	for _, header := range []string{"X-Forwarded-For", "Forwarded", "X-Real-Ip"} {
+		t.Run(header, func(t *testing.T) {
+			t.Parallel()
+			h := New(&mockConnService{cliContexts: &entities.CliContexts{}})
+
+			list := connect.NewRequest(&connectionspb.ListCliContextsRequest{})
+			list.Header().Set(header, "203.0.113.7")
+			_, listErr := h.ListCliContexts(t.Context(), list)
+			imp := connect.NewRequest(&connectionspb.ImportCliContextsRequest{Names: []string{"prod"}})
+			imp.Header().Set(header, "203.0.113.7")
+			_, importErr := h.ImportCliContexts(t.Context(), imp)
+			uploaded := connect.NewRequest(&connectionspb.ListCliContextsRequest{Files: []*connectionspb.CliContextFile{{Name: "a.json", Content: []byte("{}")}}})
+			uploaded.Header().Set(header, "203.0.113.7")
+			_, uploadErr := h.ListCliContexts(t.Context(), uploaded)
+
+			require.ErrorIs(t, listErr, errs.ErrCliContextsHostDisabled)
+			require.ErrorIs(t, importErr, errs.ErrCliContextsHostDisabled)
+			require.NoError(t, uploadErr)
+		})
+	}
+}

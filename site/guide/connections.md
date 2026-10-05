@@ -65,6 +65,7 @@ plus the TLS certificates and keys. They go to the secret vault like any other c
 
 Natscope running in Docker or on another host cannot see your contexts. Click **Upload context files**
 and pick the `.json` files from that folder instead. With [remote access](/reference/remote-access) allowed,
+extra host names in `ALLOWED_HOSTS`, web auth set, or a request that came through a reverse proxy,
 Natscope never reads its own host's contexts, so other people using it cannot pick up that machine's
 credentials: upload the files there too. The credential and certificate files they point at
 stay on your machine, so add them to each connection after the import.

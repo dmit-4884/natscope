@@ -31,8 +31,8 @@ var (
 	// ErrConnectionReadOnly is returned when a write is attempted through a read-only connection.
 	ErrConnectionReadOnly = errors.New("connection: read-only")
 
-	// ErrCliContextsHostDisabled is returned when the host's nats CLI contexts are requested while Natscope accepts remote connections.
-	ErrCliContextsHostDisabled = errors.New("connection: this host's nats CLI contexts are off while remote access is allowed")
+	// ErrCliContextsHostDisabled is returned when the host's nats CLI contexts are requested while other machines may reach Natscope.
+	ErrCliContextsHostDisabled = errors.New("connection: this host's nats CLI contexts are off while other machines may reach Natscope")
 
 	// ErrSidebarLayoutNotFound is returned by [storages/layouts] when nothing was
 	// saved for a connection; the connections service reads it as an empty layout.

@@ -175,7 +175,6 @@ func newLayoutsStorage(db *bbstore.DB) (layoutsStorageIface.Storage, error) {
 	return storage, nil
 }
 
-// newMappingsService creates a new mappings service using bbolt storage.
 // newConnectionsService lets the service read this host's nats CLI contexts only while Natscope serves the local machine alone.
 func newConnectionsService(
 	cfg *appconfig.Config,
@@ -183,9 +182,15 @@ func newConnectionsService(
 	layouts layoutsStorageIface.Storage,
 	natService natssvc.ConnectionManager,
 ) *connectionsService.Service {
-	return connectionsService.New(storage, layouts, natService, !cfg.AllowRemote)
+	return connectionsService.New(storage, layouts, natService, readsHostCliContexts(cfg))
 }
 
+// readsHostCliContexts is false once the config lets other machines in: a remote bind, extra host names or web auth.
+func readsHostCliContexts(cfg *appconfig.Config) bool {
+	return !cfg.AllowRemote && len(cfg.AllowedHostsList()) == 0 && !cfg.WebAuth.Enabled()
+}
+
+// newMappingsService creates a new mappings service using bbolt storage.
 func newMappingsService(db *bbstore.DB) (mappingssvc.Service, error) {
 	storage, err := mappingsBbolt.New(context.Background(), db)
 	if err != nil {

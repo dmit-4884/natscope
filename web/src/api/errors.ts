@@ -67,7 +67,7 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   // Connections
   CONNECTION_NOT_FOUND: 'Connection not found',
   CONNECTION_NAME_ALREADY_IN_USE: 'Connection name already in use',
-  CLI_CONTEXTS_HOST_DISABLED: "Natscope accepts remote connections, so it does not read this host's nats CLI contexts: upload the files instead",
+  CLI_CONTEXTS_HOST_DISABLED: "Other machines may reach this Natscope, so it does not read this host's nats CLI contexts: upload the files instead",
   CONNECTION_READ_ONLY: 'This connection is read-only. Turn it off in the connection settings to make changes',
   CONNECTION_NAME_REQUIRED: 'Connection name is required',
   CONNECTION_URL_INVALID: 'A server URL is invalid',

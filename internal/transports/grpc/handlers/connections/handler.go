@@ -14,6 +14,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
 
@@ -210,6 +211,9 @@ func (h *Handler) ListCliContexts(
 	ctx context.Context,
 	req *connect.Request[connectionspb.ListCliContextsRequest],
 ) (*connect.Response[connectionspb.ListCliContextsResponse], error) {
+	if len(req.Msg.GetFiles()) == 0 && proxied(req.Header()) {
+		return nil, errs.ErrCliContextsHostDisabled
+	}
 	found, err := h.connService.ListCliContexts(ctx, toCliContextFiles(req.Msg.GetFiles()))
 	if err != nil {
 		return nil, err
@@ -225,6 +229,9 @@ func (h *Handler) ImportCliContexts(
 	ctx context.Context,
 	req *connect.Request[connectionspb.ImportCliContextsRequest],
 ) (*connect.Response[connectionspb.ImportCliContextsResponse], error) {
+	if len(req.Msg.GetFiles()) == 0 && proxied(req.Header()) {
+		return nil, errs.ErrCliContextsHostDisabled
+	}
 	res, err := h.connService.ImportCliContexts(ctx, req.Msg.GetNames(), toCliContextFiles(req.Msg.GetFiles()))
 	if err != nil {
 		return nil, err
@@ -235,6 +242,16 @@ func (h *Handler) ImportCliContexts(
 			return &connectionspb.SkippedCliContext{Name: s.Name, Reason: s.Reason}
 		}),
 	}), nil
+}
+
+// proxied reports whether a reverse proxy forwarded the request, so it may come from another machine.
+func proxied(header http.Header) bool {
+	for _, name := range []string{"Forwarded", "X-Forwarded-For", "X-Real-Ip"} {
+		if header.Get(name) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func toCliContextFiles(files []*connectionspb.CliContextFile) []entities.CliContextFile {

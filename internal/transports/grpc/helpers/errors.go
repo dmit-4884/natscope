@@ -47,7 +47,7 @@ var commonDomainErrors = []struct {
 	{errs.ErrSavedConnectionNotFound, errorMapping{codes.NotFound, "connection not found", "CONNECTION_NOT_FOUND"}},
 	{errs.ErrConnectionReadOnly, errorMapping{codes.FailedPrecondition, "connection is read-only", "CONNECTION_READ_ONLY"}},
 	{errs.ErrCliContextsHostDisabled, errorMapping{
-		codes.FailedPrecondition, "this host's nats CLI contexts are off while remote access is allowed", "CLI_CONTEXTS_HOST_DISABLED",
+		codes.FailedPrecondition, "this host's nats CLI contexts are off while other machines may reach Natscope", "CLI_CONTEXTS_HOST_DISABLED",
 	}},
 
 	// NATS — common (not copied into 8+ converters); SDK sentinels translated to
