@@ -223,3 +223,62 @@ func TestPermissionWatcher_BeginWatchesUntilEnd(t *testing.T) {
 	pw.HandleAsyncError(violation)
 	assert.ErrorIs(t, pw.TakeRecent(time.Minute), violation, "after end the subject is no longer watched")
 }
+
+func TestPermissionWatcher_MatchesTheOperation(t *testing.T) {
+	t.Parallel()
+
+	pw := NewPermissionWatcher()
+	pw.TrackReplies("_INBOX.", "_INBOX.mux.*")
+	refusedSubject := errors.New(`nats: Permissions Violation for Subscription to "orders.get"`)
+	refusedNamespace := errors.New(`nats: Permissions Violation for Subscription to "_INBOX.>"`)
+
+	err := pw.WatchRequest(t.Context(), []string{"orders.get"}, func(context.Context) error {
+		pw.HandleAsyncError(refusedSubject)
+		pw.HandleAsyncError(refusedNamespace)
+		return nil
+	})
+	require.NoError(t, err, "another subscription's refusal is not this request's")
+
+	err = pw.WatchInbox(t.Context(), []string{"$SRV.INFO"}, "_INBOX.mux.own", func(context.Context) error {
+		pw.HandleAsyncError(refusedNamespace)
+		return nil
+	})
+	require.NoError(t, err)
+
+	own := errors.New(`nats: Permissions Violation for Subscription to "_INBOX.mux.own"`)
+	err = pw.WatchInbox(t.Context(), []string{"$SRV.INFO"}, "_INBOX.mux.own", func(ctx context.Context) error {
+		go pw.HandleAsyncError(own)
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	require.ErrorIs(t, err, own)
+}
+
+func TestPermissionWatcher_RefusedRepliesStayRefusedUntilReconnect(t *testing.T) {
+	t.Parallel()
+
+	pw := NewPermissionWatcher()
+	pw.TrackReplies("_INBOX.", "_INBOX.mux.*")
+	refused := errors.New(`nats: Permissions Violation for Subscription to "_INBOX.mux.*"`)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	err := pw.WatchRequest(ctx, []string{"svc.echo"}, func(ctx context.Context) error {
+		go pw.HandleAsyncError(refused)
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	require.ErrorIs(t, err, refused)
+
+	ran := false
+	err = pw.WatchRequest(t.Context(), []string{"svc.echo"}, func(context.Context) error {
+		ran = true
+		return nil
+	})
+	require.ErrorIs(t, err, refused, "the server refuses the shared reply subscription only once")
+	assert.False(t, ran)
+	require.NoError(t, pw.Watch(t.Context(), []string{"svc.echo"}, func(context.Context) error { return nil }), "a plain publish needs no replies")
+
+	pw.ResetReplies()
+	require.NoError(t, pw.WatchRequest(t.Context(), []string{"svc.echo"}, func(context.Context) error { return nil }))
+}

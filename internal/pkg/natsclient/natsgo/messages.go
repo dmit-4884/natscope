@@ -113,7 +113,7 @@ func (c *Client) Publish(ctx context.Context, subject string, data []byte, heade
 			return err
 		}
 		if last := c.conn.LastError(); last != nil && last != before { //nolint:errorlint // identity check
-			if v, ok := ParsePermissionViolation(last); ok && v.Operation == "publish" && v.Subject == subject {
+			if v, ok := ParsePermissionViolation(last); ok && v.Operation == violatedPublish && v.Subject == subject {
 				return last
 			}
 		}

@@ -68,8 +68,8 @@ func (c *Client) gather(ctx context.Context, subject string) ([]microReply, erro
 	defer cancel()
 
 	var replies []microReply
-	err := c.permWatch.Watch(ctx, []string{subject, c.inboxPrefix()}, func(ctx context.Context) error {
-		inbox := c.conn.NewRespInbox()
+	inbox := c.conn.NewRespInbox()
+	err := c.permWatch.WatchInbox(ctx, []string{subject}, inbox, func(ctx context.Context) error {
 		sub, err := c.conn.SubscribeSync(inbox)
 		if err != nil {
 			return err

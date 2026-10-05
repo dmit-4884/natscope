@@ -69,6 +69,7 @@ func (d *Dialer) Dial(_ context.Context, saved *entities.SavedConnection) (natsc
 				slogx.Error(err))
 		}),
 		nats.ReconnectHandler(func(_ *nats.Conn) {
+			client.permWatch.ResetReplies()
 			d.logger.Info("NATS reconnected",
 				slogx.String("connection_id", saved.Id),
 				slogx.String("url", logURL))
@@ -104,6 +105,7 @@ func (d *Dialer) Dial(_ context.Context, saved *entities.SavedConnection) (natsc
 	}
 
 	client.conn = conn
+	client.permWatch.TrackReplies(client.inboxPrefix(), replySubscription(conn))
 	client.api = apiPrefix(domain, prefix)
 	client.jetStream = watchJetStream(jsNew, client.permWatch, client.api)
 

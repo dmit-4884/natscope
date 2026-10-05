@@ -109,7 +109,7 @@ func (w *jetStreamWatch) translate(err error) error {
 // outcome.
 func watchCall[T any](ctx context.Context, w *jetStreamWatch, subjects []string, fn func(ctx context.Context) (T, error)) (T, error) {
 	var out T
-	err := w.pw.Watch(ctx, subjects, func(ctx context.Context) error {
+	err := w.pw.WatchRequest(ctx, subjects, func(ctx context.Context) error {
 		var fnErr error
 		out, fnErr = fn(ctx)
 		return fnErr
@@ -181,7 +181,7 @@ func (w *jetStreamWatch) Stream(ctx context.Context, name string) (jetstream.Str
 }
 
 func (w *jetStreamWatch) DeleteStream(ctx context.Context, name string) error {
-	err := w.pw.Watch(ctx, w.subjectsFor(name, subjStreamDelete), func(ctx context.Context) error {
+	err := w.pw.WatchRequest(ctx, w.subjectsFor(name, subjStreamDelete), func(ctx context.Context) error {
 		return w.JetStream.DeleteStream(ctx, name)
 	})
 	return w.translate(err)
@@ -225,7 +225,7 @@ func (s *streamWatch) Info(ctx context.Context, opts ...jetstream.StreamInfoOpt)
 }
 
 func (s *streamWatch) Purge(ctx context.Context, opts ...jetstream.StreamPurgeOpt) error {
-	err := s.w.pw.Watch(ctx, s.w.subjectsFor(s.name, subjStreamPurge), func(ctx context.Context) error {
+	err := s.w.pw.WatchRequest(ctx, s.w.subjectsFor(s.name, subjStreamPurge), func(ctx context.Context) error {
 		return s.Stream.Purge(ctx, opts...)
 	})
 	return s.w.translate(err)
@@ -267,7 +267,7 @@ func (s *streamWatch) Consumer(ctx context.Context, name string) (jetstream.Cons
 }
 
 func (s *streamWatch) DeleteConsumer(ctx context.Context, name string) error {
-	err := s.w.pw.Watch(ctx, s.w.subjectsFor(s.name, subjConsumerDelete), func(ctx context.Context) error {
+	err := s.w.pw.WatchRequest(ctx, s.w.subjectsFor(s.name, subjConsumerDelete), func(ctx context.Context) error {
 		return s.Stream.DeleteConsumer(ctx, name)
 	})
 	return s.w.translate(err)
@@ -298,14 +298,14 @@ func (s *streamWatch) GetLastMsgForSubject(ctx context.Context, subject string) 
 }
 
 func (s *streamWatch) DeleteMsg(ctx context.Context, seq uint64) error {
-	err := s.w.pw.Watch(ctx, s.w.subjectsFor(s.name, subjMsgDelete), func(ctx context.Context) error {
+	err := s.w.pw.WatchRequest(ctx, s.w.subjectsFor(s.name, subjMsgDelete), func(ctx context.Context) error {
 		return s.Stream.DeleteMsg(ctx, seq)
 	})
 	return s.w.translate(err)
 }
 
 func (s *streamWatch) SecureDeleteMsg(ctx context.Context, seq uint64) error {
-	err := s.w.pw.Watch(ctx, s.w.subjectsFor(s.name, subjMsgDelete), func(ctx context.Context) error {
+	err := s.w.pw.WatchRequest(ctx, s.w.subjectsFor(s.name, subjMsgDelete), func(ctx context.Context) error {
 		return s.Stream.SecureDeleteMsg(ctx, seq)
 	})
 	return s.w.translate(err)
@@ -399,7 +399,7 @@ func (l *consumerInfoLister) Err() error { return l.w.listerErr(l.end, l.Consume
 // subject, so a denied request fails fast instead of waiting out its deadline.
 func (pw *PermissionWatcher) Request(ctx context.Context, nc *nats.Conn, subject string, data []byte) (*nats.Msg, error) {
 	var msg *nats.Msg
-	err := pw.Watch(ctx, []string{subject}, func(ctx context.Context) error {
+	err := pw.WatchRequest(ctx, []string{subject}, func(ctx context.Context) error {
 		var reqErr error
 		msg, reqErr = nc.RequestWithContext(ctx, subject, data)
 		return reqErr

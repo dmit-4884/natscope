@@ -57,7 +57,7 @@ func (c *Client) Subscribe(
 
 	var stop func()
 	if onDenied != nil {
-		stop = c.permWatch.Observe(PermissionViolation{Operation: "subscription", Subject: subject}, onDenied)
+		stop = c.permWatch.Observe(PermissionViolation{Operation: violatedSubscription, Subject: subject}, onDenied)
 	}
 	sub, err := c.conn.Subscribe(subject, natsHandler)
 	if err != nil {

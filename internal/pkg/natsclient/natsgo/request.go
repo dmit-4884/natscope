@@ -6,6 +6,7 @@ package natsgo
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -50,7 +51,7 @@ func (c *Client) Request(
 		reply *nats.Msg
 		took  time.Duration
 	)
-	err := c.permWatch.Watch(ctx, []string{subject, c.inboxPrefix()}, func(ctx context.Context) error {
+	err := c.permWatch.WatchRequest(ctx, []string{subject}, func(ctx context.Context) error {
 		start := time.Now()
 		var reqErr error
 		reply, reqErr = c.conn.RequestMsgWithContext(ctx, msg)
@@ -67,6 +68,12 @@ func (c *Client) Request(
 	result := converter.Convert(reply, &entities.Reply{}, replyOpts...)
 	result.Duration = took
 	return result, nil
+}
+
+// replySubscription is the subject of the reply subscription nats.go shares between a connection's requests.
+func replySubscription(conn *nats.Conn) string {
+	inbox := conn.NewRespInbox()
+	return inbox[:strings.LastIndexByte(inbox, '.')+1] + "*"
 }
 
 // inboxPrefix returns the subject prefix of this connection's reply inboxes,
