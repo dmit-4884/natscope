@@ -8,12 +8,19 @@ import (
 )
 
 type connectionView struct {
-	Id          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	URLs        []string  `json:"urls"`
-	Auth        *authView `json:"auth,omitempty"`
-	Meta        *testView `json:"lastTest,omitempty"`
+	Id          string     `json:"id"`
+	Name        string     `json:"name"`
+	Description *string    `json:"description,omitempty"`
+	URLs        []string   `json:"urls"`
+	Auth        *authView  `json:"auth,omitempty"`
+	ReadOnly    bool       `json:"readOnly,omitempty" jsonschema:"natscope refuses every write through this connection"`
+	Label       *labelView `json:"label,omitempty"`
+	Meta        *testView  `json:"lastTest,omitempty"`
+}
+
+type labelView struct {
+	Text  string `json:"text" jsonschema:"environment tag the user set, e.g. PROD"`
+	Color string `json:"color" jsonschema:"unspecified, gray, blue, green, amber or red"`
 }
 
 type authView struct {

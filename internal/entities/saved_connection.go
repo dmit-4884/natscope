@@ -168,6 +168,30 @@ func (p *PingConfig) IsEmpty() bool {
 	return p.PingInterval == nil && p.MaxPingsOutstanding == nil
 }
 
+// LabelColor is a connection label color; values match proto enum
+// natscope.types.nats.LabelColor.
+type LabelColor int32
+
+const (
+	LabelColorUnspecified LabelColor = 0
+	LabelColorGray        LabelColor = 1
+	LabelColorBlue        LabelColor = 2
+	LabelColorGreen       LabelColor = 3
+	LabelColorAmber       LabelColor = 4
+	LabelColorRed         LabelColor = 5
+)
+
+// ConnectionLabel is a short colored tag that names the connection's environment.
+type ConnectionLabel struct {
+	Text  string `normalize:"trim"`
+	Color LabelColor
+}
+
+// IsEmpty reports a label without text, which clears it on update.
+func (l *ConnectionLabel) IsEmpty() bool {
+	return l == nil || l.Text == ""
+}
+
 // ConnectionMeta is the most recent server-probe snapshot; written by the
 // connections service on Test, never accepted from clients.
 type ConnectionMeta struct {
@@ -234,6 +258,12 @@ type SavedConnection struct {
 	// Ping holds ping/pong health check settings.
 	Ping *PingConfig
 
+	// ReadOnly makes natscope refuse every write through this connection.
+	ReadOnly bool
+
+	// Label tags the connection in the header, e.g. a red PROD.
+	Label *ConnectionLabel
+
 	// Meta is the most recent server-probe snapshot; set by the connections
 	// service, never by clients.
 	Meta *ConnectionMeta
@@ -279,6 +309,9 @@ func (c *SavedConnection) ApplyUpdate(req *SavedConnectionUpdate) {
 	if c.Ping.IsEmpty() {
 		c.Ping = nil
 	}
+	if c.Label.IsEmpty() {
+		c.Label = nil
+	}
 
 	c.BeforeUpdate()
 }
@@ -314,6 +347,8 @@ type SavedConnectionCreate struct {
 	Connection  *ConnectionConfig
 	Reconnect   *ReconnectConfig
 	Ping        *PingConfig
+	ReadOnly    bool
+	Label       *ConnectionLabel
 }
 
 // SavedConnectionUpdate is the update DTO for a saved connection.
@@ -328,6 +363,8 @@ type SavedConnectionUpdate struct {
 	Connection  *ConnectionConfig
 	Reconnect   *ReconnectConfig
 	Ping        *PingConfig
+	ReadOnly    *bool
+	Label       *ConnectionLabel
 }
 
 // TestConnectionRequest tests a connection without saving; non-empty

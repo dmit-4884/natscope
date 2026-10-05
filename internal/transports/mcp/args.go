@@ -16,7 +16,10 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/convcodecs"
 )
 
-const noneName = "none"
+const (
+	noneName        = "none"
+	unspecifiedName = "unspecified"
+)
 
 // ViewCodecs renders durations and NATS enums as readable strings when converting entities to tool views.
 var ViewCodecs = converter.WithCodecs(
@@ -32,8 +35,9 @@ var ViewCodecs = converter.WithCodecs(
 		reflect.TypeFor[entities.PriorityPolicy]():     {noneName, "pinned_client", "overflow", "prioritized"},
 		reflect.TypeFor[entities.ReplayPolicy]():       {"instant", "original"},
 		reflect.TypeFor[entities.AuthMethod]():         {noneName, "user_pass", "token", "nkey", "credentials"},
-		reflect.TypeFor[entities.StreamRelationKind](): {"unspecified", "source", "mirror", "republish"},
-		reflect.TypeFor[entities.StreamNodeKind]():     {"unspecified", "stream", "kv", "object_store", "external", "missing", "subject"},
+		reflect.TypeFor[entities.LabelColor]():         {unspecifiedName, "gray", "blue", "green", "amber", "red"},
+		reflect.TypeFor[entities.StreamRelationKind](): {unspecifiedName, "source", "mirror", "republish"},
+		reflect.TypeFor[entities.StreamNodeKind]():     {unspecifiedName, "stream", "kv", "object_store", "external", "missing", "subject"},
 	}),
 )
 

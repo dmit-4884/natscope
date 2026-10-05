@@ -93,6 +93,9 @@ func (p *Pool) Client(ctx context.Context, connectionID string) (Client, error) 
 		if err != nil {
 			return nil, err
 		}
+		if saved.ReadOnly {
+			c = newReadOnlyClient(c)
+		}
 
 		p.mu.Lock()
 		p.clients[connectionID] = c

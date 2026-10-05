@@ -22,7 +22,14 @@ type connectionDoc struct {
 	Connection  *connectionConfigDoc `json:"connection,omitempty"`
 	Reconnect   *reconnectConfigDoc  `json:"reconnect,omitempty"`
 	Ping        *pingConfigDoc       `json:"ping,omitempty"`
+	ReadOnly    bool                 `json:"readOnly,omitempty"`
+	Label       *labelDoc            `json:"label,omitempty"`
 	Meta        *connectionMetaDoc   `json:"meta,omitempty"`
+}
+
+type labelDoc struct {
+	Text  string `json:"text"`
+	Color int32  `json:"color,omitempty"`
 }
 
 // Secret fields (Password/Token/NkeySeed/Credentials/JWT) are tagged input_only:

@@ -62,6 +62,9 @@ func (s *Service) Create(
 	in.URLs, in.Auth = urls, auth
 
 	conn := converter.Convert(in, entities.SavedConnectionNew())
+	if conn.Label.IsEmpty() {
+		conn.Label = nil
+	}
 
 	if err := s.storage.Save(ctx, conn); err != nil {
 		s.logger.ErrorContext(ctx, "failed to save connection",

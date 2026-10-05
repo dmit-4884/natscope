@@ -94,7 +94,7 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 
 	ack, err := s.natsService.PublishToStream(pubCtx, in.ConnectionID, in.Subject, data, in.Headers)
 	if err != nil {
-		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
+		if refused(err) {
 			return nil, err
 		}
 		failure := publishFailure(err)
@@ -116,12 +116,16 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 
 func (s *Service) publishCore(ctx context.Context, in *entities.PublishRequest, data []byte) (*entities.PublishResult, error) {
 	if err := s.natsService.Publish(ctx, in.ConnectionID, in.Subject, data, in.Headers); err != nil {
-		if errors.Is(err, errs.ErrSavedConnectionNotFound) {
+		if refused(err) {
 			return nil, err
 		}
 		return publishFailure(err), nil
 	}
 	return &entities.PublishResult{}, nil
+}
+
+func refused(err error) bool {
+	return errors.Is(err, errs.ErrSavedConnectionNotFound) || errors.Is(err, errs.ErrConnectionReadOnly)
 }
 
 func publishFailure(err error) *entities.PublishResult {

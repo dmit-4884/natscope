@@ -80,6 +80,8 @@ func TestConnections_AllGroupsRoundTrip(t *testing.T) {
 		}
 		pi := 2 * time.Minute
 		c.Ping = &entities.PingConfig{PingInterval: &pi, MaxPingsOutstanding: ptr.Wrap(int32(3))}
+		c.ReadOnly = true
+		c.Label = &entities.ConnectionLabel{Text: "PROD", Color: entities.LabelColorRed}
 		c.Meta = &entities.ConnectionMeta{
 			LastTestedAt: time.UnixMilli(1700000000123).UTC(), LastSuccess: true,
 			LastRTTMs: ptr.Wrap(int64(42)), ServerVersion: ptr.Wrap("2.12"), ServerName: ptr.Wrap("n1"),
@@ -118,6 +120,9 @@ func TestConnections_AllGroupsRoundTrip(t *testing.T) {
 	}
 	if *got.Ping.PingInterval != 2*time.Minute || *got.Ping.MaxPingsOutstanding != 3 {
 		t.Fatalf("ping mismatch: %+v", got.Ping)
+	}
+	if !got.ReadOnly || got.Label == nil || got.Label.Text != "PROD" || got.Label.Color != entities.LabelColorRed {
+		t.Fatalf("read-only/label mismatch: %v %+v", got.ReadOnly, got.Label)
 	}
 	if got.Meta.LastTestedAt.UnixMilli() != 1700000000123 || !got.Meta.LastSuccess ||
 		*got.Meta.LastRTTMs != 42 || *got.Meta.ServerVersion != "2.12" || *got.Meta.ServerName != "n1" ||

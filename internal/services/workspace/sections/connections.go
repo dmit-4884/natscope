@@ -30,6 +30,8 @@ type connectionItem struct {
 	Connection  *entities.ConnectionConfig `json:"connection,omitempty"`
 	Reconnect   *entities.ReconnectConfig  `json:"reconnect,omitempty"`
 	Ping        *entities.PingConfig       `json:"ping,omitempty"`
+	ReadOnly    bool                       `json:"readOnly,omitempty"`
+	Label       *entities.ConnectionLabel  `json:"label,omitempty"`
 }
 
 type connAuthItem struct {

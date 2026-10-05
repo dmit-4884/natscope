@@ -405,6 +405,21 @@ func TestConnectionsExport_KeepsNonSecretConfig(t *testing.T) {
 	assertNoSecrets(t, payload, "tok-secret")
 }
 
+func TestConnectionsExport_KeepsReadOnlyAndLabel(t *testing.T) {
+	t.Parallel()
+	item := redactConnection(&entities.SavedConnection{
+		Name:     "prod",
+		URLs:     []string{"nats://h:4222"},
+		ReadOnly: true,
+		Label:    &entities.ConnectionLabel{Text: "PROD", Color: entities.LabelColorRed},
+	})
+
+	create := converter.Convert(item, &entities.SavedConnectionCreate{})
+	assert.True(t, create.ReadOnly)
+	require.NotNil(t, create.Label)
+	assert.Equal(t, entities.ConnectionLabel{Text: "PROD", Color: entities.LabelColorRed}, *create.Label)
+}
+
 // TestRedactConnection_ConverterRoundTrip pins what the converter actually
 // copies. Structural redaction only holds if the non-secret fields survive and
 // the secret ones do not, and a silent field-name mismatch would break either

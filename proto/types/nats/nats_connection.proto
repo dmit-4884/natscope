@@ -124,6 +124,36 @@ message PingConfig {
   optional int32 max_pings_outstanding = 2;
 }
 
+// Colors a connection label can take.
+enum LabelColor {
+  // No color chosen; shown as gray.
+  LABEL_COLOR_UNSPECIFIED = 0;
+
+  // Gray.
+  LABEL_COLOR_GRAY = 1;
+
+  // Blue.
+  LABEL_COLOR_BLUE = 2;
+
+  // Green.
+  LABEL_COLOR_GREEN = 3;
+
+  // Amber.
+  LABEL_COLOR_AMBER = 4;
+
+  // Red.
+  LABEL_COLOR_RED = 5;
+}
+
+// A short colored tag that names a connection's environment, e.g. a red PROD.
+message ConnectionLabel {
+  // Required. Tag text. An empty text on update removes the label.
+  string text = 1 [(buf.validate.field).string = {max_len: 16, pattern: "^[^\\p{Cc}\\p{Cf}]*$"}];
+
+  // Optional. Tag color.
+  LabelColor color = 2 [(buf.validate.field).enum.defined_only = true];
+}
+
 // Snapshot of the most recent server probe, written by the backend after a
 // successful or failed Test. Surfaces what the broker reported (version,
 // JetStream, RTT) so the UI can show meaningful info on saved-connection
@@ -201,4 +231,10 @@ message SavedConnection {
   // Optional. Probe snapshot from the most recent Test run. Filled in by the
   // backend, never by clients.
   optional ConnectionMeta meta = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Natscope refuses every write through a read-only connection.
+  bool read_only = 13;
+
+  // Optional. Tag shown in the header while the connection is active.
+  optional ConnectionLabel label = 14;
 }

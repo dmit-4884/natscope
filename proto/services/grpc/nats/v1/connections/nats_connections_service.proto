@@ -72,6 +72,12 @@ message CreateConnectionRequest {
 
   // Optional. Ping/pong health check settings.
   optional .natscope.types.nats.PingConfig ping = 14;
+
+  // Optional. Refuse every write through this connection.
+  bool read_only = 15;
+
+  // Optional. Tag shown in the header while the connection is active.
+  optional .natscope.types.nats.ConnectionLabel label = 16;
 }
 
 // Defines the response message for creating a new saved connection.
@@ -131,6 +137,12 @@ message UpdateConnectionRequest {
 
   // Optional. Updated ping/pong health check settings. Replaces the entire config.
   optional .natscope.types.nats.PingConfig ping = 14;
+
+  // Optional. Updated read-only switch.
+  optional bool read_only = 15;
+
+  // Optional. Updated label; an empty text removes it.
+  optional .natscope.types.nats.ConnectionLabel label = 16;
 
   // Defines options for the update operation.
   message Options {

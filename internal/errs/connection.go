@@ -28,6 +28,9 @@ var (
 	// ErrConnectionURLInvalid is returned when a server URL contains "@" but cannot be parsed.
 	ErrConnectionURLInvalid = errors.New("connection: server URL is invalid")
 
+	// ErrConnectionReadOnly is returned when a write is attempted through a read-only connection.
+	ErrConnectionReadOnly = errors.New("connection: read-only")
+
 	// ErrSidebarLayoutNotFound is returned by [storages/layouts] when nothing was
 	// saved for a connection; the connections service reads it as an empty layout.
 	ErrSidebarLayoutNotFound = errors.New("connection: sidebar layout not found")
