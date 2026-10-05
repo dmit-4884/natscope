@@ -22,6 +22,7 @@ import {
   SETTINGS_LAST_TAB_KEY,
   type SettingsTab,
 } from '@/components/settings/page/settingsNav'
+import { SubscribeSessionProvider } from '../subscribe/SubscribeSessionProvider'
 import CompactHeader from './CompactHeader'
 import Sidebar from './Sidebar'
 
@@ -186,12 +187,14 @@ export default function ConnectedLayout() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {!location.pathname.startsWith('/settings') && <Sidebar connectionId={connectionId} />}
+      <SubscribeSessionProvider key={connectionId} connectionId={connectionId}>
+        <div className="flex-1 flex overflow-hidden">
+          {!location.pathname.startsWith('/settings') && <Sidebar connectionId={connectionId} />}
 
-        {/* Main Content */}
-        <Outlet context={outletContext} />
-      </div>
+          {/* Main Content */}
+          <Outlet context={outletContext} />
+        </div>
+      </SubscribeSessionProvider>
     </>
   )
 }

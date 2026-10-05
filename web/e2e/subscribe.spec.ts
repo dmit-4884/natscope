@@ -43,6 +43,48 @@ test.describe('subscribe', () => {
 
     await page.getByRole('button', { name: 'Start' }).click()
     await expect(page.getByTestId('subscribe-status')).toHaveText('Live')
+    await expect(feed(page).getByText(`${base}.a`).first()).toBeVisible()
+    await expect(async () => {
+      await publishCore(env.connectionId, `${base}.b`, 'second')
+      await expect(feed(page).getByText(`${base}.b`).first()).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 10_000 })
+    await expect(feed(page).getByText(`${base}.a`).first()).toBeVisible()
+  })
+
+  test('the subscription keeps listening while another page is open', async ({ page, env }) => {
+    const base = `e2e.sub.${Date.now()}`
+    await startSubscription(page, `${base}.>`)
+    await expect(async () => {
+      await publishCore(env.connectionId, `${base}.before`, '1')
+      await expect(feed(page).getByText(`${base}.before`).first()).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 10_000 })
+
+    await page.getByRole('link', { name: 'Request / Reply' }).click()
+    await expect(page.getByRole('heading', { name: 'Request / Reply' })).toBeVisible()
+    await expect(page.getByTestId('subscribe-listening')).toBeVisible()
+    await publishCore(env.connectionId, `${base}.away`, '2')
+
+    await page.getByRole('link', { name: /^Subscribe/ }).click()
+    await expect(page.getByTestId('subscribe-status')).toHaveText('Live')
+    await expect(feed(page).getByText(`${base}.before`).first()).toBeVisible()
+    await expect(feed(page).getByText(`${base}.away`).first()).toBeVisible()
+  })
+
+  test('a stopped feed stays after visiting another page', async ({ page, env }) => {
+    const base = `e2e.sub.${Date.now()}`
+    await startSubscription(page, `${base}.>`)
+    await expect(async () => {
+      await publishCore(env.connectionId, `${base}.kept`, '1')
+      await expect(feed(page).getByText(`${base}.kept`).first()).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Stop' }).click()
+
+    await page.getByRole('link', { name: 'Services' }).click()
+    await expect(page.getByTestId('subscribe-listening')).toBeHidden()
+    await page.getByRole('link', { name: /^Subscribe/ }).click()
+
+    await expect(page.getByTestId('subscribe-stopped')).toBeVisible()
+    await expect(feed(page).getByText(`${base}.kept`).first()).toBeVisible()
   })
 
   test('a request seen in the feed can be answered', async ({ page, env }) => {

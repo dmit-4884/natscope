@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { usePreferencesStore } from '@/stores/preferencesStore'
 import { PlusIcon, ServicesIcon, SignalIcon, SwitchHorizontalIcon } from '@/components/ui'
+import { useSubscribeRunning } from '../subscribe/subscribeSession'
 import StreamList from '../streams/StreamList'
 import KVList from '../kv/KVList'
 import ObjectList from '../objects/ObjectList'
@@ -40,25 +41,38 @@ const PAGE_ENTRIES: PageEntry[] = [
   { to: '/services', label: 'Services', icon: <ServicesIcon /> },
 ]
 
-function RailButton({ entry, active, onClick }: { entry: PageEntry; active: boolean; onClick: () => void }) {
+const LISTENING = 'Subscription is running'
+
+function ListeningDot({ className }: { className?: string }) {
+  return <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse ${className ?? ''}`} />
+}
+
+interface PageEntryProps {
+  entry: PageEntry
+  active: boolean
+  listening: boolean
+}
+
+function RailButton({ entry, active, listening, onClick }: PageEntryProps & { onClick: () => void }) {
   return (
-    <Tooltip content={entry.label}>
+    <Tooltip content={listening ? `${entry.label} · ${LISTENING}` : entry.label}>
       <button
         type="button"
         onClick={onClick}
-        className={`p-1.5 rounded transition-colors ${
+        className={`relative p-1.5 rounded transition-colors ${
           active ? 'text-accent bg-accent-muted/70' : 'text-content-tertiary hover:text-content-primary hover:bg-surface-hover/60'
         }`}
-        aria-label={entry.label}
+        aria-label={listening ? `${entry.label}, ${LISTENING.toLowerCase()}` : entry.label}
         aria-current={active ? 'page' : undefined}
       >
         {entry.icon}
+        {listening && <ListeningDot className="absolute top-1 right-1" />}
       </button>
     </Tooltip>
   )
 }
 
-function PageLink({ entry, active }: { entry: PageEntry; active: boolean }) {
+function PageLink({ entry, active, listening }: PageEntryProps) {
   return (
     <Link
       to={entry.to}
@@ -69,6 +83,14 @@ function PageLink({ entry, active }: { entry: PageEntry; active: boolean }) {
     >
       {entry.icon}
       <span className="text-xs font-semibold uppercase tracking-wide">{entry.label}</span>
+      {listening && (
+        <Tooltip content={LISTENING}>
+          <span className="ml-auto flex items-center p-1" data-testid="subscribe-listening">
+            <ListeningDot />
+            <span className="sr-only">{LISTENING}</span>
+          </span>
+        </Tooltip>
+      )}
     </Link>
   )
 }
@@ -118,6 +140,8 @@ export default function Sidebar({ connectionId }: SidebarProps) {
   const isKV = location.pathname.includes('/kv')
   const isObjects = location.pathname.includes('/objects')
   const isPage = (entry: PageEntry) => location.pathname.startsWith(entry.to)
+  const subscribing = useSubscribeRunning()
+  const isListening = (entry: PageEntry) => entry.to === '/subscribe' && subscribing
 
   // Mini-rail mode: narrow strip of section icons that navigate on click.
   if (collapsed) {
@@ -170,7 +194,13 @@ export default function Sidebar({ connectionId }: SidebarProps) {
           </button>
         </Tooltip>
         {PAGE_ENTRIES.map((entry) => (
-          <RailButton key={entry.to} entry={entry} active={isPage(entry)} onClick={() => navigate(entry.to)} />
+          <RailButton
+            key={entry.to}
+            entry={entry}
+            active={isPage(entry)}
+            listening={isListening(entry)}
+            onClick={() => navigate(entry.to)}
+          />
         ))}
       </nav>
     )
@@ -217,7 +247,7 @@ export default function Sidebar({ connectionId }: SidebarProps) {
         </CollapsibleSection>
 
         {PAGE_ENTRIES.map((entry) => (
-          <PageLink key={entry.to} entry={entry} active={isPage(entry)} />
+          <PageLink key={entry.to} entry={entry} active={isPage(entry)} listening={isListening(entry)} />
         ))}
       </div>
     </nav>

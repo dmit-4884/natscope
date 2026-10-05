@@ -18,9 +18,10 @@ interface Options {
   maxDisplayRate?: number
   initialLimit: LiveMessageLimit
   subjectFilter?: string
+  globalStats?: boolean
 }
 
-interface Result {
+export interface LiveSubscription {
   liveMessages: LiveMessage[]
   liveLimit: LiveMessageLimit
   setLiveLimit: (limit: LiveMessageLimit) => void
@@ -32,6 +33,7 @@ interface Result {
   clearMessages: () => void
   subjectCounts: Record<string, number>
   deniedSubjects: string[]
+  msgPerSecond: number | undefined
 }
 
 const MAX_COUNTED_SUBJECTS = 1000
@@ -62,7 +64,8 @@ export function useLiveSubscription({
   maxDisplayRate,
   initialLimit,
   subjectFilter,
-}: Options): Result {
+  globalStats = true,
+}: Options): LiveSubscription {
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([])
   const [liveLimit, setLiveLimit] = useState<LiveMessageLimit>(initialLimit)
   const [wsStatus, setWsStatus] = useState<WsStatus>('disconnected')
@@ -71,6 +74,7 @@ export function useLiveSubscription({
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set())
   const [subjectCounts, setSubjectCounts] = useState<Record<string, number>>({})
   const [deniedSubjects, setDeniedSubjects] = useState<string[]>([])
+  const [msgPerSecond, setMsgPerSecond] = useState<number | undefined>(undefined)
 
   const [ws, setWs] = useState<LiveStreamClient | null>(null)
   const liveLimitRef = useRef(liveLimit)
@@ -225,6 +229,8 @@ export function useLiveSubscription({
     }
     socket.onBatch = processBatch
     socket.onStats = (payload: WSStatsPayload) => {
+      setMsgPerSecond(payload.msg_per_second)
+      if (!globalStats) return
       setGlobalStats({
         messagesReceived: payload.messages_received,
         messagesDropped: payload.messages_dropped,
@@ -242,7 +248,8 @@ export function useLiveSubscription({
     }
     socket.onDisconnect = () => {
       setWsStatus('disconnected')
-      setGlobalStats(null)
+      setMsgPerSecond(undefined)
+      if (globalStats) setGlobalStats(null)
     }
     socket.onReconnecting = () => setWsStatus('reconnecting')
 
@@ -252,12 +259,13 @@ export function useLiveSubscription({
     return () => {
       socket.disconnect()
       setWs(null)
+      setMsgPerSecond(undefined)
       setIsPaused(false)
       stopDrip()
       clearHighlightTimers()
     }
 
-  }, [connectionId, enabled, processBatch, setGlobalStats, clearHighlightTimers, stopDrip])
+  }, [connectionId, enabled, processBatch, globalStats, setGlobalStats, clearHighlightTimers, stopDrip])
 
   // Subscribe / unsubscribe when stream changes on an open connection.
   useEffect(() => {
@@ -310,5 +318,6 @@ export function useLiveSubscription({
     clearMessages,
     subjectCounts,
     deniedSubjects,
+    msgPerSecond,
   }
 }

@@ -35,7 +35,12 @@ viewer as stream messages, decoded from Protobuf when a [subject mapping](/guide
 - **Keep** sets how many messages stay in the feed, and **Display rate** caps how fast new ones are drawn
   on a busy subject.
 
-**Stop** ends the subscription and keeps the messages on screen.
+**Stop** ends the subscription and keeps the messages on screen; **Start** listens again and adds to
+them.
+
+The subscription keeps running while you work on other pages, and a green dot next to **Subscribe** in
+the sidebar shows that it is listening. Come back to find everything that arrived meanwhile. It ends
+when you press **Stop**, disconnect, or switch to another connection.
 
 ## Resend and reply
 

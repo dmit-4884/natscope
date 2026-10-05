@@ -1,17 +1,15 @@
+import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@/test/utils'
 import { clearAllSubscribeDrafts } from '@/stores/subscribeDraftStore'
 import type { LiveMessage } from '../messages/unified/messageListUtils'
 import { useLiveSubscription } from '../messages/unified/useLiveSubscription'
+import { SubscribeSessionProvider } from './SubscribeSessionProvider'
 import SubscribePage from './SubscribePage'
 
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
   useOutletContext: () => ({ connectionId: 'conn-1', handleOpenMappings: vi.fn() }),
-}))
-
-vi.mock('@/contexts/live', () => ({
-  useLiveStatsStore: (pick: (s: { stats: null }) => unknown) => pick({ stats: null }),
 }))
 
 const mappingItems = vi.hoisted(() => ({ data: [] as { pattern: string }[] }))
@@ -59,12 +57,33 @@ function liveState(over: Partial<ReturnType<typeof useLiveSubscription>> = {}): 
     clearMessages: vi.fn(),
     subjectCounts: {},
     deniedSubjects: [],
+    msgPerSecond: undefined,
     ...over,
   }
 }
 
 function message(id: string, subject: string): LiveMessage {
   return { id, stream_name: '', subject, timestamp: Date.now(), data_base64: '', data_size: 0, content_type: 'text', headers: {} }
+}
+
+function renderPage() {
+  return render(
+    <SubscribeSessionProvider connectionId="conn-1">
+      <SubscribePage />
+    </SubscribeSessionProvider>,
+  )
+}
+
+function AwayAndBack() {
+  const [here, setHere] = useState(true)
+  return (
+    <>
+      <button type="button" onClick={() => setHere((v) => !v)}>
+        Toggle page
+      </button>
+      {here ? <SubscribePage /> : <p>Another page</p>}
+    </>
+  )
 }
 
 const input = () => screen.getByLabelText('Subjects')
@@ -85,7 +104,7 @@ describe('SubscribePage', () => {
 
   it('starts on Cmd/Ctrl+Enter while suggestions are open', () => {
     mappingItems.data = [{ pattern: 'audit.>' }]
-    render(<SubscribePage />)
+    renderPage()
     addSubject('orders.>')
     fireEvent.focus(input())
     fireEvent.keyDown(input(), { key: 'Enter', metaKey: true })
@@ -96,7 +115,7 @@ describe('SubscribePage', () => {
 
   it('does not pick a suggestion on Enter in the empty field', () => {
     mappingItems.data = [{ pattern: 'audit.>' }]
-    render(<SubscribePage />)
+    renderPage()
     fireEvent.focus(input())
     fireEvent.keyDown(input(), { key: 'Enter' })
 
@@ -107,20 +126,20 @@ describe('SubscribePage', () => {
   })
 
   it('explains core NATS before the first subscription', () => {
-    render(<SubscribePage />)
+    renderPage()
     expect(screen.getByText('Subscribe to any subject')).toBeInTheDocument()
     expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Stopped')
   })
 
   it('asks for a subject instead of starting with none', () => {
-    render(<SubscribePage />)
+    renderPage()
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
     expect(screen.getByTestId('subject-error')).toHaveTextContent('Add a subject to subscribe to')
     expect(mockedLive).not.toHaveBeenCalledWith(expect.objectContaining({ enabled: true }))
   })
 
   it('adds subjects as chips on Enter and removes them with Backspace', () => {
-    render(<SubscribePage />)
+    renderPage()
     addSubject('orders.>')
     addSubject('payments.*')
     expect(chips().map((c) => c.textContent)).toEqual(['orders.>', 'payments.*'])
@@ -130,7 +149,7 @@ describe('SubscribePage', () => {
   })
 
   it('rejects an invalid subject inline', () => {
-    render(<SubscribePage />)
+    renderPage()
     addSubject('orders..x')
     expect(screen.getByTestId('subject-error')).toBeInTheDocument()
     expect(input()).toHaveAttribute('aria-invalid', 'true')
@@ -138,7 +157,7 @@ describe('SubscribePage', () => {
   })
 
   it('starts the subscription with the typed subject and waits for messages', () => {
-    render(<SubscribePage />)
+    renderPage()
     fireEvent.change(input(), { target: { value: 'orders.>' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
 
@@ -150,7 +169,7 @@ describe('SubscribePage', () => {
 
   it('marks a refused subject while the others keep receiving', () => {
     mockedLive.mockReturnValue(liveState({ deniedSubjects: ['secret.>'], liveMessages: [message('1', 'orders.new')] }))
-    render(<SubscribePage />)
+    renderPage()
     addSubject('orders.>')
     addSubject('secret.>')
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
@@ -164,7 +183,7 @@ describe('SubscribePage', () => {
 
   it('shows the missing permission when every subject is refused', () => {
     mockedLive.mockReturnValue(liveState({ deniedSubjects: ['secret.>'] }))
-    render(<SubscribePage />)
+    renderPage()
     addSubject('secret.>')
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
 
@@ -176,7 +195,7 @@ describe('SubscribePage', () => {
 
   it('keeps received messages after Stop and says how to resume', () => {
     mockedLive.mockReturnValue(liveState({ liveMessages: [message('1', 'orders.new')] }))
-    render(<SubscribePage />)
+    renderPage()
     addSubject('orders.>')
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
@@ -186,8 +205,46 @@ describe('SubscribePage', () => {
     expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false }))
   })
 
+  it('keeps the subscription and its messages while another page is open', () => {
+    mockedLive.mockReturnValue(liveState({ liveMessages: [message('1', 'orders.new')] }))
+    render(
+      <SubscribeSessionProvider connectionId="conn-1">
+        <AwayAndBack />
+      </SubscribeSessionProvider>,
+    )
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle page' }))
+    expect(screen.getByText('Another page')).toBeInTheDocument()
+    expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ subjects: ['orders.>'], enabled: true }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle page' }))
+    expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Live')
+    expect(chips().map((c) => c.textContent)).toEqual(['orders.>'])
+    expect(within(screen.getByTestId('feed')).getByText('orders.new')).toBeInTheDocument()
+  })
+
+  it('keeps a stopped feed while another page is open', () => {
+    mockedLive.mockReturnValue(liveState({ liveMessages: [message('1', 'orders.new')] }))
+    render(
+      <SubscribeSessionProvider connectionId="conn-1">
+        <AwayAndBack />
+      </SubscribeSessionProvider>,
+    )
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle page' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle page' }))
+
+    expect(screen.getByTestId('subscribe-stopped')).toBeInTheDocument()
+    expect(within(screen.getByTestId('feed')).getByText('orders.new')).toBeInTheDocument()
+  })
+
   it('offers quick-add presets and remembers started subjects as recents', () => {
-    render(<SubscribePage />)
+    renderPage()
     fireEvent.change(input(), { target: { value: 'orders.>' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))

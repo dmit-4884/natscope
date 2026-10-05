@@ -1,10 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { useLiveStatsStore } from '@/contexts/live'
 import { useMappingItems } from '@/contexts/mappings'
 import { useDisplayPreferences, useLivePolicy, useUpdateSettings } from '@/contexts/settings'
 import { useResizablePanel } from '@/hooks/useResizablePanel'
-import { useSubscribeDraft, withRecentSubjects } from '@/stores/subscribeDraftStore'
+import { useSubscribeDraft } from '@/stores/subscribeDraftStore'
 import type { SelectedMessage } from '@/types/messages'
 import { EmptyState, LockClosedIcon, SignalIcon } from '@/components/ui'
 import ErrorAlert from '@/components/ui/ErrorAlert'
@@ -14,10 +13,10 @@ import UnifiedMessageViewer from '../messages/UnifiedMessageViewer'
 import type { ResendDraft } from '../messages/resend'
 import { MessageVirtualTable } from '../messages/unified/MessageVirtualTable'
 import type { LiveMessage, WsStatus } from '../messages/unified/messageListUtils'
-import { useLiveSubscription } from '../messages/unified/useLiveSubscription'
 import { buildSubject } from '../streams/publish/subjectPatternUtils'
 import { CorePublishDialog, type CorePublishDraft } from './CorePublishDialog'
 import { SubjectBar } from './SubjectBar'
+import { useSubscribeSession } from './subscribeSession'
 import { SubscribeToolbar } from './SubscribeToolbar'
 import { filterReceived } from './subscribeUtils'
 
@@ -59,28 +58,16 @@ function StatusPill(props: PillProps) {
 export default function SubscribePage() {
   const { connectionId, handleOpenMappings } = useOutletContext<ConnectionOutletContext>()
   const [draft, updateDraft] = useSubscribeDraft(connectionId)
-  const [running, setRunning] = useState(false)
-  const [query, setQuery] = useState('')
-  const [subjectFilter, setSubjectFilter] = useState<string | null>(null)
-  const [selected, setSelected] = useState<SelectedMessage | null>(null)
+  const { running, start, stop, live, query, setQuery, subjectFilter, setSubjectFilter, selected, setSelected } =
+    useSubscribeSession()
   const [dialog, setDialog] = useState<{ mode: 'resend' | 'reply'; initial: CorePublishDraft } | null>(null)
 
   const liveSettings = useLivePolicy()
   const updateSettings = useUpdateSettings()
   const display = useDisplayPreferences()
-  const stats = useLiveStatsStore((s) => s.stats)
   const { data: mappings = [] } = useMappingItems()
   const { rightPanelPct, containerRef, separatorProps } = useResizablePanel()
   const autoScrollRef = useRef(true)
-
-  const live = useLiveSubscription({
-    connectionId,
-    streamName: null,
-    subjects: running ? draft.subjects : undefined,
-    enabled: running,
-    maxDisplayRate: liveSettings.maxDisplayRate,
-    initialLimit: 100,
-  })
 
   const suggestions = useMemo(
     () => [...new Set([...draft.recentSubjects, ...mappings.map((m) => m.pattern)])],
@@ -94,11 +81,6 @@ export default function SubscribePage() {
 
   const allDenied =
     running && draft.subjects.length > 0 && draft.subjects.every((s) => live.deniedSubjects.includes(s))
-
-  const start = (subjects: string[]) => {
-    updateDraft({ recentSubjects: withRecentSubjects(draft.recentSubjects, subjects) })
-    setRunning(true)
-  }
 
   const clear = () => {
     live.clearMessages()
@@ -123,7 +105,7 @@ export default function SubscribePage() {
       reply: msg.reply,
       isLive: true,
     })
-  }, [])
+  }, [setSelected])
 
   const openResend = useCallback((d: ResendDraft) => {
     setDialog({
@@ -210,7 +192,7 @@ export default function SubscribePage() {
           recentSubjects={draft.recentSubjects}
           running={running}
           onStart={start}
-          onStop={() => setRunning(false)}
+          onStop={stop}
         />
         {draft.subjects.includes('>') && (
           <p className="mt-2 text-xs text-content-tertiary">
@@ -238,7 +220,7 @@ export default function SubscribePage() {
                 subjectCounts={live.subjectCounts}
                 subjectFilter={subjectFilter}
                 onSubjectFilterChange={setSubjectFilter}
-                msgPerSecond={stats?.msgPerSecond}
+                msgPerSecond={live.msgPerSecond}
                 running={running}
                 isPaused={live.isPaused}
                 onTogglePause={live.togglePause}

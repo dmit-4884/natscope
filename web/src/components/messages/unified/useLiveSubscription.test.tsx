@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { WSBatchPayload, WSErrorPayload, WSMessagePayload } from '@/contexts/live'
+import type { WSBatchPayload, WSErrorPayload, WSMessagePayload, WSStatsPayload } from '@/contexts/live'
 import { useLiveSubscription } from './useLiveSubscription'
 
-const { clients } = vi.hoisted(() => ({ clients: [] as FakeClient[] }))
+const { clients, setStats } = vi.hoisted(() => ({ clients: [] as FakeClient[], setStats: vi.fn() }))
 
 interface FakeClient {
   deliver: (payload: WSBatchPayload) => void
   onError?: (payload: WSErrorPayload) => void
+  onStats?: (payload: WSStatsPayload) => void
   subscribe: ReturnType<typeof vi.fn>
   subscribeSubjects: ReturnType<typeof vi.fn>
 }
@@ -17,7 +18,7 @@ vi.mock('@/contexts/live', () => {
     onConnected?: () => void
     onSubscribed?: () => void
     onBatch?: (payload: WSBatchPayload) => void
-    onStats?: () => void
+    onStats?: (payload: WSStatsPayload) => void
     onError?: (payload: WSErrorPayload) => void
     onDisconnect?: () => void
     onReconnecting?: () => void
@@ -45,7 +46,7 @@ vi.mock('@/contexts/live', () => {
       else this.onBatch?.(payload)
     }
   }
-  const statsState = { setStats: () => {} }
+  const statsState = { setStats }
   return {
     LiveStreamClient,
     useLiveStatsStore: (selector: (s: typeof statsState) => unknown) => selector(statsState),
@@ -203,5 +204,25 @@ describe('useLiveSubscription subjects', () => {
     rerender({ list: ['open.>'] })
     expect(client.subscribeSubjects).toHaveBeenLastCalledWith(['open.>'])
     expect(result.current.deniedSubjects).toEqual([])
+  })
+
+  it('keeps its own message rate and leaves the shared stream stats alone', () => {
+    setStats.mockClear()
+    const { result } = renderHook(() =>
+      useLiveSubscription({
+        connectionId: 'conn-1',
+        streamName: null,
+        subjects: ['>'],
+        enabled: true,
+        initialLimit: 100,
+        globalStats: false,
+      }),
+    )
+    const client = clients[clients.length - 1]
+
+    act(() => client.onStats?.({ messages_received: 10, messages_dropped: 0, msg_per_second: 7 }))
+
+    expect(result.current.msgPerSecond).toBe(7)
+    expect(setStats).not.toHaveBeenCalled()
   })
 })
