@@ -24,6 +24,7 @@ The **Status** column names the problem in plain words. Hover a badge for the de
 | **Nobody pulling**    | A pull consumer has messages to deliver, no pull request waits, and no client pulled in the last minute. |
 | **Redelivering**      | Some unacknowledged messages were delivered again: a client rejected them or missed the ack wait.        |
 | **May lose messages** | The stream is at least 90% full and drops its oldest messages, and the next message for this consumer is among the oldest tenth. |
+| **Losing messages**  | The same, and the stream already dropped messages this consumer had not reached.                      |
 | **Paused**            | Delivery is paused until the time shown.                                                                |
 
 A consumer with nothing wrong is **Catching up** while it has work left, and **Caught up** when it has none.
@@ -46,6 +47,7 @@ The view of a consumer starts with **What holds it back** when one of the proble
   past it.
 - **Next to deliver**: the next new message for the consumer. Redeliveries of unacknowledged messages go out before it.
 - How far the consumer delivered, and up to where every message is done.
+- Which messages left the stream before the consumer reached them, when that happened.
 
 **Open** shows the message on the stream's **Messages** tab. Natscope reads these messages straight from the stream, so
 looking at them does not deliver or acknowledge anything.

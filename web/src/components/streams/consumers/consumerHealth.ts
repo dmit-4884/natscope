@@ -87,12 +87,23 @@ function streamFullIssue(consumer: ConsumerInfo, stream: StreamInfo | undefined)
   const fill = streamFillOf(stream)
   const next = (consumer.delivered?.stream_seq ?? 0) + 1
   if (fill < STREAM_FULL_RATIO || next - stream.state.first_seq >= stream.messages * OLDEST_SHARE) return null
+  const percent = Math.min(100, Math.floor(fill * 100))
+  if (next < stream.state.first_seq && (consumer.delivered?.consumer_seq ?? 0) > 0) {
+    return {
+      kind: 'stream_full',
+      severity: 'warning',
+      label: 'Losing messages',
+      detail:
+        `Stream ${stream.name} is ${percent}% full and already dropped messages #${next}–#${stream.state.first_seq - 1} ` +
+        'before this consumer reached them. More of its messages may go the same way.',
+    }
+  }
   return {
     kind: 'stream_full',
     severity: 'warning',
     label: 'May lose messages',
     detail:
-      `Stream ${stream.name} is ${Math.min(100, Math.floor(fill * 100))}% full and drops its oldest messages when full. ` +
+      `Stream ${stream.name} is ${percent}% full and drops its oldest messages when full. ` +
       'The next message for this consumer is among the oldest, so it may be gone before the consumer gets it.',
   }
 }

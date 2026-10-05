@@ -100,3 +100,27 @@ describe('ConsumerPosition oldest unacknowledged', () => {
     expect(screen.queryByText('#25')).not.toBeInTheDocument()
   })
 })
+
+describe('ConsumerPosition lost messages', () => {
+  it('says which messages left the stream before the consumer reached them', () => {
+    const behind = consumer({ num_pending: 0, num_ack_pending: 0 })
+    render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={behind} firstSeq={40} onOpenMessage={vi.fn()} />)
+
+    expect(screen.getByTestId('consumer-lost')).toHaveTextContent('Messages #21–#39 left the stream before this consumer reached them.')
+  })
+
+  it('stays quiet when the consumer is ahead of the stream start', () => {
+    render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={consumer({ num_pending: 0, num_ack_pending: 0 })} firstSeq={5} onOpenMessage={vi.fn()} />)
+
+    expect(screen.queryByTestId('consumer-lost')).not.toBeInTheDocument()
+  })
+})
+
+describe('ConsumerPosition lost messages for a new consumer', () => {
+  it('does not claim losses before the first delivery', () => {
+    const fresh = consumer({ num_pending: 0, num_ack_pending: 0, delivered: { consumer_seq: 0, stream_seq: 0 } })
+    render(<ConsumerPosition connectionId="conn-1" streamName="ORDERS" consumer={fresh} firstSeq={40} onOpenMessage={vi.fn()} />)
+
+    expect(screen.queryByTestId('consumer-lost')).not.toBeInTheDocument()
+  })
+})

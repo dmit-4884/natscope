@@ -187,3 +187,21 @@ describe('compareByHealth', () => {
     expect(rows.sort(compareByHealth).map((r) => r.consumer.name)).toEqual(['c', 'e', 'd', 'a', 'b'])
   })
 })
+
+describe('consumerIssues lost messages', () => {
+  it('says when the stream already dropped messages the consumer had not reached', () => {
+    const behind = consumer({ num_pending: 90, num_waiting: 1, delivered: { consumer_seq: 5, stream_seq: 800, last_active: NOW } })
+    const issues = consumerIssues(behind, stream({ max_msgs: 100 }, 95, 1_000, 906), NOW)
+    expect(issues.map((i) => i.kind)).toEqual(['stream_full'])
+    expect(issues[0].label).toBe('Losing messages')
+    expect(issues[0].detail).toContain('already dropped messages #801–#905')
+  })
+})
+
+describe('consumerIssues lost messages for a new consumer', () => {
+  it('does not claim losses for a consumer that has not delivered anything', () => {
+    const fresh = consumer({ num_pending: 90, num_waiting: 1, delivered: { consumer_seq: 0, stream_seq: 0 } })
+    const issues = consumerIssues(fresh, stream({ max_msgs: 100 }, 95, 1_000, 906), NOW)
+    expect(issues[0].label).toBe('May lose messages')
+  })
+})

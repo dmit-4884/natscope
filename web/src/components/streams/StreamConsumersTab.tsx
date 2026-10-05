@@ -309,6 +309,7 @@ export default function StreamConsumersTab() {
                   connectionId={connectionId}
                   streamName={streamName}
                   consumer={selectedConsumer}
+                  firstSeq={streamDetail?.state?.first_seq}
                   onOpenMessage={openMessage}
                 />
               }

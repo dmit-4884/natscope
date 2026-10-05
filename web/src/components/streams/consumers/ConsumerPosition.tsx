@@ -11,6 +11,7 @@ interface Props {
   connectionId: string
   streamName: string
   consumer: ConsumerInfo
+  firstSeq?: number
   onOpenMessage: (message: Message) => void
 }
 
@@ -75,7 +76,7 @@ function Spot({ label, hint, idle, startSeq, lastSeq, connectionId, streamName, 
   )
 }
 
-export function ConsumerPosition({ connectionId, streamName, consumer, onOpenMessage }: Props) {
+export function ConsumerPosition({ connectionId, streamName, consumer, firstSeq, onOpenMessage }: Props) {
   const subjects = getFilterSubjectsArray(consumer)
   const delivered = consumer.delivered?.stream_seq ?? 0
   const ackFloor = consumer.ack_floor?.stream_seq ?? 0
@@ -112,6 +113,11 @@ export function ConsumerPosition({ connectionId, streamName, consumer, onOpenMes
             ? 'Nothing delivered yet'
             : `Delivered up to #${delivered} · ${(consumer.ack_floor?.consumer_seq ?? 0) === 0 ? 'nothing acknowledged yet' : `done up to #${ackFloor}`}`}
         </p>
+        {firstSeq != null && (consumer.delivered?.consumer_seq ?? 0) > 0 && delivered + 1 < firstSeq && (
+          <p className="mt-1 text-xs text-status-warning-text" data-testid="consumer-lost">
+            Messages #{delivered + 1}–#{firstSeq - 1} left the stream before this consumer reached them.
+          </p>
+        )}
       </div>
     </div>
   )
