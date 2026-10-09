@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { isMacPlatform } from '@/utils/platform'
+import { placeTooltip, type TooltipSide } from './tooltipPlacement'
 
 interface TooltipProps {
   content: string
   children: ReactNode
   delay?: number
-  position?: 'top' | 'bottom' | 'left' | 'right'
+  position?: TooltipSide
   /** Keyboard shortcut to display alongside content */
   shortcut?: string
 }
@@ -18,10 +20,10 @@ interface TooltipProps {
 function formatShortcut(shortcut: string): string {
   const isMac = isMacPlatform()
   return shortcut
-    .replace(/mod\+/gi, isMac ? '\u2318' : 'Ctrl+')
-    .replace(/shift\+/gi, isMac ? '\u21E7' : 'Shift+')
-    .replace(/alt\+/gi, isMac ? '\u2325' : 'Alt+')
-    .replace(/ctrl\+/gi, isMac ? '\u2303' : 'Ctrl+')
+    .replace(/mod\+/gi, isMac ? '⌘' : 'Ctrl+')
+    .replace(/shift\+/gi, isMac ? '⇧' : 'Shift+')
+    .replace(/alt\+/gi, isMac ? '⌥' : 'Alt+')
+    .replace(/ctrl\+/gi, isMac ? '⌃' : 'Ctrl+')
 }
 
 export default function Tooltip({
@@ -32,30 +34,46 @@ export default function Tooltip({
   shortcut,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false)
-  const [coords, setCoords] = useState({ x: 0, y: 0 })
+  const [place, setPlace] = useState<{ left: number; top: number } | null>(null)
   const timeoutRef = useRef<number | null>(null)
-  const elementRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLSpanElement>(null)
+  const tipRef = useRef<HTMLDivElement>(null)
 
   const showTooltip = () => {
-    timeoutRef.current = window.setTimeout(() => {
-      if (elementRef.current) {
-        const rect = elementRef.current.getBoundingClientRect()
-        setCoords({
-          x: rect.left + rect.width / 2,
-          y: position === 'bottom' ? rect.bottom : rect.top,
-        })
-      }
-      setIsVisible(true)
-    }, delay)
+    timeoutRef.current = window.setTimeout(() => setIsVisible(true), delay)
   }
 
-  const hideTooltip = () => {
+  const hideTooltip = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
     setIsVisible(false)
-  }
+    setPlace(null)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!isVisible || !triggerRef.current || !tipRef.current) return
+    const tip = tipRef.current.getBoundingClientRect()
+    setPlace(
+      placeTooltip(
+        triggerRef.current.getBoundingClientRect(),
+        { width: tip.width, height: tip.height },
+        { width: window.innerWidth, height: window.innerHeight },
+        position,
+      ),
+    )
+  }, [isVisible, position, content, shortcut])
+
+  useEffect(() => {
+    if (!isVisible) return
+    window.addEventListener('scroll', hideTooltip, true)
+    window.addEventListener('resize', hideTooltip)
+    return () => {
+      window.removeEventListener('scroll', hideTooltip, true)
+      window.removeEventListener('resize', hideTooltip)
+    }
+  }, [isVisible, hideTooltip])
 
   useEffect(() => {
     return () => {
@@ -74,7 +92,7 @@ export default function Tooltip({
   return (
     <>
       <span
-        ref={elementRef}
+        ref={triggerRef}
         onMouseEnter={showTooltip}
         onMouseLeave={hideTooltip}
         onFocus={showTooltip}
@@ -83,24 +101,23 @@ export default function Tooltip({
       >
         {children}
       </span>
-      {isVisible && (
-        <div
-          className="fixed z-50 px-2 py-1 text-xs text-content-inverse bg-surface-inverse rounded shadow-lg pointer-events-none max-w-sm flex items-center gap-2"
-          style={{
-            left: coords.x,
-            top: position === 'bottom' ? coords.y + 8 : coords.y - 8,
-            transform: `translateX(-50%) ${position === 'bottom' ? '' : 'translateY(-100%)'}`,
-          }}
-          role="tooltip"
-        >
-          <span>{content}</span>
-          {formattedShortcut && (
-            <kbd className="px-1.5 py-0.5 text-2xs bg-gray-700 rounded font-mono text-gray-300">
-              {formattedShortcut}
-            </kbd>
-          )}
-        </div>
-      )}
+      {isVisible &&
+        createPortal(
+          <div
+            ref={tipRef}
+            className="fixed z-tooltip w-max max-w-[min(20rem,calc(100vw-16px))] px-2.5 py-1.5 text-xs leading-snug text-content-inverse bg-surface-inverse rounded-md shadow-lg pointer-events-none flex items-center gap-2 whitespace-normal break-words"
+            style={place ? { left: place.left, top: place.top } : { left: 0, top: 0, visibility: 'hidden' }}
+            role="tooltip"
+          >
+            <span>{content}</span>
+            {formattedShortcut && (
+              <kbd className="px-1.5 py-0.5 text-2xs bg-gray-700 rounded font-mono text-gray-300">
+                {formattedShortcut}
+              </kbd>
+            )}
+          </div>,
+          document.body,
+        )}
     </>
   )
 }
