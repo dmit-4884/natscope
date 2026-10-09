@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@/test/utils'
 import type { SchemaType, TypeDescription } from '@/api/proto'
 import type { ProtoSource } from '@/api/protoSources'
+import { resetSchemaBrowser } from '@/stores/schemaBrowserStore'
 import SchemaBrowser from './SchemaBrowser'
 
 const hoisted = vi.hoisted(() => ({
@@ -70,6 +71,7 @@ const sources = [{ id: 'src', name: 'shop-protos' }] as ProtoSource[]
 
 describe('SchemaBrowser', () => {
   beforeEach(() => {
+    resetSchemaBrowser()
     hoisted.listSchemaTypes.mockResolvedValue([
       schemaType('shop.Order', { comment: 'A placed order.' }),
       schemaType('shop.Status', { kind: 'enum', comment: 'Order lifecycle.' }),
@@ -95,6 +97,18 @@ describe('SchemaBrowser', () => {
 
     fireEvent.click(screen.getByTestId('schema-show-imported'))
     expect(screen.getByText('Timestamp')).toBeInTheDocument()
+  })
+
+  it('opens on the type and filters left there after a visit elsewhere', async () => {
+    const first = render(<SchemaBrowser sources={sources} />)
+    fireEvent.click(await screen.findByText('Order'))
+    await screen.findByTestId('schema-type-detail')
+    first.unmount()
+
+    render(<SchemaBrowser sources={sources} />)
+
+    const detail = await screen.findByTestId('schema-type-detail')
+    expect(within(detail).getByText('shop.Order')).toBeInTheDocument()
   })
 
   it('filters by name or comment', async () => {

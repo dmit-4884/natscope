@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { ProtoSource } from '@/api/protoSources'
 import type { SchemaType } from '@/api/proto'
 import { groupByPackage, shortTypeName, useSchemaTypes } from '@/contexts/proto'
 import { EmptyState, QueryErrorState, SearchInput, Select, SkeletonRows, Toggle } from '@/components/ui'
 import { plural } from '@/utils/plural'
 import { cn } from '@/utils/cn'
+import { useSchemaBrowserStore } from '@/stores/schemaBrowserStore'
 import { KindBadge, SchemaTypeDetail } from './SchemaTypeDetail'
 
 interface Props {
@@ -12,10 +13,8 @@ interface Props {
 }
 
 export default function SchemaBrowser({ sources }: Props) {
-  const [search, setSearch] = useState('')
-  const [sourceFilter, setSourceFilter] = useState('')
-  const [showImported, setShowImported] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const { search, setSearch, sourceFilter, setSourceFilter, showImported, setShowImported, selectedId, setSelectedId } =
+    useSchemaBrowserStore()
   const { data: types = [], isLoading, error, refetch } = useSchemaTypes()
 
   const sourceNames = useMemo(() => new Map(sources.map((s) => [s.id, s.name])), [sources])
