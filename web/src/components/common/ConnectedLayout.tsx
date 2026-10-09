@@ -100,15 +100,13 @@ export default function ConnectedLayout() {
 
   const handleSwitchConnection = useCallback(async (connection: SavedConnection) => {
     if (connectionId) await queryClient.cancelQueries({ queryKey: [CONNECTION_QUERY_PREFIX, connectionId] })
+    await navigate('/streams', { flushSync: true })
     resetAllStores()
 
     setActiveConnectionId(connection.id)
     storeActiveConnectionInfo(connection)
     setConnectionId(connection.id)
     setCurrentConnection(connection)
-
-    // Always navigate to streams list to avoid stale stream from previous connection
-    navigate('/streams')
   }, [connectionId, queryClient, navigate])
 
   // When CompactHeader resolves full connection data from lazy-loaded connections

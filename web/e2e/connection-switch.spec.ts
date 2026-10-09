@@ -37,4 +37,22 @@ test.describe('switching connections', () => {
 
     expect(await page.evaluate(() => (window as unknown as { sawLoading: boolean }).sawLoading)).toBe(false)
   })
+
+  test('switching from a stream page asks the new connection nothing about that stream', async ({ page, env }) => {
+    const otherId = await ensureReadOnlyCopy(env.connectionId, OTHER)
+    await page.goto(`/streams/${STREAM}/messages`)
+    await expect(page.getByTestId('stream-tabs')).toBeVisible()
+    const leaked: string[] = []
+    page.on('request', (req) => {
+      const body = req.postData() ?? ''
+      if (body.includes(otherId) && body.includes(STREAM)) leaked.push(req.url())
+    })
+
+    await switchTo(page, new RegExp(`connection ${OTHER}`))
+    await expect(page).toHaveURL(/\/streams$/)
+    await expect(page.getByRole('banner').getByText('PROD')).toBeVisible()
+    await page.waitForTimeout(500)
+
+    expect(leaked).toEqual([])
+  })
 })
