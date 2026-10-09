@@ -45,6 +45,12 @@ describe('filterReceived', () => {
     expect(filterReceived(messages, '')).toBe(messages)
   })
 
+  it('matches the decoded payload the feed shows', () => {
+    const decoded: LiveMessage = { ...msg('orders.proto', '\u0008\u0001'), decoded: { orderId: 'ord-123' } }
+    expect(filterReceived([decoded], 'orderid')).toEqual([decoded])
+    expect(filterReceived([decoded], 'ord-123')).toEqual([decoded])
+  })
+
   it('leaves out muted subjects', () => {
     expect(filterReceived(messages, '', null, ['audit.>']).map((m) => m.subject)).toEqual(['orders.new'])
     expect(filterReceived(messages, 'bob', null, ['audit.login'])).toEqual([])

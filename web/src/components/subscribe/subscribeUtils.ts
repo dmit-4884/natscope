@@ -45,6 +45,10 @@ function payloadText(message: LiveMessage): string {
     } catch {
       text = ''
     }
+    if (message.decoded !== undefined && message.decoded !== null) {
+      const decoded = typeof message.decoded === 'string' ? message.decoded : JSON.stringify(message.decoded)
+      text = `${text}\n${decoded.toLowerCase()}`
+    }
     payloadTexts.set(message, text)
   }
   return text
