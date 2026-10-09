@@ -14,6 +14,9 @@ type Service interface {
 	// Create returns errs.ErrConnectionNameAlreadyInUse if name is taken.
 	Create(ctx context.Context, in *entities.SavedConnectionCreate) (*entities.SavedConnection, error)
 
+	// ValidateCreate checks in as Create would, without saving it; a taken name is not checked.
+	ValidateCreate(in *entities.SavedConnectionCreate) error
+
 	// Get returns errs.ErrSavedConnectionNotFound if not found.
 	Get(ctx context.Context, id string) (*entities.SavedConnection, error)
 

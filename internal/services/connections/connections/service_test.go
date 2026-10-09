@@ -664,6 +664,30 @@ func connWith(init func(*entities.SavedConnection)) *entities.SavedConnection {
 	return entities.SavedConnectionNew(init)
 }
 
+func TestService_ValidateCreateChecksWhatCreateWouldWithoutSaving(t *testing.T) {
+	t.Parallel()
+	bad := map[string]*entities.SavedConnectionCreate{
+		"blank name":        {Name: "  ", URLs: []string{"nats://h:4222"}},
+		"long label":        {Name: "c", URLs: []string{"nats://h:4222"}, Label: &entities.ConnectionLabel{Text: "seventeen-chars-x", Color: entities.LabelColorRed}},
+		"credentials twice": {Name: "c", URLs: []string{"nats://u:p@h:4222"}, Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("t")}},
+	}
+	for name, in := range bad {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			storage := &mockStorage{}
+			svc := New(storage, &mockLayouts{}, &mockNATSService{}, true)
+
+			require.Error(t, svc.ValidateCreate(in))
+			assert.False(t, storage.saveCalled)
+		})
+	}
+
+	storage := &mockStorage{}
+	svc := New(storage, &mockLayouts{}, &mockNATSService{}, true)
+	require.NoError(t, svc.ValidateCreate(&entities.SavedConnectionCreate{Name: "c", URLs: []string{"nats://h:4222"}}))
+	assert.False(t, storage.saveCalled)
+}
+
 func TestService_RejectsALabelTheFormWouldNot(t *testing.T) {
 	t.Parallel()
 	bad := map[string]*entities.ConnectionLabel{

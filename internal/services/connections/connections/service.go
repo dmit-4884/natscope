@@ -52,22 +52,9 @@ func (s *Service) Create(
 	ctx context.Context,
 	in *entities.SavedConnectionCreate,
 ) (*entities.SavedConnection, error) {
-	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
-
-	// buf.validate min_len=1 runs on the raw request; re-check after the trim
-	// normalizer so a whitespace-only name can't persist as an empty name.
-	if strings.TrimSpace(in.Name) == "" {
-		return nil, errs.ErrConnectionNameRequired
-	}
-	if err := validateLabel(in.Label); err != nil {
+	if err := prepareCreate(in); err != nil {
 		return nil, err
 	}
-
-	urls, auth, err := liftURLCredentials(in.URLs, in.Auth)
-	if err != nil {
-		return nil, err
-	}
-	in.URLs, in.Auth = urls, auth
 
 	conn := converter.Convert(in, entities.SavedConnectionNew())
 	if conn.Label.IsEmpty() {
@@ -86,6 +73,32 @@ func (s *Service) Create(
 		slog.String("name", in.Name))
 
 	return conn, nil
+}
+
+// ValidateCreate checks in as Create would, without saving it.
+func (s *Service) ValidateCreate(in *entities.SavedConnectionCreate) error {
+	return prepareCreate(in)
+}
+
+// prepareCreate normalizes and checks a new connection and moves the credentials in its URLs into its auth config.
+func prepareCreate(in *entities.SavedConnectionCreate) error {
+	_ = normalizer.Normalize(in) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
+
+	// buf.validate min_len=1 runs on the raw request; re-check after the trim
+	// normalizer so a whitespace-only name can't persist as an empty name.
+	if strings.TrimSpace(in.Name) == "" {
+		return errs.ErrConnectionNameRequired
+	}
+	if err := validateLabel(in.Label); err != nil {
+		return err
+	}
+
+	urls, auth, err := liftURLCredentials(in.URLs, in.Auth)
+	if err != nil {
+		return err
+	}
+	in.URLs, in.Auth = urls, auth
+	return nil
 }
 
 // Get returns errs.ErrSavedConnectionNotFound if not found.

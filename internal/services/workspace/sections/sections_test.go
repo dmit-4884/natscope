@@ -19,6 +19,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore/bbstoretest"
 
 	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
+	connectionssvc "github.com/dmit-4884/natscope/internal/services/connections"
 	mappingssvc "github.com/dmit-4884/natscope/internal/services/mappings"
 	mappingsService "github.com/dmit-4884/natscope/internal/services/mappings/mappings"
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
@@ -505,4 +506,66 @@ func TestRedactConnection_NoAuthOrTLS(t *testing.T) {
 	assert.Nil(t, item.Auth)
 	assert.Nil(t, item.TLS)
 	assert.Nil(t, converter.Convert(item, &entities.SavedConnectionCreate{}).Auth)
+}
+
+type fakeConnections struct {
+	connectionssvc.Service
+	saved   entities.SavedConnections
+	deleted []string
+	created []string
+}
+
+func (f *fakeConnections) List(context.Context, *entities.SavedConnectionsList) (*entities.List[entities.SavedConnections], error) {
+	return &entities.List[entities.SavedConnections]{Items: f.saved}, nil
+}
+
+func (f *fakeConnections) Delete(_ context.Context, id string) error {
+	f.deleted = append(f.deleted, id)
+	return nil
+}
+
+func (f *fakeConnections) Create(_ context.Context, in *entities.SavedConnectionCreate) (*entities.SavedConnection, error) {
+	f.created = append(f.created, in.Name)
+	return &entities.SavedConnection{Name: in.Name}, nil
+}
+
+func (f *fakeConnections) ValidateCreate(in *entities.SavedConnectionCreate) error {
+	if in.Label != nil && len(in.Label.Text) > 16 {
+		return errs.ErrConnectionLabelInvalid
+	}
+	return nil
+}
+
+func TestConnectionsSection_RefusesABadFileBeforeChangingAnything(t *testing.T) {
+	t.Parallel()
+	long := &entities.ConnectionLabel{Text: "PRODUCTION-EU-WEST", Color: entities.LabelColorRed}
+	tests := map[string]struct {
+		items []connectionItem
+		want  error
+	}{
+		"a malformed connection": {
+			items: []connectionItem{{Name: "ok", URLs: []string{"nats://h:4222"}}, {Name: "bad", URLs: []string{"nats://h:4222"}, Label: long}},
+			want:  errs.ErrConnectionLabelInvalid,
+		},
+		"a name used twice": {
+			items: []connectionItem{{Name: "dup", URLs: []string{"nats://h:4222"}}, {Name: "dup", URLs: []string{"nats://g:4222"}}},
+			want:  errs.ErrConnectionNameAlreadyInUse,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			svc := &fakeConnections{saved: entities.SavedConnections{entities.SavedConnectionNew(func(c *entities.SavedConnection) { c.Name = "old" })}}
+			section := NewConnectionsSection(svc)
+			raw, err := json.Marshal(newItemsPayload(tt.items))
+			require.NoError(t, err)
+
+			_, err = section.Validate(t.Context(), raw, entities.WorkspaceStrategyReplace)
+			require.ErrorIs(t, err, tt.want)
+			_, err = section.Import(t.Context(), raw, entities.WorkspaceStrategyReplace)
+			require.ErrorIs(t, err, tt.want)
+			assert.Empty(t, svc.deleted)
+			assert.Empty(t, svc.created)
+		})
+	}
 }

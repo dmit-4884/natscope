@@ -6,6 +6,7 @@ package sections
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
 	"github.com/altessa-s/go-atlas/core/collections/slices"
@@ -13,6 +14,7 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	connectionssvc "github.com/dmit-4884/natscope/internal/services/connections"
@@ -88,6 +90,9 @@ func (s *ConnectionsSection) Validate(
 	if err != nil {
 		return entities.WorkspaceSectionReport{}, err
 	}
+	if err := s.checkCreates(items, kept(existing, strategy)); err != nil {
+		return entities.WorkspaceSectionReport{}, err
+	}
 	created, deleted, conflicts := createOnlyPlan(
 		existing,
 		slices.To(items, func(i connectionItem) string { return i.Name }),
@@ -117,6 +122,12 @@ func (s *ConnectionsSection) Import(
 	if err != nil {
 		return entities.WorkspaceSectionResult{}, err
 	}
+	existing := maps.FromSliceWith(all, func(c *entities.SavedConnection) (string, struct{}) {
+		return c.Name, struct{}{}
+	})
+	if err := s.checkCreates(items, kept(existing, strategy)); err != nil {
+		return entities.WorkspaceSectionResult{}, err
+	}
 
 	var res entities.WorkspaceSectionResult
 	if strategy == entities.WorkspaceStrategyReplace {
@@ -141,9 +152,6 @@ func (s *ConnectionsSection) Import(
 	}
 
 	// Merge: keep existing names (their local secrets stay intact), create new.
-	existing := maps.FromSliceWith(all, func(c *entities.SavedConnection) (string, struct{}) {
-		return c.Name, struct{}{}
-	})
 	for _, it := range items {
 		if _, ok := existing[it.Name]; ok {
 			continue // keep the local one (with its credentials)
@@ -157,6 +165,33 @@ func (s *ConnectionsSection) Import(
 		res.Warnings = append(res.Warnings, "imported connections have no credentials — set them before connecting")
 	}
 	return res, nil
+}
+
+// checkCreates refuses a file whose connections to create include a malformed one or a name used twice, before
+// anything changes; the connections named in keep are not created.
+func (s *ConnectionsSection) checkCreates(items []connectionItem, keep map[string]struct{}) error {
+	seen := make(map[string]struct{}, len(items))
+	for _, it := range items {
+		if _, ok := keep[it.Name]; ok {
+			continue
+		}
+		if _, twice := seen[it.Name]; twice {
+			return fmt.Errorf("%w: %q", errs.ErrConnectionNameAlreadyInUse, it.Name)
+		}
+		seen[it.Name] = struct{}{}
+		if err := s.svc.ValidateCreate(converter.Convert(it, &entities.SavedConnectionCreate{})); err != nil {
+			return fmt.Errorf("%w: %q", err, it.Name)
+		}
+	}
+	return nil
+}
+
+// kept is the existing names an import leaves in place: all of them on merge, none on replace.
+func kept(existing map[string]struct{}, strategy entities.WorkspaceStrategy) map[string]struct{} {
+	if strategy == entities.WorkspaceStrategyReplace {
+		return nil
+	}
+	return existing
 }
 
 // redactConnection projects only the non-secret fields of a saved connection.

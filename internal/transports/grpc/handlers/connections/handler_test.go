@@ -70,6 +70,8 @@ func (m *mockConnService) Create(_ context.Context, in *entities.SavedConnection
 	return conn, m.createErr
 }
 
+func (m *mockConnService) ValidateCreate(*entities.SavedConnectionCreate) error { return nil }
+
 func (m *mockConnService) Get(_ context.Context, _ string) (*entities.SavedConnection, error) {
 	return m.getResult, m.getErr
 }
