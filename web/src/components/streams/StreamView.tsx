@@ -18,6 +18,7 @@ import {
 } from '@/stores/streamTabState/publishDraftStore'
 import { useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
 import { toast } from '@/utils/toast'
+import { useResizablePanel } from '@/hooks/useResizablePanel'
 import type { SelectedMessage } from '../messages/UnifiedMessageList'
 import { useMessageNavigation } from '../messages/unified/useMessageNavigation'
 import UnifiedMessageViewer from '../messages/UnifiedMessageViewer'
@@ -30,7 +31,6 @@ import { isStreamNotFound } from './streamErrors'
 import { useLinkedMessage } from './useLinkedMessage'
 import { subjectMatchesStream } from './publish/subjectPatternUtils'
 import type { StreamPublishFeatures } from './publish/publishOptions'
-import { useResizablePanel } from '@/hooks/useResizablePanel'
 
 const EMPTY_HEADERS: HeaderDraft[] = []
 
