@@ -135,6 +135,7 @@ const PayloadViewer = memo(function PayloadViewer({
     { mode: 'wire' as const, label: 'Wire', available: !!bytes && bytes.length > 0 && !jsonData },
   ]
   const availableModes = allModes.filter(m => m.available)
+  const shownMode = availableModes.some((m) => m.mode === viewMode) ? viewMode : (defaultMode ?? availableModes[0].mode)
 
   // Get current data for display
   const currentData = decodedData || jsonData
@@ -147,7 +148,7 @@ const PayloadViewer = memo(function PayloadViewer({
         label="Payload view"
         idPrefix="payload"
         className="bg-surface-primary sticky top-0 z-10"
-        value={viewMode}
+        value={shownMode}
         onChange={(mode) => handleModeChange(mode as ViewMode)}
         tabs={availableModes.map(({ mode, label, loading }) => ({
           value: mode,
@@ -159,9 +160,9 @@ const PayloadViewer = memo(function PayloadViewer({
       />
 
       {/* Content */}
-      <div {...tabPanelProps('payload', viewMode)} className="flex-1 overflow-auto p-4 bg-surface-secondary">
+      <div {...tabPanelProps('payload', shownMode)} className="flex-1 overflow-auto p-4 bg-surface-secondary">
         {/* Decoded View — JsonTreeViewer owns the truncated-preview UX; PayloadViewer stays a thin tab router. */}
-        {viewMode === 'decoded' && (
+        {shownMode === 'decoded' && (
           isDecoding ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-center">
@@ -185,12 +186,12 @@ const PayloadViewer = memo(function PayloadViewer({
         )}
 
         {/* JSON View */}
-        {viewMode === 'json' && currentData ? (
+        {shownMode === 'json' && currentData ? (
           <JsonTreeViewer data={currentData} title="JSON Data" searchable jsonIndentSize={jsonIndentSize} />
         ) : null}
 
         {/* Raw View */}
-        {viewMode === 'raw' && (
+        {shownMode === 'raw' && (
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -229,7 +230,7 @@ const PayloadViewer = memo(function PayloadViewer({
         )}
 
         {/* Hex View */}
-        {viewMode === 'hex' && bytes && (
+        {shownMode === 'hex' && bytes && (
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-700">
@@ -254,7 +255,7 @@ const PayloadViewer = memo(function PayloadViewer({
           </div>
         )}
 
-        {viewMode === 'wire' && bytes && <WireView dataBase64={rawData} totalBytes={bytes.length} />}
+        {shownMode === 'wire' && bytes && <WireView dataBase64={rawData} totalBytes={bytes.length} />}
 
         {/* Headers */}
         {headers && Object.keys(headers).length > 0 && (

@@ -112,14 +112,26 @@ function UnifiedMessageViewer({
     selectionIdRef.current = selectedMessage?.id
   }, [selectedMessage?.id])
 
-  useEffect(() => {
+  const [viewedId, setViewedId] = useState<string | undefined>(undefined)
+  if (viewedId !== selectedMessage?.id) {
+    setViewedId(selectedMessage?.id)
+    const server = selectedMessage?.decoded && selectedMessage.decodedType ? selectedMessage : null
+    setDecodedData(server ? server.decoded : null)
+    setSelectedProtoType(server?.decodedType ?? '')
+    setHasDecodedForType(server?.decodedType ?? null)
+    setDecodeNotes(server ? { unknownCount: server.decodedUnknownFields ?? 0, validBytes: server.decodedValidBytes } : null)
+    setSelectedSourceId('')
+    setSelectedFraming(undefined)
+    setSelectedFingerprint(undefined)
+    setDecodeError(null)
+    setDecoding(false)
     setFullMessage(null)
     setLoadFullError(null)
     setLoadingFull(false)
     setDetectOpen(false)
     setPicked(null)
     setSavedMapping(false)
-  }, [selectedMessage?.id])
+  }
 
   // selectedMessage already carries all data; list endpoint returns identical
   // data, no re-fetch.
