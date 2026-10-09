@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { Code } from '@connectrpc/connect'
 import { getErrorMessage, isErrorCode } from '@/api/errors'
-import { useStreamDetail } from '@/contexts/streams'
-import { useResizablePanel } from '@/hooks/useResizablePanel'
+import { useStreamDetail, useStreamRelations } from '@/contexts/streams'
 import {
   type StreamScope,
   isScopeReady,
@@ -31,6 +30,7 @@ import { isStreamNotFound } from './streamErrors'
 import { useLinkedMessage } from './useLinkedMessage'
 import { subjectMatchesStream } from './publish/subjectPatternUtils'
 import type { StreamPublishFeatures } from './publish/publishOptions'
+import { useResizablePanel } from '@/hooks/useResizablePanel'
 
 const EMPTY_HEADERS: HeaderDraft[] = []
 
@@ -133,6 +133,7 @@ export default function StreamView() {
   const { rightPanelPct, containerRef, separatorProps } = useResizablePanel()
 
   const { data: streamDetail, error: streamError } = useStreamDetail(streamName ?? null, connectionId)
+  useStreamRelations(connectionId)
 
   useEffect(() => {
     if (!isScopeReady(scope)) return
@@ -230,85 +231,85 @@ export default function StreamView() {
   const baseUrl = `/streams/${encodeURIComponent(streamName)}`
 
   return (
-    <div ref={containerRef} className="flex flex-1 overflow-hidden">
-      {/* Main Content */}
-      <main
-        className="bg-surface-primary flex flex-col overflow-hidden"
-        style={isFullWidthTab ? { flex: 1 } : { width: `${100 - rightPanelPct}%` }}
-        id="main-content"
-        role="main"
-        aria-label="Stream content"
-      >
-        {/* Header with Tabs */}
-        <div className="border-b bg-surface-secondary">
-          <div className="px-4 py-3">
-            <h2 className="text-sm font-semibold text-content-primary mb-3 truncate" title={decodeURIComponent(streamName)}>
-              Stream: {decodeURIComponent(streamName)}
-            </h2>
-            <StreamTabs baseUrl={baseUrl} />
-          </div>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="border-b bg-surface-secondary">
+        <div className="px-4 py-3">
+          <h2 className="text-sm font-semibold text-content-primary mb-3 truncate" title={decodeURIComponent(streamName)}>
+            Stream: {decodeURIComponent(streamName)}
+          </h2>
+          <StreamTabs baseUrl={baseUrl} />
         </div>
+      </div>
+      <div ref={containerRef} className="flex flex-1 overflow-hidden">
+        {/* Main Content */}
+        <main
+          className="bg-surface-primary flex flex-col overflow-hidden"
+          style={isFullWidthTab ? { flex: 1 } : { width: `${100 - rightPanelPct}%` }}
+          id="main-content"
+          role="main"
+          aria-label="Stream content"
+        >
+          {/* Tab Content */}
+          <Outlet context={{
+            scope,
+            connectionId,
+            streamName,
+            selectedMessage,
+            setSelectedMessage: handleSelectMessage,
+            handleOpenMappings,
+            publishPattern,
+            setPublishPattern,
+            publishWildcards,
+            setPublishWildcards,
+            publishMessageJson,
+            setPublishMessageJson,
+            publishHeaders,
+            setPublishHeaders,
+            subjects: streamDetail?.subjects || [],
+            streamMaxMsgSize: streamDetail?.config?.max_msg_size,
+            streamPublishFeatures: streamDetail?.config
+              ? {
+                  msgTtl: !!streamDetail.config.allow_msg_ttl,
+                  msgSchedules: !!streamDetail.config.allow_msg_schedules,
+                  msgCounter: !!streamDetail.config.allow_msg_counter,
+                }
+              : undefined,
+          } satisfies StreamViewOutletContext} />
+        </main>
 
-        {/* Tab Content */}
-        <Outlet context={{
-          scope,
-          connectionId,
-          streamName,
-          selectedMessage,
-          setSelectedMessage: handleSelectMessage,
-          handleOpenMappings,
-          publishPattern,
-          setPublishPattern,
-          publishWildcards,
-          setPublishWildcards,
-          publishMessageJson,
-          setPublishMessageJson,
-          publishHeaders,
-          setPublishHeaders,
-          subjects: streamDetail?.subjects || [],
-          streamMaxMsgSize: streamDetail?.config?.max_msg_size,
-          streamPublishFeatures: streamDetail?.config
-            ? {
-                msgTtl: !!streamDetail.config.allow_msg_ttl,
-                msgSchedules: !!streamDetail.config.allow_msg_schedules,
-                msgCounter: !!streamDetail.config.allow_msg_counter,
-              }
-            : undefined,
-        } satisfies StreamViewOutletContext} />
-      </main>
-
-      {/* Right Panel - only for Messages and Publish tabs */}
-      {!isFullWidthTab && (
-        <>
-          {/* Resize handle */}
-          <ResizeHandle {...separatorProps} />
-          <aside
-            className="bg-surface-secondary flex flex-col overflow-hidden"
-            style={{ width: `${rightPanelPct}%` }}
-            role="complementary"
-            aria-label="Details panel"
-          >
-            {isPublishTab ? (
-              <PublishHistory
-                streamName={streamName}
-                connectionId={connectionId}
-                connectionUrl={currentConnection?.urls[0] || null}
-                subjects={streamDetail?.subjects || []}
-              />
-            ) : (
-              <UnifiedMessageViewer
-                streamName={streamName}
-                connectionId={connectionId}
-                selectedMessage={selectedMessage}
-                onOpenMappings={handleOpenMappings}
-                onDeleted={() => handleSelectMessage(null)}
-                onResend={handleResend}
-                navigation={navigation}
-              />
-            )}
-          </aside>
-        </>
-      )}
+        {/* Right Panel - only for Messages and Publish tabs */}
+        {!isFullWidthTab && (
+          <>
+            {/* Resize handle */}
+            <ResizeHandle {...separatorProps} />
+            <aside
+              className="bg-surface-secondary flex flex-col overflow-hidden"
+              style={{ width: `${rightPanelPct}%` }}
+              role="complementary"
+              aria-label="Details panel"
+            >
+              {isPublishTab ? (
+                <PublishHistory
+                  streamName={streamName}
+                  connectionId={connectionId}
+                  connectionUrl={currentConnection?.urls[0] || null}
+                  subjects={streamDetail?.subjects || []}
+                />
+              ) : (
+                <UnifiedMessageViewer
+                  streamName={streamName}
+                  connectionId={connectionId}
+                  selectedMessage={selectedMessage}
+                  onOpenMappings={handleOpenMappings}
+                  onDeleted={() => handleSelectMessage(null)}
+                  onResend={handleResend}
+                  navigation={navigation}
+                />
+              )}
+            </aside>
+          </>
+        )}
+      </div>
     </div>
   )
 }
