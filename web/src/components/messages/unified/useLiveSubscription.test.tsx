@@ -26,6 +26,7 @@ vi.mock('@/contexts/live', () => {
     onDisconnect?: () => void
     onReconnecting?: () => void
     onLink?: (connected: boolean) => void
+    onBuffered?: (count: number) => void
     paused: WSBatchPayload[] | null = null
     subscribe = vi.fn()
     subscribeSubjects = vi.fn()
