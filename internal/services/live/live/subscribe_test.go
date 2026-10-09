@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -42,6 +43,7 @@ type fakeSubscriber struct {
 	handlers map[string]entities.MessageHandler
 	// hides is the inbox prefix whose messages reach only a subject that names it.
 	hides string
+	down  atomic.Bool
 }
 
 func (f *fakeSubscriber) Subscribe(
@@ -59,6 +61,8 @@ func (f *fakeSubscriber) Subscribe(
 }
 
 func (f *fakeSubscriber) OnDisconnect(func(string)) {}
+
+func (f *fakeSubscriber) LinkDown(string) bool { return f.down.Load() }
 
 func (f *fakeSubscriber) deny(t *testing.T, subject string) {
 	t.Helper()
@@ -353,6 +357,21 @@ func nextEvent(t *testing.T, events <-chan *entities.LiveEvent, match func(*enti
 			return nil
 		}
 	}
+}
+
+func TestSubscribe_ReportsTheNATSConnectionGoingDownAndBack(t *testing.T) {
+	t.Parallel()
+
+	sub, events, stop := startFakeSession(t, "orders.>")
+	defer stop()
+
+	sub.down.Store(true)
+	down := nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Connection != nil })
+	assert.False(t, down.Connection.Connected)
+
+	sub.down.Store(false)
+	up := nextEvent(t, events, func(ev *entities.LiveEvent) bool { return ev.Connection != nil })
+	assert.True(t, up.Connection.Connected)
 }
 
 func TestSubscribe_ExcludedSubjectsDoNotUseTheDisplayRate(t *testing.T) {

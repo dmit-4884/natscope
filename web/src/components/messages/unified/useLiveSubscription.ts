@@ -76,6 +76,7 @@ export function useLiveSubscription({
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([])
   const [liveLimit, setLiveLimit] = useState<LiveMessageLimit>(initialLimit)
   const [wsStatus, setWsStatus] = useState<WsStatus>('disconnected')
+  const [natsDown, setNatsDown] = useState(false)
   const [wsError, setWsError] = useState<string | null>(null)
   const [isPaused, setIsPaused] = useState(false)
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set())
@@ -247,6 +248,7 @@ export function useLiveSubscription({
     }
     socket.onSubscribed = () => {
       setWsStatus('connected')
+      setNatsDown(false)
       setWsError(null)
     }
     socket.onBatch = processBatch
@@ -273,11 +275,13 @@ export function useLiveSubscription({
     }
     socket.onDisconnect = () => {
       setWsStatus('disconnected')
+      setNatsDown(false)
       setMsgPerSecond(undefined)
       if (globalStats) setGlobalStats(null)
     }
     socket.onReconnecting = () => setWsStatus('reconnecting')
     socket.onBuffered = setPausedCount
+    socket.onLink = (connected) => setNatsDown(!connected)
 
     setWs(socket)
     socket.connect()
@@ -340,12 +344,14 @@ export function useLiveSubscription({
     setMessagesDropped((prev) => (prev === undefined ? prev : 0))
   }, [stopDrip])
 
+  const shownStatus = natsDown && wsStatus === 'connected' ? 'reconnecting' : wsStatus
+
   return useMemo(
     () => ({
       liveMessages,
       liveLimit,
       setLiveLimit,
-      wsStatus,
+      wsStatus: shownStatus,
       wsError,
       isPaused,
       togglePause,
@@ -360,7 +366,7 @@ export function useLiveSubscription({
     [
       liveMessages,
       liveLimit,
-      wsStatus,
+      shownStatus,
       wsError,
       isPaused,
       togglePause,

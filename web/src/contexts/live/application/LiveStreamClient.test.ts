@@ -163,6 +163,27 @@ describe('LiveStreamClient', () => {
     expect(reconnecting).not.toHaveBeenCalled()
   })
 
+  it('reports the NATS connection going down and back', async () => {
+    let push: ((value: IteratorResult<unknown>) => void) | undefined
+    subscribeCall.mockImplementation(() => ({
+      [Symbol.asyncIterator]: () => ({
+        next: () => new Promise((resolve) => (push = resolve)),
+      }),
+    }))
+    const client = new LiveStreamClient('conn-1')
+    const link = vi.fn()
+    client.onLink = link
+    client.connect()
+    client.subscribeSubjects(['orders.>'])
+
+    await vi.waitFor(() => expect(push).toBeDefined())
+    push?.({ value: { event: { case: 'connection', value: { connected: false } } }, done: false })
+    await vi.waitFor(() => expect(link).toHaveBeenLastCalledWith(false))
+    push?.({ value: { event: { case: 'connection', value: { connected: true } } }, done: false })
+    await vi.waitFor(() => expect(link).toHaveBeenLastCalledWith(true))
+    client.disconnect()
+  })
+
   it('opens no stream once disconnected', () => {
     const client = new LiveStreamClient('conn-1')
     client.connect()

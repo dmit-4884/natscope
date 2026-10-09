@@ -105,6 +105,10 @@ func toProtoLiveEvent(ev *entities.LiveEvent) *livepb.LiveEvent {
 				MessagesCount: ev.ProtoReload.MessagesCount,
 			},
 		}
+	case ev.Connection != nil:
+		out.Event = &livepb.LiveEvent_Connection{
+			Connection: &livepb.LiveConnection{Connected: ev.Connection.Connected},
+		}
 	}
 	return out
 }

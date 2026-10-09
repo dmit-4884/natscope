@@ -11,6 +11,7 @@ interface FakeClient {
   onError?: (payload: WSErrorPayload) => void
   onStats?: (payload: WSStatsPayload) => void
   onBuffered?: (count: number) => void
+  onLink?: (connected: boolean) => void
   subscribe: ReturnType<typeof vi.fn>
   subscribeSubjects: ReturnType<typeof vi.fn>
 }
@@ -24,6 +25,7 @@ vi.mock('@/contexts/live', () => {
     onError?: (payload: WSErrorPayload) => void
     onDisconnect?: () => void
     onReconnecting?: () => void
+    onLink?: (connected: boolean) => void
     paused: WSBatchPayload[] | null = null
     subscribe = vi.fn()
     subscribeSubjects = vi.fn()
@@ -279,6 +281,23 @@ describe('useLiveSubscription subjects', () => {
 
     act(() => client.onStats?.({ messages_received: 10, messages_dropped: 3, msg_per_second: 2 }))
     expect(result.current.messagesDropped).toBe(503)
+  })
+
+  it('shows the subscription reconnecting while NATS is down and keeps its skipped count', () => {
+    const { result } = renderHook(() =>
+      useLiveSubscription({ connectionId: 'conn-1', streamName: null, subjects: ['>'], enabled: true, initialLimit: 100, globalStats: false }),
+    )
+    const client = clients[clients.length - 1]
+    act(() => client.onSubscribed?.())
+    act(() => client.onStats?.({ messages_received: 40, messages_dropped: 6, msg_per_second: 1 }))
+
+    act(() => client.onLink?.(false))
+    expect(result.current.wsStatus).toBe('reconnecting')
+    act(() => client.onLink?.(true))
+    expect(result.current.wsStatus).toBe('connected')
+
+    act(() => client.onStats?.({ messages_received: 41, messages_dropped: 6, msg_per_second: 1 }))
+    expect(result.current.messagesDropped).toBe(6)
   })
 
   it('clears the skipped count with the feed', () => {

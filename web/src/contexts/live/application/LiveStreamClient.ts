@@ -111,6 +111,7 @@ export class LiveStreamClient {
   public onReconnecting?: (attempt: number, maxRetries: number) => void
   public onProtoReload?: (payload: WSProtoReloadPayload) => void
   public onBuffered?: (count: number) => void
+  public onLink?: (connected: boolean) => void
 
   constructor(connectionId: string, _token?: string, config?: Partial<ReconnectConfig>) {
     this.connectionId = connectionId
@@ -284,6 +285,9 @@ export class LiveStreamClient {
         })
         break
       }
+      case 'connection':
+        this.onLink?.(event.event.value.connected)
+        break
     }
   }
 

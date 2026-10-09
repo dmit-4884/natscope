@@ -195,6 +195,15 @@ describe('SubscribePage', () => {
     expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Disconnected')
   })
 
+  it('says the subscription is reconnecting while NATS is down', () => {
+    mockedLive.mockReturnValue(liveState({ wsStatus: 'reconnecting' }))
+    renderPage()
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Reconnecting…')
+  })
+
   it('shows the missing permission when every subject is refused', () => {
     mockedLive.mockReturnValue(liveState({ deniedSubjects: ['secret.>'] }))
     renderPage()

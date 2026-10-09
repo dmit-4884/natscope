@@ -29,6 +29,13 @@ type LiveEvent struct {
 	Stats       *LiveStats
 	Error       *LiveError
 	ProtoReload *LiveProtoReload
+	Connection  *LiveConnection
+}
+
+// LiveConnection reports a change of the NATS connection a session runs over.
+type LiveConnection struct {
+	// Connected is false while the NATS client has lost its server and reconnects.
+	Connected bool
 }
 
 // LiveBatch carries a batch of messages observed since the previous batch.

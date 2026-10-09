@@ -128,6 +128,7 @@ func (s *Service) runLoop(
 	batch := make([]*entities.LiveMessage, 0, maxBatchSize)
 
 	var lastMsgCount, muted int64
+	linkDown := false
 	lastTime := time.Now()
 	warmup := true // skip first stats tick to avoid burst spike
 
@@ -215,6 +216,12 @@ func (s *Service) runLoop(
 		case <-batchTicker.C:
 			if err := flush(); err != nil {
 				return err
+			}
+			if down := s.natsService.LinkDown(sess.connectionID); down != linkDown {
+				linkDown = down
+				if err := emitWithDeadline(ctx, emit, &entities.LiveEvent{Connection: &entities.LiveConnection{Connected: !down}}); err != nil {
+					return err
+				}
 			}
 
 		case msg := <-msgChan:

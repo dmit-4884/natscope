@@ -37,7 +37,10 @@ function pillState({ running, hasFeed, status, paused, denied, failed }: PillPro
   if (!running) return { label: hasFeed ? 'Stopped' : 'Not subscribed', dot: 'bg-content-muted', text: 'text-content-tertiary', pulse: false }
   if (denied) return { label: 'No permission', dot: null, text: 'text-content-secondary', pulse: false }
   if (failed) return { label: 'Disconnected', dot: 'bg-status-error-border', text: 'text-status-error-text', pulse: false }
-  if (status !== 'connected') return { label: 'Connecting…', dot: 'bg-status-warning-border', text: 'text-status-warning-text', pulse: true }
+  if (status !== 'connected') {
+    const label = status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'
+    return { label, dot: 'bg-status-warning-border', text: 'text-status-warning-text', pulse: true }
+  }
   if (paused) return { label: 'Paused', dot: 'bg-status-warning-border', text: 'text-status-warning-text', pulse: false }
   return { label: 'Live', dot: 'bg-status-success-border', text: 'text-status-success-text', pulse: true }
 }

@@ -258,6 +258,9 @@ type Subscriber interface {
 
 	// OnDisconnect registers fn to run whenever a pooled connection is closed or replaced.
 	OnDisconnect(fn func(connectionID string))
+
+	// LinkDown reports whether the pooled connection for connectionID has lost its server.
+	LinkDown(connectionID string) bool
 }
 
 // ServiceDiscoverer asks NATS Micro services about themselves over $SRV.

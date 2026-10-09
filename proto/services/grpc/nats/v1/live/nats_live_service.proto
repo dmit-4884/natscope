@@ -67,6 +67,9 @@ message LiveEvent {
 
     // Notification that protobuf descriptors have been reloaded.
     LiveProtoReload proto_reload = 4;
+
+    // A change of the NATS connection the subscription runs over.
+    LiveConnection connection = 5;
   }
 }
 
@@ -101,6 +104,13 @@ message LiveError {
 
   // Optional. The denied operation when the server refused a subscription.
   optional .natscope.types.nats.AccessCheck access = 3;
+}
+
+// Defines a change of the NATS connection a live subscription runs over.
+message LiveConnection {
+  // Required. False while the NATS client has lost its server and reconnects; the subscriptions resume on their own
+  // once it is true again.
+  bool connected = 1;
 }
 
 // Defines a notification that protobuf descriptors have been reloaded on the server.

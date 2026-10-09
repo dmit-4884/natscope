@@ -109,6 +109,15 @@ func TestToProtoLiveEvent_DeniedSubscription(t *testing.T) {
 	assert.Nil(t, toProtoLiveEvent(&entities.LiveEvent{Error: &entities.LiveError{Code: "X"}}).GetError().Access)
 }
 
+func TestToProtoLiveEvent_Connection(t *testing.T) {
+	t.Parallel()
+
+	down := toProtoLiveEvent(&entities.LiveEvent{Connection: &entities.LiveConnection{Connected: false}})
+	require.NotNil(t, down.GetConnection())
+	assert.False(t, down.GetConnection().GetConnected())
+	assert.True(t, toProtoLiveEvent(&entities.LiveEvent{Connection: &entities.LiveConnection{Connected: true}}).GetConnection().GetConnected())
+}
+
 func TestToProtoLiveBatchMessage_AutoDetected(t *testing.T) {
 	t.Parallel()
 	decoded, messageType, sourceID := `{"id":"1"}`, "shop.Order", "src-1"

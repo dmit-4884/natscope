@@ -102,6 +102,12 @@ func (s *Service) SubscribeJetStream(
 	return c.SubscribeJetStream(ctx, streamName, subject, deliverPolicy, handler)
 }
 
+// LinkDown reports whether the pooled connection for connectionID has lost its server.
+func (s *Service) LinkDown(connectionID string) bool {
+	c, ok := s.pool.Pooled(connectionID)
+	return ok && !c.IsConnected()
+}
+
 // OnDisconnect registers fn to run whenever the pool drops a connection.
 func (s *Service) OnDisconnect(fn func(connectionID string)) {
 	s.pool.OnDisconnect(fn)
