@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@/test/utils'
+import { getServerInfo } from '@/api/stats'
 import CompactHeader from './CompactHeader'
+
+vi.mock('@/api/stats', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/stats')>()),
+  getServerInfo: vi.fn(() => new Promise(() => {})),
+}))
 
 const health = vi.hoisted(() => ({ status: 'connecting' }))
 
@@ -52,5 +58,14 @@ describe('CompactHeader', () => {
 
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('Manage Connections')).not.toBeInTheDocument()
+  })
+
+  it('starts loading the server information as the pointer reaches its button', () => {
+    health.status = 'connected'
+    renderHeader()
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Server information' }))
+
+    expect(vi.mocked(getServerInfo)).toHaveBeenCalledWith('conn-1', expect.any(AbortSignal))
   })
 })

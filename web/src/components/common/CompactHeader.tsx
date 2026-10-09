@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SavedConnection } from '@/api/connections'
+import { getServerInfo } from '@/api/stats'
 import { useConnections, useConnectionHealth, useConnectionPolicy, type ConnectionStatus } from '@/contexts/connection'
 import { ConnectionBadges } from '@/components/connections/ConnectionBadges'
 import { LABEL_STRIPE_CLASSES } from '@/components/connections/labelStyles'
@@ -110,6 +111,14 @@ export default function CompactHeader({
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [showConnectionDropdown])
+
+  const prefetchServerInfo = () => {
+    if (!connectionId) return
+    void queryClient.prefetchQuery({
+      queryKey: [CONNECTION_QUERY_PREFIX, connectionId, 'serverInfo'],
+      queryFn: ({ signal }) => getServerInfo(connectionId, signal),
+    })
+  }
 
   const handleConnectToSaved = (connection: SavedConnection) => {
     onSwitchConnection(connection)
@@ -286,6 +295,8 @@ export default function CompactHeader({
             <Tooltip content="Server information">
               <button
                 onClick={() => setShowServerInfo(true)}
+                onMouseEnter={prefetchServerInfo}
+                onFocus={prefetchServerInfo}
                 className="p-1.5 text-content-muted hover:text-accent hover:bg-accent-light rounded-md transition-colors"
                 aria-label="Server information"
               >

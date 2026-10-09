@@ -73,8 +73,20 @@ export default function ServerInfo({ connectionId, onClose }: Props) {
       className="bg-surface-secondary"
     >
       <div className="overflow-y-auto">
+        {!data && (
+          <div className="flex justify-end px-4 pt-4">
+            <button
+              onClick={onClose}
+              aria-label="Close server info"
+              className="p-1 text-content-muted hover:text-content-secondary transition-colors"
+            >
+              <CloseIcon className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {isLoading && (
-          <div className="flex items-center justify-center py-16">
+          <div className="flex items-center justify-center min-h-[min(40rem,70vh)] reveal-after-delay">
             <Spinner size="md" />
           </div>
         )}
