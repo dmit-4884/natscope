@@ -18,7 +18,7 @@ export interface SkeletonRowsProps {
 
 export function SkeletonRows({ count = 5, rowClassName = 'h-8', className }: SkeletonRowsProps) {
   return (
-    <div role="status" aria-busy="true" aria-label="Loading" className={cn('space-y-2', className)}>
+    <div role="status" aria-busy="true" aria-label="Loading" className={cn('space-y-2 reveal-after-delay', className)}>
       {Array.from({ length: count }, (_, i) => (
         <Skeleton key={i} className={rowClassName} />
       ))}

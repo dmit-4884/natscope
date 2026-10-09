@@ -61,7 +61,7 @@ export function ProtoTypePicker({
 
   if (isLoading) {
     return (
-      <div className="px-3 py-2 text-xs text-content-tertiary bg-surface-secondary border border-border rounded-md">
+      <div className="px-3 py-2 text-xs text-content-tertiary bg-surface-secondary border border-border rounded-md reveal-after-delay">
         Loading types…
       </div>
     )

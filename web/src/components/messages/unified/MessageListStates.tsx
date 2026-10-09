@@ -7,7 +7,7 @@ export function NoStreamSelected() {
 
 export function MessagesLoading() {
   return (
-    <div className="flex-1 flex items-center justify-center text-content-tertiary">
+    <div className="flex-1 flex items-center justify-center text-content-tertiary reveal-after-delay">
       <div className="text-center">
         <svg className="mx-auto h-8 w-8 text-content-muted mb-3 animate-spin" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

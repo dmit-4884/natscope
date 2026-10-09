@@ -110,10 +110,10 @@ export default function StreamStatsHeader({ streamName, connectionId }: StreamSt
 
   if (!stats) {
     return (
-      <div className="px-4 py-2 bg-surface-primary border-b flex items-center gap-6 text-sm animate-pulse">
-        <div className="h-4 w-24 bg-surface-hover rounded" />
-        <div className="h-4 w-20 bg-surface-hover rounded" />
-        <div className="h-4 w-24 bg-surface-hover rounded" />
+      <div className="px-4 py-2 bg-surface-primary border-b flex items-center gap-6 text-sm reveal-after-delay">
+        <div className="h-5 w-24 bg-surface-hover rounded animate-pulse" />
+        <div className="h-5 w-20 bg-surface-hover rounded animate-pulse" />
+        <div className="h-5 w-24 bg-surface-hover rounded animate-pulse" />
       </div>
     )
   }

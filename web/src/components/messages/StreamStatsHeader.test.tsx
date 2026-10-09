@@ -36,6 +36,17 @@ describe('StreamStatsHeader', () => {
     vi.restoreAllMocks()
   })
 
+  it('keeps its loading placeholder out of sight for a quick answer', () => {
+    const loaded = detail.data
+    detail.data = undefined as unknown as typeof loaded
+    try {
+      const { container } = render(<StreamStatsHeader streamName="ORDERS" connectionId="c1" />)
+      expect(container.firstElementChild).toHaveClass('reveal-after-delay')
+    } finally {
+      detail.data = loaded
+    }
+  })
+
   it('shows full labels when they fit', () => {
     containerWidth = 800
     render(<StreamStatsHeader streamName="ORDERS" connectionId="conn-1" />)

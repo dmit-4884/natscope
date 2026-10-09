@@ -183,3 +183,16 @@
     background-size: 200% 100%;
   }
 }
+
+@layer utilities {
+  .reveal-after-delay {
+    opacity: 0;
+    animation: reveal-after-delay 0s linear 200ms forwards;
+  }
+
+  @keyframes reveal-after-delay {
+    to {
+      opacity: 1;
+    }
+  }
+}
