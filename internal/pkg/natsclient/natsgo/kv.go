@@ -208,7 +208,7 @@ func (c *Client) ListKVKeys(ctx context.Context, bucket string, query entities.K
 	if err != nil {
 		return entities.KVKeyList{}, wrapErr(err)
 	}
-	defer func() { _ = lister.Stop() }()
+	defer lister.Stop() //nolint:errcheck // the listing is over either way
 
 	list := entities.KVKeyList{Keys: []string{}}
 	seen := make(map[string]struct{})
@@ -262,7 +262,7 @@ func (c *Client) WatchKV(ctx context.Context, bucket, filter string) (<-chan ent
 	go func() {
 		defer panics.Handle(ctx)
 		defer close(out)
-		defer func() { _ = watcher.Stop() }()
+		defer watcher.Stop() //nolint:errcheck // the watch is over either way
 		for {
 			select {
 			case <-ctx.Done():
@@ -626,10 +626,10 @@ func (c *Client) UpdateKVBucket(ctx context.Context, bucket string, settings ent
 	}
 	cfg.Metadata = settings.Metadata
 
-	if err := c.requireFeatures(ctx, streamConfigFeatures(cfg)...); err != nil {
+	if err = c.requireFeatures(ctx, streamConfigFeatures(cfg)...); err != nil {
 		return nil, err
 	}
-	if _, err := c.jetStream.UpdateStream(ctx, cfg); err != nil {
+	if _, err = c.jetStream.UpdateStream(ctx, cfg); err != nil {
 		return nil, wrapErr(err)
 	}
 
