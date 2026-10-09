@@ -433,7 +433,13 @@ const JsonTreeViewer = memo(function JsonTreeViewer({
   // hidden) since they need a parsed object.
   const isStringPreview = typeof data === 'string'
   const [searchTerm, setSearchTerm] = useState('')
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set(['']))
+  const initialPaths = () => (defaultExpanded ? new Set(getAllPaths(data, '', maxInitialDepth)) : new Set(['']))
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(initialPaths)
+  const [expandedFor, setExpandedFor] = useState({ data, defaultExpanded, maxInitialDepth })
+  if (expandedFor.data !== data || expandedFor.defaultExpanded !== defaultExpanded || expandedFor.maxInitialDepth !== maxInitialDepth) {
+    setExpandedFor({ data, defaultExpanded, maxInitialDepth })
+    setExpandedPaths(initialPaths())
+  }
   const [contentHeight, setContentHeight] = useState(initialHeight)
   const [showTypeLabels, setShowTypeLabels] = useState(true)
   const isDraggingResize = useRef(false)
@@ -472,15 +478,6 @@ const JsonTreeViewer = memo(function JsonTreeViewer({
     document.body.style.cursor = 'row-resize'
     document.body.style.userSelect = 'none'
   }, [contentHeight])
-
-  useEffect(() => {
-    if (defaultExpanded) {
-      const paths = getAllPaths(data, '', maxInitialDepth)
-      setExpandedPaths(new Set(paths))
-    } else {
-      setExpandedPaths(new Set(['']))
-    }
-  }, [data, defaultExpanded, maxInitialDepth])
 
   // Toggle single path
   const toggleExpand = useCallback((path: string) => {
