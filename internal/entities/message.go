@@ -31,8 +31,11 @@ type Message struct {
 	// ContentType is the detected content type (json, text, binary).
 	ContentType ContentType
 
-	// Headers are the message headers.
+	// Headers are the message headers, several values of one header joined with ", ".
 	Headers map[string]string
+
+	// HeaderValues are the values of each header one by one, when the reader kept them.
+	HeaderValues map[string][]string
 
 	// Decoded protobuf fields (populated when user has mappings configured).
 	Decoded     json.RawMessage

@@ -116,6 +116,9 @@ func toMessage(msg *jetstream.RawStreamMsg) *entities.Message {
 	result := converter.Convert(msg, &entities.Message{}, rawMessageOpts...)
 	result.DataSize = len(msg.Data)
 	result.ContentType = entities.DetectContentType(msg.Data)
+	if len(msg.Header) > 0 {
+		result.HeaderValues = msg.Header
+	}
 	return result
 }
 

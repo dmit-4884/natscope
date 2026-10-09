@@ -215,6 +215,32 @@ func TestScanDirect_DropsTheHeadersDirectReadsAdd(t *testing.T) {
 	}
 }
 
+func TestScan_KeepsEveryHeaderValueApart(t *testing.T) {
+	t.Parallel()
+	_, url := jetStreamServer(t)
+	nc, err := nats.Connect(url)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+	_, err = js.CreateStream(t.Context(), jetstream.StreamConfig{Name: "HDR", Subjects: []string{"hdr.>"}, AllowDirect: true})
+	require.NoError(t, err)
+	hdr := nats.Header{}
+	hdr.Add("X-Tag", "a")
+	hdr.Add("X-Tag", "b")
+	hdr.Set("X-One", "a, b")
+	_, err = js.PublishMsg(t.Context(), &nats.Msg{Subject: "hdr.a", Data: []byte("a"), Header: hdr})
+	require.NoError(t, err)
+
+	c := dialClient(t, url)
+	for _, method := range []string{fetchMethodConsumer, "direct"} {
+		got := scanAll(t, c, "HDR", entities.ScanOptions{FromSeq: 1, ToSeq: 1, FetchMethod: method})
+		require.Len(t, got, 1)
+		assert.Equal(t, map[string][]string{"X-Tag": {"a", "b"}, "X-One": {"a, b"}}, got[0].HeaderValues, method)
+		assert.Equal(t, map[string]string{"X-Tag": "a, b", "X-One": "a, b"}, got[0].Headers, method)
+	}
+}
+
 func TestBrowseViaConsumer_SlowLinkKeepsTheWholePage(t *testing.T) {
 	t.Parallel()
 	_, url := jetStreamServer(t)

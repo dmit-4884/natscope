@@ -177,7 +177,13 @@ func TestSearchEventToProto(t *testing.T) {
 	exhausted := searchEventToProto(&entities.MessageSearchEvent{Progress: &entities.MessageSearchProgress{RangeFirst: 1, RangeLast: 900}}).GetProgress()
 	assert.Nil(t, exhausted.ResumeSeq, "nothing left to resume")
 
-	matches := searchEventToProto(&entities.MessageSearchEvent{Matches: []*entities.Message{{Sequence: 7, Subject: "orders.paid"}}}).GetMatches()
+	matches := searchEventToProto(&entities.MessageSearchEvent{Matches: []*entities.Message{{
+		Sequence:     7,
+		Subject:      "orders.paid",
+		Headers:      map[string]string{"X-Tag": "a, b"},
+		HeaderValues: map[string][]string{"X-Tag": {"a", "b"}},
+	}}}).GetMatches()
 	require.Len(t, matches.GetMessages(), 1)
 	assert.Equal(t, uint64(7), matches.GetMessages()[0].GetSequence())
+	assert.Equal(t, map[string]string{"X-Tag": "a, b"}, matches.GetMessages()[0].GetHeaders())
 }

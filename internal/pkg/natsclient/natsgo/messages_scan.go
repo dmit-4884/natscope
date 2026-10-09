@@ -326,20 +326,23 @@ func (c *Client) scanDirect(ctx context.Context, stream jetstream.Stream, opts e
 // scannedMessage builds the entity a scan yields from a delivered consumer message.
 func scannedMessage(seq uint64, subject string, at time.Time, data []byte, header nats.Header) *entities.Message {
 	var headers map[string]string
+	var values map[string][]string
 	if len(header) > 0 {
 		headers = make(map[string]string, len(header))
 		for k, v := range header {
 			headers[k] = strings.Join(v, ", ")
 		}
+		values = header
 	}
 	return &entities.Message{
-		Sequence:    seq,
-		Subject:     subject,
-		Timestamp:   at,
-		DataBase64:  base64.StdEncoding.EncodeToString(data),
-		DataSize:    len(data),
-		ContentType: entities.DetectContentType(data),
-		Headers:     headers,
+		Sequence:     seq,
+		Subject:      subject,
+		Timestamp:    at,
+		DataBase64:   base64.StdEncoding.EncodeToString(data),
+		DataSize:     len(data),
+		ContentType:  entities.DetectContentType(data),
+		Headers:      headers,
+		HeaderValues: values,
 	}
 }
 

@@ -6,6 +6,7 @@ package messages
 import (
 	"encoding/base64"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,6 +18,14 @@ import (
 
 func payloadMessage(payload string, headers map[string]string) *entities.Message {
 	return &entities.Message{DataBase64: base64.StdEncoding.EncodeToString([]byte(payload)), Headers: headers}
+}
+
+func headerMessage(values map[string][]string) *entities.Message {
+	joined := make(map[string]string, len(values))
+	for name, v := range values {
+		joined[name] = strings.Join(v, ", ")
+	}
+	return &entities.Message{Headers: joined, HeaderValues: values}
 }
 
 func TestSearchMatcher(t *testing.T) {
@@ -34,7 +43,9 @@ func TestSearchMatcher(t *testing.T) {
 		{name: "regex keeps case", req: entities.MessageSearchRequest{Text: `Order`, Regex: true}, msg: payloadMessage(`order`, nil)},
 		{name: "header name ignores case", req: entities.MessageSearchRequest{HeaderName: "x-trace"}, msg: payloadMessage("", map[string]string{"X-Trace": "abc"}), want: true},
 		{name: "header value must match", req: entities.MessageSearchRequest{HeaderName: "X-Trace", HeaderValue: "abc"}, msg: payloadMessage("", map[string]string{"X-Trace": "abd"})},
-		{name: "header value matches one of several", req: entities.MessageSearchRequest{HeaderName: "X-Tag", HeaderValue: "b"}, msg: payloadMessage("", map[string]string{"X-Tag": "a, b"}), want: true},
+		{name: "header value matches one of several", req: entities.MessageSearchRequest{HeaderName: "X-Tag", HeaderValue: "b"}, msg: headerMessage(map[string][]string{"X-Tag": {"a", "b"}}), want: true},
+		{name: "header value is not a part of one value", req: entities.MessageSearchRequest{HeaderName: "X-Tag", HeaderValue: "b"}, msg: headerMessage(map[string][]string{"X-Tag": {"a, b"}})},
+		{name: "header value with a comma matches whole", req: entities.MessageSearchRequest{HeaderName: "X-Tag", HeaderValue: "a, b"}, msg: headerMessage(map[string][]string{"X-Tag": {"a, b"}}), want: true},
 		{name: "missing header", req: entities.MessageSearchRequest{HeaderName: "X-Trace"}, msg: payloadMessage("", nil)},
 		{name: "every condition must hold", req: entities.MessageSearchRequest{Text: "needle", HeaderName: "X-Trace"}, msg: payloadMessage("needle", nil)},
 		{name: "no condition matches all", req: entities.MessageSearchRequest{}, msg: payloadMessage("anything", nil), want: true},
