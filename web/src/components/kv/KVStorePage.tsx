@@ -58,10 +58,9 @@ export default function KVStorePage() {
   const [keySearchQuery, setKeySearchQuery] = useState('')
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyValue, setNewKeyValue] = useState('')
-  const [editingValue, setEditingValue] = useState('')
-  const [valueDirty, setValueDirty] = useState(false)
+  const [draft, setDraft] = useState<{ key: string | null; value: string } | null>(null)
   const [showHistory, setShowHistory] = useState(false)
-  const [showRaw, setShowRaw] = useState(false)
+  const [rawChoice, setRawChoice] = useState<{ key: string | null; revision?: number; on: boolean } | null>(null)
   const [confirmAction, setConfirmAction] = useState<KVConfirmAction | null>(null)
 
   const deleteKeyConfirmation = useConfirmation('deleteKvKey')
@@ -112,22 +111,12 @@ export default function KVStorePage() {
     k.toLowerCase().includes(keySearchQuery.toLowerCase())
   )
 
-  useEffect(() => {
-    if (keyEntry && !isCreatingKey && !valueDirty) {
-      setEditingValue(editableValue(keyEntry, !!target))
-    }
-  }, [keyEntry, isCreatingKey, valueDirty, target])
-
-  useEffect(() => {
-    setValueDirty(false)
-    setEditingValue('')
-    setShowRaw(false)
-  }, [selectedKey])
+  const valueDirty = draft !== null && draft.key === selectedKey
+  const editingValue = valueDirty ? draft.value : keyEntry && !isCreatingKey ? editableValue(keyEntry, !!target) : ''
+  const setEditingValue = (value: string) => setDraft({ key: selectedKey, value })
 
   const undecodable = !!keyEntry?.decoded?.error && keyEntry.decoded.data === undefined
-  useEffect(() => {
-    if (undecodable) setShowRaw(true)
-  }, [undecodable, keyEntry?.revision])
+  const showRaw = rawChoice && rawChoice.key === selectedKey && rawChoice.revision === keyEntry?.revision ? rawChoice.on : undecodable
 
   // Reset selection AND search on bucket change — a stale search filter
   // would hide all keys in the new bucket, looking like it's empty.
@@ -156,7 +145,7 @@ export default function KVStorePage() {
           value: storedValue(target, editingValue),
           expectedRevision: keyEntry?.revision,
         })
-        setValueDirty(false)
+        setDraft(null)
       }
       refetchKeys()
     } catch {
@@ -470,7 +459,7 @@ export default function KVStorePage() {
                   target={target}
                   decoded={keyEntry.decoded}
                   showRaw={showRaw}
-                  onToggleRaw={() => setShowRaw((v) => !v)}
+                  onToggleRaw={() => setRawChoice({ key: selectedKey, revision: keyEntry.revision, on: !showRaw })}
                 />
               )}
 
@@ -490,10 +479,7 @@ export default function KVStorePage() {
                 ) : (
                   <textarea
                     value={editingValue}
-                    onChange={(e) => {
-                      setEditingValue(e.target.value)
-                      setValueDirty(true)
-                    }}
+                    onChange={(e) => setEditingValue(e.target.value)}
                     aria-label="Key value"
                     readOnly={readOnly}
                     className="w-full flex-1 min-h-0 p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
@@ -506,12 +492,7 @@ export default function KVStorePage() {
                 <div className="flex justify-end gap-2 p-3 border-t bg-surface-secondary">
                   <Button
                     variant="secondary"
-                    onClick={() => {
-                      if (keyEntry) {
-                        setEditingValue(editableValue(keyEntry, !!target))
-                        setValueDirty(false)
-                      }
-                    }}
+                    onClick={() => setDraft(null)}
                   >
                     Reset
                   </Button>
