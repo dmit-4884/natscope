@@ -360,6 +360,15 @@ describe('SubscribePage', () => {
     }
   })
 
+  it('shortens a large paused count', () => {
+    mockedLive.mockReturnValue(liveState({ isPaused: true, pausedCount: 1_234_567, liveMessages: [message('1', 'orders.new')] }))
+    renderPage()
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    expect(screen.getByRole('button', { name: 'Resume (+1.2M)' })).toBeInTheDocument()
+  })
+
   it('shows how many messages wait while paused', () => {
     mockedLive.mockReturnValue(liveState({ isPaused: true, pausedCount: 8, liveMessages: [message('1', 'orders.new')] }))
     renderPage()

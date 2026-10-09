@@ -128,8 +128,8 @@ describe('LiveStreamClient', () => {
       }),
     }))
     const client = new LiveStreamClient('conn-1')
-    const buffered = vi.fn()
-    client.onBuffered = buffered
+    const replayed = vi.fn()
+    client.onBatch = replayed
     client.connect()
     client.subscribeSubjects(['orders.>'])
     client.pause()
@@ -140,12 +140,66 @@ describe('LiveStreamClient', () => {
       const next = push
       push = undefined
       next?.({ value: { event: { case: 'batch', value: { messages: [create(NatsMessageSchema, { subject: 'orders.a', dataBase64: big })] } } }, done: false })
-      await vi.waitFor(() => expect(buffered).toHaveBeenCalledTimes(i + 1))
     }
+    await vi.waitFor(() => expect(push).toBeDefined())
 
-    const kept = buffered.mock.lastCall?.[0] as number
+    client.resume()
+    const kept = replayed.mock.calls.reduce((total, [batch]) => total + (batch as { count: number }).count, 0)
     expect(kept).toBeGreaterThan(0)
     expect(kept).toBeLessThan(40)
+    client.disconnect()
+  })
+
+  it('counts every message that arrived while paused, not only the ones it keeps', async () => {
+    let push: ((value: IteratorResult<unknown>) => void) | undefined
+    subscribeCall.mockImplementation(() => ({
+      [Symbol.asyncIterator]: () => ({
+        next: () => new Promise((resolve) => (push = resolve)),
+      }),
+    }))
+    const client = new LiveStreamClient('conn-1')
+    const buffered = vi.fn()
+    client.onBuffered = buffered
+    client.connect()
+    client.subscribeSubjects(['tel.>'])
+    client.pause()
+
+    const messages = Array.from({ length: 3000 }, () => create(NatsMessageSchema, { subject: 'tel.eu.1' }))
+    for (let i = 0; i < 3; i++) {
+      await vi.waitFor(() => expect(push).toBeDefined())
+      const next = push
+      push = undefined
+      next?.({ value: { event: { case: 'batch', value: { messages } } }, done: false })
+    }
+
+    await vi.waitFor(() => expect(buffered).toHaveBeenLastCalledWith(9000), { timeout: 3000 })
+    expect(buffered.mock.calls.map(([n]) => n)).toEqual([...buffered.mock.calls.map(([n]) => n)].sort((a, b) => a - b))
+    client.disconnect()
+  })
+
+  it('reports the paused count at most about once a second', async () => {
+    let push: ((value: IteratorResult<unknown>) => void) | undefined
+    subscribeCall.mockImplementation(() => ({
+      [Symbol.asyncIterator]: () => ({
+        next: () => new Promise((resolve) => (push = resolve)),
+      }),
+    }))
+    const client = new LiveStreamClient('conn-1')
+    const buffered = vi.fn()
+    client.onBuffered = buffered
+    client.connect()
+    client.subscribeSubjects(['tel.>'])
+    client.pause()
+
+    for (let i = 0; i < 20; i++) {
+      await vi.waitFor(() => expect(push).toBeDefined())
+      const next = push
+      push = undefined
+      next?.({ value: { event: { case: 'batch', value: { messages: [create(NatsMessageSchema, { subject: 'tel.eu.1' })] } } }, done: false })
+    }
+    await vi.waitFor(() => expect(push).toBeDefined())
+
+    expect(buffered.mock.calls.length).toBeLessThanOrEqual(2)
     client.disconnect()
   })
 

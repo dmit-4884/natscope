@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Tooltip from '@/components/common/Tooltip'
 import { Button, CloseIcon, Dropdown, EyeOffIcon, PauseIcon, PlayIcon, SearchInput } from '@/components/ui'
 import { matchSubject } from '@/shared/domain/subjectMatch'
-import { formatCount } from '@/utils/formatters'
+import { formatCount, formatNumber } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
 import { LIVE_MESSAGE_LIMITS, type LiveMessageLimit } from '../messages/unified/messageListUtils'
 
@@ -115,7 +115,7 @@ export function SubscribeToolbar({
               icon={isPaused ? <PlayIcon className="w-3 h-3" /> : <PauseIcon className="w-3 h-3" />}
               onClick={onTogglePause}
             >
-              {isPaused ? `Resume${pausedCount > 0 ? ` (+${formatCount(pausedCount)})` : ''}` : 'Pause'}
+              {isPaused ? `Resume${pausedCount > 0 ? ` (+${formatNumber(pausedCount)})` : ''}` : 'Pause'}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onClear}>

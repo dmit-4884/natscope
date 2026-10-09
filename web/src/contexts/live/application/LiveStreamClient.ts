@@ -78,6 +78,7 @@ const DEFAULT_RECONNECT: ReconnectConfig = {
 /** Max messages, and characters of payload, retained in the paused buffer before oldest batches are dropped. */
 const MAX_PAUSED_MESSAGES = 5000
 const MAX_PAUSED_CHARS = 32 << 20
+const PAUSED_REPORT_MS = 1000
 
 function batchChars(batch: WSBatchPayload): number {
   let chars = 0
@@ -99,6 +100,9 @@ export class LiveStreamClient {
   private connected = false
   private paused = false
   private pausedBatches: WSBatchPayload[] = []
+  private pausedArrivals = 0
+  private arrivalsReportedAt = 0
+  private arrivalsTimer: ReturnType<typeof setTimeout> | null = null
 
   private currentSubscription: string | null = null
 
@@ -130,6 +134,7 @@ export class LiveStreamClient {
 
   disconnect(): void {
     this.intentionalClose = true
+    this.clearArrivalsTimer()
     this.cancelStream()
     this.currentSubscription = null
     this.connected = false
@@ -257,7 +262,8 @@ export class LiveStreamClient {
         if (this.paused) {
           this.pausedBatches.push(payload)
           this.trimPausedBatches()
-          this.onBuffered?.(this.pausedBatches.reduce((total, b) => total + b.count, 0))
+          this.pausedArrivals += payload.count
+          this.reportArrivals()
         } else {
           this.onBatch?.(payload)
         }
@@ -329,7 +335,27 @@ export class LiveStreamClient {
   }
 
   pause(): void {
+    if (!this.paused) this.pausedArrivals = 0
     this.paused = true
+  }
+
+  private reportArrivals(): void {
+    const wait = this.arrivalsReportedAt + PAUSED_REPORT_MS - Date.now()
+    if (wait <= 0) {
+      this.arrivalsReportedAt = Date.now()
+      this.onBuffered?.(this.pausedArrivals)
+      return
+    }
+    this.arrivalsTimer ??= setTimeout(() => {
+      this.arrivalsTimer = null
+      this.arrivalsReportedAt = Date.now()
+      if (this.paused) this.onBuffered?.(this.pausedArrivals)
+    }, wait)
+  }
+
+  private clearArrivalsTimer(): void {
+    if (this.arrivalsTimer) clearTimeout(this.arrivalsTimer)
+    this.arrivalsTimer = null
   }
 
   /**
@@ -354,6 +380,8 @@ export class LiveStreamClient {
 
   discardPaused(): void {
     this.pausedBatches = []
+    this.pausedArrivals = 0
+    this.clearArrivalsTimer()
     this.onBuffered?.(0)
   }
 
@@ -361,6 +389,8 @@ export class LiveStreamClient {
     this.paused = false
     const buffered = this.pausedBatches
     this.pausedBatches = []
+    this.pausedArrivals = 0
+    this.clearArrivalsTimer()
     this.onBuffered?.(0)
     for (const batch of buffered) {
       this.onBatch?.(batch)
