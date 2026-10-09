@@ -57,15 +57,14 @@ func NewPool(dialer Dialer, source ConfigSource) *Pool {
 // Client returns a live client for the ID, checking the in-memory pool first
 // then loading the configuration and dialing; establishes it lazily if needed.
 func (p *Pool) Client(ctx context.Context, connectionID string) (Client, error) {
-	// Fast path: check the in-memory pool.
+	// Fast path: check the in-memory pool; the client is asked about its state outside the pool lock.
 	p.mu.RLock()
-	if c, ok := p.clients[connectionID]; ok {
+	c, ok := p.clients[connectionID]
+	p.mu.RUnlock()
+	if ok {
 		if c.IsConnected() {
-			p.mu.RUnlock()
 			return c, nil
 		}
-		p.mu.RUnlock()
-
 		if c.IsReconnecting() {
 			return nil, errs.ErrNATSConnectionClosed
 		}
@@ -74,8 +73,6 @@ func (p *Pool) Client(ctx context.Context, connectionID string) (Client, error) 
 			slogx.String("connection_id", connectionID),
 			slogx.String("status", c.Status()))
 		p.drop(connectionID, c)
-	} else {
-		p.mu.RUnlock()
 	}
 
 	// Slow path: singleflight dedups concurrent connects. DoChan + select-on-ctx
@@ -177,12 +174,12 @@ func (p *Pool) drop(connectionID string, dead Client) {
 	p.removeLocked(connectionID, dead)
 }
 
-// removeLocked closes and removes c, unlocks the pool and notifies OnDisconnect listeners.
+// removeLocked removes c, unlocks the pool, closes c and notifies OnDisconnect listeners.
 func (p *Pool) removeLocked(connectionID string, c Client) {
-	c.Close()
 	delete(p.clients, connectionID)
 	listeners := slices.Clone(p.listeners)
 	p.mu.Unlock()
+	c.Close()
 
 	p.logger.Info("disconnected from NATS pool",
 		slogx.String("connection_id", connectionID))
@@ -192,15 +189,15 @@ func (p *Pool) removeLocked(connectionID string, c Client) {
 	}
 }
 
-// Close closes all clients and clears the pool.
+// Close clears the pool and closes all clients.
 func (p *Pool) Close() {
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	clients := p.clients
+	p.clients = make(map[string]Client)
+	p.mu.Unlock()
 
-	for _, c := range p.clients {
+	for _, c := range clients {
 		c.Close()
 	}
-
-	p.clients = make(map[string]Client)
 	p.logger.Debug("closed all NATS connections")
 }

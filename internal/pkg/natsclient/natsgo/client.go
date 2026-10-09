@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -93,7 +94,19 @@ type Client struct {
 	levelMu      sync.Mutex
 	remoteLevel  *int32
 	levelRefused bool
+
+	// link is the connection state the connection's handlers report, so a status read never waits for the lock a
+	// reconnect attempt holds while it dials.
+	link atomic.Int32
 }
+
+// Connection states a Client keeps in link; linkUnknown until the first handler or the dial reports one.
+const (
+	linkUnknown int32 = iota
+	linkUp
+	linkDown
+	linkClosed
+)
 
 var _ natsclient.Client = (*Client)(nil)
 
@@ -101,13 +114,34 @@ var _ natsclient.Client = (*Client)(nil)
 func (c *Client) URL() string { return c.url }
 
 // IsConnected reports whether the underlying connection is currently up.
-func (c *Client) IsConnected() bool { return c.conn.IsConnected() }
+func (c *Client) IsConnected() bool {
+	if state := c.link.Load(); state != linkUnknown {
+		return state == linkUp
+	}
+	return c.conn.IsConnected()
+}
 
 // IsReconnecting reports whether the client is mid-reconnect.
-func (c *Client) IsReconnecting() bool { return c.conn.IsReconnecting() }
+func (c *Client) IsReconnecting() bool {
+	if state := c.link.Load(); state != linkUnknown {
+		return state == linkDown
+	}
+	return c.conn.IsReconnecting()
+}
 
 // Status returns the connection status as a string.
-func (c *Client) Status() string { return c.conn.Status().String() }
+func (c *Client) Status() string {
+	switch c.link.Load() {
+	case linkUp:
+		return nats.CONNECTED.String()
+	case linkDown:
+		return nats.RECONNECTING.String()
+	case linkClosed:
+		return nats.CLOSED.String()
+	default:
+		return c.conn.Status().String()
+	}
+}
 
 // Close closes the underlying connection; idempotent.
 func (c *Client) Close() { c.conn.Close() }

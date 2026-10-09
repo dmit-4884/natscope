@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 )
@@ -171,5 +172,48 @@ func TestPool_ALateCallerDoesNotDropTheFreshClient(t *testing.T) {
 	}
 	if n := len(dialer.dials); n != 1 {
 		t.Errorf("dials = %d, want 1", n)
+	}
+}
+
+// blockingCloseClient waits in Close until released, as a nats.go connection does while a reconnect attempt dials.
+type blockingCloseClient struct {
+	fakeClient
+	closing chan struct{}
+	release chan struct{}
+}
+
+func (c *blockingCloseClient) Close() {
+	close(c.closing)
+	<-c.release
+}
+
+// TestPool_ASlowCloseDoesNotHoldOtherConnections checks that closing one connection leaves the others usable.
+func TestPool_ASlowCloseDoesNotHoldOtherConnections(t *testing.T) {
+	t.Parallel()
+
+	pool := NewPool(&fakeDialer{}, func(context.Context, string) (*entities.SavedConnection, error) {
+		return &entities.SavedConnection{}, nil
+	})
+	slow := &blockingCloseClient{fakeClient: fakeClient{connected: true}, closing: make(chan struct{}), release: make(chan struct{})}
+	other := &fakeClient{connected: true}
+	pool.clients["a"] = slow
+	pool.clients["b"] = other
+
+	go pool.Disconnect("a")
+	<-slow.closing
+	defer close(slow.release)
+
+	got := make(chan Client, 1)
+	go func() {
+		c, _ := pool.Client(t.Context(), "b")
+		got <- c
+	}()
+	select {
+	case c := <-got:
+		if c != other {
+			t.Errorf("Client(b) = %p, want %p", c, other)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("closing connection a held the pool for connection b")
 	}
 }

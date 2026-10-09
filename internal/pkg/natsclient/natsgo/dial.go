@@ -62,19 +62,25 @@ func (d *Dialer) Dial(_ context.Context, saved *entities.SavedConnection) (natsc
 
 	// Add logging handlers
 	natsOpts = append(natsOpts,
+		nats.ConnectHandler(func(_ *nats.Conn) {
+			client.link.Store(linkUp)
+		}),
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
+			client.link.Store(linkDown)
 			d.logger.Warn("NATS disconnected",
 				slogx.String("connection_id", saved.Id),
 				slogx.String("url", logURL),
 				slogx.Error(err))
 		}),
 		nats.ReconnectHandler(func(_ *nats.Conn) {
+			client.link.Store(linkUp)
 			client.permWatch.ResetReplies()
 			d.logger.Info("NATS reconnected",
 				slogx.String("connection_id", saved.Id),
 				slogx.String("url", logURL))
 		}),
 		nats.ClosedHandler(func(_ *nats.Conn) {
+			client.link.Store(linkClosed)
 			d.logger.Warn("NATS connection closed",
 				slogx.String("connection_id", saved.Id),
 				slogx.String("url", logURL))
@@ -105,6 +111,11 @@ func (d *Dialer) Dial(_ context.Context, saved *entities.SavedConnection) (natsc
 	}
 
 	client.conn = conn
+	initial := linkDown
+	if conn.IsConnected() {
+		initial = linkUp
+	}
+	client.link.CompareAndSwap(linkUnknown, initial)
 	client.permWatch.TrackReplies(client.inboxPrefix(), replySubscription(conn))
 	client.api = apiPrefix(domain, prefix)
 	client.jetStream = watchJetStream(jsNew, client.permWatch, client.api)

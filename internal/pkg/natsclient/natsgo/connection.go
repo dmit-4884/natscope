@@ -215,7 +215,7 @@ func (c *Client) Health(_ context.Context) (*entities.ConnectionHealth, error) {
 	}
 
 	switch {
-	case c.conn.IsConnected():
+	case c.IsConnected():
 		health.IsConnected = true
 		health.Status = "connected"
 		health.ServerVersion = c.conn.ConnectedServerVersion()
@@ -228,7 +228,7 @@ func (c *Client) Health(_ context.Context) (*entities.ConnectionHealth, error) {
 			health.Status = "degraded"
 			health.Error = err.Error()
 		}
-	case c.conn.IsReconnecting():
+	case c.IsReconnecting():
 		health.IsReconnecting = true
 		health.Status = "reconnecting"
 	default:
