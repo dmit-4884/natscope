@@ -211,6 +211,11 @@ export default function ConnectionSelector() {
     input.click()
   }
 
+  const resumingId = getActiveConnectionId()
+  const resuming = resumingId !== null && !connectionsError &&
+    (loadingConnections || savedConnections.some((c) => c.id === resumingId))
+  if (resuming) return null
+
   return (
     <div className="flex-1 flex items-center justify-center bg-surface-secondary">
       <div className="max-w-lg w-full mx-4">

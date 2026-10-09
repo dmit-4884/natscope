@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ConnectError, Code } from '@connectrpc/connect'
 import { render, screen, fireEvent, waitFor } from '@/test/utils'
 import { toast } from '@/utils/toast'
@@ -17,6 +17,13 @@ vi.mock('@/api/connections', async (importOriginal) => ({
   testConnection: vi.fn(),
 }))
 
+const active = vi.hoisted(() => ({ id: null as string | null }))
+
+vi.mock('@/contexts/connection', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/contexts/connection')>()),
+  getActiveConnectionId: () => active.id,
+}))
+
 const api = vi.mocked(connectionsApi)
 
 function openNewForm() {
@@ -31,7 +38,26 @@ function openNewForm() {
 describe('ConnectionSelector', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    active.id = null
     api.getConnections.mockResolvedValue([])
+  })
+
+  it('shows nothing while it resumes the remembered connection', async () => {
+    active.id = 'prod'
+    api.getConnections.mockResolvedValue([
+      { id: 'prod', name: 'prod', urls: ['nats://prod:4222'], readOnly: false, createdAt: 0, updatedAt: 0 },
+    ] as connectionsApi.SavedConnection[])
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<ConnectionSelector />} />
+          <Route path="/streams" element={<p>streams page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByText('Connect to your NATS server to get started')).not.toBeInTheDocument()
+    expect(await screen.findByText('streams page')).toBeInTheDocument()
   })
 
   it('reports a failed create inline only — the global mutation handler owns the toast', async () => {
