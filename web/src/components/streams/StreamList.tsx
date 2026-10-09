@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Code } from '@connectrpc/connect'
-import { useConnectionPolicy } from '@/contexts/connection'
+import { useConnectionPolicy, useSidebarLayoutPending } from '@/contexts/connection'
 import { isRegularStreamName, useStreamNames } from '@/contexts/streams'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { EmptyState, PlusIcon, RefreshIcon, SkeletonRows } from '@/components/ui'
@@ -24,11 +24,12 @@ export default function StreamList({ connectionId }: StreamListProps) {
   const { streamName: selectedStream } = useParams()
   const { data: allNames, isLoading, error, refetch, isFetching } = useStreamNames(connectionId)
   const { readOnly } = useConnectionPolicy()
+  const layoutPending = useSidebarLayoutPending(connectionId)
 
   // Filter to only show regular streams (KV and Object stores are in separate sections)
   const streams = useMemo(() => (allNames ?? []).filter(isRegularStreamName), [allNames])
 
-  if (isLoading) {
+  if (isLoading || layoutPending) {
     return <SkeletonRows count={1} rowClassName="h-9" className="p-2" />
   }
 

@@ -10,12 +10,19 @@ export const EMPTY_SIDEBAR_LAYOUT: SidebarLayout = {
   objects: { pinned: [], order: [] },
 }
 
-export function useSidebarLayout(connectionId: string) {
-  const { data } = useQuery({
+function useSidebarLayoutQuery(connectionId: string) {
+  return useQuery({
     queryKey: connectionKeys.sidebarLayout(connectionId),
     queryFn: ({ signal }) => getSidebarLayout(connectionId, signal),
     enabled: !!connectionId,
     staleTime: Infinity,
   })
-  return data ?? EMPTY_SIDEBAR_LAYOUT
+}
+
+export function useSidebarLayout(connectionId: string) {
+  return useSidebarLayoutQuery(connectionId).data ?? EMPTY_SIDEBAR_LAYOUT
+}
+
+export function useSidebarLayoutPending(connectionId: string): boolean {
+  return useSidebarLayoutQuery(connectionId).isPending && !!connectionId
 }

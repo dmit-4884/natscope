@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useConnectionPolicy } from '@/contexts/connection'
+import { useConnectionPolicy, useSidebarLayoutPending } from '@/contexts/connection'
 import { useStreamNames } from '@/contexts/streams'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { EmptyState, PlusIcon, RefreshIcon, SkeletonRows } from '@/components/ui'
@@ -23,6 +23,7 @@ const bucketHref = (name: string) => `/kv/${encodeURIComponent(name)}`
 
 export default function KVList({ connectionId }: KVListProps) {
   const { readOnly } = useConnectionPolicy()
+  const layoutPending = useSidebarLayoutPending(connectionId)
   const { bucketName: selectedBucket } = useParams()
   const { data: streamNames, isLoading, isFetching, error, refetch } = useStreamNames(connectionId)
 
@@ -35,7 +36,7 @@ export default function KVList({ connectionId }: KVListProps) {
     [streamNames],
   )
 
-  if (isLoading) {
+  if (isLoading || layoutPending) {
     return <SkeletonRows count={1} rowClassName="h-9" className="p-2" />
   }
 

@@ -9,6 +9,7 @@ const names = vi.hoisted(() => ({ value: [] as string[] }))
 vi.mock('@/contexts/connection', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/contexts/connection')>()),
   useConnectionPolicy: () => ({ readOnly: policy.readOnly, label: null }),
+  useSidebarLayoutPending: () => false,
 }))
 
 vi.mock('@/contexts/streams', async (importOriginal) => ({

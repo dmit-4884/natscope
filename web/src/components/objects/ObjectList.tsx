@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useConnectionPolicy } from '@/contexts/connection'
+import { useConnectionPolicy, useSidebarLayoutPending } from '@/contexts/connection'
 import { useObjectBuckets } from '@/contexts/objects'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { EmptyState, PlusIcon, RefreshIcon, SkeletonRows } from '@/components/ui'
@@ -27,13 +27,14 @@ const SEALED_ICON = (
 
 export default function ObjectList({ connectionId }: ObjectListProps) {
   const { readOnly } = useConnectionPolicy()
+  const layoutPending = useSidebarLayoutPending(connectionId)
   const { bucketName: selectedBucket } = useParams()
   const { data: buckets, isLoading, isFetching, error, refetch } = useObjectBuckets(connectionId)
 
   const bucketNames = useMemo(() => (buckets ?? []).map((b) => b.bucket), [buckets])
   const sealed = useMemo(() => new Set((buckets ?? []).filter((b) => b.sealed).map((b) => b.bucket)), [buckets])
 
-  if (isLoading) {
+  if (isLoading || layoutPending) {
     return <SkeletonRows count={1} rowClassName="h-9" className="p-2" />
   }
 
