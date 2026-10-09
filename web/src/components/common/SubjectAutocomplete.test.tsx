@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@/test/utils'
 import { SubjectAutocomplete } from './SubjectAutocomplete'
 
@@ -9,6 +9,25 @@ function Harness({ options = ['orders.>', 'audit.*'] }: { options?: string[] }) 
 }
 
 describe('SubjectAutocomplete', () => {
+  it('opens upward when the scroll area has no room below the field', () => {
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(66)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.testid === 'scroller') return { top: 0, bottom: 705 } as DOMRect
+      if (this.tagName === 'INPUT') return { top: 660, bottom: 690 } as DOMRect
+      return { top: 0, bottom: 0 } as DOMRect
+    })
+    render(
+      <div data-testid="scroller" style={{ overflowY: 'auto' }}>
+        <Harness />
+      </div>,
+    )
+
+    fireEvent.focus(screen.getByRole('combobox'))
+
+    expect(screen.getByRole('listbox')).toHaveClass('bottom-full')
+    vi.restoreAllMocks()
+  })
+
   it('is a combobox whose suggestions are a listbox', () => {
     render(<Harness />)
     const input = screen.getByRole('combobox')

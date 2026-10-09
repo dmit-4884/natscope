@@ -1,11 +1,14 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { copyText } from '@/utils/clipboard'
 import { helpers } from '@/utils/helpers'
+import { usePopupPlacement } from '@/components/ui'
 import Tooltip from './Tooltip'
 
 export default function HelpersDropdown() {
   const helpersRef = useRef<HTMLDivElement>(null)
   const [showHelpers, setShowHelpers] = useState(false)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const placement = usePopupPlacement(showHelpers, helpersRef, popupRef)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -38,12 +41,18 @@ export default function HelpersDropdown() {
       </Tooltip>
 
       {showHelpers && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-2">
+        <div
+          ref={popupRef}
+          style={{ maxHeight: placement?.maxHeight }}
+          className={`absolute right-0 z-20 flex flex-col bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-2 ${
+            placement?.side === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
+        >
           <div className="px-3 pb-2 mb-1 border-b border-gray-700">
             <span className="text-xs font-medium text-gray-300">Dynamic Helpers</span>
             <p className="text-xs text-content-tertiary mt-0.5">Click to copy. Replaced on publish.</p>
           </div>
-          <ul className="max-h-64 overflow-y-auto">
+          <ul className="min-h-0 max-h-64 overflow-y-auto">
             {helpers.map((helper) => (
               <li key={helper.template}>
                 <button

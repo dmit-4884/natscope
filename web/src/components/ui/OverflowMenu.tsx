@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Tooltip from '@/components/common/Tooltip'
 import { DotsHorizontalIcon } from './icons'
+import { usePopupPlacement } from './popupPlacement'
 
 export interface OverflowMenuItem {
   label: string
@@ -22,6 +23,8 @@ interface OverflowMenuProps {
 export function OverflowMenu({ items, label = 'More actions', className = '', icon, highlighted = false }: OverflowMenuProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const placement = usePopupPlacement(open, containerRef, menuRef)
 
   useEffect(() => {
     if (!open) return
@@ -86,8 +89,12 @@ export function OverflowMenu({ items, label = 'More actions', className = '', ic
       </Tooltip>
       {open && (
         <div
+          ref={menuRef}
           role="menu"
-          className="absolute right-0 top-full mt-1 w-48 bg-surface-primary border border-border rounded-lg shadow-dropdown z-dropdown overflow-hidden"
+          style={{ maxHeight: placement?.maxHeight }}
+          className={`absolute right-0 w-48 bg-surface-primary border border-border rounded-lg shadow-dropdown z-dropdown overflow-y-auto ${
+            placement?.side === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
         >
           {normal.map(renderItem)}
           {normal.length > 0 && destructive.length > 0 && <div className="border-t border-border" />}

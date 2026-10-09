@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useId } from 'react'
 import { cn } from '@/utils/cn'
 import { ChevronDownIcon } from './icons'
+import { scrollWithin, usePopupPlacement } from './popupPlacement'
 
 interface DropdownOption {
   value: string
@@ -70,7 +71,9 @@ export function Dropdown({
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const placement = usePopupPlacement(isOpen && options.length > 0, triggerRef, listRef)
 
   const uid = useId()
   const listboxId = `${uid}-listbox`
@@ -139,8 +142,8 @@ export function Dropdown({
   // Scroll highlighted option into view
   useEffect(() => {
     if (isOpen && highlightedIndex >= 0 && listRef.current) {
-      const highlightedElement = listRef.current.children[highlightedIndex] as HTMLElement
-      highlightedElement?.scrollIntoView({ block: 'nearest' })
+      const highlightedElement = listRef.current.children[highlightedIndex] as HTMLElement | undefined
+      if (highlightedElement) scrollWithin(listRef.current, highlightedElement)
     }
   }, [highlightedIndex, isOpen])
 
@@ -171,6 +174,7 @@ export function Dropdown({
       }}
     >
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         onClick={handleToggle}
@@ -208,10 +212,12 @@ export function Dropdown({
           // Options aren't focusable; a plain mousedown would shift focus off
           // the trigger and fire onBlur before the click lands, closing the list.
           onMouseDown={(e) => e.preventDefault()}
+          style={{ maxHeight: placement?.maxHeight }}
           className={cn(
-            'absolute z-50 mt-1 w-full bg-surface-primary border border-border rounded-md shadow-lg',
+            'absolute z-50 min-w-full w-max max-w-[20rem] bg-surface-primary border border-border rounded-md shadow-lg',
             'max-h-60 overflow-auto',
             'py-1',
+            placement?.side === 'above' ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0'
           )}
         >

@@ -36,6 +36,7 @@ export { JsonEditor } from './JsonEditor'
 // Navigation components
 export { Tabs, type TabsProps } from './Tabs'
 export { tabPanelProps } from './tabPanel'
+export { scrollWithin, usePopupPlacement } from './popupPlacement'
 
 // Action components
 export { CopyButton, type CopyButtonProps } from './CopyButton'

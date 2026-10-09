@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { usePopupPlacement } from '@/components/ui'
 
 interface Props {
   value: string
@@ -33,6 +34,8 @@ export function SubjectAutocomplete({
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(-1)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const listId = useId()
 
   // Close on outside click.
@@ -67,6 +70,7 @@ export function SubjectAutocomplete({
   }, [filtered])
 
   const showDropdown = open && filtered.length > 0
+  const placement = usePopupPlacement(showDropdown, inputRef, listRef)
 
   const choose = (opt: string) => {
     onChange(opt)
@@ -97,6 +101,7 @@ export function SubjectAutocomplete({
   return (
     <div ref={wrapRef} className="relative">
       <input
+        ref={inputRef}
         id={inputId}
         type="text"
         value={value}
@@ -125,9 +130,13 @@ export function SubjectAutocomplete({
       />
       {showDropdown && (
         <ul
+          ref={listRef}
           id={listId}
           role="listbox"
-          className="absolute z-dropdown mt-1 w-full max-h-60 overflow-auto rounded-md border border-border bg-surface-primary shadow-lg"
+          style={{ maxHeight: placement?.maxHeight }}
+          className={`absolute z-dropdown w-full max-h-60 overflow-auto rounded-md border border-border bg-surface-primary shadow-lg ${
+            placement?.side === 'above' ? 'bottom-full mb-1' : 'mt-1'
+          }`}
         >
           {filtered.map((opt, i) => (
             <li

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useId, useMemo } from 'react'
 import { cn } from '@/utils/cn'
 import { ChevronDownIcon, CheckIcon } from './icons'
+import { scrollWithin, usePopupPlacement } from './popupPlacement'
 
 export interface SearchableSelectOption {
   value: string
@@ -46,8 +47,11 @@ export function SearchableSelect({
   const [search, setSearch] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const placement = usePopupPlacement(isOpen, triggerRef, popupRef)
 
   const uid = useId()
   const listboxId = `${uid}-listbox`
@@ -121,8 +125,8 @@ export function SearchableSelect({
   // Scroll highlighted option into view
   useEffect(() => {
     if (isOpen && highlightedIndex >= 0 && listRef.current) {
-      const highlightedElement = listRef.current.children[highlightedIndex] as HTMLElement
-      highlightedElement?.scrollIntoView({ block: 'nearest' })
+      const highlightedElement = listRef.current.children[highlightedIndex] as HTMLElement | undefined
+      if (highlightedElement) scrollWithin(listRef.current, highlightedElement)
     }
   }, [highlightedIndex, isOpen])
 
@@ -145,6 +149,7 @@ export function SearchableSelect({
     <div ref={containerRef} className={cn('relative', className)}>
       {/* Trigger button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={handleToggle}
         disabled={disabled || loading}
@@ -173,7 +178,14 @@ export function SearchableSelect({
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-surface-primary border border-border rounded-lg shadow-lg overflow-hidden">
+        <div
+          ref={popupRef}
+          style={{ maxHeight: placement?.maxHeight }}
+          className={cn(
+            'absolute z-50 w-full flex flex-col bg-surface-primary border border-border rounded-lg shadow-lg overflow-hidden',
+            placement?.side === 'above' ? 'bottom-full mb-1' : 'mt-1',
+          )}
+        >
           {/* Search input */}
           <div className="p-2 border-b border-gray-100">
             <div className="relative">
@@ -215,7 +227,7 @@ export function SearchableSelect({
             id={listboxId}
             role="listbox"
             aria-label={label ?? placeholder}
-            className="max-h-60 overflow-auto py-1"
+            className="min-h-0 max-h-60 overflow-auto py-1"
           >
             {filteredOptions.length === 0 ? (
               <li role="presentation" className="px-3 py-2 text-sm text-content-tertiary text-center">
