@@ -229,6 +229,31 @@ func TestSearchBudgetsBoundEveryRun(t *testing.T) {
 	}
 }
 
+func TestSearchBackwardSlowFirstWindowKeepsTheTimeBudget(t *testing.T) {
+	slow := func() *fakeStream {
+		return &fakeStream{first: 1, last: 3000, match: 7, clock: &fakeClock{now: time.Unix(0, 0), step: 100 * time.Millisecond}}
+	}
+	t.Run("one run", func(t *testing.T) {
+		f := slow()
+		s := newFakeSearch(t, f)
+		started := f.clock.now
+
+		res := runSearch(t, s, entities.MessageSearchRequest{Direction: "backward", Text: "needle"}, 0)
+
+		assert.Equal(t, entities.SearchStopTimeLimit, res.done.Reason)
+		assert.LessOrEqual(t, f.clock.now.Sub(started), searchMaxDuration+2*time.Second)
+		assert.NotEmpty(t, res.matches)
+	})
+	t.Run("continues to the end without gaps", func(t *testing.T) {
+		f := slow()
+		s := newFakeSearch(t, f)
+
+		got := searchAll(t, s, entities.MessageSearchRequest{Direction: "backward", Text: "needle"}, func(int) int { return 0 })
+
+		assert.Equal(t, expectedMatches(f, true), got)
+	})
+}
+
 func TestSearchProgressNamesWhereToResumeFromTheStart(t *testing.T) {
 	f := &fakeStream{first: 1, last: 5000, match: 7, clock: &fakeClock{now: time.Unix(0, 0), step: time.Millisecond}}
 	s := newFakeSearch(t, f)
