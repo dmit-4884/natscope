@@ -6,8 +6,10 @@ import { toast } from '@/utils/toast'
 import Toaster from './Toaster'
 import CommandPalette from './CommandPalette'
 
+const NAVIGATION_TOAST_GRACE_MS = 1000
+
 /**
- * Dismisses any open toasts when the route changes. Without this, an error
+ * Dismisses open toasts when the route changes. Without this, an error
  * toast triggered on /streams/X/publish stays visible after the user
  * navigates to /streams or switches connection — confusing because its
  * context no longer applies.
@@ -15,7 +17,7 @@ import CommandPalette from './CommandPalette'
 function useDismissToastsOnRouteChange() {
   const { pathname } = useLocation()
   useEffect(() => {
-    toast.dismiss()
+    toast.dismissShownBefore(Date.now() - NAVIGATION_TOAST_GRACE_MS)
   }, [pathname])
 }
 

@@ -21,35 +21,49 @@ export interface ToastAction {
   onClick: () => void
 }
 
+const shownAt = new Map<string | number, number>()
+
+function shown(id: string | number): string | number {
+  shownAt.set(id, Date.now())
+  return id
+}
+
 export const toast = {
   success: (message: string, options?: { duration?: number; action?: ToastAction }) => {
-    return sonnerToast.success(message, {
+    return shown(sonnerToast.success(message, {
       duration: options?.duration ?? calculateDuration(message),
       action: options?.action,
-    })
+    }))
   },
   error: (message: string, options?: { duration?: number }) => {
     // Auto-dismiss, but slow enough to read. Pass duration: Infinity to stick.
-    return sonnerToast.error(message, {
+    return shown(sonnerToast.error(message, {
       duration: options?.duration ?? calculateDuration(message, { min: 6000, max: 12000 }),
-    })
+    }))
   },
   warning: (message: string, options?: { duration?: number }) => {
-    return sonnerToast.warning(message, {
+    return shown(sonnerToast.warning(message, {
       duration: options?.duration ?? calculateDuration(message) + 2000, // extra time for warnings
-    })
+    }))
   },
   info: (message: string, options?: { duration?: number; id?: string }) => {
-    return sonnerToast.info(message, {
+    return shown(sonnerToast.info(message, {
       id: options?.id,
       duration: options?.duration ?? calculateDuration(message),
-    })
+    }))
   },
   loading: (message: string) => {
-    return sonnerToast.loading(message)
+    return shown(sonnerToast.loading(message))
   },
   dismiss: (id?: string | number) => {
     return sonnerToast.dismiss(id)
+  },
+  dismissShownBefore: (time: number) => {
+    for (const [id, at] of shownAt) {
+      if (at >= time) continue
+      shownAt.delete(id)
+      sonnerToast.dismiss(id)
+    }
   },
   promise: sonnerToast.promise,
   custom: sonnerToast.custom,
