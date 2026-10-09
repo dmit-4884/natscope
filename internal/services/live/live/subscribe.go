@@ -29,6 +29,7 @@ func (s *Service) Subscribe(
 	targets := dedupeSubscriptionTargets(in.Subscriptions)
 
 	sess := newSessionState(in.ConnectionId)
+	sess.exclude = in.ExcludeSubjects
 	s.registerSession(sess)
 	defer s.unregisterSession(sess)
 	defer sess.endHolding()
@@ -65,7 +66,7 @@ func (s *Service) Subscribe(
 		return err
 	}
 
-	limits := loopLimits{maxDisplayRate: maxDisplayRate, maxPayloadBytes: payloadCap, detect: detect, exclude: in.ExcludeSubjects}
+	limits := loopLimits{maxDisplayRate: maxDisplayRate, maxPayloadBytes: payloadCap, detect: detect}
 	return s.runLoop(ctx, sess, msgChan, limits, emit)
 }
 
@@ -235,14 +236,14 @@ func (s *Service) startSubscriptions(
 }
 
 // buildMessageHandler builds the per-target delivery callback. Internal subjects pass only when the
-// target's own pattern names an internal namespace.
+// target's own pattern names an internal namespace; muted subjects never reach the counters or the buffer.
 func (s *Service) buildMessageHandler(
 	targetSubject string,
 	msgChan chan<- *entities.NatsMessage,
 	sess *sessionState,
 ) entities.MessageHandler {
 	return func(msg *entities.NatsMessage) {
-		if !takesInternal(targetSubject, msg.Subject) {
+		if !takesInternal(targetSubject, msg.Subject) || sess.excludes(msg.Subject) {
 			return
 		}
 		sess.totalMessages.Add(1)

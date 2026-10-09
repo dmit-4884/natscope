@@ -345,7 +345,12 @@ func collectPayloads(t *testing.T, events <-chan *entities.LiveEvent, last strin
 
 func nextEvent(t *testing.T, events <-chan *entities.LiveEvent, match func(*entities.LiveEvent) bool) *entities.LiveEvent {
 	t.Helper()
-	deadline := time.After(5 * time.Second)
+	return nextEventWithin(t, events, 5*time.Second, match)
+}
+
+func nextEventWithin(t *testing.T, events <-chan *entities.LiveEvent, wait time.Duration, match func(*entities.LiveEvent) bool) *entities.LiveEvent {
+	t.Helper()
+	deadline := time.After(wait)
 	for {
 		select {
 		case ev := <-events:
@@ -403,7 +408,58 @@ func TestSubscribe_ExcludedSubjectsDoNotUseTheDisplayRate(t *testing.T) {
 		}
 	}
 	assert.Zero(t, stats.MessagesDropped, "a muted message is not a skipped one")
-	assert.Equal(t, int64(5), stats.SubjectCounts["metrics.cpu"], "muted subjects still count")
+	assert.NotContains(t, stats.SubjectCounts, "metrics.cpu", "muted subjects stay out of the counters")
+}
+
+func TestSubscribe_MutedSubjectsTakeNoRoomFromWantedOnes(t *testing.T) {
+	t.Parallel()
+
+	sub := &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}
+	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	entered, release := make(chan struct{}), make(chan struct{})
+	var blockOnce sync.Once
+	events := make(chan *entities.LiveEvent, 256)
+	done := make(chan error, 1)
+	go func() {
+		done <- svc.Subscribe(ctx, &entities.LiveSubscribeRequest{
+			ConnectionId:    "conn",
+			Subscriptions:   []*entities.LiveSubscriptionTarget{{Subject: ">"}},
+			ExcludeSubjects: []string{"metrics.>"},
+		}, func(ev *entities.LiveEvent) error {
+			if ev.Batch != nil {
+				blockOnce.Do(func() {
+					close(entered)
+					<-release
+				})
+			}
+			events <- ev
+			return nil
+		})
+	}()
+	require.Eventually(t, func() bool {
+		sub.mu.Lock()
+		defer sub.mu.Unlock()
+		return len(sub.handlers) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+
+	sub.deliver(t, ">", &entities.NatsMessage{Subject: "orders.a", Data: []byte("w1")})
+	<-entered
+	for range 150 {
+		sub.deliver(t, ">", &entities.NatsMessage{Subject: "metrics.cpu", Data: []byte("noise")})
+	}
+	sub.deliver(t, ">", &entities.NatsMessage{Subject: "orders.b", Data: []byte("w2")})
+	close(release)
+
+	assert.Equal(t, map[string]int{"w1": 1, "w2": 1}, collectPayloads(t, events, "w2"))
+	stats := nextEventWithin(t, events, 2*statsInterval+2*time.Second, func(ev *entities.LiveEvent) bool { return ev.Stats != nil && ev.Stats.TotalMessages > 0 }).Stats
+	assert.Equal(t, int64(2), stats.TotalMessages)
+	assert.Zero(t, stats.MessagesDropped)
+
+	cancel()
+	require.NoError(t, <-done)
 }
 
 func TestSubscribe_AnAllowedSubjectKeepsItsMessagesUntilAnEarlierWildcardProvesLive(t *testing.T) {

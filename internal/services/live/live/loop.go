@@ -7,14 +7,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"slices"
 	"time"
 
 	"github.com/altessa-s/go-atlas/core/runtime/panics"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
-	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 )
 
 // truncateLiveMessage caps the raw byte payload to maxBytes and drops any
@@ -103,11 +101,6 @@ type loopLimits struct {
 	maxDisplayRate  int32
 	maxPayloadBytes int32
 	detect          bool
-	exclude         []string
-}
-
-func (l loopLimits) excludes(subject string) bool {
-	return slices.ContainsFunc(l.exclude, func(pattern string) bool { return natsutil.MatchSubject(pattern, subject) })
 }
 
 // runLoop is the core event loop; it rate-limits, decodes, and batches
@@ -127,7 +120,7 @@ func (s *Service) runLoop(
 
 	batch := make([]*entities.LiveMessage, 0, maxBatchSize)
 
-	var lastMsgCount, muted int64
+	var lastMsgCount int64
 	linkDown := false
 	lastTime := time.Now()
 	warmup := true // skip first stats tick to avoid burst spike
@@ -184,7 +177,7 @@ func (s *Service) runLoop(
 			}
 
 			now := time.Now()
-			current := sess.totalMessages.Load() - muted
+			current := sess.totalMessages.Load()
 
 			if warmup {
 				warmup = false
@@ -228,10 +221,6 @@ func (s *Service) runLoop(
 			sess.bufferedBytes.Add(-int64(len(msg.Data)))
 			if _, tracked := subjectCounts[msg.Subject]; tracked || len(subjectCounts) < maxSubjectCardinality {
 				subjectCounts[msg.Subject]++
-			}
-			if limits.excludes(msg.Subject) {
-				muted++
-				continue
 			}
 
 			if maxDisplayRate > 0 {

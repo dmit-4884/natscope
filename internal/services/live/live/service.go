@@ -5,11 +5,13 @@ package live
 
 import (
 	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	livesvc "github.com/dmit-4884/natscope/internal/services/live"
@@ -77,7 +79,9 @@ type sessionState struct {
 	bufferedBytes atomic.Int64
 
 	connectionID string
-	lost         chan struct{}
+	// exclude are the muted subject patterns, dropped as they arrive.
+	exclude []string
+	lost    chan struct{}
 	lostOnce     sync.Once
 
 	denials        chan *entities.LiveError
@@ -138,6 +142,10 @@ func (sess *sessionState) markSilent(subject string) bool {
 	sess.silentMu.Unlock()
 	deliverHeld(shown)
 	return true
+}
+
+func (sess *sessionState) excludes(subject string) bool {
+	return slices.ContainsFunc(sess.exclude, func(pattern string) bool { return natsutil.MatchSubject(pattern, subject) })
 }
 
 func (sess *sessionState) markLost() {
