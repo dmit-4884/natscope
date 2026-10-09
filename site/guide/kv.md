@@ -1,6 +1,6 @@
 ---
 title: Key/Value
-description: Browse JetStream KV buckets, write with compare-and-set, and read revision history.
+description: Browse and watch JetStream KV buckets, find keys with NATS patterns, give keys a TTL, and edit or clear buckets.
 ---
 
 # Key/Value
@@ -18,6 +18,32 @@ bucket config into **Basic Configuration**, **Limits**, **Storage Options** (sto
 compression), **Placement**, **Mirror**, **Sources**, **Republish** and **Metadata**. Fields marked
 immutable can only be set at creation time.
 
+**Key TTL marker** under **Limits** lets single keys carry their own TTL (NATS 2.11+). It also sets how long a
+marker stays after a key expires, so watchers see the expiry. Once on, it can't be turned off.
+
+## Edit or clear a bucket
+
+The **⋯** menu of an open bucket has:
+
+- **Edit bucket…** — change the description, history, TTL, size limits, replicas, compression, key TTL
+  marker and metadata. You review the changes before they apply. Storage type, mirror, sources, republish
+  and placement stay as they are.
+- **Clear bucket…** — remove every key and every revision in one purge and keep the bucket. Apps watching
+  the bucket aren't told: no delete markers are left, so the values they cached stay until they reload.
+- **Delete bucket…** — remove the bucket and its data.
+
+Clearing and deleting ask you to type the bucket name.
+
+## Find keys
+
+The search box above the key list takes plain text or a NATS pattern:
+
+- Plain text filters the loaded keys, ignoring case.
+- A pattern with `*` or `>`, such as `orders.*` or `users.>`, goes to the server, which returns only the
+  matching keys.
+
+The list loads up to 1,000 keys. When more match, a note says so; narrow the pattern to see the rest.
+
 ## Work with keys
 
 Select a bucket, then a key. The editor gives you:
@@ -29,6 +55,23 @@ Select a bucket, then a key. The editor gives you:
 - **Delete** — remove the key
 
 **New key** or **Create New Key** adds one. In create mode the save button reads **Create Key**.
+
+On a bucket with a key TTL marker, the new key form also takes a **TTL** such as `30s`, `5m` or `1h`.
+The key is removed once it expires, and its header shows the TTL and when it expires. A TTL can only be set
+when a key is created.
+
+## Watch changes
+
+Turn on **Live updates** above the key list to watch the bucket. Natscope then:
+
+- adds keys to the list and drops them as they are written, deleted or purged;
+- reloads the open key when it changes;
+- lists the latest changes under **Changes**, newest first, with the operation, revision, time and the
+  start of the value. Pick one to open the key.
+
+The watch follows the pattern in the search box, and it reports changes made after you turned it on.
+If you're editing a value and someone else changes the key, the editor says so. Saving then fails the revision
+check instead of overwriting their change.
 
 ## Protobuf values
 
