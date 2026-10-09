@@ -46,6 +46,7 @@ export default function StreamConsumersTab() {
     refetch,
     isFetching,
     dataUpdatedAt,
+    errorUpdatedAt,
   } = useConsumers(connectionId, streamName)
   const { data: streamDetail } = useStreamDetail(streamName, connectionId)
   const issues = useMemo(
@@ -56,9 +57,16 @@ export default function StreamConsumersTab() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedConsumer = searchParams.get('consumer')
+  const answeredAt = Math.max(dataUpdatedAt, errorUpdatedAt)
+  const [linkedAt, setLinkedAt] = useState<number | null>(null)
+  const awaitingLink = linkedAt !== null && answeredAt <= linkedAt
   useEffect(() => {
     if (!requestedConsumer) return
     setEditorState({ selectedName: requestedConsumer, isCreating: false, isEditing: false, editorMode: 'form', formDraft: null })
+    if (!consumers.some((c) => c.name === requestedConsumer)) {
+      setLinkedAt(answeredAt)
+      void refetch()
+    }
     setSearchParams(
       (params) => {
         params.delete('consumer')
@@ -66,7 +74,7 @@ export default function StreamConsumersTab() {
       },
       { replace: true },
     )
-  }, [requestedConsumer, setEditorState, setSearchParams])
+  }, [requestedConsumer, consumers, answeredAt, refetch, setEditorState, setSearchParams])
 
   const [, setMessagesView] = useMessagesViewEntry(scope)
   const openMessage = (message: Message) => {
@@ -122,10 +130,10 @@ export default function StreamConsumersTab() {
 
   // Drop a stale selection if the consumer no longer exists upstream.
   useEffect(() => {
-    if (selectedName && !isLoading && consumers.length > 0 && !selectedConsumer) {
+    if (selectedName && !isLoading && !awaitingLink && consumers.length > 0 && !selectedConsumer) {
       setEditorState({ selectedName: null, isEditing: false, formDraft: null })
     }
-  }, [selectedName, isLoading, consumers.length, selectedConsumer, setEditorState])
+  }, [selectedName, isLoading, awaitingLink, consumers.length, selectedConsumer, setEditorState])
 
   // "Original" config derived from live consumer; not persisted, recomputed to
   // stay in sync with backend.
@@ -260,7 +268,7 @@ export default function StreamConsumersTab() {
             priorityUnsupportedReason={unpinUnsupportedReason}
             prioritizedUnsupportedReason={prioritizedUnsupportedReason}
           />
-        ) : isLoading ? (
+        ) : isLoading || (awaitingLink && !selectedConsumer) ? (
           <SkeletonRows count={6} rowClassName="h-10" className="p-6" />
         ) : selectedConsumer ? (
           isEditing && !readOnly ? (
