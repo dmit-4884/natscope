@@ -303,22 +303,22 @@ export default function ConsumersPage() {
               >
                 Refresh
               </Button>
-              {rows.length > 0 && (
-                <OverflowMenu
-                  label="Export consumers"
-                  icon={<DownloadIcon className="w-4 h-4" />}
-                  items={[
-                    {
-                      label: 'Export as CSV',
-                      onSelect: () => downloadBlob(rowsToCsv(rows), exportName('csv', dataUpdatedAt), 'text/csv'),
-                    },
-                    {
-                      label: 'Export as JSON',
-                      onSelect: () => downloadBlob(rowsToJson(rows), exportName('json', dataUpdatedAt), 'application/json'),
-                    },
-                  ]}
-                />
-              )}
+              <OverflowMenu
+                label="Export consumers"
+                icon={<DownloadIcon className="w-4 h-4" />}
+                items={[
+                  {
+                    label: 'Export as CSV',
+                    disabled: rows.length === 0,
+                    onSelect: () => downloadBlob(rowsToCsv(rows), exportName('csv', dataUpdatedAt), 'text/csv'),
+                  },
+                  {
+                    label: 'Export as JSON',
+                    disabled: rows.length === 0,
+                    onSelect: () => downloadBlob(rowsToJson(rows), exportName('json', dataUpdatedAt), 'application/json'),
+                  },
+                ]}
+              />
             </div>
           )}
         </div>

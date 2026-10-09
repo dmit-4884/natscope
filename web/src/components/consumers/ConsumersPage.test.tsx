@@ -168,6 +168,18 @@ describe('ConsumersPage', () => {
     expect(await screen.findByText('No consumers yet')).toBeInTheDocument()
   })
 
+  it('keeps the toolbar in place when the filter matches nothing', async () => {
+    mockedOverview.mockResolvedValue(overview())
+    renderPage()
+    await screen.findByText('billing')
+
+    fireEvent.change(screen.getByPlaceholderText(/filter by consumer/i), { target: { value: 'nothing-like-this' } })
+    await waitFor(() => expect(screen.queryByText('billing')).not.toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export consumers' }))
+    expect(await screen.findByRole('menuitem', { name: /csv/i })).toBeDisabled()
+  })
+
   it('exports the shown consumers as CSV or JSON', async () => {
     mockedOverview.mockResolvedValue(overview())
     renderPage()
