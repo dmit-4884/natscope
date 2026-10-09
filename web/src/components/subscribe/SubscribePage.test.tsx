@@ -279,12 +279,14 @@ describe('SubscribePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Mute metrics.cpu' }))
     expect(within(screen.getByTestId('feed')).queryByText('metrics.cpu')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mute metrics.cpu' })).not.toBeInTheDocument()
     expect(mockedLive).toHaveBeenLastCalledWith(
       expect.objectContaining({ exclude: ['metrics.cpu'], subjectLimits: expect.objectContaining({ exclude: ['metrics.cpu'] }) }),
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Unmute metrics.cpu' }))
     expect(within(screen.getByTestId('feed')).getByText('metrics.cpu')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mute metrics.cpu' })).toBeInTheDocument()
   })
 
   it('opens the details only for a selected message', () => {

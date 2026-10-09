@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Tooltip from '@/components/common/Tooltip'
 import { Button, CloseIcon, Dropdown, EyeOffIcon, PauseIcon, PlayIcon, SearchInput } from '@/components/ui'
+import { matchSubject } from '@/shared/domain/subjectMatch'
 import { formatCount } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
 import { LIVE_MESSAGE_LIMITS, type LiveMessageLimit } from '../messages/unified/messageListUtils'
@@ -96,7 +97,7 @@ export function SubscribeToolbar({
   onDisplayRateChange,
 }: Props) {
   const [showAll, setShowAll] = useState(false)
-  const subjects = Object.entries(subjectCounts)
+  const subjects = Object.entries(subjectCounts).filter(([subject]) => !muted.some((pattern) => matchSubject(subject, pattern)))
   const visible = showAll ? subjects : subjects.slice(0, MAX_SUBJECT_CHIPS)
   const hidden = subjects.length - visible.length
 
