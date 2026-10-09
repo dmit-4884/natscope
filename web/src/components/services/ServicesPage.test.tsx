@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { act, render, screen, fireEvent, waitFor, within } from '@/test/utils'
 import { listServices, type MicroDiscovery, type MicroEndpoint, type MicroService } from '@/api/discovery'
 import { clearAllRequestDrafts, getRequestDraft } from '@/stores/requestDraftStore'
+import { clearServiceSamples } from './serviceRates'
 import ServicesPage from './ServicesPage'
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -71,6 +72,7 @@ describe('ServicesPage', () => {
   beforeEach(() => {
     mockedList.mockReset()
     clearAllRequestDrafts()
+    clearServiceSamples()
   })
 
   it('names the missing permission and stops auto-refresh when discovery is denied', async () => {

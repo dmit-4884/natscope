@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import type { MicroDiscovery, MicroService } from '@/api/discovery'
 
 interface Counters {
@@ -28,6 +28,7 @@ export type Health = 'ok' | 'degraded' | 'failing' | 'idle' | 'unknown'
 
 const DEGRADED_ERROR_SHARE = 0.01
 const FAILING_ERROR_SHARE = 0.1
+const HISTORY_MS = 20_000
 
 export function sampleOf(services: MicroService[], at: number): Sample {
   const counters: Sample['counters'] = new Map()
@@ -92,27 +93,29 @@ export function healthOf(window: WindowTotal | undefined): Health {
   return 'ok'
 }
 
-const remembered = new Map<string, { sample: Sample; windows: EndpointWindow[] | null }>()
+const remembered = new Map<string, { samples: Sample[]; windows: EndpointWindow[] | null }>()
+
+function measure(connectionId: string, data: MicroDiscovery | undefined, updatedAt: number): EndpointWindow[] | null {
+  const last = remembered.get(connectionId)
+  if (!data || !updatedAt) return last?.windows ?? null
+  const latest = last?.samples[last.samples.length - 1]
+  if (last && latest?.at === updatedAt) return last.windows
+  const next = sampleOf(data.services, updatedAt)
+  const recent = (last?.samples ?? []).filter((sample) => updatedAt - sample.at <= HISTORY_MS)
+  const base = recent[0] ?? latest
+  const windows = base && next.counters.size > 0 ? windowsBetween(base, next) : null
+  remembered.set(connectionId, { samples: [...recent, next], windows })
+  return windows
+}
+
+export function clearServiceSamples(): void {
+  remembered.clear()
+}
 
 export function useServiceWindows(
   connectionId: string,
   data: MicroDiscovery | undefined,
   updatedAt: number,
 ): EndpointWindow[] | null {
-  const [shown, setShown] = useState(() => ({ connectionId, windows: remembered.get(connectionId)?.windows ?? null }))
-
-  useEffect(() => {
-    if (!data || !updatedAt) return
-    const last = remembered.get(connectionId)
-    if (last?.sample.at === updatedAt) {
-      setShown((prev) => (prev.connectionId === connectionId && prev.windows === last.windows ? prev : { connectionId, windows: last.windows }))
-      return
-    }
-    const next = sampleOf(data.services, updatedAt)
-    const windows = last && next.counters.size > 0 ? windowsBetween(last.sample, next) : null
-    remembered.set(connectionId, { sample: next, windows })
-    setShown({ connectionId, windows })
-  }, [connectionId, data, updatedAt])
-
-  return shown.connectionId === connectionId ? shown.windows : (remembered.get(connectionId)?.windows ?? null)
+  return useMemo(() => measure(connectionId, data, updatedAt), [connectionId, data, updatedAt])
 }

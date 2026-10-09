@@ -103,4 +103,30 @@ describe('useServiceWindows', () => {
     const other = renderHook(() => useServiceWindows('conn-other', discovery(30), 6000))
     expect(other.result.current).toBeNull()
   })
+
+  it('answers with the new window in the same render as the new poll', () => {
+    const seen: (number | undefined)[] = []
+    const hook = renderHook(({ data, at }) => {
+      const windows = useServiceWindows('conn-same-render', data, at)
+      seen.push(windows ? sumWindows(windows, () => true)?.requests : undefined)
+      return windows
+    }, { initialProps: { data: discovery(10), at: 1000 } })
+    seen.length = 0
+
+    hook.rerender({ data: discovery(30), at: 6000 })
+
+    expect(seen[0]).toBe(20)
+  })
+
+  it('measures over the last polls together, so one quiet poll does not flip the health', () => {
+    const hook = renderHook(({ data, at }) => useServiceWindows('conn-smooth', data, at), {
+      initialProps: { data: discovery(0), at: 1000 },
+    })
+    hook.rerender({ data: discovery(10), at: 6000 })
+    hook.rerender({ data: discovery(20), at: 11_000 })
+
+    const total = sumWindows(hook.result.current!, () => true)
+    expect(total?.requests).toBe(20)
+    expect(total?.seconds).toBe(10)
+  })
 })
