@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Message } from '@/types/nats'
 import { formatBytes, formatTimeWithMs, formatTimestamp } from '@/utils/formatters'
@@ -106,7 +106,7 @@ const MessageRow = memo(function MessageRow({
       tabIndex={isFocused ? 0 : -1}
       onFocus={() => onFocusIndex(index)}
       onKeyDown={handleKeyDown}
-      className={`flex items-center cursor-pointer transition-all duration-300 motion-reduce:transition-none border-b border-l-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-inset ${
+      className={`flex items-center cursor-pointer transition-colors duration-300 motion-reduce:transition-none border-b border-l-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-inset ${
         isCompareHighlighted
           ? 'bg-indigo-100 border-l-indigo-500'
           : isSelected
@@ -252,15 +252,20 @@ export function MessageVirtualTable({
     return () => el.removeEventListener('scroll', handler)
   }, [mode, autoScrollRef])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (mode !== 'realtime') return
     const firstId = messages.length > 0 ? idOf(messages[0]) : null
-    const changed = firstId !== null && firstId !== prevFirstIdRef.current
+    const prevFirstId = prevFirstIdRef.current
     prevFirstIdRef.current = firstId
-    if (changed && autoScrollRef.current && parentRef.current) {
-      parentRef.current.scrollTo({ top: 0 })
+    const el = parentRef.current
+    if (firstId === null || firstId === prevFirstId || !el) return
+    if (autoScrollRef.current) {
+      el.scrollTo({ top: 0 })
+      return
     }
-  }, [messages, mode, autoScrollRef, idOf])
+    const inserted = messages.findIndex((m) => idOf(m) === prevFirstId)
+    if (inserted > 0) el.scrollTop += inserted * rowHeight
+  }, [messages, mode, autoScrollRef, idOf, rowHeight])
 
   const rowVirtualizer = useVirtualizer({
     count: messages.length,
