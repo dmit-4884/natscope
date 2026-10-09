@@ -240,7 +240,7 @@ export default function PublishHistory({ streamName, connectionId, connectionUrl
       {/* History List */}
       <div className="flex-1 overflow-auto min-h-0">
         {isLoading ? (
-          <div className="p-4 text-center text-content-tertiary text-sm">Loading...</div>
+          <div className="p-4 text-center text-content-tertiary text-sm reveal-after-delay">Loading...</div>
         ) : error ? (
           <QueryErrorState error={error} onRetry={() => void refetch()} />
         ) : filteredHistory.length === 0 ? (

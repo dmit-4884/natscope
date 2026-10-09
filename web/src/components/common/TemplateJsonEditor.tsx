@@ -272,7 +272,7 @@ export default function TemplateJsonEditor({
       <div style={{ height: editorHeight }} className="relative">
         <Suspense
           fallback={
-            <div className="h-full flex items-center justify-center text-xs text-content-secondary font-mono">
+            <div className="h-full flex items-center justify-center text-xs text-content-secondary font-mono reveal-after-delay">
               Loading editor…
             </div>
           }

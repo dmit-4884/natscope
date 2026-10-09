@@ -10,7 +10,7 @@ export function LazyRoute({ children }: { children: ReactNode }) {
   return (
     <Suspense
       fallback={
-        <div className="p-4 text-center">
+        <div className="p-4 text-center reveal-after-delay">
           <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-surface-tertiary flex items-center justify-center">
             <svg
               className="w-4 h-4 text-content-muted animate-spin"
