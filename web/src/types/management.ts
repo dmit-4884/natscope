@@ -250,6 +250,15 @@ export interface KVKeyList {
   truncated: boolean
 }
 
+export interface KVChange {
+  key: string
+  operation: 'put' | 'delete' | 'purge'
+  revision: number
+  created: number
+  value: string
+  size: number
+}
+
 export interface KVEntry {
   bucket: string
   key: string

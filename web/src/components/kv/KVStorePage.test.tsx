@@ -7,6 +7,14 @@ const keys = vi.hoisted(() => ({
   list: { keys: ['alpha', 'beta'], truncated: false },
   filters: [] as Array<string | undefined>,
   buckets: [] as Array<{ bucket: string; values: number; bytes: number; limit_marker_ttl?: number }>,
+  watch: {
+    status: 'off' as string,
+    error: undefined as string | undefined,
+    changes: [] as Array<{ key: string; operation: string; revision: number; created: number; value: string; size: number }>,
+    restart: () => {},
+  },
+  watchEnabled: [] as boolean[],
+  revisions: {} as Record<string, number>,
 }))
 
 const entries: Record<string, { key: string; value: string; revision: number; created: number; operation: string; ttl?: number }> = {
@@ -34,7 +42,14 @@ vi.mock('@/contexts/kv', async (importOriginal) => ({
     keys.filters.push(filter)
     return { data: keys.list, isLoading: false, error: null, refetch: vi.fn() }
   },
-  useKVKey: (_conn: string, _bucket: string, key?: string) => ({ data: key ? entries[key] : undefined, isLoading: false }),
+  useKVKey: (_conn: string, _bucket: string, key?: string) => ({
+    data: key ? { ...entries[key], revision: keys.revisions[key] ?? entries[key].revision } : undefined,
+    isLoading: false,
+  }),
+  useKVWatch: (_conn: string, _bucket: string, _filter: string, enabled: boolean) => {
+    keys.watchEnabled.push(enabled)
+    return enabled ? keys.watch : { ...keys.watch, status: 'off', changes: [] }
+  },
   useKVKeyHistory: () => ({ data: undefined, isLoading: false, error: null }),
   usePutKVKey: () => mutation,
   useDeleteKVKey: () => mutation,
@@ -61,7 +76,73 @@ describe('KVStorePage', () => {
     keys.list = { keys: ['alpha', 'beta'], truncated: false }
     keys.filters = []
     keys.buckets = []
+    keys.watch = { status: 'live', error: undefined, changes: [], restart: vi.fn() }
+    keys.watchEnabled = []
+    keys.revisions = {}
     mutation.mutateAsync.mockReset()
+  })
+
+  it('watches the bucket only after Live is turned on', () => {
+    renderPage()
+    expect(keys.watchEnabled.every((on) => !on)).toBe(true)
+
+    fireEvent.click(screen.getByRole('switch', { name: /live updates/i }))
+
+    expect(keys.watchEnabled[keys.watchEnabled.length - 1]).toBe(true)
+    expect(screen.getByText(/^live$/i)).toBeInTheDocument()
+  })
+
+  it('lists the changes and opens a changed key', () => {
+    keys.watch.changes = [
+      { key: 'beta', operation: 'put', revision: 7, created: 0, value: btoa('second value'), size: 12 },
+      { key: 'gone', operation: 'delete', revision: 6, created: 0, value: '', size: 0 },
+    ]
+    renderPage()
+    fireEvent.click(screen.getByRole('switch', { name: /live updates/i }))
+
+    fireEvent.click(screen.getByRole('tab', { name: /changes/i }))
+    expect(screen.getByText('delete')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /beta/ }))
+
+    expect(screen.getByLabelText('Key value')).toHaveValue('second value')
+  })
+
+  it('offers a restart when the watch stops', () => {
+    keys.watch = { ...keys.watch, status: 'stopped', error: 'connection closed' }
+    renderPage()
+    fireEvent.click(screen.getByRole('switch', { name: /live updates/i }))
+
+    expect(screen.getByText(/connection closed/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /restart/i }))
+
+    expect(keys.watch.restart).toHaveBeenCalled()
+  })
+
+  it('keeps the revision an edit started from, and says when the server moved on', async () => {
+    mutation.mutateAsync.mockResolvedValue({ revision: 9 })
+    const view = render(
+      <MemoryRouter initialEntries={['/kv/CONFIG']}>
+        <Routes>
+          <Route path="/kv/:bucketName" element={<KVStorePage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'alpha' }))
+    fireEvent.change(screen.getByLabelText('Key value'), { target: { value: 'my edit' } })
+
+    keys.revisions.alpha = 5
+    view.rerender(
+      <MemoryRouter initialEntries={['/kv/CONFIG']}>
+        <Routes>
+          <Route path="/kv/:bucketName" element={<KVStorePage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText(/changed on the server/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save Value' }))
+    await waitFor(() => expect(mutation.mutateAsync).toHaveBeenCalled())
+    expect(mutation.mutateAsync.mock.calls[0][0]).toMatchObject({ key: 'alpha', expectedRevision: 1 })
   })
 
   it('creates a key with a TTL when the bucket allows one', async () => {

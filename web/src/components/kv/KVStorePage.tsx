@@ -11,15 +11,31 @@ import {
   usePurgeKVKey,
   useDeleteKVBucket,
   usePurgeKVBucket,
+  useKVWatch,
 } from '@/contexts/kv'
 import { decodeBase64, type KVProtoValue } from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
-import { formatBytes, formatDateTime, formatNsDuration } from '@/utils/formatters'
+import { formatBytes, formatDateTime, formatNsDuration, formatTime } from '@/utils/formatters'
 import { decodeBase64ToBytes } from '@/utils/base64'
 import { plural } from '@/utils/plural'
 import { useConfirmation } from '@/contexts/settings'
-import type { KVEntry } from '@/types/management'
-import { Button, Modal, Input, Badge, Alert, Spinner, SearchInput, CloseIcon, PlusIcon, RefreshIcon, OverflowMenu } from '@/components/ui'
+import type { KVChange, KVEntry } from '@/types/management'
+import {
+  Button,
+  Modal,
+  Input,
+  Badge,
+  Alert,
+  Spinner,
+  SearchInput,
+  CloseIcon,
+  PlusIcon,
+  RefreshIcon,
+  OverflowMenu,
+  Tabs,
+  Toggle,
+  tabPanelProps,
+} from '@/components/ui'
 import Tooltip from '../common/Tooltip'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import { WireView } from '../messages/WireView'
@@ -45,6 +61,28 @@ function storedValue(target: KVProtoTarget | null, text: string): string | KVPro
 }
 
 const NO_KEYS: string[] = []
+const PREVIEW_CHARS = 80
+
+function isPrintable(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i)
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) return false
+  }
+  return true
+}
+
+function changePreview(change: KVChange): string {
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(decodeBase64ToBytes(change.value))
+    if (isPrintable(text)) {
+      const line = text.replace(/\s+/g, ' ')
+      return line.length > PREVIEW_CHARS || change.size > text.length ? `${line.slice(0, PREVIEW_CHARS)}…` : line
+    }
+  } catch {
+    /* binary values fall through to their size */
+  }
+  return formatBytes(change.size)
+}
 
 function isKeyPattern(text: string): boolean {
   return /[*>]/.test(text)
@@ -67,7 +105,9 @@ export default function KVStorePage() {
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyValue, setNewKeyValue] = useState('')
   const [newKeyTtl, setNewKeyTtl] = useState('')
-  const [draft, setDraft] = useState<{ key: string | null; value: string } | null>(null)
+  const [draft, setDraft] = useState<{ key: string | null; value: string; revision?: number } | null>(null)
+  const [live, setLive] = useState(false)
+  const [listView, setListView] = useState<'keys' | 'changes'>('keys')
   const [showHistory, setShowHistory] = useState(false)
   const [rawChoice, setRawChoice] = useState<{ key: string | null; revision?: number; on: boolean } | null>(null)
   const [confirmAction, setConfirmAction] = useState<KVConfirmAction | null>(null)
@@ -89,6 +129,7 @@ export default function KVStorePage() {
     keyPattern
   )
   const keys = keyList?.keys ?? NO_KEYS
+  const watch = useKVWatch(connectionId, bucketName, keyPattern, live)
 
   // Fetch selected key value
   const { data: keyEntry, isLoading: keyLoading } = useKVKey(
@@ -127,7 +168,14 @@ export default function KVStorePage() {
 
   const valueDirty = draft !== null && draft.key === selectedKey
   const editingValue = valueDirty ? draft.value : keyEntry && !isCreatingKey ? editableValue(keyEntry, !!target) : ''
-  const setEditingValue = (value: string) => setDraft({ key: selectedKey, value })
+  const setEditingValue = (value: string) =>
+    setDraft((prev) => ({
+      key: selectedKey,
+      value,
+      revision: prev && prev.key === selectedKey ? prev.revision : keyEntry?.revision,
+    }))
+  const changedWhileEditing =
+    valueDirty && draft.revision !== undefined && !!keyEntry && keyEntry.revision !== draft.revision
 
   const undecodable = !!keyEntry?.decoded?.error && keyEntry.decoded.data === undefined
   const showRaw = rawChoice && rawChoice.key === selectedKey && rawChoice.revision === keyEntry?.revision ? rawChoice.on : undecodable
@@ -158,7 +206,7 @@ export default function KVStorePage() {
         await putKey.mutateAsync({
           key: selectedKey,
           value: storedValue(target, editingValue),
-          expectedRevision: keyEntry?.revision,
+          expectedRevision: valueDirty ? draft.revision : keyEntry?.revision,
         })
         setDraft(null)
       }
@@ -307,10 +355,85 @@ export default function KVStorePage() {
                 <span className="font-mono">orders.&gt;</span>
               </p>
             )}
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <Toggle
+                size="xs"
+                checked={live}
+                onChange={(on) => {
+                  setLive(on)
+                  if (!on) setListView('keys')
+                }}
+                label="Live updates"
+              />
+              <span className="text-content-secondary">Live updates</span>
+              {watch.status === 'starting' && <span className="text-content-tertiary">Starting…</span>}
+              {watch.status === 'live' && (
+                <span className="flex items-center gap-1 text-status-success-text">
+                  <span className="w-1.5 h-1.5 rounded-full bg-status-success-text" aria-hidden="true" />
+                  <span>Live</span>
+                </span>
+              )}
+            </div>
+            {watch.status === 'stopped' && (
+              <div className="mt-1 flex items-center gap-2 text-xs text-status-error-text">
+                <span className="min-w-0 truncate" title={watch.error}>Stopped: {watch.error}</span>
+                <Button size="sm" variant="ghost" onClick={watch.restart}>
+                  Restart
+                </Button>
+              </div>
+            )}
+            {live && (
+              <Tabs
+                variant="pills"
+                label="Key list view"
+                idPrefix="kv-list"
+                className="mt-2 w-fit"
+                value={listView}
+                onChange={(view) => setListView(view as 'keys' | 'changes')}
+                tabs={[
+                  { value: 'keys', label: 'Keys' },
+                  { value: 'changes', label: `Changes (${watch.changes.length})` },
+                ]}
+              />
+            )}
           </div>
 
-          <div className="flex-1 overflow-auto">
-            {keysLoading ? (
+          <div className="flex-1 overflow-auto" {...(live ? tabPanelProps('kv-list', listView) : {})}>
+            {live && listView === 'changes' ? (
+              watch.changes.length === 0 ? (
+                <p className="p-4 text-center text-sm text-content-tertiary">
+                  No changes yet. Changes made from now on show up here.
+                </p>
+              ) : (
+                <ul>
+                  {watch.changes.map((change) => (
+                    <li key={`${change.revision}-${change.key}`} className="border-b">
+                      <button
+                        type="button"
+                        className={`w-full text-left p-2 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
+                          selectedKey === change.key ? 'bg-accent-light' : ''
+                        }`}
+                        onClick={() => {
+                          setSelectedKey(change.key)
+                          setIsCreatingKey(false)
+                        }}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="font-mono text-sm truncate min-w-0">{change.key}</span>
+                          <Badge size="sm" variant={change.operation === 'put' ? 'success' : change.operation === 'delete' ? 'warning' : 'error'}>
+                            {change.operation}
+                          </Badge>
+                        </span>
+                        <span className="block text-2xs text-content-tertiary truncate">
+                          rev {change.revision} · {formatTime(change.created)}
+                          {change.operation === 'put' && ` · ${changePreview(change)}`}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : keysLoading ? (
               <div className="flex items-center justify-center p-4">
                 <Spinner size="sm" />
               </div>
@@ -531,6 +654,12 @@ export default function KVStorePage() {
               )}
 
               <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+                {changedWhileEditing && (
+                  <Alert variant="warning">
+                    This key changed on the server (revision {keyEntry.revision}) while you were editing. Saving will
+                    fail; Reset loads the new value.
+                  </Alert>
+                )}
                 {target && keyEntry?.decoded?.error && (
                   <Alert variant="warning">
                     The stored value does not decode as {target.messageType}: {keyEntry.decoded.error}.

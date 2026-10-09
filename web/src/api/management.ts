@@ -20,6 +20,7 @@ import type {
   KVBucketConfig,
   KVBucketInfo,
   KVBucketSettings,
+  KVChange,
   KVEntry,
   KVKeyList,
   ObjectBucketConfig,
@@ -32,7 +33,7 @@ import type {
 } from '../types/management'
 import type { KVBucketInfo as PbKVBucketInfo, KVEntry as PbKVEntry } from '../gen/types/nats/nats_kv_pb'
 import { framingToProto, type Framing } from './framing'
-import { managementClient } from './grpc/clients'
+import { liveClient, managementClient } from './grpc/clients'
 import { toStreamInfo, toConsumerInfo, RETENTION_INT, STORAGE_INT, STORAGE_STR, DISCARD_INT, COMPRESSION_INT, PERSIST_MODE_INT, DELIVER_POLICY_INT, ACK_POLICY_INT, REPLAY_POLICY_INT, PRIORITY_POLICY_INT } from './streams'
 
 function toPlacementInit(p: PlacementConfig) {
@@ -479,6 +480,24 @@ export async function listKVKeys(
     .listKVKeys({ connectionId, bucket, filter }, { signal })
     .catch(emptyOn('NATS_NO_KEYS', 'no keys found', { keys: [], truncated: false }))
   return { keys: response.keys || [], truncated: !!response.truncated }
+}
+
+export async function* watchKV(
+  connectionId: string,
+  bucket: string,
+  filter: string,
+  signal: AbortSignal,
+): AsyncGenerator<KVChange[]> {
+  for await (const event of liveClient.watchKV({ connectionId, bucket, filter }, { signal })) {
+    yield event.changes.map((c) => ({
+      key: c.key,
+      operation: c.operation as KVChange['operation'],
+      revision: Number(c.revision),
+      created: tsToMillis(c.created),
+      value: c.value,
+      size: c.size,
+    }))
+  }
 }
 
 export async function getKVKey(

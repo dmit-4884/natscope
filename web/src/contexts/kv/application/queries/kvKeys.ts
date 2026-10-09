@@ -13,6 +13,8 @@ export const kvKeys = {
     [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'kv', 'bucket', bucket] as const,
   keys: (connectionId: string | undefined, bucket: string | undefined) =>
     [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'kv', 'keys', bucket] as const,
+  keyList: (connectionId: string | undefined, bucket: string | undefined, filter: string) =>
+    [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'kv', 'keys', bucket, filter] as const,
   key: (
     connectionId: string | undefined,
     bucket: string | undefined,
