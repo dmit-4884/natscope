@@ -39,8 +39,9 @@ export const toast = {
       duration: options?.duration ?? calculateDuration(message) + 2000, // extra time for warnings
     })
   },
-  info: (message: string, options?: { duration?: number }) => {
+  info: (message: string, options?: { duration?: number; id?: string }) => {
     return sonnerToast.info(message, {
+      id: options?.id,
       duration: options?.duration ?? calculateDuration(message),
     })
   },

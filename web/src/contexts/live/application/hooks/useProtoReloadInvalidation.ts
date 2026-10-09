@@ -33,7 +33,7 @@ export function useProtoReloadInvalidation(client: LiveStreamClient | null) {
         },
       })
 
-      toast.info(`Proto schemas reloaded — ${plural(payload.messages_count, 'message type')} available`)
+      toast.info(`Proto schemas reloaded — ${plural(payload.messages_count, 'message type')} available`, { id: 'proto-reload' })
     }
 
     return () => {
