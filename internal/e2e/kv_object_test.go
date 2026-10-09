@@ -9,12 +9,15 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
@@ -204,6 +207,41 @@ func TestListKVKeysFiltersAndLimitsOnTheServer(t *testing.T) {
 	}))
 	require.Error(t, err)
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+}
+
+// TestKVBucketSettingsRoundTrip checks that create and update carry compression, limits and the key TTL marker.
+func TestKVBucketSettingsRoundTrip(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kvsettings")
+
+	created, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID, Config: &natstypes.KVBucketConfig{
+			Bucket: "settings", Compression: true, LimitMarkerTtl: durationpb.New(5 * time.Second),
+		},
+	}))
+	require.NoError(t, err)
+	assert.True(t, created.Msg.GetBucket().GetIsCompressed())
+	assert.Equal(t, 5*time.Second, created.Msg.GetBucket().GetLimitMarkerTtl().AsDuration())
+
+	updated, err := env.management.UpdateKVBucket(ctx, connect.NewRequest(&managementpb.UpdateKVBucketRequest{
+		ConnectionId: connID, Bucket: "settings", Settings: &natstypes.KVBucketSettings{
+			Description: "edited", History: 4, MaxBytes: 1 << 20, LimitMarkerTtl: durationpb.New(2 * time.Second),
+		},
+	}))
+	require.NoError(t, err)
+	b := updated.Msg.GetBucket()
+	assert.Equal(t, "edited", b.GetDescription())
+	assert.Equal(t, uint32(4), b.GetHistory())
+	assert.Equal(t, int64(1<<20), b.GetMaxBytes())
+	assert.False(t, b.GetIsCompressed())
+	assert.Equal(t, 2*time.Second, b.GetLimitMarkerTtl().AsDuration())
+
+	_, err = env.management.UpdateKVBucket(ctx, connect.NewRequest(&managementpb.UpdateKVBucketRequest{
+		ConnectionId: connID, Bucket: "settings", Settings: &natstypes.KVBucketSettings{LimitMarkerTtl: durationpb.New(time.Millisecond)},
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a marker under one second is invalid")
 }
 
 // TestBucketDeleteSealRefusesPlainStream checks that Delete and Seal refuse a plain stream named like a bucket.

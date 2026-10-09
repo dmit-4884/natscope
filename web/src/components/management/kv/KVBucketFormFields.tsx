@@ -9,22 +9,28 @@ import { StreamSourceEditor } from '@/components/common/forms/editors/StreamSour
 import { StreamSourcesArrayEditor } from '@/components/common/forms/editors/StreamSourcesArrayEditor'
 import { KeyValueInput } from '@/components/common/forms/inputs/KeyValueInput'
 import { KV_HISTORY_MIN, KV_HISTORY_MAX, isKVHistoryValid } from './kvHistory'
+import { kvMarkerTtlError } from './kvMarkerTtl'
 
 interface KVBucketFormFieldsProps {
   value: KVBucketConfig
   onChange: (value: KVBucketConfig) => void
   isEditMode: boolean
+  keyTtlLocked?: boolean
+  keyTtlUnsupportedReason?: string
 }
 
 export function KVBucketFormFields({
   value,
   onChange,
   isEditMode,
+  keyTtlLocked = false,
+  keyTtlUnsupportedReason,
 }: KVBucketFormFieldsProps) {
+  const markerError = kvMarkerTtlError(value.limit_marker_ttl, keyTtlLocked)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     basic: true,
-    limits: false,
-    storage: false,
+    limits: isEditMode,
+    storage: isEditMode,
     placement: false,
     mirror: false,
     sources: false,
@@ -131,6 +137,26 @@ export function KVBucketFormFields({
             />
             <p className="text-xs text-content-tertiary mt-1">0 for no expiry</p>
           </div>
+
+          <div>
+            <label htmlFor="kv-limit-marker-ttl" className="block text-sm font-medium text-gray-700 mb-1">Key TTL marker (ns)</label>
+            <Input
+              id="kv-limit-marker-ttl"
+              type="number"
+              min={0}
+              value={value.limit_marker_ttl ?? 0}
+              onChange={(e) => updateField('limit_marker_ttl', parseIntOr(e.target.value, 0) || undefined)}
+              disabled={!!keyTtlUnsupportedReason && !value.limit_marker_ttl}
+              error={!!markerError}
+              errorMessage={markerError}
+            />
+            <p className="text-xs text-content-tertiary mt-1">
+              {keyTtlUnsupportedReason && !value.limit_marker_ttl
+                ? keyTtlUnsupportedReason
+                : 'Lets single keys carry a TTL and keeps a marker this long after one expires (at least 1000000000 = 1s, 0 = off). Requires NATS 2.11+.'}
+              {keyTtlLocked && " Can't be turned off once on."}
+            </p>
+          </div>
         </div>
       </SectionPanel>
 
@@ -152,26 +178,24 @@ export function KVBucketFormFields({
             </ImmutableField>
 
             {/* Replicas */}
-            <ImmutableField label="Replicas" isImmutable={isEditMode}>
+            <ImmutableField label="Replicas" isImmutable={false}>
               <Input
                 type="number"
                 min={1}
                 max={5}
                 value={value.num_replicas ?? 1}
                 onChange={(e) => updateField('num_replicas', parseIntOr(e.target.value, 1))}
-                disabled={isEditMode}
               />
             </ImmutableField>
           </div>
 
           {/* Compression */}
-          <ImmutableField label="Compression" isImmutable={isEditMode}>
+          <ImmutableField label="Compression" isImmutable={false}>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={value.compression ?? false}
                 onChange={(e) => updateField('compression', e.target.checked)}
-                disabled={isEditMode}
                 className="rounded border-border-strong disabled:cursor-not-allowed"
               />
               <span className="text-sm text-gray-700">Enabled</span>
@@ -180,42 +204,44 @@ export function KVBucketFormFields({
         </div>
       </SectionPanel>
 
-      {/* Placement Section */}
-      <SectionPanel label="Placement" isOpen={openSections.placement} onToggle={() => toggleSection('placement')}>
-        <p className="text-xs text-content-tertiary mb-3">Pin the bucket to a specific cluster or set of server tags.</p>
-        <PlacementEditor value={value.placement} onChange={(next) => updateField('placement', next)} />
-      </SectionPanel>
+      {!isEditMode && (
+        <>
+          {/* Placement Section */}
+          <SectionPanel label="Placement" isOpen={openSections.placement} onToggle={() => toggleSection('placement')}>
+            <p className="text-xs text-content-tertiary mb-3">Pin the bucket to a specific cluster or set of server tags.</p>
+            <PlacementEditor value={value.placement} onChange={(next) => updateField('placement', next)} />
+          </SectionPanel>
 
-      {/* Mirror Section (NATS 2.11+) */}
-      <SectionPanel label="Mirror" isOpen={openSections.mirror} onToggle={() => toggleSection('mirror')}>
-        <p className="text-xs text-content-tertiary mb-3">
-          Mirror exactly one upstream KV bucket. Requires NATS 2.11+. Immutable after creation.
-        </p>
-        <ImmutableField label="" isImmutable={isEditMode} helpText="Mirror cannot be changed after creation.">
-          <StreamSourceEditor
-            value={value.mirror}
-            onChange={(next) => updateField('mirror', next)}
-            hideRemove
-          />
-        </ImmutableField>
-      </SectionPanel>
+          {/* Mirror Section (NATS 2.11+) */}
+          <SectionPanel label="Mirror" isOpen={openSections.mirror} onToggle={() => toggleSection('mirror')}>
+            <p className="text-xs text-content-tertiary mb-3">
+              Mirror exactly one upstream KV bucket. Requires NATS 2.11+. Immutable after creation.
+            </p>
+            <StreamSourceEditor
+              value={value.mirror}
+              onChange={(next) => updateField('mirror', next)}
+              hideRemove
+            />
+          </SectionPanel>
 
-      {/* Sources Section (NATS 2.11+) */}
-      <SectionPanel label="Sources" isOpen={openSections.sources} onToggle={() => toggleSection('sources')}>
-        <p className="text-xs text-content-tertiary mb-3">
-          Aggregate from one or more upstream KV buckets. Requires NATS 2.11+.
-        </p>
-        <StreamSourcesArrayEditor
-          value={value.sources}
-          onChange={(next) => updateField('sources', next)}
-        />
-      </SectionPanel>
+          {/* Sources Section (NATS 2.11+) */}
+          <SectionPanel label="Sources" isOpen={openSections.sources} onToggle={() => toggleSection('sources')}>
+            <p className="text-xs text-content-tertiary mb-3">
+              Aggregate from one or more upstream KV buckets. Requires NATS 2.11+.
+            </p>
+            <StreamSourcesArrayEditor
+              value={value.sources}
+              onChange={(next) => updateField('sources', next)}
+            />
+          </SectionPanel>
 
-      {/* Republish Section */}
-      <SectionPanel label="Republish" isOpen={openSections.republish} onToggle={() => toggleSection('republish')}>
-        <p className="text-xs text-content-tertiary mb-3">Re-publish bucket operations to a different subject.</p>
-        <RePublishEditor value={value.republish} onChange={(next) => updateField('republish', next)} />
-      </SectionPanel>
+          {/* Republish Section */}
+          <SectionPanel label="Republish" isOpen={openSections.republish} onToggle={() => toggleSection('republish')}>
+            <p className="text-xs text-content-tertiary mb-3">Re-publish bucket operations to a different subject.</p>
+            <RePublishEditor value={value.republish} onChange={(next) => updateField('republish', next)} />
+          </SectionPanel>
+        </>
+      )}
 
       {/* Metadata Section */}
       <SectionPanel label="Metadata" isOpen={openSections.metadata} onToggle={() => toggleSection('metadata')}>

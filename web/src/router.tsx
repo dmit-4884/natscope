@@ -20,6 +20,7 @@ const StreamConsumersTab = lazyPage(() => import('./components/streams/StreamCon
 const StreamRelationsTab = lazyPage(() => import('./components/streams/StreamRelationsTab'))
 const KVStorePage = lazyPage(() => import('./components/kv/KVStorePage'))
 const CreateKVPage = lazyPage(() => import('./components/kv/CreateKVPage'))
+const EditKVPage = lazyPage(() => import('./components/kv/EditKVPage'))
 const KVOverviewPage = lazyPage(() => import('./components/kv/KVOverviewPage'))
 const ObjectsTab = lazyPage(() => import('./components/management/objects/ObjectsTab'))
 const ObjectsOverviewPage = lazyPage(() => import('./components/objects/ObjectsOverviewPage'))
@@ -36,6 +37,7 @@ export function preloadRoutes() {
     StreamRelationsTab,
     KVStorePage,
     CreateKVPage,
+    EditKVPage,
     KVOverviewPage,
     ObjectsTab,
     ObjectsOverviewPage,
@@ -114,6 +116,7 @@ export const router = createBrowserRouter([
               { path: 'new', element: <ReadOnlyGate><LazyRoute><CreateKVPage /></LazyRoute></ReadOnlyGate> },
               // KV store view
               { path: ':bucketName', element: <KeyedByParam param="bucketName"><LazyRoute><KVStorePage /></LazyRoute></KeyedByParam> },
+              { path: ':bucketName/edit', element: <ReadOnlyGate><KeyedByParam param="bucketName"><LazyRoute><EditKVPage /></LazyRoute></KeyedByParam></ReadOnlyGate> },
             ]
           },
 

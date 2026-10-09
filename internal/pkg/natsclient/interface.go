@@ -212,6 +212,9 @@ type KVStore interface {
 	// CreateKVBucket creates a KeyValue bucket.
 	CreateKVBucket(ctx context.Context, config entities.KVBucketConfig) (*entities.KVBucketInfo, error)
 
+	// UpdateKVBucket applies new settings to a bucket and keeps every other stream setting.
+	UpdateKVBucket(ctx context.Context, bucket string, settings entities.KVBucketSettings) (*entities.KVBucketInfo, error)
+
 	// DeleteKVBucket deletes a KeyValue bucket and its data.
 	DeleteKVBucket(ctx context.Context, bucket string) error
 

@@ -115,6 +115,10 @@ func (r *readOnlyClient) CreateKVBucket(context.Context, entities.KVBucketConfig
 	return nil, errs.ErrConnectionReadOnly
 }
 
+func (r *readOnlyClient) UpdateKVBucket(context.Context, string, entities.KVBucketSettings) (*entities.KVBucketInfo, error) {
+	return nil, errs.ErrConnectionReadOnly
+}
+
 func (r *readOnlyClient) DeleteKVBucket(context.Context, string) error {
 	return errs.ErrConnectionReadOnly
 }

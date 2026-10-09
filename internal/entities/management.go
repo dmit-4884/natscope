@@ -481,6 +481,43 @@ type KVBucketConfig struct {
 
 	// Republish configures re-publishing of bucket operations to another subject.
 	Republish *StreamRePublish
+
+	// Compression turns on S2 compression of the bucket's stream.
+	Compression bool
+
+	// LimitMarkerTTL keeps a marker this long after a key expires; non-zero allows a TTL per key (NATS 2.11+).
+	LimitMarkerTTL time.Duration
+}
+
+// KVBucketSettings are the settings of an existing bucket that can change.
+type KVBucketSettings struct {
+	// Description is the bucket description.
+	Description string `normalize:"trim"`
+
+	// MaxValueSize is the maximum value size in bytes; zero or less is unlimited.
+	MaxValueSize int32
+
+	// MaxBytes is the maximum total bucket size in bytes; zero or less is unlimited.
+	MaxBytes int64
+
+	// History is the number of historical values to keep per key (1-64).
+	History uint8
+
+	// TTL is the time-to-live for keys; zero keeps them forever.
+	TTL time.Duration
+
+	// Replicas is the number of replicas.
+	Replicas int
+
+	// Compression turns on S2 compression of the bucket's stream.
+	Compression bool
+
+	// LimitMarkerTTL keeps a marker this long after a key expires; non-zero allows a TTL per key. Once allowed,
+	// a TTL per key stays allowed.
+	LimitMarkerTTL time.Duration
+
+	// Metadata is custom key-value metadata.
+	Metadata map[string]string
 }
 
 // KVBucketInfo is the current state of a KeyValue bucket.
@@ -514,6 +551,15 @@ type KVBucketInfo struct {
 
 	// Metadata is custom key-value metadata.
 	Metadata map[string]string
+
+	// MaxValueSize is the maximum value size in bytes; -1 is unlimited.
+	MaxValueSize int32
+
+	// MaxBytes is the maximum total bucket size in bytes; -1 is unlimited.
+	MaxBytes int64
+
+	// LimitMarkerTTL is how long a marker stays after a key expires; non-zero means keys may carry their own TTL.
+	LimitMarkerTTL time.Duration
 }
 
 // KVEntry is a single key-value pair from a KV bucket.

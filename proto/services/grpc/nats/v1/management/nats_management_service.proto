@@ -71,6 +71,9 @@ service ManagementService {
   // Retrieves detailed information about a specific KeyValue bucket.
   rpc GetKVBucket(GetKVBucketRequest) returns (GetKVBucketResponse) {}
 
+  // Applies new settings to a KeyValue bucket, keeping every other setting of its stream.
+  rpc UpdateKVBucket(UpdateKVBucketRequest) returns (UpdateKVBucketResponse) {}
+
   // Permanently deletes a KeyValue bucket and all of its entries.
   rpc DeleteKVBucket(DeleteKVBucketRequest) returns (DeleteKVBucketResponse) {}
 
@@ -826,6 +829,24 @@ message GetKVBucketRequest {
 // Defines the response message for retrieving a KeyValue bucket.
 message GetKVBucketResponse {
   // Required. Detailed information about the requested KeyValue bucket.
+  .natscope.types.nats.KVBucketInfo bucket = 1;
+}
+
+// Defines the request message for changing the settings of a KeyValue bucket.
+message UpdateKVBucketRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Name of the KeyValue bucket to change.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Required. The new settings; settings outside this message stay as they are.
+  .natscope.types.nats.KVBucketSettings settings = 3 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true];
+}
+
+// Defines the response message for changing the settings of a KeyValue bucket.
+message UpdateKVBucketResponse {
+  // Required. The bucket after the change.
   .natscope.types.nats.KVBucketInfo bucket = 1;
 }
 

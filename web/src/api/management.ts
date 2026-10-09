@@ -1,4 +1,4 @@
-import type { Duration, Timestamp } from '@bufbuild/protobuf/wkt'
+import type { Timestamp } from '@bufbuild/protobuf/wkt'
 import { ConnectError } from '@connectrpc/connect'
 import { getErrorReason } from '@/api/errors'
 import { durToNanos, nanosToDur, tsToMillis } from '@/utils/timestamp'
@@ -19,6 +19,7 @@ import type {
   ConsumerResetResponse,
   KVBucketConfig,
   KVBucketInfo,
+  KVBucketSettings,
   KVEntry,
   KVKeyList,
   ObjectBucketConfig,
@@ -29,7 +30,7 @@ import type {
   StatusResponse,
   RevisionResponse,
 } from '../types/management'
-import type { KVEntry as PbKVEntry } from '../gen/types/nats/nats_kv_pb'
+import type { KVBucketInfo as PbKVBucketInfo, KVEntry as PbKVEntry } from '../gen/types/nats/nats_kv_pb'
 import { framingToProto, type Framing } from './framing'
 import { managementClient } from './grpc/clients'
 import { toStreamInfo, toConsumerInfo, RETENTION_INT, STORAGE_INT, STORAGE_STR, DISCARD_INT, COMPRESSION_INT, PERSIST_MODE_INT, DELIVER_POLICY_INT, ACK_POLICY_INT, REPLAY_POLICY_INT, PRIORITY_POLICY_INT } from './streams'
@@ -357,7 +358,7 @@ export async function resumeConsumer(
   return { status: 'ok' }
 }
 
-function toKVBucketInfo(b: { bucket: string; description: string; values: bigint; bytes: bigint; history: number; ttl?: Duration; storage: number; numReplicas: number; isCompressed: boolean; metadata: Record<string, string> }): KVBucketInfo {
+function toKVBucketInfo(b: PbKVBucketInfo): KVBucketInfo {
   return {
     bucket: b.bucket,
     description: b.description || undefined,
@@ -369,7 +370,33 @@ function toKVBucketInfo(b: { bucket: string; description: string; values: bigint
     num_replicas: b.numReplicas,
     is_compressed: b.isCompressed || undefined,
     metadata: Object.keys(b.metadata).length > 0 ? b.metadata : undefined,
+    max_value_size: b.maxValueSize,
+    max_bytes: Number(b.maxBytes),
+    limit_marker_ttl: durToNanos(b.limitMarkerTtl) || undefined,
   }
+}
+
+export async function updateKVBucket(
+  connectionId: string,
+  bucket: string,
+  settings: KVBucketSettings,
+): Promise<KVBucketInfo> {
+  const response = await managementClient.updateKVBucket({
+    connectionId,
+    bucket,
+    settings: {
+      description: settings.description ?? '',
+      maxValueSize: settings.max_value_size ?? 0,
+      maxBytes: BigInt(settings.max_bytes ?? 0),
+      history: settings.history ?? 0,
+      ttl: settings.ttl ? nanosToDur(settings.ttl) : undefined,
+      numReplicas: settings.num_replicas ?? 0,
+      compression: settings.compression ?? false,
+      limitMarkerTtl: settings.limit_marker_ttl ? nanosToDur(settings.limit_marker_ttl) : undefined,
+      metadata: settings.metadata ?? {},
+    },
+  })
+  return toKVBucketInfo(response.bucket!)
 }
 
 export async function listKVBuckets(
@@ -396,6 +423,8 @@ export async function createKVBucket(
       storage: STORAGE_INT[config.storage ?? ''] ?? 0,
       numReplicas: config.num_replicas ?? 0,
       metadata: config.metadata ?? {},
+      compression: config.compression ?? false,
+      limitMarkerTtl: config.limit_marker_ttl ? nanosToDur(config.limit_marker_ttl) : undefined,
     },
   })
   return toKVBucketInfo(response.bucket!)

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -25,6 +26,9 @@ import (
 
 // kvKeyPattern mirrors nats.go's key charset (jetstream/kv.go validKeyRe).
 var kvKeyPattern = regexp.MustCompile(`^[-/_=.a-zA-Z0-9]+$`)
+
+// kvStreamPrefix names the stream behind a bucket: KV_<bucket>.
+const kvStreamPrefix = "KV_"
 
 // validateKVKey rejects empty path segments and wildcards with nats.go's "invalid key" error.
 func validateKVKey(key string) error {
@@ -81,9 +85,15 @@ func (c *Client) CreateKVBucket(ctx context.Context, config entities.KVBucketCon
 	_ = normalizer.Normalize(&config) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
 
 	kvConfig := converter.Convert(config, &jetstream.KeyValueConfig{},
-		converter.WithIgnoreFields("TTL", "Mirror", "Sources", "Republish"),
+		converter.WithIgnoreFields("TTL", "LimitMarkerTTL", "Mirror", "Sources", "Republish"),
 	)
 	kvConfig.TTL = config.TTL
+	kvConfig.LimitMarkerTTL = config.LimitMarkerTTL
+	if config.LimitMarkerTTL > 0 {
+		if err := c.requireFeatures(ctx, featMessageTTL); err != nil {
+			return nil, err
+		}
+	}
 	if config.Mirror != nil {
 		kvConfig.Mirror = converter.Convert(config.Mirror, &jetstream.StreamSource{})
 	}
@@ -390,15 +400,85 @@ func toKVBucketInfo(status jetstream.KeyValueStatus) entities.KVBucketInfo {
 	}
 
 	return entities.KVBucketInfo{
-		Bucket:       status.Bucket(),
-		Description:  cfg.Description,
-		Values:       status.Values(),
-		Bytes:        status.Bytes(),
-		History:      uint8(history),
-		TTL:          status.TTL(),
-		Storage:      storage,
-		Replicas:     replicas,
-		IsCompressed: status.IsCompressed(),
-		Metadata:     status.Metadata(),
+		Bucket:         status.Bucket(),
+		Description:    cfg.Description,
+		Values:         status.Values(),
+		Bytes:          status.Bytes(),
+		History:        uint8(history),
+		TTL:            status.TTL(),
+		Storage:        storage,
+		Replicas:       replicas,
+		IsCompressed:   status.IsCompressed(),
+		Metadata:       status.Metadata(),
+		MaxValueSize:   cfg.MaxValueSize,
+		MaxBytes:       cfg.MaxBytes,
+		LimitMarkerTTL: cfg.LimitMarkerTTL,
 	}
+}
+
+// kvDuplicateWindow mirrors nats.go: two minutes, or the bucket TTL when that is shorter.
+func kvDuplicateWindow(ttl time.Duration) time.Duration {
+	const window = 2 * time.Minute
+	if ttl > 0 && ttl < window {
+		return ttl
+	}
+	return window
+}
+
+// UpdateKVBucket applies new settings to a bucket's stream and keeps every other stream setting as it is.
+func (c *Client) UpdateKVBucket(ctx context.Context, bucket string, settings entities.KVBucketSettings) (*entities.KVBucketInfo, error) {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)
+	defer cancel()
+
+	_ = normalizer.Normalize(&settings) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed DTO
+
+	kv, err := c.jetStream.KeyValue(ctx, bucket)
+	if err != nil {
+		return nil, wrapBucketErr(err)
+	}
+	stream, err := c.jetStream.Stream(ctx, kvStreamPrefix+bucket)
+	if err != nil {
+		return nil, wrapBucketErr(err)
+	}
+
+	cfg := stream.CachedInfo().Config
+	if cfg.SubjectDeleteMarkerTTL > 0 && settings.LimitMarkerTTL <= 0 {
+		return nil, &errs.NATSValidationError{Description: "per-key TTL cannot be turned off once a bucket allows it"}
+	}
+	cfg.Description = settings.Description
+	cfg.MaxMsgsPerSubject = int64(max(settings.History, 1))
+	cfg.MaxAge = settings.TTL
+	cfg.Duplicates = kvDuplicateWindow(settings.TTL)
+	cfg.MaxMsgSize = settings.MaxValueSize
+	if cfg.MaxMsgSize <= 0 {
+		cfg.MaxMsgSize = -1
+	}
+	cfg.MaxBytes = settings.MaxBytes
+	if cfg.MaxBytes <= 0 {
+		cfg.MaxBytes = -1
+	}
+	cfg.Replicas = max(settings.Replicas, 1)
+	cfg.Compression = jetstream.NoCompression
+	if settings.Compression {
+		cfg.Compression = jetstream.S2Compression
+	}
+	cfg.SubjectDeleteMarkerTTL = settings.LimitMarkerTTL
+	if settings.LimitMarkerTTL > 0 {
+		cfg.AllowMsgTTL = true
+	}
+	cfg.Metadata = settings.Metadata
+
+	if err := c.requireFeatures(ctx, streamConfigFeatures(cfg)...); err != nil {
+		return nil, err
+	}
+	if _, err := c.jetStream.UpdateStream(ctx, cfg); err != nil {
+		return nil, wrapErr(err)
+	}
+
+	status, err := kv.Status(ctx)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	result := toKVBucketInfo(status)
+	return &result, nil
 }

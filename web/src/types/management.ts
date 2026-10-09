@@ -221,7 +221,13 @@ export interface KVBucketConfig {
   mirror?: StreamSource
   sources?: StreamSource[]
   republish?: RePublishConfig
+  limit_marker_ttl?: number
 }
+
+export type KVBucketSettings = Pick<
+  KVBucketConfig,
+  'description' | 'max_value_size' | 'max_bytes' | 'history' | 'ttl' | 'num_replicas' | 'compression' | 'limit_marker_ttl' | 'metadata'
+>
 
 export interface KVBucketInfo {
   bucket: string
@@ -234,6 +240,9 @@ export interface KVBucketInfo {
   num_replicas: number
   is_compressed?: boolean
   metadata?: Record<string, string>
+  max_value_size: number
+  max_bytes: number
+  limit_marker_ttl?: number
 }
 
 export interface KVKeyList {

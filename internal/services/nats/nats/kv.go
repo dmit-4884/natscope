@@ -31,6 +31,20 @@ func (s *Service) CreateKVBucket(
 	return c.CreateKVBucket(ctx, config)
 }
 
+// UpdateKVBucket applies new settings to a bucket and keeps every other stream setting.
+func (s *Service) UpdateKVBucket(
+	ctx context.Context,
+	connectionID string,
+	bucket string,
+	settings entities.KVBucketSettings,
+) (*entities.KVBucketInfo, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.UpdateKVBucket(ctx, bucket, settings)
+}
+
 // DeleteKVBucket deletes a KeyValue bucket and all its data.
 func (s *Service) DeleteKVBucket(ctx context.Context, connectionID string, bucket string) error {
 	c, err := s.client(ctx, connectionID)

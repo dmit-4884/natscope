@@ -228,6 +228,10 @@ export default function KVStorePage() {
               label="Bucket actions"
               items={[
                 {
+                  label: 'Edit bucket…',
+                  onSelect: () => navigate(`/kv/${encodeURIComponent(bucketName)}/edit`),
+                },
+                {
                   label: 'Delete bucket…',
                   destructive: true,
                   onSelect: () => setConfirmAction({

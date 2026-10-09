@@ -40,6 +40,52 @@ message KVBucketInfo {
 
   // Optional. User-defined metadata as key-value pairs.
   map<string, string> metadata = 10;
+
+  // Required. Maximum size of a single value in bytes (-1 for unlimited).
+  int32 max_value_size = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Maximum total size of the bucket in bytes (-1 for unlimited).
+  int64 max_bytes = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. How long a marker stays after a key expires; set when keys may carry their own TTL (NATS 2.11+).
+  google.protobuf.Duration limit_marker_ttl = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Defines the settings of an existing Key-Value bucket that can change.
+message KVBucketSettings {
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.kv.limit_marker_ttl_min"
+    message: "the key TTL marker must last at least 1s"
+    expression: "!has(this.limit_marker_ttl) || this.limit_marker_ttl == duration('0s') || this.limit_marker_ttl >= duration('1s')"
+  };
+
+  // Optional. Human-readable description of the bucket.
+  string description = 1;
+
+  // Optional. Maximum size of a single value in bytes (zero or -1 for unlimited).
+  int32 max_value_size = 2;
+
+  // Optional. Maximum total size of the bucket in bytes (zero or -1 for unlimited).
+  int64 max_bytes = 3;
+
+  // Optional. Number of historical values kept per key (1-64; zero keeps one).
+  uint32 history = 4 [(buf.validate.field).uint32.lte = 64];
+
+  // Optional. Time-to-live for keys (unset for no expiry).
+  google.protobuf.Duration ttl = 5;
+
+  // Optional. Number of replicas in the cluster (zero keeps one).
+  int32 num_replicas = 6 [(buf.validate.field).int32 = {gte: 0, lte: 5}];
+
+  // Optional. Whether S2 compression is enabled for the bucket.
+  bool compression = 7;
+
+  // Optional. How long a marker stays after a key expires; set to allow a TTL per key (NATS 2.11+). Once allowed,
+  // a TTL per key stays allowed.
+  google.protobuf.Duration limit_marker_ttl = 8;
+
+  // Optional. User-defined metadata as key-value pairs.
+  map<string, string> metadata = 9;
 }
 
 // Defines the configuration for creating or updating a NATS JetStream Key-Value bucket.
@@ -48,6 +94,11 @@ message KVBucketConfig {
     id: "natscope.nats.kv.mirror_sources_exclusive"
     message: "mirror and sources are mutually exclusive"
     expression: "!(has(this.mirror) && size(this.sources) > 0)"
+  };
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.kv.limit_marker_ttl_min"
+    message: "the key TTL marker must last at least 1s"
+    expression: "!has(this.limit_marker_ttl) || this.limit_marker_ttl == duration('0s') || this.limit_marker_ttl >= duration('1s')"
   };
 
   // Required. Name of the Key-Value bucket.
@@ -88,6 +139,12 @@ message KVBucketConfig {
 
   // Optional. Republish — re-publish bucket operations to a different subject.
   optional .natscope.types.nats.RePublish republish = 13;
+
+  // Optional. Whether S2 compression is enabled for the bucket.
+  bool compression = 14;
+
+  // Optional. How long a marker stays after a key expires; set to allow a TTL per key (NATS 2.11+).
+  google.protobuf.Duration limit_marker_ttl = 15;
 }
 
 // Defines a single entry in a NATS JetStream Key-Value bucket.

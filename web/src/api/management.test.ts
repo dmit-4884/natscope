@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { create } from '@bufbuild/protobuf'
 import { DurationSchema } from '@bufbuild/protobuf/wkt'
 
+import { KVBucketInfoSchema } from '../gen/types/nats/nats_kv_pb'
 import { ConsumerInfoSchema, StreamInfoSchema } from '../gen/types/nats/nats_stream_pb'
 
 const createConsumerCall = vi.fn()
@@ -11,6 +12,8 @@ const getKVKeyCall = vi.fn()
 const createStreamCall = vi.fn()
 const updateStreamCall = vi.fn()
 const resetConsumerCall = vi.fn()
+const createKVBucketCall = vi.fn()
+const updateKVBucketCall = vi.fn()
 
 vi.mock('./grpc/clients', () => ({
   streamsClient: {},
@@ -22,10 +25,13 @@ vi.mock('./grpc/clients', () => ({
     createStream: createStreamCall,
     updateStream: updateStreamCall,
     resetConsumer: resetConsumerCall,
+    createKVBucket: createKVBucketCall,
+    updateKVBucket: updateKVBucketCall,
   },
 }))
 
-const { createConsumer, updateConsumer, putKVKey, getKVKey, createStream, updateStream, resetConsumer } = await import('./management')
+const { createConsumer, updateConsumer, putKVKey, getKVKey, createStream, updateStream, resetConsumer, createKVBucket, updateKVBucket } =
+  await import('./management')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -244,6 +250,66 @@ describe('putKVKey', () => {
       fingerprint: 'fp-1',
     })
     expect(payload.value.framing.kind).toBe(1)
+  })
+})
+
+describe('KV bucket settings', () => {
+  const pbBucket = create(KVBucketInfoSchema, {
+    bucket: 'CONFIG',
+    maxValueSize: 1024,
+    maxBytes: 4096n,
+    isCompressed: true,
+    limitMarkerTtl: create(DurationSchema, { seconds: 5n }),
+  })
+
+  beforeEach(() => {
+    createKVBucketCall.mockResolvedValue({ bucket: pbBucket })
+    updateKVBucketCall.mockResolvedValue({ bucket: pbBucket })
+  })
+
+  it('creates a bucket with compression and the key TTL marker', async () => {
+    await createKVBucket('conn-1', { bucket: 'CONFIG', compression: true, limit_marker_ttl: 5_000_000_000 })
+
+    const { config } = createKVBucketCall.mock.calls[0][0]
+    expect(config.compression).toBe(true)
+    expect(config.limitMarkerTtl.seconds).toBe(5n)
+  })
+
+  it('maps limits and the key TTL marker back from the bucket', async () => {
+    const info = await createKVBucket('conn-1', { bucket: 'CONFIG' })
+
+    expect(info.max_value_size).toBe(1024)
+    expect(info.max_bytes).toBe(4096)
+    expect(info.is_compressed).toBe(true)
+    expect(info.limit_marker_ttl).toBe(5_000_000_000)
+  })
+
+  it('sends every editable setting on update', async () => {
+    await updateKVBucket('conn-1', 'CONFIG', {
+      description: 'flags',
+      history: 4,
+      ttl: 60_000_000_000,
+      max_value_size: 512,
+      max_bytes: 2048,
+      num_replicas: 3,
+      compression: true,
+      limit_marker_ttl: 2_000_000_000,
+      metadata: { team: 'core' },
+    })
+
+    const req = updateKVBucketCall.mock.calls[0][0]
+    expect(req.bucket).toBe('CONFIG')
+    expect(req.settings).toMatchObject({
+      description: 'flags',
+      history: 4,
+      maxValueSize: 512,
+      maxBytes: 2048n,
+      numReplicas: 3,
+      compression: true,
+      metadata: { team: 'core' },
+    })
+    expect(req.settings.ttl.seconds).toBe(60n)
+    expect(req.settings.limitMarkerTtl.seconds).toBe(2n)
   })
 })
 

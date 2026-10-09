@@ -47,6 +47,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/kv/CONFIG']}>
       <Routes>
         <Route path="/kv/:bucketName" element={<KVStorePage />} />
+        <Route path="/kv/:bucketName/edit" element={<p>edit page</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -74,6 +75,15 @@ describe('KVStorePage', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'beta' })).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'alpha' })).toBeInTheDocument()
     expect(keys.filters.every((f) => !f)).toBe(true)
+  })
+
+  it('opens the bucket editor from the bucket menu', async () => {
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bucket actions' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /edit bucket/i }))
+
+    expect(await screen.findByText('edit page')).toBeInTheDocument()
   })
 
   it('says when the server cut the list at the limit', () => {

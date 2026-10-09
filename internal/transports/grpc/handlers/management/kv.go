@@ -88,6 +88,28 @@ func (h *Handler) GetKVBucket(
 	}), nil
 }
 
+// UpdateKVBucket applies new settings to a KeyValue bucket.
+func (h *Handler) UpdateKVBucket(
+	ctx context.Context,
+	req *connect.Request[managementpb.UpdateKVBucketRequest],
+) (*connect.Response[managementpb.UpdateKVBucketResponse], error) {
+	in := req.Msg
+	settings := converter.Convert(in.GetSettings(), &entities.KVBucketSettings{},
+		protoCodecs,
+		replicasMappingToEntity,
+		converter.WithIgnoreFields("History"),
+	)
+	settings.History = uint8(in.GetSettings().GetHistory())
+
+	bucket, err := h.natsService.UpdateKVBucket(ctx, in.GetConnectionId(), in.GetBucket(), *settings)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&managementpb.UpdateKVBucketResponse{
+		Bucket: converter.Convert(bucket, &natspb.KVBucketInfo{}, replicasMapping, protoCodecs),
+	}), nil
+}
+
 // DeleteKVBucket deletes a KeyValue bucket.
 func (h *Handler) DeleteKVBucket(
 	ctx context.Context,

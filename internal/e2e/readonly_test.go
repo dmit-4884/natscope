@@ -83,6 +83,10 @@ func TestReadOnlyConnection(t *testing.T) {
 			ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "ro_kv"},
 		}))
 		refused(t, err)
+		_, err = env.management.UpdateKVBucket(ctx, connect.NewRequest(&managementpb.UpdateKVBucketRequest{
+			ConnectionId: connID, Bucket: "ro_kv", Settings: &natstypes.KVBucketSettings{History: 2},
+		}))
+		refused(t, err)
 	})
 
 	t.Run("reads work", func(t *testing.T) {

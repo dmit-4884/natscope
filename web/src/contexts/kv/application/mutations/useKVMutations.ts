@@ -3,7 +3,7 @@ import { toast } from '@/utils/toast'
 import * as api from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
-import type { KVBucketConfig } from '@/types/management'
+import type { KVBucketConfig, KVBucketSettings } from '@/types/management'
 import { kvKeys } from '../queries/kvKeys'
 
 /**
@@ -35,6 +35,23 @@ export function useCreateKVBucket(connectionId: string | undefined) {
     },
     onError: (error: Error) => {
       toast.error(`Failed to create KV bucket: ${getErrorMessage(error)}`)
+    },
+  })
+}
+
+export function useUpdateKVBucket(connectionId: string | undefined) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ bucket, settings }: { bucket: string; settings: KVBucketSettings }) => {
+      if (!connectionId) throw new Error('No connection')
+      return api.updateKVBucket(connectionId, bucket, settings)
+    },
+    onSuccess: (bucket) => {
+      toast.success(`KV bucket "${bucket.bucket}" updated`)
+      invalidateAllKVViews(queryClient, connectionId, bucket.bucket)
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update KV bucket: ${getErrorMessage(error)}`)
     },
   })
 }

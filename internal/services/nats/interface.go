@@ -306,6 +306,14 @@ type KVStore interface {
 		config entities.KVBucketConfig,
 	) (*entities.KVBucketInfo, error)
 
+	// UpdateKVBucket applies new settings to a bucket and keeps every other stream setting.
+	UpdateKVBucket(
+		ctx context.Context,
+		connectionID string,
+		bucket string,
+		settings entities.KVBucketSettings,
+	) (*entities.KVBucketInfo, error)
+
 	// DeleteKVBucket deletes a KeyValue bucket and its data.
 	DeleteKVBucket(ctx context.Context, connectionID string, bucket string) error
 
