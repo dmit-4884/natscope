@@ -55,6 +55,23 @@ describe('ConnectionForm environment', () => {
   })
 })
 
+describe('ConnectionForm label color', () => {
+  it('is one tab stop whose arrow keys move the choice', () => {
+    const onChange = vi.fn()
+    render(<Harness onChange={onChange} />)
+
+    expect(screen.getAllByRole('radio').filter((r) => r.tabIndex === 0).map((r) => r.getAttribute('aria-label'))).toEqual(['Gray'])
+
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Gray' }), { key: 'ArrowRight' })
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ labelColor: 'blue' }))
+    expect(screen.getByRole('radio', { name: 'Blue' })).toHaveFocus()
+
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Blue' }), { key: 'ArrowLeft' })
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Gray' }), { key: 'ArrowLeft' })
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ labelColor: 'red' }))
+  })
+})
+
 describe('ConnectionForm JetStream target', () => {
   it('edits the domain and the API prefix and shows their errors', () => {
     const onChange = vi.fn()

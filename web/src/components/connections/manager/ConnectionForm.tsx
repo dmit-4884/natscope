@@ -142,14 +142,24 @@ export function ConnectionForm({
               />
             </label>
             <div role="radiogroup" aria-label="Label color" className="flex items-center gap-1.5 pb-2">
-              {LABEL_COLORS.map((color) => (
+              {LABEL_COLORS.map((color, index) => (
                 <button
                   key={color}
                   type="button"
                   role="radio"
                   aria-checked={value.labelColor === color}
                   aria-label={COLOR_NAMES[color]}
+                  tabIndex={value.labelColor === color ? 0 : -1}
                   onClick={() => update({ labelColor: color })}
+                  onKeyDown={(event) => {
+                    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key]
+                    if (!step) return
+                    event.preventDefault()
+                    const next = (index + step + LABEL_COLORS.length) % LABEL_COLORS.length
+                    update({ labelColor: LABEL_COLORS[next] })
+                    const radios = event.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="radio"]')
+                    radios?.[next]?.focus()
+                  }}
                   className={`w-6 h-6 rounded-full ${LABEL_BADGE_CLASSES[color]} ${
                     value.labelColor === color ? 'ring-2 ring-offset-2 ring-border-focus' : ''
                   }`}
