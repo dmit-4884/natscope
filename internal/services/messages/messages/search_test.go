@@ -45,6 +45,7 @@ func TestSearchMatcher(t *testing.T) {
 		{name: "header value must match", req: entities.MessageSearchRequest{HeaderName: "X-Trace", HeaderValue: "abc"}, msg: payloadMessage("", map[string]string{"X-Trace": "abd"})},
 		{name: "header value matches one of several", req: entities.MessageSearchRequest{HeaderName: "X-Tag", HeaderValue: "b"}, msg: headerMessage(map[string][]string{"X-Tag": {"a", "b"}}), want: true},
 		{name: "header value is not a part of one value", req: entities.MessageSearchRequest{HeaderName: "X-Tag", HeaderValue: "b"}, msg: headerMessage(map[string][]string{"X-Tag": {"a, b"}})},
+		{name: "header values match as shown together", req: entities.MessageSearchRequest{HeaderName: "X-Tag", HeaderValue: "a, b"}, msg: headerMessage(map[string][]string{"X-Tag": {"a", "b"}}), want: true},
 		{name: "header value with a comma matches whole", req: entities.MessageSearchRequest{HeaderName: "X-Tag", HeaderValue: "a, b"}, msg: headerMessage(map[string][]string{"X-Tag": {"a, b"}}), want: true},
 		{name: "missing header", req: entities.MessageSearchRequest{HeaderName: "X-Trace"}, msg: payloadMessage("", nil)},
 		{name: "every condition must hold", req: entities.MessageSearchRequest{Text: "needle", HeaderName: "X-Trace"}, msg: payloadMessage("needle", nil)},

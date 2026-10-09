@@ -99,11 +99,7 @@ func (m *searchMatcher) matchHeaders(msg *entities.Message) bool {
 		if !strings.EqualFold(name, m.headerName) {
 			continue
 		}
-		values, kept := msg.HeaderValues[name]
-		if !kept {
-			values = []string{value}
-		}
-		if m.headerValue == "" || slices.Contains(values, m.headerValue) {
+		if m.headerValue == "" || value == m.headerValue || slices.Contains(msg.HeaderValues[name], m.headerValue) {
 			return true
 		}
 	}

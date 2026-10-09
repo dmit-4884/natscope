@@ -19,7 +19,7 @@ Click **Filters** in the toolbar to open the filter panel:
   match an RE2 expression as written; start it with `(?i)` to ignore case. A payload counts as decoded when a
   [Protobuf mapping](/guide/protobuf) matches its subject; one natscope only guesses the type of is searched as stored.
 - **Header** — a header the message must carry, as `X-Trace` or `X-Trace=abc`. The name ignores case, a value must
-  match exactly; for a header sent several times, any one of its values does.
+  match exactly; for a header sent several times, any one of its values does, as do all of them as shown, joined by `, `.
 - **Start Sequence** — begin the listing at a stream sequence.
 - **Start Date & Time** — jump to the first message published at or after a timestamp. Quick chips:
   **Now**, **1h ago**, **24h ago**, **7d ago**.
