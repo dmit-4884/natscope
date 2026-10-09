@@ -88,6 +88,10 @@ export function useLiveSubscription({
   const [pausedCount, setPausedCount] = useState(0)
 
   const [ws, setWs] = useState<LiveStreamClient | null>(null)
+  const wsRef = useRef<LiveStreamClient | null>(null)
+  useEffect(() => {
+    wsRef.current = ws
+  }, [ws])
   const liveLimitRef = useRef(liveLimit)
   const streamNameRef = useRef(streamName)
   const subjectsKey = subjects && subjects.length > 0 ? subjects.join('\n') : null
@@ -337,14 +341,14 @@ export function useLiveSubscription({
 
   const clearMessages = useCallback(() => {
     stopDrip()
-    ws?.discardPaused()
+    wsRef.current?.discardPaused()
     setPausedCount(0)
     setLiveMessages([])
     setSubjectCounts({})
     const skipped = skippedRef.current
     skippedRef.current = { carried: 0, session: skipped.session, cleared: skipped.session }
     setMessagesDropped((prev) => (prev === undefined ? prev : 0))
-  }, [ws, stopDrip])
+  }, [stopDrip])
 
   const shownStatus = natsDown && wsStatus === 'connected' ? 'reconnecting' : wsStatus
 

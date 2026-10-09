@@ -316,6 +316,18 @@ describe('useLiveSubscription subjects', () => {
     expect(result.current.messagesDropped).toBe(6)
   })
 
+  it('keeps Clear the same function when the subscription starts, so a reset keyed on it does not fire', () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useLiveSubscription({ connectionId: 'conn-1', streamName: null, subjects: ['>'], enabled, initialLimit: 100 }),
+      { initialProps: { enabled: false } },
+    )
+    const before = result.current.clearMessages
+
+    rerender({ enabled: true })
+
+    expect(result.current.clearMessages).toBe(before)
+  })
+
   it('clears the skipped count with the feed', () => {
     const { result } = renderHook(() =>
       useLiveSubscription({ connectionId: 'conn-1', streamName: null, subjects: ['>'], enabled: true, initialLimit: 100, globalStats: false }),
