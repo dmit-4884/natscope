@@ -94,6 +94,20 @@ describe('useKVWatch', () => {
     await waitFor(() => expect(hook.result.current.status).toBe('live'))
   })
 
+  it('reloads the key list each time a watch starts, since changes made while it was off are not replayed', async () => {
+    const { client, hook } = setup()
+    const listState = () => client.getQueryState(kvKeys.keyList('conn-1', 'CONFIG', ''))
+    expect(listState()?.isInvalidated).toBe(false)
+
+    act(() => watch.push!([]))
+    await waitFor(() => expect(listState()?.isInvalidated).toBe(true))
+
+    client.setQueryData<KVKeyList>(kvKeys.keyList('conn-1', 'CONFIG', ''), { keys: ['a'], truncated: false })
+    act(() => hook.result.current.restart())
+    act(() => watch.push!([]))
+    await waitFor(() => expect(listState()?.isInvalidated).toBe(true))
+  })
+
   it('lists the newest change first and patches the key list', async () => {
     const { client, hook } = setup()
     act(() => watch.push!([]))

@@ -50,7 +50,12 @@ export function useKVWatch(connectionId: string | undefined, bucket: string | un
 
     void (async () => {
       try {
+        let started = false
         for await (const batch of api.watchKV(connectionId, bucket, filter, controller.signal)) {
+          if (!started) {
+            started = true
+            queryClient.invalidateQueries({ queryKey: kvKeys.keys(connectionId, bucket) })
+          }
           update((changes) => ({ status: 'live', changes: [...batch].reverse().concat(changes).slice(0, MAX_CHANGES) }))
           if (batch.length === 0) continue
           applyChanges(queryClient, connectionId, bucket, filter, batch)
