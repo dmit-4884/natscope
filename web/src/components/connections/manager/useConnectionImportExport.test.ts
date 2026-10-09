@@ -55,4 +55,29 @@ describe('useConnectionImportExport', () => {
     await waitFor(() => expect(createConnection).toHaveBeenCalled())
     expect(createConnection.mock.lastCall?.[0]).toMatchObject({ readOnly: true, label: { text: 'PROD', color: 'red' } })
   })
+
+  it('keeps the JetStream domain and inbox prefix on import and refuses a malformed one', async () => {
+    const createConnection = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() =>
+      useConnectionImportExport({ connections: [], mappings: [], createConnection, bulkSaveMappings: vi.fn() }),
+    )
+    const config = {
+      version: 2,
+      connections: [
+        { name: 'leaf', urls: ['nats://leaf:4222'], connection: { jetstreamDomain: 'hub', inboxPrefix: '_INBOX_app', noEcho: false } },
+        { name: 'broken', urls: ['nats://leaf:4222'], connection: { jetstreamDomain: 'a.b' } },
+      ],
+    }
+
+    result.current.handleImport({
+      target: { files: [new File([JSON.stringify(config)], 'config.json')] },
+    } as unknown as React.ChangeEvent<HTMLInputElement>)
+
+    await waitFor(() => expect(createConnection).toHaveBeenCalled())
+    expect(createConnection).toHaveBeenCalledTimes(1)
+    expect(createConnection.mock.lastCall?.[0]).toMatchObject({
+      name: 'leaf',
+      connection: { jetstreamDomain: 'hub', inboxPrefix: '_INBOX_app' },
+    })
+  })
 })

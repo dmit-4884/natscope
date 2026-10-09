@@ -3,7 +3,13 @@ import { downloadBlob } from '@/utils/download'
 import { toast } from '@/utils/toast'
 import type { ConnectionLabel, CreateConnectionRequest, LabelColor, SavedConnection } from '@/api/connections'
 import type { Framing } from '@/api/framing'
-import { AuthConfig, toApiAuthConfig } from '@/contexts/connection'
+import {
+  AuthConfig,
+  inboxPrefixError,
+  jetStreamTargetErrors,
+  toApiAuthConfig,
+  toApiConnectionConfig,
+} from '@/contexts/connection'
 import type { MappingItem } from '@/contexts/mappings'
 import { exportFraming, importFraming } from '@/components/mappings/framingExport'
 import { LABEL_COLORS } from '../labelStyles'
@@ -27,6 +33,26 @@ function importedLabel(label: unknown): ConnectionLabel | undefined {
   const { text, color } = label as Partial<ConnectionLabel>
   if (typeof text !== 'string' || !text.trim()) return undefined
   return { text: text.trim(), color: LABEL_COLORS.includes(color as LabelColor) ? (color as LabelColor) : 'gray' }
+}
+
+function importedConnectionConfig(raw: unknown): ReturnType<typeof toApiConnectionConfig> | null {
+  if (!raw || typeof raw !== 'object') return undefined
+  const c = raw as Record<string, unknown>
+  const text = (v: unknown) => (typeof v === 'string' ? v : '')
+  const flag = (v: unknown) => v === true
+  const edits = { inboxPrefix: text(c.inboxPrefix), jetstreamDomain: text(c.jetstreamDomain), jetstreamApiPrefix: text(c.jetstreamApiPrefix) }
+  const target = jetStreamTargetErrors(edits.jetstreamDomain, edits.jetstreamApiPrefix)
+  if (target.domain || target.prefix || inboxPrefixError(edits.inboxPrefix)) return null
+  return toApiConnectionConfig(
+    {
+      connectTimeout: typeof c.connectTimeout === 'number' && c.connectTimeout > 0 ? c.connectTimeout : undefined,
+      connectionName: text(c.connectionName) || undefined,
+      noEcho: flag(c.noEcho),
+      noRandomize: flag(c.noRandomize),
+      ignoreDiscoveredServers: flag(c.ignoreDiscoveredServers),
+    },
+    edits,
+  )
 }
 
 /** v2 export format; import drops mappings without a `sourceId` or with malformed framing. */
@@ -97,6 +123,12 @@ export function useConnectionImportExport({
             skipped++
             continue
           }
+          const connectionConfig = importedConnectionConfig(conn.connection)
+          if (connectionConfig === null) {
+            failed++
+            toast.error(`Skipped ${conn.name}: its JetStream domain, API prefix or inbox prefix is malformed`)
+            continue
+          }
           try {
             const authProto = conn.auth
               ? toApiAuthConfig(AuthConfig.fromTrusted(conn.auth))
@@ -106,9 +138,10 @@ export function useConnectionImportExport({
               description: conn.description,
               urls: conn.urls,
               auth: authProto,
+              connection: connectionConfig,
               readOnly: conn.readOnly === true,
               label: importedLabel(conn.label),
-              // TLS / connection / reconnect / ping configs are not preserved
+              // TLS / reconnect / ping configs are not preserved
               // by the export at this time.
             })
             imported++
