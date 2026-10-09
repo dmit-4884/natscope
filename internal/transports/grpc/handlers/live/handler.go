@@ -71,6 +71,30 @@ func (h *Handler) Subscribe(
 	})
 }
 
+// kvChangeOpts converts entities.KVChange to natspb.KVChange: Value bytes go out base64-encoded.
+var kvChangeOpts = []converter.Option{
+	grpchelpers.ProtoCodecs,
+	converter.WithCodecs(convcodecs.BytesBase64),
+}
+
+// WatchKV is the server-streaming endpoint for the changes of a KeyValue bucket.
+func (h *Handler) WatchKV(
+	ctx context.Context,
+	req *connect.Request[livepb.WatchKVRequest],
+	stream *connect.ServerStream[livepb.WatchKVEvent],
+) error {
+	in := req.Msg
+	return h.service.WatchKV(ctx, &entities.KVWatchRequest{
+		ConnectionID: in.GetConnectionId(),
+		Bucket:       in.GetBucket(),
+		Filter:       in.GetFilter(),
+	}, func(changes []entities.KVChange) error {
+		return stream.Send(&livepb.WatchKVEvent{Changes: slices.To(changes, func(c entities.KVChange) *natspb.KVChange {
+			return converter.Convert(&c, &natspb.KVChange{}, kvChangeOpts...)
+		})})
+	})
+}
+
 // toProtoLiveEvent expands the entities.LiveEvent union into the proto oneof.
 func toProtoLiveEvent(ev *entities.LiveEvent) *livepb.LiveEvent {
 	out := &livepb.LiveEvent{}

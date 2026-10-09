@@ -136,6 +136,10 @@ func (r *readOnlyClient) ListKVKeys(ctx context.Context, bucket string, query en
 	return r.inner.ListKVKeys(ctx, bucket, query)
 }
 
+func (r *readOnlyClient) WatchKV(ctx context.Context, bucket, filter string) (<-chan entities.KVChange, error) {
+	return r.inner.WatchKV(ctx, bucket, filter)
+}
+
 func (r *readOnlyClient) GetKVKey(ctx context.Context, bucket, key string) (*entities.KVEntry, error) {
 	return r.inner.GetKVKey(ctx, bucket, key)
 }

@@ -19,4 +19,8 @@ type Service interface {
 	// BroadcastProtoReload makes every in-flight session reflect reloaded proto
 	// descriptors.
 	BroadcastProtoReload()
+
+	// WatchKV sends the changes of a bucket in batches until ctx ends, emit fails or the connection drops the watch.
+	// The first batch is empty and confirms the watch is running.
+	WatchKV(ctx context.Context, in *entities.KVWatchRequest, emit func([]entities.KVChange) error) error
 }

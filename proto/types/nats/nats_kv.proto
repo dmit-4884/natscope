@@ -174,6 +174,27 @@ message KVEntry {
   google.protobuf.Duration ttl = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
+// Defines one change of a key seen by a bucket watch.
+message KVChange {
+  // Required. The key that changed.
+  string key = 1;
+
+  // Required. Operation of the change: "put", "delete" or "purge".
+  string operation = 2;
+
+  // Required. Revision the change created.
+  uint64 revision = 3;
+
+  // Required. When the change was stored.
+  google.protobuf.Timestamp created = 4;
+
+  // Required. Base64-encoded beginning of the value, at most 1 KiB (standard alphabet, padded).
+  string value = 5;
+
+  // Required. Size of the whole value in bytes.
+  int32 size = 6;
+}
+
 // Defines the placement preferences for a NATS JetStream resource.
 message Placement {
   // Optional. Name of the target cluster.

@@ -50,6 +50,7 @@ var _ livesvc.Service = (*Service)(nil)
 type natsDeps struct {
 	natssvc.StreamReader
 	natssvc.Subscriber
+	natssvc.KVStore
 }
 
 // Service implements livesvc.Service.
@@ -156,11 +157,12 @@ func (sess *sessionState) markLost() {
 func New(
 	streamReader natssvc.StreamReader,
 	subscriber natssvc.Subscriber,
+	kvStore natssvc.KVStore,
 	protoService protosvc.Codec,
 	settingsService settingssvc.Service,
 ) *Service {
 	s := &Service{
-		natsService:     natsDeps{streamReader, subscriber},
+		natsService:     natsDeps{streamReader, subscriber, kvStore},
 		protoService:    protoService,
 		settingsService: settingsService,
 		logger:          slog.Default().With(slogx.Module("service:live")),

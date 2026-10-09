@@ -5,12 +5,35 @@ option go_package = "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "types/nats/nats_access.proto";
+import "types/nats/nats_kv.proto";
 import "types/nats/nats_message.proto";
 
 // Provides server-streaming subscription for real-time NATS message delivery.
 service LiveService {
   // Opens a server-streaming subscription that delivers live NATS messages, periodic statistics, errors, and proto reload notifications.
   rpc Subscribe(SubscribeRequest) returns (stream LiveEvent) {}
+
+  // Opens a server-streaming watch of a KeyValue bucket that delivers its changes from now on in batches. The first
+  // batch is empty and confirms the watch is running.
+  rpc WatchKV(WatchKVRequest) returns (stream WatchKVEvent) {}
+}
+
+// Defines the request message for watching a KeyValue bucket.
+message WatchKVRequest {
+  // Required. Identifier of the NATS connection the bucket is on.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Name of the KeyValue bucket to watch.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. NATS subject pattern over key names (e.g. "orders.*"); empty watches every key.
+  string filter = 3 [(buf.validate.field).string.max_len = 1024];
+}
+
+// Defines a batch of KeyValue changes delivered in a single server-stream frame.
+message WatchKVEvent {
+  // Required. Changes seen since the last batch, oldest first.
+  repeated .natscope.types.nats.KVChange changes = 1;
 }
 
 // Defines the request message for subscribing to live NATS messages.

@@ -87,6 +87,15 @@ func (s *Service) ListKVKeys(
 	return c.ListKVKeys(ctx, bucket, query)
 }
 
+// WatchKV reports every change from now on to keys matching filter; the channel closes when the watch ends.
+func (s *Service) WatchKV(ctx context.Context, connectionID string, bucket string, filter string) (<-chan entities.KVChange, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.WatchKV(ctx, bucket, filter)
+}
+
 // GetKVKey returns the value and metadata for a key in a KeyValue bucket.
 func (s *Service) GetKVKey(
 	ctx context.Context,

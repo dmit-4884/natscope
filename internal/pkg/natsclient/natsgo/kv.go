@@ -16,6 +16,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
+	"github.com/altessa-s/go-atlas/core/runtime/panics"
 	"github.com/altessa-s/go-atlas/domain/converter"
 	"github.com/altessa-s/go-atlas/domain/normalizer"
 
@@ -229,6 +230,68 @@ func (c *Client) ListKVKeys(ctx context.Context, bucket string, query entities.K
 		return entities.KVKeyList{}, wrapErr(err)
 	}
 	return list, nil
+}
+
+// WatchKV reports every change from now on to the keys of a bucket matching filter, a NATS pattern over key names
+// (empty watches every key). The channel closes when ctx ends or the connection drops the watch.
+func (c *Client) WatchKV(ctx context.Context, bucket, filter string) (<-chan entities.KVChange, error) {
+	filter = strings.TrimSpace(filter)
+	if filter != "" {
+		if err := natsutil.ValidateSubjectPattern(filter); err != nil {
+			return nil, err
+		}
+	}
+
+	lookupCtx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)
+	defer cancel()
+	kv, err := c.jetStream.KeyValue(lookupCtx, bucket)
+	if err != nil {
+		return nil, wrapBucketErr(err)
+	}
+
+	var keys []string
+	if filter != "" {
+		keys = []string{filter}
+	}
+	watcher, err := kv.WatchFiltered(ctx, keys, jetstream.UpdatesOnly())
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+
+	out := make(chan entities.KVChange)
+	go func() {
+		defer panics.Handle(ctx)
+		defer close(out)
+		defer func() { _ = watcher.Stop() }()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case entry, ok := <-watcher.Updates():
+				if !ok {
+					return
+				}
+				if entry == nil {
+					continue
+				}
+				e := toKVEntry(bucket, entry)
+				change := entities.KVChange{
+					Key:       e.Key,
+					Operation: e.Operation,
+					Revision:  e.Revision,
+					Created:   e.Created,
+					Value:     entry.Value(),
+					Size:      len(entry.Value()),
+				}
+				select {
+				case out <- change:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return out, nil
 }
 
 // GetKVKey returns the value and metadata for a key in a KeyValue bucket.

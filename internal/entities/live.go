@@ -15,6 +15,18 @@ type LiveSubscribeRequest struct {
 	ExcludeSubjects []string
 }
 
+// KVWatchRequest asks for the changes of a KeyValue bucket from now on.
+type KVWatchRequest struct {
+	// ConnectionID names the connection the bucket is on.
+	ConnectionID string
+
+	// Bucket is the bucket to watch.
+	Bucket string
+
+	// Filter is a NATS pattern over key names; empty watches every key.
+	Filter string
+}
+
 // LiveSubscriptionTarget is one subject (with optional stream binding) to
 // live-deliver.
 type LiveSubscriptionTarget struct {

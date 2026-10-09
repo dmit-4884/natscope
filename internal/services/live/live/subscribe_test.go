@@ -103,7 +103,7 @@ func TestSubscribe_ReportsADeniedSubjectAndKeepsTheOthers(t *testing.T) {
 	t.Parallel()
 
 	sub := &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}
-	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
+	svc := New(nil, sub, nil, fakeCodec{}, fakeSettings{})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -159,7 +159,7 @@ func TestSubscribe_ACoveredSubjectTakesOverWhenItsWildcardIsDenied(t *testing.T)
 	t.Parallel()
 
 	sub := &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}
-	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
+	svc := New(nil, sub, nil, fakeCodec{}, fakeSettings{})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -298,7 +298,7 @@ func startFakeSessionWith(t *testing.T, req *entities.LiveSubscribeRequest) (*fa
 func startFakeSessionOn(t *testing.T, sub *fakeSubscriber, req *entities.LiveSubscribeRequest) (*fakeSubscriber, <-chan *entities.LiveEvent, func()) {
 	t.Helper()
 
-	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
+	svc := New(nil, sub, nil, fakeCodec{}, fakeSettings{})
 	ctx, cancel := context.WithCancel(t.Context())
 
 	events := make(chan *entities.LiveEvent, 64)
@@ -415,7 +415,7 @@ func TestSubscribe_MutedSubjectsTakeNoRoomFromWantedOnes(t *testing.T) {
 	t.Parallel()
 
 	sub := &fakeSubscriber{onDenied: map[string]func(error){}, handlers: map[string]entities.MessageHandler{}}
-	svc := New(nil, sub, fakeCodec{}, fakeSettings{})
+	svc := New(nil, sub, nil, fakeCodec{}, fakeSettings{})
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 

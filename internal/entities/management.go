@@ -591,6 +591,27 @@ func (e *KVEntry) Subject() string {
 	return "$KV." + e.Bucket + "." + e.Key
 }
 
+// KVChange is one change of a key seen by a bucket watch.
+type KVChange struct {
+	// Key is the key that changed.
+	Key string
+
+	// Operation is put, delete or purge.
+	Operation string
+
+	// Revision is the revision the change created.
+	Revision uint64
+
+	// Created is when the change was stored.
+	Created time.Time
+
+	// Value is the stored value, or its beginning when a watch cuts it.
+	Value []byte
+
+	// Size is the size of the whole value in bytes.
+	Size int
+}
+
 // KVKeysQuery narrows a listing of a bucket's keys.
 type KVKeysQuery struct {
 	// Filter is a NATS subject pattern over key names; empty lists every key.

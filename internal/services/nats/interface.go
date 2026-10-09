@@ -323,6 +323,9 @@ type KVStore interface {
 	// GetKVBucket returns info for one KeyValue bucket.
 	GetKVBucket(ctx context.Context, connectionID string, bucket string) (*entities.KVBucketInfo, error)
 
+	// WatchKV reports every change from now on to keys matching filter; the channel closes when the watch ends.
+	WatchKV(ctx context.Context, connectionID string, bucket string, filter string) (<-chan entities.KVChange, error)
+
 	// ListKVKeys returns up to query.Limit keys of a bucket matching query.Filter, filtered on the server.
 	ListKVKeys(ctx context.Context, connectionID string, bucket string, query entities.KVKeysQuery) (entities.KVKeyList, error)
 
