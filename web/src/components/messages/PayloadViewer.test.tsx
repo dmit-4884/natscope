@@ -40,3 +40,11 @@ describe('PayloadViewer', () => {
     expect(frames[0]).toContain('JSON Data')
   })
 })
+
+describe('PayloadViewer while decoding', () => {
+  it('holds the decoding notice back so a quick decode does not flash it', () => {
+    render(<PayloadViewer rawData={btoa('\u0008\u0001')} isDecoding defaultMode="decoded" />)
+
+    expect(screen.getByText('Decoding...').closest('.reveal-after-delay')).not.toBeNull()
+  })
+})

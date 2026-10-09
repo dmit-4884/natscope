@@ -116,13 +116,16 @@ function UnifiedMessageViewer({
   if (viewedId !== selectedMessage?.id) {
     setViewedId(selectedMessage?.id)
     const server = selectedMessage?.decoded && selectedMessage.decodedType ? selectedMessage : null
+    const mapped = selectedMessage && !selectedMessage.isLive && !selectedMessage.decodedType
+      ? findMappingMatch(selectedMessage.subject, mappings)
+      : null
     setDecodedData(server ? server.decoded : null)
-    setSelectedProtoType(server?.decodedType ?? '')
+    setSelectedProtoType(server?.decodedType ?? mapped?.messageType ?? '')
     setHasDecodedForType(server?.decodedType ?? null)
     setDecodeNotes(server ? { unknownCount: server.decodedUnknownFields ?? 0, validBytes: server.decodedValidBytes } : null)
-    setSelectedSourceId('')
-    setSelectedFraming(undefined)
-    setSelectedFingerprint(undefined)
+    setSelectedSourceId(mapped?.sourceId ?? '')
+    setSelectedFraming(mapped?.framing)
+    setSelectedFingerprint(mapped?.pinnedFingerprint)
     setDecodeError(null)
     setDecoding(false)
     setFullMessage(null)

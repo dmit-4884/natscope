@@ -155,7 +155,7 @@ const PayloadViewer = memo(function PayloadViewer({
         {shownMode === 'decoded' && (
           isDecoding ? (
             <div className="flex items-center justify-center h-32">
-              <div className="text-center">
+              <div className="text-center reveal-after-delay">
                 <div className="inline-block w-6 h-6 border-2 border-border-focus border-t-transparent rounded-full animate-spin" />
                 <p className="mt-2 text-sm text-content-tertiary">Decoding...</p>
               </div>
