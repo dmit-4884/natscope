@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -36,10 +37,25 @@ func (c *Client) trackOwnConsumer(name string) func() {
 	return func() { c.ownConsumers.Delete(name) }
 }
 
+// trackOwnConsumerSeries remembers the consumers an ordered consumer named prefix creates one after another, named
+// prefix_1, prefix_2 and so on; the returned func forgets them.
+func (c *Client) trackOwnConsumerSeries(prefix string) func() {
+	c.ownConsumerSeries.Store(prefix+"_", struct{}{})
+	return func() { c.ownConsumerSeries.Delete(prefix + "_") }
+}
+
 // isOwnConsumer reports whether this client created the consumer to read a stream.
 func (c *Client) isOwnConsumer(name string) bool {
-	_, ok := c.ownConsumers.Load(name)
-	return ok
+	if _, ok := c.ownConsumers.Load(name); ok {
+		return true
+	}
+	own := false
+	c.ownConsumerSeries.Range(func(key, _ any) bool {
+		prefix, _ := key.(string)
+		own = strings.HasPrefix(name, prefix)
+		return !own
+	})
+	return own
 }
 
 // GetConsumersOverview lists every stream, then the consumers of each in parallel; a stream whose consumers

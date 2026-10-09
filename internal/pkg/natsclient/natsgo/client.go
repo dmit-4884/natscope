@@ -83,8 +83,10 @@ type Client struct {
 	// putObjectLocks serializes PutObject per (bucket, name).
 	putObjectLocks sync.Map
 
-	// ownConsumers holds the names of the short-lived consumers this client created to read streams.
-	ownConsumers sync.Map
+	// ownConsumers holds the names of the short-lived consumers this client created to read streams, and
+	// ownConsumerSeries the name prefixes of the ordered consumers it reads live streams with.
+	ownConsumers      sync.Map
+	ownConsumerSeries sync.Map
 
 	// remoteLevel is the API level of the JetStream behind api, once an AccountInfo has reported it; levelRefused
 	// records that the server refused the AccountInfo, so it is not asked again.

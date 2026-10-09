@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -79,4 +80,48 @@ func TestSubscribe_SaysWhichSubjectsItDelivers(t *testing.T) {
 	assert.False(t, all.Delivers("_INBOX_alice.abc.1"))
 	assert.True(t, inbox.Delivers("_INBOX_alice.abc.1"))
 	assert.False(t, inbox.Delivers("orders.created"))
+}
+
+func TestSubscribeJetStream_KeepsDeliveringAfterTheServerDropsItsConsumer(t *testing.T) {
+	t.Parallel()
+	_, url := jetStreamServer(t)
+	nc, err := nats.Connect(url)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+	stream, err := js.CreateStream(t.Context(), jetstream.StreamConfig{Name: "LIVE", Subjects: []string{"live.>"}})
+	require.NoError(t, err)
+
+	c := dialClient(t, url)
+	got := make(chan string, 16)
+	sub, err := c.SubscribeJetStream(t.Context(), "LIVE", ">", "new", func(m *entities.NatsMessage) { got <- string(m.Data) })
+	require.NoError(t, err)
+	defer func() { _ = sub.Unsubscribe() }()
+
+	receive := func(want string) {
+		t.Helper()
+		select {
+		case data := <-got:
+			assert.Equal(t, want, data)
+		case <-time.After(10 * time.Second):
+			t.Fatalf("%q never arrived", want)
+		}
+	}
+	_, err = js.Publish(t.Context(), "live.a", []byte("before"))
+	require.NoError(t, err)
+	receive("before")
+
+	names := stream.ConsumerNames(t.Context())
+	for name := range names.Name() {
+		require.NoError(t, stream.DeleteConsumer(t.Context(), name))
+	}
+	require.NoError(t, names.Err())
+
+	_, err = js.Publish(t.Context(), "live.a", []byte("after"))
+	require.NoError(t, err)
+	receive("after")
+	overview, err := c.GetConsumersOverview(t.Context())
+	require.NoError(t, err)
+	assert.Empty(t, overview.Consumers, "the recreated consumer is still hidden as natscope's own")
 }

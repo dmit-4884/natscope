@@ -96,11 +96,11 @@ func (c *Client) Subscribe(
 const ephemeralCleanupTimeout = 5 * time.Second
 
 type jsSubscriptionWrapper struct {
-	consumeCtx   jetstream.ConsumeContext
-	stream       jetstream.Stream
-	consumerName string
-	forget       func()
-	filter       string
+	consumeCtx jetstream.ConsumeContext
+	stream     jetstream.Stream
+	consumer   jetstream.Consumer
+	forget     func()
+	filter     string
 }
 
 func (s *jsSubscriptionWrapper) Delivers(subject string) bool {
@@ -109,12 +109,12 @@ func (s *jsSubscriptionWrapper) Delivers(subject string) bool {
 
 func (s *jsSubscriptionWrapper) Unsubscribe() error {
 	s.consumeCtx.Stop()
-	if s.stream != nil && s.consumerName != "" {
+	if info := s.consumer.CachedInfo(); s.stream != nil && info != nil {
 		// Bound the best-effort cleanup so a wedged server can't block the
 		// caller (live session teardown) indefinitely.
 		ctx, cancel := corecontext.ApplyTimeout(context.Background(), ephemeralCleanupTimeout)
 		defer cancel()
-		_ = s.stream.DeleteConsumer(ctx, s.consumerName) //nolint:errcheck // best-effort cleanup
+		_ = s.stream.DeleteConsumer(ctx, info.Name) //nolint:errcheck // best-effort cleanup
 	}
 	if s.forget != nil {
 		s.forget()
@@ -159,18 +159,16 @@ func (c *Client) SubscribeJetStream(
 		policy = jetstream.DeliverNewPolicy
 	}
 
-	consumerName := liveConsumerPrefix + nats.NewInbox()[7:]
-
-	ephCfg := jetstream.ConsumerConfig{
-		Name:              consumerName,
-		FilterSubject:     subject,
+	// An ordered consumer recreates itself from the last message it delivered when the server drops it, as it does
+	// after the link was down longer than the inactive threshold.
+	namePrefix := liveConsumerPrefix + nats.NewInbox()[7:]
+	forget := c.trackOwnConsumerSeries(namePrefix)
+	consumer, err := stream.OrderedConsumer(ctx, jetstream.OrderedConsumerConfig{
+		FilterSubjects:    []string{subject},
 		DeliverPolicy:     policy,
-		AckPolicy:         jetstream.AckNonePolicy,
 		InactiveThreshold: ephemeralConsumerInactiveThreshold,
-	}
-
-	forget := c.trackOwnConsumer(consumerName)
-	consumer, err := stream.CreateConsumer(ctx, ephCfg)
+		NamePrefix:        namePrefix,
+	})
 	if err != nil {
 		forget()
 		return nil, wrapErr(err)
@@ -193,17 +191,19 @@ func (c *Client) SubscribeJetStream(
 		handler(nm)
 	})
 	if err != nil {
-		_ = stream.DeleteConsumer(ctx, consumerName) //nolint:errcheck // best-effort cleanup
+		if info := consumer.CachedInfo(); info != nil {
+			_ = stream.DeleteConsumer(ctx, info.Name) //nolint:errcheck // best-effort cleanup
+		}
 		forget()
 		return nil, wrapErr(errors.WrapOperation(err, "start consuming"))
 	}
 
 	return &jsSubscriptionWrapper{
-		consumeCtx:   consumeCtx,
-		stream:       stream,
-		consumerName: consumerName,
-		forget:       forget,
-		filter:       subject,
+		consumeCtx: consumeCtx,
+		stream:     stream,
+		consumer:   consumer,
+		forget:     forget,
+		filter:     subject,
 	}, nil
 }
 
