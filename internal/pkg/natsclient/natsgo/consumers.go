@@ -51,8 +51,8 @@ func (c *Client) isOwnConsumer(name string) bool {
 	}
 	own := false
 	c.ownConsumerSeries.Range(func(key, _ any) bool {
-		prefix, _ := key.(string)
-		own = strings.HasPrefix(name, prefix)
+		prefix, ok := key.(string)
+		own = ok && strings.HasPrefix(name, prefix)
 		return !own
 	})
 	return own

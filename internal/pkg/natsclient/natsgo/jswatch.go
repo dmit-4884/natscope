@@ -80,7 +80,7 @@ func (w *jetStreamWatch) subjects(s string) []string {
 
 // subjectsFor renders subject templates for one stream name on the client's API prefix.
 func (w *jetStreamWatch) subjectsFor(name string, templates ...string) []string {
-	subjects := make([]string, 0, 2*len(templates))
+	subjects := make([]string, 0, len(templates))
 	for _, t := range templates {
 		subjects = append(subjects, w.subjects(fmt.Sprintf(t, name))...)
 	}
