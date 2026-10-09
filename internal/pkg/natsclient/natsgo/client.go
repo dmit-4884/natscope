@@ -95,8 +95,7 @@ type Client struct {
 	remoteLevel  *int32
 	levelRefused bool
 
-	// link is the connection state the connection's handlers report, so a status read never waits for the lock a
-	// reconnect attempt holds while it dials.
+	// link is the connection state the connection's handlers report.
 	link atomic.Int32
 }
 

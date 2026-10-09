@@ -159,8 +159,6 @@ func (c *Client) SubscribeJetStream(
 		policy = jetstream.DeliverNewPolicy
 	}
 
-	// An ordered consumer recreates itself from the last message it delivered when the server drops it, as it does
-	// after the link was down longer than the inactive threshold.
 	namePrefix := liveConsumerPrefix + nats.NewInbox()[7:]
 	forget := c.trackOwnConsumerSeries(namePrefix)
 	consumer, err := stream.OrderedConsumer(ctx, jetstream.OrderedConsumerConfig{

@@ -47,7 +47,7 @@ func (d *Dialer) TestConnection(
 	stop := context.AfterFunc(ctx, cd.closeAll)
 	defer stop()
 	denials := newDenialWatch()
-	natsOpts = append(natsOpts, nats.SetCustomDialer(cd), nats.IgnoreDiscoveredServers(), nats.ErrorHandler(denials.record))
+	natsOpts = append(natsOpts, nats.SetCustomDialer(cd), nats.SkipHostLookup(), nats.IgnoreDiscoveredServers(), nats.ErrorHandler(denials.record))
 
 	var best *diagnosis
 	bestURL := ""

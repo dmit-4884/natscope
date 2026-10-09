@@ -725,6 +725,24 @@ func TestDiagnose_MoreTLS(t *testing.T) {
 	})
 }
 
+// TestDiagnose_ADeadResolverDoesNotHoldTheTestPastItsSteps checks that a connect tried after a slow DNS step resolves
+// within the test's deadline instead of waiting out the system resolver. It swaps the default resolver, so it runs
+// before the parallel tests.
+func TestDiagnose_ADeadResolverDoesNotHoldTheTestPastItsSteps(t *testing.T) {
+	previous := net.DefaultResolver
+	net.DefaultResolver = &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}}
+	t.Cleanup(func() { net.DefaultResolver = previous })
+
+	start := time.Now()
+	res := diagnoseURL(t, &entities.TestConnectionRequest{URLs: []string{"nats://nats.invalid:4222"}, ConnectTimeout: ptr.Wrap(time.Second)})
+
+	assert.False(t, res.Success)
+	assert.Less(t, time.Since(start), 8*time.Second)
+}
+
 // slowProxy forwards a TCP port, connecting upstream only after delay.
 func slowProxy(t *testing.T, upstream string, delay time.Duration) string {
 	t.Helper()
