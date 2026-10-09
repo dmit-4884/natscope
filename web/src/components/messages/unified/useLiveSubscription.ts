@@ -337,12 +337,14 @@ export function useLiveSubscription({
 
   const clearMessages = useCallback(() => {
     stopDrip()
+    ws?.discardPaused()
+    setPausedCount(0)
     setLiveMessages([])
     setSubjectCounts({})
     const skipped = skippedRef.current
     skippedRef.current = { carried: 0, session: skipped.session, cleared: skipped.session }
     setMessagesDropped((prev) => (prev === undefined ? prev : 0))
-  }, [stopDrip])
+  }, [ws, stopDrip])
 
   const shownStatus = natsDown && wsStatus === 'connected' ? 'reconnecting' : wsStatus
 

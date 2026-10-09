@@ -45,6 +45,10 @@ vi.mock('@/contexts/live', () => {
       this.paused = null
       buffered.forEach((b) => this.onBatch?.(b))
     }
+    discardPaused() {
+      if (this.paused) this.paused = []
+      this.onBuffered?.(0)
+    }
     deliver(payload: WSBatchPayload) {
       if (this.paused) this.paused.push(payload)
       else this.onBatch?.(payload)
@@ -137,6 +141,17 @@ describe('useLiveSubscription display rate', () => {
 
     act(() => result.current.togglePause())
     expect(sequences(result)).toEqual([5, 4, 3, 2, 1])
+  })
+
+  it('clears what waits while paused along with the feed', () => {
+    const { result } = render(0)
+    act(() => result.current.togglePause())
+    deliver(1, 2)
+
+    act(() => result.current.clearMessages())
+    expect(result.current.pausedCount).toBe(0)
+    act(() => result.current.togglePause())
+    expect(sequences(result)).toEqual([])
   })
 
   it('flushes every batch without a display rate, newest first', () => {

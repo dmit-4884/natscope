@@ -352,6 +352,11 @@ export class LiveStreamClient {
     }
   }
 
+  discardPaused(): void {
+    this.pausedBatches = []
+    this.onBuffered?.(0)
+  }
+
   resume(): void {
     this.paused = false
     const buffered = this.pausedBatches

@@ -94,6 +94,32 @@ describe('LiveStreamClient', () => {
     client.disconnect()
   })
 
+  it('drops what waits while paused when told to', async () => {
+    let push: ((value: IteratorResult<unknown>) => void) | undefined
+    subscribeCall.mockImplementation(() => ({
+      [Symbol.asyncIterator]: () => ({
+        next: () => new Promise((resolve) => (push = resolve)),
+      }),
+    }))
+    const client = new LiveStreamClient('conn-1')
+    const buffered = vi.fn()
+    const batches = vi.fn()
+    client.onBuffered = buffered
+    client.onBatch = batches
+    client.connect()
+    client.subscribeSubjects(['orders.>'])
+    client.pause()
+
+    push?.({ value: { event: { case: 'batch', value: { messages: [create(NatsMessageSchema, { subject: 'orders.a' })] } } }, done: false })
+    await vi.waitFor(() => expect(buffered).toHaveBeenLastCalledWith(1))
+
+    client.discardPaused()
+    expect(buffered).toHaveBeenLastCalledWith(0)
+    client.resume()
+    expect(batches).not.toHaveBeenCalled()
+    client.disconnect()
+  })
+
   it('bounds the paused buffer by size as well as by count', async () => {
     let push: ((value: IteratorResult<unknown>) => void) | undefined
     subscribeCall.mockImplementation(() => ({
