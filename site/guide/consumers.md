@@ -24,17 +24,18 @@ The **Status** column names the problem in plain words. Hover a badge for the de
 | **Nobody pulling**    | A pull consumer has messages to deliver, no pull request waits, and no client pulled in the last minute. |
 | **Redelivering**      | Messages still wait for an ack, and some were delivered again: a client rejected them or missed the ack wait. |
 | **May lose messages** | The stream is at least 90% full and drops its oldest messages, and the next message for this consumer is among the oldest tenth. |
-| **Losing messages**  | The same, and the stream already dropped messages this consumer had not reached.                      |
-
-Natscope raises the last two only for a consumer that sees the whole stream: one without a filter, or whose filter takes every
-subject of the stream. For a filtered consumer the server does not say which of the dropped messages were on its subjects.
+| **Losing messages**   | The same, and the stream already dropped messages this consumer had not reached.                       |
 | **Paused**            | Delivery is paused until the time shown.                                                                |
+
+Natscope raises **May lose messages** and **Losing messages** only for a consumer that sees the whole stream: one without a
+filter, or whose filter takes every subject of the stream. For a filtered consumer the server does not say which of the
+dropped messages were on its subjects.
 
 A consumer with nothing wrong is **Catching up** while it has work left, and **Caught up** when it has none.
 
 The page reads the consumers every 5 seconds; turn **Auto-refresh** off to freeze the numbers. **Problems only** hides the
 healthy consumers, the filter matches consumer names, streams and filter subjects, and the download button exports the
-list as CSV or JSON. Click a row to open the consumer on its stream.
+list as CSV or JSON. Click a row to open the consumer on its stream; Cmd/Ctrl-click or middle-click opens it in a new tab.
 
 The server keeps the time of the last delivery in memory only, so after a server restart **Last delivery** says **unknown** until the
 consumer delivers again. Natscope's own short-lived consumers, which it creates to read streams, are left out.
