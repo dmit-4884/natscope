@@ -353,12 +353,13 @@ func (r *searchRun) backward() error {
 		keep := int(r.maxMatches() - r.matched)
 		var found []*entities.Message
 		dropped := false
-		windowStarted := searchClock()
+		pace := &windowPace{started: searchClock()}
 		scannedBefore := r.scanned
 		var slowAt uint64
 		stop := entities.SearchStopUnspecified
 		var emitErr error
 		err := r.scan(winLo, winHi, func(msg *entities.Message) bool {
+			pace.saw(msg.Sequence)
 			if r.accept(msg) {
 				found = append(found, r.prepare(msg))
 				if len(found) > keep {
@@ -371,7 +372,7 @@ func (r *searchRun) backward() error {
 				if stop = r.overBudget(); stop != entities.SearchStopUnspecified {
 					return false
 				}
-			case !shrunk && r.tooSlow(winLo, winHi, msg.Sequence, windowStarted):
+			case !shrunk && r.tooSlow(pace, winHi, msg.Sequence):
 				slowAt = msg.Sequence
 				return false
 			}
@@ -388,7 +389,7 @@ func (r *searchRun) backward() error {
 			return r.done(stop, winHi)
 		}
 		if slowAt != 0 {
-			window = r.fittingWindow(slowAt-winLo+1, windowStarted)
+			window = r.fittingWindow(pace, slowAt)
 			r.scanned = scannedBefore
 			shrunk = true
 			continue
@@ -414,32 +415,62 @@ func (r *searchRun) backward() error {
 		if err := r.flush(true); err != nil {
 			return err
 		}
-		window = r.nextWindow(window, windowStarted, winHi-winLo+1)
+		window = r.nextWindow(window, pace, winHi-winLo+1)
 		winHi, first = winLo-1, false
 	}
 }
 
-// tooSlow reports whether the rest of a window read up to seq since started cannot finish in the run's time left.
-func (r *searchRun) tooSlow(winLo, winHi, seq uint64, started time.Time) bool {
-	took := searchClock().Sub(started)
-	if seq >= winHi || took < searchFastWindow {
-		return false
-	}
-	perSeq := took / time.Duration(seq-winLo+1)
-	return perSeq*time.Duration(winHi-seq) > searchMaxDuration-searchClock().Sub(r.started)
+// windowPace tracks how a window reads: when it started, and when and at which sequence its first message came. The
+// time before the first message is what a read costs to start, the time after it is what each sequence costs.
+type windowPace struct {
+	started  time.Time
+	firstAt  time.Time
+	firstSeq uint64
 }
 
-// fittingWindow is the window that the run's time left reads at the pace of covered sequences read since started.
-func (r *searchRun) fittingWindow(covered uint64, started time.Time) uint64 {
-	perSeq := max(searchClock().Sub(started)/time.Duration(covered), 1)
-	left := searchMaxDuration - searchClock().Sub(r.started)
+func (p *windowPace) saw(seq uint64) {
+	if p.firstSeq == 0 {
+		p.firstAt, p.firstSeq = searchClock(), seq
+	}
+}
+
+// setup is the time the window took before its first message, or so far when none came yet.
+func (p *windowPace) setup() time.Duration {
+	if p.firstSeq == 0 {
+		return searchClock().Sub(p.started)
+	}
+	return p.firstAt.Sub(p.started)
+}
+
+// perSeq is the time each sequence after the first message took up to seq, zero before a second message.
+func (p *windowPace) perSeq(seq uint64) time.Duration {
+	if p.firstSeq == 0 || seq <= p.firstSeq {
+		return 0
+	}
+	return searchClock().Sub(p.firstAt) / time.Duration(seq-p.firstSeq)
+}
+
+// tooSlow reports whether the rest of a window read up to seq cannot finish in the run's time left.
+func (r *searchRun) tooSlow(pace *windowPace, winHi, seq uint64) bool {
+	if seq >= winHi || searchClock().Sub(pace.started) < searchFastWindow {
+		return false
+	}
+	perSeq := pace.perSeq(seq)
+	return perSeq > 0 && perSeq*time.Duration(winHi-seq) > searchMaxDuration-searchClock().Sub(r.started)
+}
+
+// fittingWindow is the window the run's time left reads when it costs what this window cost to start and goes at its
+// pace up to seq.
+func (r *searchRun) fittingWindow(pace *windowPace, seq uint64) uint64 {
+	perSeq := max(pace.perSeq(seq), 1)
+	left := searchMaxDuration - searchClock().Sub(r.started) - pace.setup()
 	return max(uint64(max(left, 0)/perSeq), 1)
 }
 
-// nextWindow grows a window that read fast and keeps the next one within what is left of both budgets.
-func (r *searchRun) nextWindow(window uint64, started time.Time, covered uint64) uint64 {
-	took := searchClock().Sub(started)
-	if took < searchFastWindow {
+// nextWindow grows a window whose sequences read fast and keeps the next one within what is left of both budgets.
+func (r *searchRun) nextWindow(window uint64, pace *windowPace, covered uint64) uint64 {
+	took := searchClock().Sub(pace.started)
+	if took-pace.setup() < searchFastWindow {
 		window = min(window*searchWindowGrowth, searchMaxWindow)
 	}
 	if r.scanned < searchMaxScanned {

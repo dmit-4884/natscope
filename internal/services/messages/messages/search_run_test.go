@@ -42,6 +42,8 @@ type fakeStream struct {
 	clock       *fakeClock
 	size        int
 	onYield     func(*entities.Message)
+	// setup is what each scan costs before its first message, as a consumer create or a first fetch does.
+	setup time.Duration
 }
 
 func (f *fakeStream) has(seq uint64) bool { return seq >= f.first && seq <= f.last && !f.deleted[seq] }
@@ -54,6 +56,7 @@ func (f *fakeStream) GetStreamInfo(context.Context, string, string) (*entities.S
 
 func (f *fakeStream) ScanMessages(ctx context.Context, _, _ string, opts entities.ScanOptions) iter.Seq2[*entities.Message, error] {
 	return func(yield func(*entities.Message, error) bool) {
+		f.clock.now = f.clock.now.Add(f.setup)
 		for seq := opts.FromSeq; seq <= opts.ToSeq; seq++ {
 			if err := ctx.Err(); err != nil {
 				yield(nil, err)
@@ -252,6 +255,21 @@ func TestSearchBackwardSlowFirstWindowKeepsTheTimeBudget(t *testing.T) {
 
 		assert.Equal(t, expectedMatches(f, true), got)
 	})
+}
+
+func TestSearchBackwardReadsFastPastASlowStartOfEachWindow(t *testing.T) {
+	for _, setup := range []time.Duration{500 * time.Millisecond, 1500 * time.Millisecond, 3 * time.Second} {
+		t.Run(setup.String(), func(t *testing.T) {
+			f := &fakeStream{first: 1, last: 400_000, match: 997, setup: setup, clock: &fakeClock{now: time.Unix(0, 0), step: 100 * time.Microsecond}}
+			s := newFakeSearch(t, f)
+			started := f.clock.now
+
+			res := runSearch(t, s, entities.MessageSearchRequest{Direction: "backward", Text: "needle"}, 0)
+
+			assert.GreaterOrEqual(t, res.done.Scanned, uint64(20_000))
+			assert.LessOrEqual(t, f.clock.now.Sub(started), searchMaxDuration+setup+2*time.Second)
+		})
+	}
 }
 
 func TestSearchProgressNamesWhereToResumeFromTheStart(t *testing.T) {
