@@ -40,6 +40,7 @@ const (
 	subjMsgDelete             = "$JS.API.MSG.DELETE.%s"
 	subjDirectGet             = "$JS.API.DIRECT.GET.%s"
 	subjDirectGetPrefix       = "$JS.API.DIRECT.GET.%s."
+	subjAccountInfo           = "$JS.API.INFO"
 )
 
 // defaultAPIPrefix is the JetStream API prefix without a domain or an imported prefix.
@@ -150,6 +151,16 @@ func (w *jetStreamWatch) consumer(c jetstream.Consumer, stream string) jetstream
 		return nil
 	}
 	return &consumerWatch{Consumer: c, stream: stream, w: w}
+}
+
+// AccountInfo is watched on the client's API prefix and on the default one, which a server maps the prefix of a
+// domain it serves itself to.
+func (w *jetStreamWatch) AccountInfo(ctx context.Context) (*jetstream.AccountInfo, error) {
+	subjects := []string{w.subject(subjAccountInfo)}
+	if w.api != defaultAPIPrefix {
+		subjects = append(subjects, subjAccountInfo)
+	}
+	return watchCall(ctx, w, subjects, w.JetStream.AccountInfo)
 }
 
 func (w *jetStreamWatch) CreateStream(ctx context.Context, cfg jetstream.StreamConfig) (jetstream.Stream, error) {

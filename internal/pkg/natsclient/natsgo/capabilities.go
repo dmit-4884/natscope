@@ -174,16 +174,25 @@ func checkFeaturesAt(level int32, api string, features ...feature) error {
 	return err
 }
 
-// remoteAPILevel is the API level of the JetStream behind the client's domain or API prefix, read once.
+// remoteAPILevel is the API level of the JetStream behind the client's domain or API prefix, read once; a refused
+// read is not tried again.
 func (c *Client) remoteAPILevel(ctx context.Context) (int32, bool) {
 	c.levelMu.Lock()
-	known := c.remoteLevel
+	known, refused := c.remoteLevel, c.levelRefused
 	c.levelMu.Unlock()
 	if known != nil {
 		return *known, true
 	}
+	if refused {
+		return 0, false
+	}
 	info, err := c.jetStream.AccountInfo(ctx)
 	if err != nil {
+		if errors.Is(err, errs.ErrNATSPermissionViolation) {
+			c.levelMu.Lock()
+			c.levelRefused = true
+			c.levelMu.Unlock()
+		}
 		return 0, false
 	}
 	return c.rememberRemoteLevel(info.API.Level), true

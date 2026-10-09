@@ -86,9 +86,11 @@ type Client struct {
 	// ownConsumers holds the names of the short-lived consumers this client created to read streams.
 	ownConsumers sync.Map
 
-	// remoteLevel is the API level of the JetStream behind api, once an AccountInfo has reported it.
-	levelMu     sync.Mutex
-	remoteLevel *int32
+	// remoteLevel is the API level of the JetStream behind api, once an AccountInfo has reported it; levelRefused
+	// records that the server refused the AccountInfo, so it is not asked again.
+	levelMu      sync.Mutex
+	remoteLevel  *int32
+	levelRefused bool
 }
 
 var _ natsclient.Client = (*Client)(nil)

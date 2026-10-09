@@ -9,9 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -275,6 +278,17 @@ func TestRequireFeatures_AnotherDomainUsesItsOwnLevel(t *testing.T) {
 		assert.NoError(t, c.requireFeatures(t.Context(), featConsumerReset))
 	})
 
+	t.Run("a refused level is not asked again", func(t *testing.T) {
+		t.Parallel()
+		c := dialClient(t, url)
+		remote := &remoteJetStream{err: &errs.NATSPermissionError{Operation: errs.PermissionOperationPublish, Subject: "$JS.hub.API.INFO"}}
+		c.api, c.jetStream = "$JS.hub.API", remote
+
+		assert.NoError(t, c.requireFeatures(t.Context(), featMessageTTL))
+		assert.NoError(t, c.requireFeatures(t.Context(), featMessageTTL))
+		assert.Equal(t, 1, remote.calls)
+	})
+
 	t.Run("server info reports the hub's capabilities", func(t *testing.T) {
 		t.Parallel()
 		c := dialClient(t, url)
@@ -286,4 +300,39 @@ func TestRequireFeatures_AnotherDomainUsesItsOwnLevel(t *testing.T) {
 		assert.False(t, info.Capabilities.ConsumerReset)
 		assert.True(t, info.Capabilities.ConsumerPause)
 	})
+}
+
+// TestRequireFeatures_RefusedLevelDoesNotHoldTheCall checks that a domain whose API INFO the user may not ask lets a
+// gated call through at once and is not asked again.
+func TestRequireFeatures_RefusedLevelDoesNotHoldTheCall(t *testing.T) {
+	t.Parallel()
+	url := startTestServer(t, func(o *server.Options) {
+		o.JetStream, o.JetStreamDomain, o.StoreDir = true, "hub", t.TempDir()
+		o.Users = []*server.User{{
+			Username: "app", Password: "pw",
+			Permissions: &server.Permissions{Publish: &server.SubjectPermission{Allow: []string{">"}, Deny: []string{"$JS.API.INFO"}}},
+		}}
+	})
+	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
+		URLs:       []string{url},
+		Auth:       &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("pw")},
+		Connection: &entities.ConnectionConfig{JetstreamDomain: ptr.Wrap("hub")},
+	})
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+	c, ok := conn.(*Client)
+	require.True(t, ok)
+
+	for i := range 2 {
+		ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
+		start := time.Now()
+		sent := c.conn.Stats().OutMsgs
+		gateErr := c.requireFeatures(ctx, featMessageTTL)
+		cancel()
+		require.NoError(t, gateErr)
+		assert.Less(t, time.Since(start), 2*time.Second, "call %d waits out its timeout", i)
+		if i > 0 {
+			assert.Equal(t, sent, c.conn.Stats().OutMsgs, "the refused level is asked again")
+		}
+	}
 }
