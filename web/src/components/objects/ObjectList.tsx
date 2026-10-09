@@ -34,7 +34,7 @@ export default function ObjectList({ connectionId }: ObjectListProps) {
   const sealed = useMemo(() => new Set((buckets ?? []).filter((b) => b.sealed).map((b) => b.bucket)), [buckets])
 
   if (isLoading) {
-    return <SkeletonRows count={5} rowClassName="h-9" className="p-2" />
+    return <SkeletonRows count={1} rowClassName="h-9" className="p-2" />
   }
 
   if (error) {

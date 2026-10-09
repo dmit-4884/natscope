@@ -36,7 +36,7 @@ export default function KVList({ connectionId }: KVListProps) {
   )
 
   if (isLoading) {
-    return <SkeletonRows count={5} rowClassName="h-9" className="p-2" />
+    return <SkeletonRows count={1} rowClassName="h-9" className="p-2" />
   }
 
   if (error) {

@@ -29,7 +29,7 @@ export default function StreamList({ connectionId }: StreamListProps) {
   const streams = useMemo(() => (allNames ?? []).filter(isRegularStreamName), [allNames])
 
   if (isLoading) {
-    return <SkeletonRows count={6} rowClassName="h-9" className="p-2" />
+    return <SkeletonRows count={1} rowClassName="h-9" className="p-2" />
   }
 
   if (error) {
