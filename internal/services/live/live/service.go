@@ -80,9 +80,9 @@ type sessionState struct {
 
 	connectionID string
 	// exclude are the muted subject patterns, dropped as they arrive.
-	exclude []string
-	lost    chan struct{}
-	lostOnce     sync.Once
+	exclude  []string
+	lost     chan struct{}
+	lostOnce sync.Once
 
 	denials        chan *entities.LiveError
 	silentMu       sync.RWMutex
