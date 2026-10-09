@@ -218,8 +218,8 @@ type KVStore interface {
 	// GetKVBucket returns info for one KeyValue bucket.
 	GetKVBucket(ctx context.Context, bucket string) (*entities.KVBucketInfo, error)
 
-	// ListKVKeys returns all keys in a bucket.
-	ListKVKeys(ctx context.Context, bucket string) ([]string, error)
+	// ListKVKeys returns up to query.Limit keys matching query.Filter, filtered on the server.
+	ListKVKeys(ctx context.Context, bucket string, query entities.KVKeysQuery) (entities.KVKeyList, error)
 
 	// GetKVKey returns value + metadata for a key.
 	GetKVKey(ctx context.Context, bucket string, key string) (*entities.KVEntry, error)

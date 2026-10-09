@@ -42,6 +42,12 @@ function storedValue(target: KVProtoTarget | null, text: string): string | KVPro
     : text
 }
 
+const NO_KEYS: string[] = []
+
+function isKeyPattern(text: string): boolean {
+  return /[*>]/.test(text)
+}
+
 type KVConfirmAction = {
   type: 'delete-bucket' | 'delete-key' | 'purge-key'
   name: string
@@ -70,11 +76,14 @@ export default function KVStorePage() {
   const { data: buckets = [] } = useKVBuckets(connectionId)
   const bucketInfo = buckets.find(b => b.bucket === bucketName)
 
-  // Fetch keys for bucket
-  const { data: keys = [], isLoading: keysLoading, error: keysError, refetch: refetchKeys } = useKVKeys(
+  const searchText = keySearchQuery.trim()
+  const keyPattern = isKeyPattern(searchText) ? searchText : ''
+  const { data: keyList, isLoading: keysLoading, error: keysError, refetch: refetchKeys } = useKVKeys(
     connectionId,
-    bucketName
+    bucketName,
+    keyPattern
   )
+  const keys = keyList?.keys ?? NO_KEYS
 
   // Fetch selected key value
   const { data: keyEntry, isLoading: keyLoading } = useKVKey(
@@ -106,10 +115,9 @@ export default function KVStorePage() {
   const deleteKey = useDeleteKVKey(connectionId, bucketName)
   const purgeKey = usePurgeKVKey(connectionId, bucketName)
 
-  // Filter keys
-  const filteredKeys = (keys ?? []).filter((k: string) =>
-    k.toLowerCase().includes(keySearchQuery.toLowerCase())
-  )
+  const filteredKeys = keyPattern
+    ? keys
+    : keys.filter((k) => k.toLowerCase().includes(searchText.toLowerCase()))
 
   const valueDirty = draft !== null && draft.key === selectedKey
   const editingValue = valueDirty ? draft.value : keyEntry && !isCreatingKey ? editableValue(keyEntry, !!target) : ''
@@ -240,7 +248,7 @@ export default function KVStorePage() {
         <div className="w-72 border-r bg-surface-primary flex flex-col">
           <div className="p-3 border-b">
             <SearchInput
-              placeholder="Search keys..."
+              placeholder="Search keys, or a pattern like orders.>"
               value={keySearchQuery}
               onChange={setKeySearchQuery}
               debounce={200}
@@ -267,6 +275,12 @@ export default function KVStorePage() {
                 </Button>
               )}
             </div>
+            {keyList?.truncated && (
+              <p className="mt-1 text-xs text-content-tertiary" data-testid="kv-keys-truncated">
+                Only the first {plural(keys.length, 'key')} are loaded. Narrow the search with a pattern like{' '}
+                <span className="font-mono">orders.&gt;</span>
+              </p>
+            )}
           </div>
 
           <div className="flex-1 overflow-auto">

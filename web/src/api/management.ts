@@ -20,6 +20,7 @@ import type {
   KVBucketConfig,
   KVBucketInfo,
   KVEntry,
+  KVKeyList,
   ObjectBucketConfig,
   ObjectBucketInfo,
   ObjectInfo,
@@ -421,12 +422,13 @@ function emptyOn<T>(reason: string, messageSubstring: string, fallback: T) {
 export async function listKVKeys(
   connectionId: string,
   bucket: string,
+  filter: string,
   signal?: AbortSignal,
-): Promise<string[]> {
+): Promise<KVKeyList> {
   const response = await managementClient
-    .listKVKeys({ connectionId, bucket }, { signal })
-    .catch(emptyOn('NATS_NO_KEYS', 'no keys found', { keys: [] }))
-  return response.keys || []
+    .listKVKeys({ connectionId, bucket, filter }, { signal })
+    .catch(emptyOn('NATS_NO_KEYS', 'no keys found', { keys: [], truncated: false }))
+  return { keys: response.keys || [], truncated: !!response.truncated }
 }
 
 export async function getKVKey(

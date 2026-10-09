@@ -106,11 +106,14 @@ func (h *Handler) ListKVKeys(
 	req *connect.Request[managementpb.ListKVKeysRequest],
 ) (*connect.Response[managementpb.ListKVKeysResponse], error) {
 	in := req.Msg
-	keys, err := h.natsService.ListKVKeys(ctx, in.GetConnectionId(), in.GetBucket())
+	list, err := h.natsService.ListKVKeys(ctx, in.GetConnectionId(), in.GetBucket(), entities.KVKeysQuery{
+		Filter: in.GetFilter(),
+		Limit:  int(in.GetLimit()),
+	})
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&managementpb.ListKVKeysResponse{Keys: keys}), nil
+	return connect.NewResponse(&managementpb.ListKVKeysResponse{Keys: list.Keys, Truncated: list.Truncated}), nil
 }
 
 // GetKVKey gets a key from a KeyValue bucket, its value decoded when a mapping or detected type applies.

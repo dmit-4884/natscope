@@ -6,7 +6,6 @@ package kv
 import (
 	"context"
 	"encoding/base64"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
-	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	mcptransport "github.com/dmit-4884/natscope/internal/transports/mcp"
 )
@@ -38,23 +36,14 @@ func (t *Toolset) listKeys(ctx context.Context, _ *mcp.CallToolRequest, in listK
 	if err != nil {
 		return nil, listKeysOutput{}, err
 	}
-	keys, err := t.kv.ListKVKeys(ctx, connID, in.Bucket)
+	list, err := t.kv.ListKVKeys(ctx, connID, in.Bucket, entities.KVKeysQuery{
+		Filter: in.Pattern,
+		Limit:  mcptransport.Limit(in.Limit, defaultKeysLimit, maxKeysLimit),
+	})
 	if err != nil {
 		return nil, listKeysOutput{}, err
 	}
-	if pattern := strings.TrimSpace(in.Pattern); pattern != "" {
-		matched := keys[:0:0]
-		for _, k := range keys {
-			if natsutil.MatchSubject(pattern, k) {
-				matched = append(matched, k)
-			}
-		}
-		keys = matched
-	}
-	return nil, listKeysOutput{
-		Keys:  mcptransport.Items(keys[:min(len(keys), mcptransport.Limit(in.Limit, defaultKeysLimit, maxKeysLimit))]),
-		Total: len(keys),
-	}, nil
+	return nil, listKeysOutput{Keys: mcptransport.Items(list.Keys), Truncated: list.Truncated}, nil
 }
 
 func newEntryView(e *entities.KVEntry, limit int, r *entities.DecodeResult) entryView {

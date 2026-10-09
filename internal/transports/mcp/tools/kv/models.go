@@ -39,8 +39,8 @@ type listKeysInput struct {
 }
 
 type listKeysOutput struct {
-	Keys  []string `json:"keys"`
-	Total int      `json:"total" jsonschema:"keys matching the pattern before the limit"`
+	Keys      []string `json:"keys"`
+	Truncated bool     `json:"truncated" jsonschema:"more keys match than the limit allowed; narrow the pattern or raise the limit"`
 }
 
 type entryView struct {

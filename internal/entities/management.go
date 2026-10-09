@@ -542,6 +542,24 @@ func (e *KVEntry) Subject() string {
 	return "$KV." + e.Bucket + "." + e.Key
 }
 
+// KVKeysQuery narrows a listing of a bucket's keys.
+type KVKeysQuery struct {
+	// Filter is a NATS subject pattern over key names; empty lists every key.
+	Filter string
+
+	// Limit caps the number of keys returned; zero or less applies the default.
+	Limit int
+}
+
+// KVKeyList is one listing of a bucket's keys.
+type KVKeyList struct {
+	// Keys are the matching key names, each listed once.
+	Keys []string
+
+	// Truncated reports that more keys matched than the limit allowed.
+	Truncated bool
+}
+
 // ObjectBucketConfig is the create/update config for an Object Store bucket.
 type ObjectBucketConfig struct {
 	// Bucket is the bucket name (required).

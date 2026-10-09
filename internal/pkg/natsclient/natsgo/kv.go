@@ -18,6 +18,7 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
+	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	corecontext "github.com/altessa-s/go-atlas/core/context"
 )
@@ -141,32 +142,62 @@ func (c *Client) GetKVBucket(ctx context.Context, bucket string) (*entities.KVBu
 	return &result, nil
 }
 
-// ListKVKeys returns all keys in a bucket. Keys() creates an ephemeral
-// consumer, so a missing CONSUMER.CREATE perm surfaces only as a timeout. An
-// empty bucket returns an empty slice.
-func (c *Client) ListKVKeys(ctx context.Context, bucket string) ([]string, error) {
+// defaultKVKeysLimit caps a key listing that names no limit.
+const defaultKVKeysLimit = 1000
+
+// ListKVKeys returns up to query.Limit keys matching query.Filter. The server applies the filter, and reading stops
+// once one key past the limit has arrived. The listing runs an ephemeral consumer, so a missing CONSUMER.CREATE perm
+// surfaces only as a timeout. An empty bucket returns an empty list.
+func (c *Client) ListKVKeys(ctx context.Context, bucket string, query entities.KVKeysQuery) (entities.KVKeyList, error) {
+	filter := strings.TrimSpace(query.Filter)
+	if filter != "" {
+		if err := natsutil.ValidateSubjectPattern(filter); err != nil {
+			return entities.KVKeyList{}, err
+		}
+	}
+	limit := query.Limit
+	if limit <= 0 {
+		limit = defaultKVKeysLimit
+	}
+
 	kvCtx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)
 	defer cancel()
 
 	kv, err := c.jetStream.KeyValue(kvCtx, bucket)
 	if err != nil {
-		return nil, wrapErr(err)
+		return entities.KVKeyList{}, wrapErr(err)
 	}
 
-	keys, err := kv.Keys(kvCtx)
-	if errors.Is(err, jetstream.ErrNoKeysFound) {
-		return []string{}, nil
+	var filters []string
+	if filter != "" {
+		filters = []string{filter}
 	}
+	lister, err := kv.ListKeysFiltered(kvCtx, filters...)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, nats.ErrTimeout) {
-			if asyncErr := c.takeAsyncError(browseAsyncErrorWait); asyncErr != nil {
-				return nil, asyncErr
-			}
-		}
-		return nil, wrapErr(err)
+		return entities.KVKeyList{}, wrapErr(err)
 	}
+	defer func() { _ = lister.Stop() }()
 
-	return keys, nil
+	list := entities.KVKeyList{Keys: []string{}}
+	seen := make(map[string]struct{})
+	for key := range lister.Keys() {
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		if len(list.Keys) == limit {
+			list.Truncated = true
+			return list, nil
+		}
+		seen[key] = struct{}{}
+		list.Keys = append(list.Keys, key)
+	}
+	if err := kvCtx.Err(); err != nil {
+		if asyncErr := c.takeAsyncError(browseAsyncErrorWait); asyncErr != nil {
+			return entities.KVKeyList{}, asyncErr
+		}
+		return entities.KVKeyList{}, wrapErr(err)
+	}
+	return list, nil
 }
 
 // GetKVKey returns the value and metadata for a key in a KeyValue bucket.

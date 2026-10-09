@@ -848,12 +848,21 @@ message ListKVKeysRequest {
 
   // Required. Name of the KeyValue bucket to list keys from.
   string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+
+  // Optional. NATS subject pattern over key names, applied by the server (e.g. "orders.*", "users.>"); empty lists every key.
+  string filter = 3 [(buf.validate.field).string.max_len = 1024];
+
+  // Optional. Maximum number of keys returned; zero applies the default of 1000.
+  int32 limit = 4 [(buf.validate.field).int32 = {gte: 0, lte: 100000}];
 }
 
 // Defines the response message for listing all keys in a KeyValue bucket.
 message ListKVKeysResponse {
-  // Required. List of all key names stored in the bucket.
+  // Required. Key names matching the filter, each listed once.
   repeated string keys = 1;
+
+  // Required. True when more keys match than the limit allowed.
+  bool truncated = 2;
 }
 
 // Defines the request message for retrieving a specific key from a KeyValue bucket.

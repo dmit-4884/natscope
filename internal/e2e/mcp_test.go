@@ -288,10 +288,18 @@ func TestMCPReadOnly(t *testing.T) {
 		assert.Equal(t, 5, buckets.Buckets[0].History)
 
 		keys := callTool[struct {
-			Keys  []string `json:"keys"`
-			Total int      `json:"total"`
+			Keys      []string `json:"keys"`
+			Truncated bool     `json:"truncated"`
 		}](t, cs, "list_kv_keys", map[string]any{"bucket": bucket, "pattern": "users.*.profile"})
 		assert.Equal(t, []string{"users.1.profile"}, keys.Keys)
+		assert.False(t, keys.Truncated)
+
+		cut := callTool[struct {
+			Keys      []string `json:"keys"`
+			Truncated bool     `json:"truncated"`
+		}](t, cs, "list_kv_keys", map[string]any{"bucket": bucket, "limit": 1})
+		assert.Len(t, cut.Keys, 1)
+		assert.True(t, cut.Truncated, "two keys exist, the limit is one")
 
 		type entry struct {
 			Revision uint64   `json:"revision"`

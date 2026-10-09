@@ -236,6 +236,11 @@ export interface KVBucketInfo {
   metadata?: Record<string, string>
 }
 
+export interface KVKeyList {
+  keys: string[]
+  truncated: boolean
+}
+
 export interface KVEntry {
   bucket: string
   key: string

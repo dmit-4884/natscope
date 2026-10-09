@@ -167,6 +167,45 @@ func TestEmptyBucketsReturnEmptyList(t *testing.T) {
 	assert.Empty(t, objs.Msg.GetObjects())
 }
 
+// TestListKVKeysFiltersAndLimitsOnTheServer checks the key filter, the limit and the truncation flag of ListKVKeys.
+func TestListKVKeysFiltersAndLimitsOnTheServer(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kvfilter")
+
+	_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "filtered"},
+	}))
+	require.NoError(t, err)
+	value := base64.StdEncoding.EncodeToString([]byte("v"))
+	for _, k := range []string{"orders.1", "orders.2", "orders.3", "users.1"} {
+		_, err = env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+			ConnectionId: connID, Bucket: "filtered", Key: k, Payload: &managementpb.PutKVKeyRequest_Value{Value: value},
+		}))
+		require.NoError(t, err)
+	}
+
+	all, err := env.management.ListKVKeys(ctx, connect.NewRequest(&managementpb.ListKVKeysRequest{
+		ConnectionId: connID, Bucket: "filtered", Filter: "orders.*",
+	}))
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"orders.1", "orders.2", "orders.3"}, all.Msg.GetKeys())
+	assert.False(t, all.Msg.GetTruncated())
+
+	cut, err := env.management.ListKVKeys(ctx, connect.NewRequest(&managementpb.ListKVKeysRequest{
+		ConnectionId: connID, Bucket: "filtered", Filter: "orders.*", Limit: 2,
+	}))
+	require.NoError(t, err)
+	assert.Len(t, cut.Msg.GetKeys(), 2)
+	assert.True(t, cut.Msg.GetTruncated())
+
+	_, err = env.management.ListKVKeys(ctx, connect.NewRequest(&managementpb.ListKVKeysRequest{
+		ConnectionId: connID, Bucket: "filtered", Filter: "orders.>.x",
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+}
+
 // TestBucketDeleteSealRefusesPlainStream checks that Delete and Seal refuse a plain stream named like a bucket.
 func TestBucketDeleteSealRefusesPlainStream(t *testing.T) {
 	env := setupE2E(t)

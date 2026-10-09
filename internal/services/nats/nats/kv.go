@@ -49,13 +49,18 @@ func (s *Service) GetKVBucket(ctx context.Context, connectionID string, bucket s
 	return c.GetKVBucket(ctx, bucket)
 }
 
-// ListKVKeys returns all keys in a bucket.
-func (s *Service) ListKVKeys(ctx context.Context, connectionID string, bucket string) ([]string, error) {
+// ListKVKeys returns up to query.Limit keys of a bucket matching query.Filter.
+func (s *Service) ListKVKeys(
+	ctx context.Context,
+	connectionID string,
+	bucket string,
+	query entities.KVKeysQuery,
+) (entities.KVKeyList, error) {
 	c, err := s.client(ctx, connectionID)
 	if err != nil {
-		return nil, err
+		return entities.KVKeyList{}, err
 	}
-	return c.ListKVKeys(ctx, bucket)
+	return c.ListKVKeys(ctx, bucket, query)
 }
 
 // GetKVKey returns the value and metadata for a key in a KeyValue bucket.

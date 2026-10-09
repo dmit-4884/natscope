@@ -123,8 +123,8 @@ func (r *readOnlyClient) GetKVBucket(ctx context.Context, bucket string) (*entit
 	return r.inner.GetKVBucket(ctx, bucket)
 }
 
-func (r *readOnlyClient) ListKVKeys(ctx context.Context, bucket string) ([]string, error) {
-	return r.inner.ListKVKeys(ctx, bucket)
+func (r *readOnlyClient) ListKVKeys(ctx context.Context, bucket string, query entities.KVKeysQuery) (entities.KVKeyList, error) {
+	return r.inner.ListKVKeys(ctx, bucket, query)
 }
 
 func (r *readOnlyClient) GetKVKey(ctx context.Context, bucket, key string) (*entities.KVEntry, error) {
