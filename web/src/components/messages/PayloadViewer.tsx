@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useEffect, useRef } from 'react'
+import { memo, useState, useMemo } from 'react'
 import { Tabs, tabPanelProps } from '@/components/ui'
 import { copyText } from '@/utils/clipboard'
 import { decodeBase64ToBytes } from '@/utils/base64'
@@ -92,22 +92,12 @@ const PayloadViewer = memo(function PayloadViewer({
 }: PayloadViewerProps) {
   // Determine initial mode
   const initialMode = defaultMode || (decodedData ? 'decoded' : (jsonData ? 'json' : 'raw'))
-  const [viewMode, setViewMode] = useState<ViewMode>(initialMode)
-
-  const userPickedRef = useRef(false)
-  useEffect(() => {
-    userPickedRef.current = false
-  }, [rawData])
-  useEffect(() => {
-    if (defaultMode && !userPickedRef.current) {
-      setViewMode(defaultMode)
-    }
-  }, [defaultMode, rawData])
+  const [picked, setPicked] = useState<{ rawData: string; mode: ViewMode } | null>(null)
+  const viewMode = picked?.rawData === rawData ? picked.mode : initialMode
 
   // Notify parent of mode changes
   const handleModeChange = (mode: ViewMode) => {
-    userPickedRef.current = true
-    setViewMode(mode)
+    setPicked({ rawData, mode })
     onModeChange?.(mode)
   }
 
