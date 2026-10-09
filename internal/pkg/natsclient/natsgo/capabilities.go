@@ -150,7 +150,7 @@ func (c *Client) requireFeatures(ctx context.Context, features ...feature) error
 	if len(features) == 0 {
 		return nil
 	}
-	if c.api != "" {
+	if c.usesRemoteJetStream() {
 		level, ok := c.remoteAPILevel(ctx)
 		if !ok {
 			return nil
@@ -163,6 +163,12 @@ func (c *Client) requireFeatures(ctx context.Context, features ...feature) error
 	}
 	_, advertised := c.conn.ConnectedServerJetStream()
 	return checkFeatures(effectiveAPILevel(version, advertised), version, features...)
+}
+
+// usesRemoteJetStream reports whether the client works with the JetStream of a domain or an API prefix rather than the
+// account's own, whose API level the connected server advertises.
+func (c *Client) usesRemoteJetStream() bool {
+	return c.api != "" && c.api != defaultAPIPrefix
 }
 
 // checkFeaturesAt is checkFeatures for the JetStream behind an API prefix, whose server version is unknown.

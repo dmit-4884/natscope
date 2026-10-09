@@ -75,7 +75,7 @@ func (c *Client) GetServerInfo(ctx context.Context) (*entities.ServerInfo, error
 			slog.String("connection_id", c.id), slogx.Error(err))
 	}
 
-	if c.api != "" {
+	if c.usesRemoteJetStream() {
 		level := 0
 		if info.Jetstream {
 			level = int(c.rememberRemoteLevel(accountInfo.API.Level))

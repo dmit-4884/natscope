@@ -336,3 +336,29 @@ func TestRequireFeatures_RefusedLevelDoesNotHoldTheCall(t *testing.T) {
 		}
 	}
 }
+
+// TestRequireFeatures_TheDefaultJetStreamGatesOnTheConnectedServer checks that a connection without a domain or
+// prefix takes the API level from the server it connected to, so a denied $JS.API.INFO does not turn the check off.
+func TestRequireFeatures_TheDefaultJetStreamGatesOnTheConnectedServer(t *testing.T) {
+	t.Parallel()
+	url := startTestServer(t, func(o *server.Options) {
+		o.JetStream, o.StoreDir = true, t.TempDir()
+		o.Users = []*server.User{{
+			Username: "app", Password: "pw",
+			Permissions: &server.Permissions{Publish: &server.SubjectPermission{Allow: []string{">"}, Deny: []string{"$JS.API.INFO"}}},
+		}}
+	})
+	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
+		URLs: []string{url},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("pw")},
+	})
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+	c, ok := conn.(*Client)
+	require.True(t, ok)
+
+	future := feature{name: "a feature of a later release", level: apiLevel214 + 1, since: "2.15"}
+	sent := c.conn.Stats().OutMsgs
+	require.ErrorIs(t, c.requireFeatures(t.Context(), future), errs.ErrFeatureUnsupported)
+	assert.Equal(t, sent, c.conn.Stats().OutMsgs, "the check asked the server")
+}
