@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@/test/utils'
 import { SubjectAutocomplete } from './SubjectAutocomplete'
 
-function Harness() {
+function Harness({ options = ['orders.>', 'audit.*'] }: { options?: string[] }) {
   const [value, setValue] = useState('')
-  return <SubjectAutocomplete value={value} onChange={setValue} options={['orders.>', 'audit.*']} inputId="subject" />
+  return <SubjectAutocomplete value={value} onChange={setValue} options={options} inputId="subject" />
 }
 
 describe('SubjectAutocomplete', () => {
@@ -41,5 +41,15 @@ describe('SubjectAutocomplete', () => {
 
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(input).toHaveValue('orders.>')
+  })
+
+  it('keeps the typed subject on Enter until a suggestion is chosen with the arrows', () => {
+    render(<Harness options={['orders.created.v2']} />)
+    const input = screen.getByRole('combobox')
+    fireEvent.change(input, { target: { value: 'orders.created' } })
+
+    expect(screen.getByRole('option', { name: 'orders.created.v2' })).toHaveAttribute('aria-selected', 'false')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(input).toHaveValue('orders.created')
   })
 })

@@ -31,7 +31,7 @@ export function SubjectAutocomplete({
   describedBy,
 }: Props) {
   const [open, setOpen] = useState(false)
-  const [highlight, setHighlight] = useState(0)
+  const [highlight, setHighlight] = useState(-1)
   const wrapRef = useRef<HTMLDivElement>(null)
   const listId = useId()
 
@@ -61,12 +61,10 @@ export function SubjectAutocomplete({
     return [...prefix, ...substr].slice(0, maxOptions)
   }, [value, options, maxOptions])
 
-  const firstHighlight = value.trim() ? 0 : -1
-
   // Reset highlight when options change.
   useEffect(() => {
-    setHighlight(firstHighlight)
-  }, [filtered, firstHighlight])
+    setHighlight(-1)
+  }, [filtered])
 
   const showDropdown = open && filtered.length > 0
 
