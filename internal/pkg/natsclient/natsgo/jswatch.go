@@ -63,11 +63,26 @@ func (w *jetStreamWatch) subject(s string) string {
 	return w.api + strings.TrimPrefix(s, defaultAPIPrefix)
 }
 
+// apiSubjects is an API subject on the prefix api together with its default-prefix form: a server serving the domain
+// of the prefix itself maps the subject to that form before it checks permissions, and names it in the violation.
+func apiSubjects(api, subject string) []string {
+	rest, ok := strings.CutPrefix(subject, api)
+	if !ok || api == "" || api == defaultAPIPrefix {
+		return []string{subject}
+	}
+	return []string{subject, defaultAPIPrefix + rest}
+}
+
+// subjects is a default-prefixed API subject moved onto the client's API prefix, with the form a violation names.
+func (w *jetStreamWatch) subjects(s string) []string {
+	return apiSubjects(w.api, w.subject(s))
+}
+
 // subjectsFor renders subject templates for one stream name on the client's API prefix.
 func (w *jetStreamWatch) subjectsFor(name string, templates ...string) []string {
-	subjects := make([]string, 0, len(templates))
+	subjects := make([]string, 0, 2*len(templates))
 	for _, t := range templates {
-		subjects = append(subjects, w.subject(fmt.Sprintf(t, name)))
+		subjects = append(subjects, w.subjects(fmt.Sprintf(t, name))...)
 	}
 	return subjects
 }
@@ -153,14 +168,8 @@ func (w *jetStreamWatch) consumer(c jetstream.Consumer, stream string) jetstream
 	return &consumerWatch{Consumer: c, stream: stream, w: w}
 }
 
-// AccountInfo is watched on the client's API prefix and on the default one, which a server maps the prefix of a
-// domain it serves itself to.
 func (w *jetStreamWatch) AccountInfo(ctx context.Context) (*jetstream.AccountInfo, error) {
-	subjects := []string{w.subject(subjAccountInfo)}
-	if w.api != defaultAPIPrefix {
-		subjects = append(subjects, subjAccountInfo)
-	}
-	return watchCall(ctx, w, subjects, w.JetStream.AccountInfo)
+	return watchCall(ctx, w, w.subjects(subjAccountInfo), w.JetStream.AccountInfo)
 }
 
 func (w *jetStreamWatch) CreateStream(ctx context.Context, cfg jetstream.StreamConfig) (jetstream.Stream, error) {
@@ -199,12 +208,12 @@ func (w *jetStreamWatch) DeleteStream(ctx context.Context, name string) error {
 }
 
 func (w *jetStreamWatch) ListStreams(ctx context.Context, opts ...jetstream.StreamListOpt) jetstream.StreamInfoLister {
-	ctx, end := w.watchLister(ctx, []string{w.subject(subjStreamList)})
+	ctx, end := w.watchLister(ctx, w.subjects(subjStreamList))
 	return &streamInfoLister{StreamInfoLister: w.JetStream.ListStreams(ctx, opts...), w: w, end: end}
 }
 
 func (w *jetStreamWatch) StreamNames(ctx context.Context, opts ...jetstream.StreamListOpt) jetstream.StreamNameLister {
-	ctx, end := w.watchLister(ctx, []string{w.subject(subjStreamNames)})
+	ctx, end := w.watchLister(ctx, w.subjects(subjStreamNames))
 	return &streamNameLister{StreamNameLister: w.JetStream.StreamNames(ctx, opts...), w: w, end: end}
 }
 
@@ -408,11 +417,11 @@ type consumerInfoLister struct {
 
 func (l *consumerInfoLister) Err() error { return l.w.listerErr(l.end, l.ConsumerInfoLister.Err()) }
 
-// Request performs a core NATS request under a permissions watch for its
-// subject, so a denied request fails fast instead of waiting out its deadline.
-func (pw *PermissionWatcher) Request(ctx context.Context, nc *nats.Conn, subject string, data []byte) (*nats.Msg, error) {
+// Request performs a core NATS request under a permissions watch for the watched
+// subjects, so a denied request fails fast instead of waiting out its deadline.
+func (pw *PermissionWatcher) Request(ctx context.Context, nc *nats.Conn, subject string, data []byte, watched []string) (*nats.Msg, error) {
 	var msg *nats.Msg
-	err := pw.WatchRequest(ctx, []string{subject}, func(ctx context.Context) error {
+	err := pw.WatchRequest(ctx, watched, func(ctx context.Context) error {
 		var reqErr error
 		msg, reqErr = nc.RequestWithContext(ctx, subject, data)
 		return reqErr

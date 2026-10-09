@@ -142,5 +142,5 @@ func (c *Client) apiSubject(suffix string) string {
 func (c *Client) request(ctx context.Context, subject string, data []byte) (*nats.Msg, error) {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, DefaultTimeout)
 	defer cancel()
-	return c.permWatch.Request(ctx, c.conn, subject, data)
+	return c.permWatch.Request(ctx, c.conn, subject, data, apiSubjects(c.api, subject))
 }
