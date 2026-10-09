@@ -5,9 +5,13 @@ package natsgo
 
 import (
 	"context"
+	"runtime"
+	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -73,6 +77,69 @@ func TestWatchKV_EndsWithTheContext(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the watch did not end")
 	}
+}
+
+type fakeKVEntry struct {
+	key string
+	rev uint64
+}
+
+func (e fakeKVEntry) Bucket() string                  { return "cfg" }
+func (e fakeKVEntry) Key() string                     { return e.key }
+func (e fakeKVEntry) Value() []byte                   { return []byte("v") }
+func (e fakeKVEntry) Revision() uint64                { return e.rev }
+func (e fakeKVEntry) Created() time.Time              { return time.Time{} }
+func (e fakeKVEntry) Delta() uint64                   { return 0 }
+func (e fakeKVEntry) Operation() jetstream.KeyValueOp { return jetstream.KeyValuePut }
+
+type fakeKeyWatcher struct {
+	updates chan jetstream.KeyValueEntry
+	stopped atomic.Bool
+}
+
+func (w *fakeKeyWatcher) Updates() <-chan jetstream.KeyValueEntry { return w.updates }
+
+func (w *fakeKeyWatcher) Stop() error {
+	if w.stopped.CompareAndSwap(false, true) {
+		close(w.updates)
+	}
+	return nil
+}
+
+func TestRelayKVChanges_DropsRevisionsFromBeforeTheWatch(t *testing.T) {
+	t.Parallel()
+	w := &fakeKeyWatcher{updates: make(chan jetstream.KeyValueEntry, 4)}
+	w.updates <- fakeKVEntry{key: "old", rev: 7}
+	w.updates <- fakeKVEntry{key: "replayed", rev: 10}
+	w.updates <- fakeKVEntry{key: "new", rev: 11}
+	out := make(chan entities.KVChange, 4)
+	ctx, cancel := context.WithCancel(t.Context())
+
+	go relayKVChanges(ctx, "cfg", 10, w, out)
+
+	got := nextChange(t, out)
+	assert.Equal(t, "new", got.Key, "a consumer reset replays the stream; revisions up to the start are not changes")
+	cancel()
+	for range out {
+	}
+	assert.True(t, w.stopped.Load(), "the watcher is stopped once the relay ends")
+}
+
+func TestWatchKV_LeavesNoGoroutineBehindWhenCancelledDuringABurst(t *testing.T) {
+	c, kv := kvWithKeys(t, "cfg")
+	before := runtime.NumGoroutine()
+	ctx, cancel := context.WithCancel(t.Context())
+
+	_, err := c.WatchKV(ctx, "cfg", "")
+	require.NoError(t, err)
+	for i := range 600 {
+		_, err := kv.PutString(t.Context(), "k"+strconv.Itoa(i), "v")
+		require.NoError(t, err)
+	}
+	cancel()
+
+	require.Eventually(t, func() bool { return runtime.NumGoroutine() <= before+2 }, 10*time.Second, 50*time.Millisecond,
+		"goroutines: before %d, now %d", before, runtime.NumGoroutine())
 }
 
 func TestWatchKV_RefusesABadFilterAndAMissingBucket(t *testing.T) {

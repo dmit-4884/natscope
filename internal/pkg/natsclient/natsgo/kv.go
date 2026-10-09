@@ -204,32 +204,53 @@ func (c *Client) ListKVKeys(ctx context.Context, bucket string, query entities.K
 	if filter != "" {
 		filters = []string{filter}
 	}
-	lister, err := kv.ListKeysFiltered(kvCtx, filters...)
+	watcher, err := kv.WatchFiltered(kvCtx, filters, jetstream.IgnoreDeletes(), jetstream.MetaOnly())
 	if err != nil {
 		return entities.KVKeyList{}, wrapErr(err)
 	}
-	defer lister.Stop() //nolint:errcheck // the listing is over either way
 
-	list := entities.KVKeyList{Keys: []string{}}
-	seen := make(map[string]struct{})
-	for key := range lister.Keys() {
-		if _, dup := seen[key]; dup {
-			continue
-		}
-		if len(list.Keys) == limit {
-			list.Truncated = true
-			return list, nil
-		}
-		seen[key] = struct{}{}
-		list.Keys = append(list.Keys, key)
-	}
-	if err := kvCtx.Err(); err != nil {
+	list, err := collectKVKeys(kvCtx, watcher, limit)
+	if errors.Is(err, context.DeadlineExceeded) {
 		if asyncErr := c.takeAsyncError(browseAsyncErrorWait); asyncErr != nil {
 			return entities.KVKeyList{}, asyncErr
 		}
+	}
+	if err != nil {
 		return entities.KVKeyList{}, wrapErr(err)
 	}
 	return list, nil
+}
+
+// collectKVKeys reads the current keys a watcher reports, each once, until it reports the end of them or one key
+// past limit arrives.
+func collectKVKeys(ctx context.Context, watcher jetstream.KeyWatcher, limit int) (entities.KVKeyList, error) {
+	defer releaseKVWatcher(ctx, watcher)
+
+	list := entities.KVKeyList{Keys: []string{}}
+	seen := make(map[string]struct{})
+	for {
+		select {
+		case <-ctx.Done():
+			return entities.KVKeyList{}, ctx.Err()
+		case entry, ok := <-watcher.Updates():
+			if !ok {
+				return entities.KVKeyList{}, errs.ErrNATSConnectionClosed
+			}
+			if entry == nil {
+				return list, nil
+			}
+			key := entry.Key()
+			if _, dup := seen[key]; dup {
+				continue
+			}
+			if len(list.Keys) == limit {
+				list.Truncated = true
+				return list, nil
+			}
+			seen[key] = struct{}{}
+			list.Keys = append(list.Keys, key)
+		}
+	}
 }
 
 // WatchKV reports every change from now on to the keys of a bucket matching filter, a NATS pattern over key names
@@ -248,6 +269,11 @@ func (c *Client) WatchKV(ctx context.Context, bucket, filter string) (<-chan ent
 	if err != nil {
 		return nil, wrapBucketErr(err)
 	}
+	stream, err := c.jetStream.Stream(lookupCtx, kvStreamPrefix+bucket)
+	if err != nil {
+		return nil, wrapBucketErr(err)
+	}
+	start := stream.CachedInfo().State.LastSeq
 
 	var keys []string
 	if filter != "" {
@@ -259,39 +285,55 @@ func (c *Client) WatchKV(ctx context.Context, bucket, filter string) (<-chan ent
 	}
 
 	out := make(chan entities.KVChange)
+	go relayKVChanges(ctx, bucket, start, watcher, out)
+	return out, nil
+}
+
+// releaseKVWatcher stops a watcher and reads off, in the background, what it still sends: nats.go's delivery goroutine
+// blocks on a full channel, and the step that closes the channel waits for that send.
+func releaseKVWatcher(ctx context.Context, watcher jetstream.KeyWatcher) {
+	_ = watcher.Stop() //nolint:errcheck // the watcher is done either way
 	go func() {
 		defer panics.Handle(ctx)
-		defer close(out)
-		defer watcher.Stop() //nolint:errcheck // the watch is over either way
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case entry, ok := <-watcher.Updates():
-				if !ok {
-					return
-				}
-				if entry == nil {
-					continue
-				}
-				e := toKVEntry(bucket, entry)
-				change := entities.KVChange{
-					Key:       e.Key,
-					Operation: e.Operation,
-					Revision:  e.Revision,
-					Created:   e.Created,
-					Value:     entry.Value(),
-					Size:      len(entry.Value()),
-				}
-				select {
-				case out <- change:
-				case <-ctx.Done():
-					return
-				}
-			}
+		for range watcher.Updates() {
 		}
 	}()
-	return out, nil
+}
+
+// relayKVChanges sends the watcher's changes made after revision start to out until ctx ends or the watcher closes.
+// The start bound drops the history nats.go replays when it recreates the ordered consumer of a watch that has not
+// seen a change yet.
+func relayKVChanges(ctx context.Context, bucket string, start uint64, watcher jetstream.KeyWatcher, out chan<- entities.KVChange) {
+	defer panics.Handle(ctx)
+	defer releaseKVWatcher(ctx, watcher)
+	defer close(out)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case entry, ok := <-watcher.Updates():
+			if !ok {
+				return
+			}
+			if entry == nil || entry.Revision() <= start {
+				continue
+			}
+			e := toKVEntry(bucket, entry)
+			change := entities.KVChange{
+				Key:       e.Key,
+				Operation: e.Operation,
+				Revision:  e.Revision,
+				Created:   e.Created,
+				Value:     entry.Value(),
+				Size:      len(entry.Value()),
+			}
+			select {
+			case out <- change:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
 }
 
 // GetKVKey returns the value and metadata for a key in a KeyValue bucket.

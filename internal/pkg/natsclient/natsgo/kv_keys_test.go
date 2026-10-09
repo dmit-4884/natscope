@@ -4,7 +4,10 @@
 package natsgo
 
 import (
+	"strconv"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -66,6 +69,52 @@ func TestListKVKeys_StopsAtTheLimit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, whole.Keys, 3)
 	assert.False(t, whole.Truncated, "every key fits")
+}
+
+// blockingKeyWatcher sends its entries the way nats.go does: each send blocks until read, and Updates closes only after
+// the sender gets past a pending send.
+type blockingKeyWatcher struct {
+	updates chan jetstream.KeyValueEntry
+	stopped atomic.Bool
+	done    chan struct{}
+}
+
+func newBlockingKeyWatcher(n int) *blockingKeyWatcher {
+	w := &blockingKeyWatcher{updates: make(chan jetstream.KeyValueEntry), done: make(chan struct{})}
+	go func() {
+		defer close(w.done)
+		defer close(w.updates)
+		for i := range n {
+			w.updates <- fakeKVEntry{key: "k" + strconv.Itoa(i), rev: uint64(i + 1)}
+			if w.stopped.Load() {
+				return
+			}
+		}
+	}()
+	return w
+}
+
+func (w *blockingKeyWatcher) Updates() <-chan jetstream.KeyValueEntry { return w.updates }
+
+func (w *blockingKeyWatcher) Stop() error {
+	w.stopped.Store(true)
+	return nil
+}
+
+func TestCollectKVKeys_ReleasesTheWatcherWhenCut(t *testing.T) {
+	t.Parallel()
+	w := newBlockingKeyWatcher(100)
+
+	got, err := collectKVKeys(t.Context(), w, 10)
+
+	require.NoError(t, err)
+	assert.Len(t, got.Keys, 10)
+	assert.True(t, got.Truncated)
+	select {
+	case <-w.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the watcher's sender is still blocked after the listing ended")
+	}
 }
 
 func TestListKVKeys_DefaultLimitAppliesWhenUnset(t *testing.T) {
