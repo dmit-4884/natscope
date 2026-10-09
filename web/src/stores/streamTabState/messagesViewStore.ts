@@ -1,4 +1,4 @@
-import type { SelectedMessage } from '@/types/messages'
+import type { FilterValues, SelectedMessage } from '@/types/messages'
 import { createStreamScopedStore, type StreamScope } from './index'
 
 /** Query context the message list is currently showing — published by
@@ -17,6 +17,9 @@ interface MessagesViewEntry {
   selectedMessage: SelectedMessage | null
   /** Optional: entries persisted before this field existed return undefined. */
   navQuery?: NavQuery
+  mode?: 'history' | 'realtime'
+  limit?: number
+  filters?: FilterValues
 }
 
 const DEFAULTS: MessagesViewEntry = {

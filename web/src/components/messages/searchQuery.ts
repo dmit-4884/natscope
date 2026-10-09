@@ -1,16 +1,8 @@
+import type { FilterValues } from '@/types/messages'
 import { parseStartDate } from './jumpToTime'
 import type { SearchQuery } from './unified/useMessageSearch'
 
-export interface FilterValues {
-  subject: string
-  startSequence: number | null
-  startDate: string | null
-  contentFilter: string
-  contentRegex: boolean
-  header: string
-  stopSequence: number | null
-  stopDate: string | null
-}
+export type { FilterValues } from '@/types/messages'
 
 const MINUTE_END_MS = 59_999
 

@@ -20,3 +20,14 @@ export interface SelectedMessage {
   truncated?: boolean
   reply?: string
 }
+
+export interface FilterValues {
+  subject: string
+  startSequence: number | null
+  startDate: string | null
+  contentFilter: string
+  contentRegex: boolean
+  header: string
+  stopSequence: number | null
+  stopDate: string | null
+}

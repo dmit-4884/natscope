@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { useLayoutEffect } from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Code, ConnectError } from '@connectrpc/connect'
 import { create, toBinary } from '@bufbuild/protobuf'
@@ -7,6 +8,7 @@ import type { StreamDetail } from '@/types/nats'
 
 const { fixtures } = vi.hoisted(() => ({
   fixtures: {
+    defaultViewMode: 'history',
     messagesError: null as unknown,
     messagesEnabled: [] as unknown[],
     workQueueStream: {
@@ -49,10 +51,24 @@ vi.mock('@/api/messages', async (importOriginal) => ({
   }),
 }))
 
+vi.mock('@/contexts/live', async (importOriginal) => {
+  class LiveStreamClient {
+    subscribe = vi.fn()
+    subscribeSubjects = vi.fn()
+    unsubscribe = vi.fn()
+    disconnect = vi.fn()
+    connect() {}
+  }
+  return {
+    ...(await importOriginal<typeof import('@/contexts/live')>()),
+    LiveStreamClient,
+  }
+})
+
 vi.mock('@/contexts/settings', () => ({
   useDisplayPreferences: () => ({
     density: 'comfortable',
-    defaultViewMode: 'history',
+    defaultViewMode: fixtures.defaultViewMode,
     timestampFormat: 'relative',
     jsonIndentSize: 2,
     autoScrollLive: true,
@@ -91,15 +107,64 @@ function streamNotFoundError(): ConnectError {
   return err
 }
 
-function renderList() {
+let scopes = 0
+
+function renderList(scope = { connectionUrl: 'nats://a', streamName: `ORDERS_WORKQUEUE-${++scopes}` }) {
   return render(
     <UnifiedMessageList
+      scope={scope}
       streamName="ORDERS_WORKQUEUE"
       connectionId="conn-1"
       onSelectMessage={() => {}}
     />,
   )
 }
+
+afterEach(() => {
+  fixtures.defaultViewMode = 'history'
+})
+
+describe('UnifiedMessageList view state', () => {
+  it('keeps the applied filters when the tab is opened again', async () => {
+    fixtures.messagesError = null
+    const scope = { connectionUrl: 'nats://a', streamName: 'KEEP' }
+    const first = renderList(scope)
+    fireEvent.click(screen.getByRole('button', { name: /filters/i }))
+    fireEvent.change(screen.getByLabelText(/payload search/i), { target: { value: 'needle' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    first.unmount()
+
+    renderList(scope)
+
+    await waitFor(() => expect(screen.getByTestId('search-status')).toBeInTheDocument())
+  })
+
+  it('opens in the default view mode from its first frame', () => {
+    fixtures.messagesError = null
+    fixtures.defaultViewMode = 'realtime'
+    const frames: string[] = []
+    function Frame() {
+      useLayoutEffect(() => {
+        frames.push(document.body.textContent ?? '')
+      })
+      return null
+    }
+
+    render(
+      <>
+        <UnifiedMessageList
+          scope={{ connectionUrl: 'nats://a', streamName: 'LIVE' }}
+          streamName="ORDERS_WORKQUEUE"
+          connectionId="conn-1"
+          onSelectMessage={() => {}}
+        />
+        <Frame />
+      </>,
+    )
+
+    expect(frames[0]).toContain('Clear')
+  })
+})
 
 describe('UnifiedMessageList WorkQueue history error banner', () => {
   it('suppresses the red alert for the expected WorkQueue consumer rejection and shows only the amber warning', () => {

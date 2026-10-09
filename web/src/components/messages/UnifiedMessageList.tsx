@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMessages, Subject } from '@/contexts/messages'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { type StreamScope, isScopeReady } from '@/stores/streamTabState'
-import { setNavQuery } from '@/stores/streamTabState/messagesViewStore'
+import { setNavQuery, useMessagesViewEntry } from '@/stores/streamTabState/messagesViewStore'
 import { useStreamDetail, streamKeys } from '@/contexts/streams'
 import type { Message } from '@/types/nats'
 import type { SelectedMessage } from '@/types/messages'
@@ -16,7 +15,6 @@ import {
   useMessagesPolicy,
   useLivePolicy,
   useUpdateSettings,
-  useSettings,
 } from '@/contexts/settings'
 import MessageDiffViewer from './MessageDiffViewer'
 import ExportDialog from './ExportDialog'
@@ -54,8 +52,7 @@ interface UnifiedMessageListProps {
   connectionId: string | null
   onSelectMessage: (message: SelectedMessage | null) => void
   selectedMessageId?: string | null
-  /** Stream-scoped store key; enables navQuery publishing when provided. */
-  scope?: StreamScope
+  scope: StreamScope
 }
 
 // Re-export: SelectedMessage lives in @/types/messages (so stores avoid the
@@ -86,7 +83,6 @@ export default function UnifiedMessageList({
   const msgSettings = useMessagesPolicy()
   const liveSettings = useLivePolicy()
   const updateSettingsMutation = useUpdateSettings()
-  const { isSuccess: settingsLoaded } = useSettings()
 
   const isCompact = display.density === 'compact'
   const rowHeight = isCompact ? 36 : 52
@@ -97,17 +93,13 @@ export default function UnifiedMessageList({
     autoScrollRef.current = display.autoScrollLive
   }, [display.autoScrollLive])
 
-  const [mode, setMode] = useState<ViewMode>('history')
-  const [limit, setLimit] = useState(50)
-  const settingsAppliedRef = useRef(false)
-  useEffect(() => {
-    if (settingsAppliedRef.current || !settingsLoaded) return
-    settingsAppliedRef.current = true
-    if (display.defaultViewMode) setMode(display.defaultViewMode as ViewMode)
-    if (msgSettings.defaultPageSize) setLimit(msgSettings.defaultPageSize)
-  }, [settingsLoaded, display.defaultViewMode, msgSettings.defaultPageSize])
-
-  const [filters, setFilters] = useState<FilterValues>(EMPTY_FILTERS)
+  const [view, setView] = useMessagesViewEntry(scope)
+  const mode: ViewMode = view.mode ?? (display.defaultViewMode === 'realtime' ? 'realtime' : 'history')
+  const limit = view.limit ?? (msgSettings.defaultPageSize || 50)
+  const filters = view.filters ?? EMPTY_FILTERS
+  const setMode = useCallback((next: ViewMode) => setView({ mode: next }), [setView])
+  const setLimit = useCallback((next: number) => setView({ limit: next }), [setView])
+  const setFilters = useCallback((next: FilterValues) => setView({ filters: next }), [setView])
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)
 
   const [showExportDialog, setShowExportDialog] = useState(false)
@@ -115,8 +107,6 @@ export default function UnifiedMessageList({
   const [compareMessages, setCompareMessages] = useState<[Message | null, Message | null]>([null, null])
   const [showDiffViewer, setShowDiffViewer] = useState(false)
 
-  const debouncedSubjectFilter = useDebouncedValue(filters.subject, 300)
-  const debouncedFilters = useDebouncedValue(filters, 300)
 
   // Jump-to-time: a startDate switches paging from sequence to a time anchor
   // (mutually exclusive server-side; reads forward).
@@ -128,8 +118,8 @@ export default function UnifiedMessageList({
     : (msgSettings.defaultDirection as 'backward' | 'forward')
 
   const searchQuery = useMemo(
-    () => (mode === 'history' ? toSearchQuery(debouncedFilters, msgSettings.defaultDirection as 'backward' | 'forward') : null),
-    [mode, debouncedFilters, msgSettings.defaultDirection],
+    () => (mode === 'history' ? toSearchQuery(filters, msgSettings.defaultDirection as 'backward' | 'forward') : null),
+    [mode, filters, msgSettings.defaultDirection],
   )
   const searchActive = searchQuery != null
   const searchWanted = searchActive || (mode === 'history' && isSearchFilter(filters))
@@ -139,18 +129,18 @@ export default function UnifiedMessageList({
   // Publish the effective query context for arrow navigation (StreamView) —
   // it must fetch with exactly the filters/direction the list shows.
   useEffect(() => {
-    if (!scope || !isScopeReady(scope)) return
+    if (!isScopeReady(scope)) return
     setNavQuery(scope, {
-      subjectFilter: debouncedSubjectFilter || undefined,
+      subjectFilter: filters.subject || undefined,
       sequences: searchQuery ? searchSequences : undefined,
       direction: searchQuery?.direction ?? effectiveDirection,
     })
-  }, [scope, debouncedSubjectFilter, effectiveDirection, searchQuery, searchSequences])
+  }, [scope, filters.subject, effectiveDirection, searchQuery, searchSequences])
 
   const { data: historyData, isLoading, error, refetch, isFetching } = useMessages(streamName, {
     connection_id: connectionId,
     limit,
-    subject_filter: debouncedSubjectFilter || undefined,
+    subject_filter: filters.subject || undefined,
     start_seq: jumpActive ? undefined : (filters.startSequence ?? undefined),
     start_time: jumpActive ? jumpStartMs : undefined,
     direction: effectiveDirection,
@@ -167,7 +157,7 @@ export default function UnifiedMessageList({
     connectionId,
     baseData: historyData,
     limit,
-    subjectFilter: debouncedSubjectFilter || undefined,
+    subjectFilter: filters.subject || undefined,
     direction: effectiveDirection,
   })
 
@@ -238,11 +228,11 @@ export default function UnifiedMessageList({
   )
 
   const handleFilterChange = (key: keyof FilterValues) => {
-    setFilters((prev) => ({
-      ...prev,
+    setFilters({
+      ...filters,
       [key]: EMPTY_FILTERS[key],
       ...(key === 'contentFilter' ? { contentRegex: false } : {}),
-    }))
+    })
   }
 
   const handleClearAllFilters = () => setFilters(EMPTY_FILTERS)
