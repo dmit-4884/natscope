@@ -5,6 +5,7 @@ import { useConnections, useConnectionHealth, useConnectionPolicy, type Connecti
 import { ConnectionBadges } from '@/components/connections/ConnectionBadges'
 import { LABEL_STRIPE_CLASSES } from '@/components/connections/labelStyles'
 import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
+import { useDelayedTrue } from '@/hooks/useDelayedTrue'
 import { usePreferencesStore } from '@/stores/preferencesStore'
 import { Badge, ChevronDownIcon, LogoIcon, PlusIcon, RefreshIcon } from '@/components/ui'
 import type { ConnectionSummary } from './ConnectedLayout'
@@ -26,6 +27,8 @@ const STATUS_DOT_CLASSES: Record<ConnectionStatus, string> = {
   reconnecting: 'bg-amber-500 animate-pulse',
   disconnected: 'bg-red-500',
 }
+
+const CONNECTING_DELAY_MS = 300
 
 interface CompactHeaderProps {
   connectionId: string | null
@@ -50,6 +53,8 @@ export default function CompactHeader({
   // Connection health
   const { status: healthStatus, serverVersion, refetch: refetchHealth } = useConnectionHealth(connectionId)
   const status: ConnectionStatus = connectionId ? healthStatus : 'disconnected'
+  const slowConnect = useDelayedTrue(status === 'connecting', CONNECTING_DELAY_MS)
+  const quietConnect = status === 'connecting' && !slowConnect
   const queryClient = useQueryClient()
   const [isRefreshing, setIsRefreshing] = useState(false)
 
@@ -82,6 +87,7 @@ export default function CompactHeader({
   }, [connectionId, savedConnections, onConnectionResolved])
 
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const dropdownTriggerRef = useRef<HTMLButtonElement>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -93,6 +99,17 @@ export default function CompactHeader({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (!showConnectionDropdown) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setShowConnectionDropdown(false)
+      dropdownTriggerRef.current?.focus()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showConnectionDropdown])
 
   const handleConnectToSaved = (connection: SavedConnection) => {
     onSwitchConnection(connection)
@@ -136,8 +153,17 @@ export default function CompactHeader({
         <div className="w-px h-6 bg-surface-hover" />
 
         {/* Connection info / selector */}
-        <div className="relative" ref={dropdownRef}>
+        <div
+          className="relative"
+          ref={dropdownRef}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setShowConnectionDropdown(false)
+          }}
+        >
           <button
+            ref={dropdownTriggerRef}
+            aria-haspopup="true"
+            aria-expanded={showConnectionDropdown}
             onClick={() => {
               const willOpen = !showConnectionDropdown
               setShowConnectionDropdown(willOpen)
@@ -153,7 +179,7 @@ export default function CompactHeader({
             <div
               role="img"
               aria-label={STATUS_LABELS[status]}
-              className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT_CLASSES[status]}`}
+              className={`w-2 h-2 rounded-full shrink-0 ${quietConnect ? 'bg-gray-300' : STATUS_DOT_CLASSES[status]}`}
             />
 
             {currentConnection ? (
@@ -168,7 +194,7 @@ export default function CompactHeader({
               <span className="text-content-tertiary">Click to connect...</span>
             )}
 
-            {connectionId && status !== 'connected' && (
+            {connectionId && status !== 'connected' && !quietConnect && (
               <Badge
                 variant={status === 'disconnected' ? 'error' : 'warning'}
                 size="sm"
@@ -191,7 +217,7 @@ export default function CompactHeader({
 
           {/* Connection dropdown */}
           {showConnectionDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-80 bg-surface-primary border border-border rounded-lg shadow-lg z-50">
+            <div className="absolute top-full left-0 mt-1 w-80 bg-surface-primary border border-border rounded-lg shadow-lg z-dropdown">
                   {/* Saved connections list */}
                   <div className="max-h-64 overflow-auto">
                     {isLoadingConnections ? (
