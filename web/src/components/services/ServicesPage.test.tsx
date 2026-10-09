@@ -194,6 +194,15 @@ describe('ServicesPage', () => {
     }
   })
 
+  it('lets the keyboard reach the totals behind the request and error rates', async () => {
+    mockedList.mockResolvedValue(discovery({ services: [service()] }))
+    renderAt()
+
+    const stats = await screen.findByTestId('service-stats')
+    const focusable = Array.from(stats.querySelectorAll<HTMLElement>('[tabindex="0"]')).map((el) => el.textContent)
+    expect(focusable).toEqual([expect.stringMatching(/^Requests/), expect.stringMatching(/^Errors/)])
+  })
+
   it('keeps the last answers when a refresh fails', async () => {
     mockedList.mockResolvedValueOnce(discovery({ services: [service()] }))
     mockedList.mockRejectedValueOnce(new Error('connection lost'))

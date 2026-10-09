@@ -52,7 +52,7 @@ function WindowCell({ window, render }: { window: WindowTotal | undefined; rende
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   const body = (
-    <div className="min-w-[7rem]">
+    <div className={`min-w-[7rem] ${hint ? 'cursor-help rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus' : ''}`} tabIndex={hint ? 0 : undefined}>
       <div className="text-2xs font-semibold uppercase tracking-wide text-content-tertiary">{label}</div>
       <div className="mt-0.5 text-base font-semibold text-content-primary tabular-nums">{value}</div>
     </div>

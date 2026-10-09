@@ -108,9 +108,11 @@ function columns(now: number): DataTableColumn<ConsumerRow>[] {
         const at = consumer.delivered?.last_active
         if (at == null && (consumer.delivered?.consumer_seq ?? 0) > 0) {
           return (
-            <span className="text-xs text-content-tertiary" title="The server keeps the delivery time only until it restarts">
-              unknown
-            </span>
+            <Tooltip content="The server keeps the delivery time only until it restarts">
+              <span className="text-xs text-content-tertiary cursor-help underline decoration-dotted underline-offset-2" tabIndex={0}>
+                unknown
+              </span>
+            </Tooltip>
           )
         }
         return (

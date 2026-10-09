@@ -208,7 +208,9 @@ describe('ConsumersPage rows', () => {
     )
     renderPage()
 
-    expect(within((await screen.findByRole('link', { name: /^restarted on/ })).closest('tr')!).getByText('unknown')).toBeInTheDocument()
+    const unknown = within((await screen.findByRole('link', { name: /^restarted on/ })).closest('tr')!).getByText('unknown')
+    expect(unknown).toHaveAttribute('tabindex', '0')
+    expect(unknown).not.toHaveAttribute('title')
     expect(within(screen.getByRole('link', { name: /^fresh on/ }).closest('tr')!).getByText('never')).toBeInTheDocument()
   })
 })
