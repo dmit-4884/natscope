@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { useLayoutEffect, useState } from 'react'
 import { Code, ConnectError } from '@connectrpc/connect'
 import { create, toBinary } from '@bufbuild/protobuf'
 import { ErrorInfoSchema } from '@/gen/google/rpc/error_details_pb'
@@ -61,6 +62,44 @@ describe('CliContextImportDialog', () => {
 
     await waitFor(() => expect(importCliContexts).toHaveBeenCalledWith(['prod'], []))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
+
+  it('opens again with the new contexts already chosen in its first frame', async () => {
+    vi.mocked(listCliContexts).mockResolvedValue({
+      directory: '/home/me/.config/nats/context',
+      contexts: [summary({ name: 'prod' }), summary({ name: 'stage' })],
+    })
+    const frames: string[] = []
+    function Frame() {
+      useLayoutEffect(() => {
+        frames.push(document.body.textContent ?? '')
+      })
+      return null
+    }
+    function Toggle() {
+      const [open, setOpen] = useState(true)
+      return (
+        <>
+          <button type="button" onClick={() => setOpen((v) => !v)}>
+            Toggle dialog
+          </button>
+          {open && (
+            <>
+              <CliContextImportDialog isOpen onClose={vi.fn()} />
+              <Frame />
+            </>
+          )}
+        </>
+      )
+    }
+    render(<Toggle />)
+    await screen.findByRole('button', { name: 'Import 2 connections' })
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle dialog', hidden: true }))
+    frames.length = 0
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle dialog', hidden: true }))
+
+    expect(frames[0]).toContain('Import 2 connections')
   })
 
   it('imports a name two uploaded files share once, from the first file', async () => {

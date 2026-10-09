@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Alert, Button, EmptyState, Modal, QueryErrorState, SkeletonRows, UploadIcon, WarningIcon } from '@/components/ui'
 import { getErrorMessage, getErrorReason } from '@/api/errors'
 import type { CliContextFile, CliContextSummary } from '@/api/connections'
@@ -16,29 +16,32 @@ const HOST_DISABLED = 'CLI_CONTEXTS_HOST_DISABLED'
 
 const selectable = (c: CliContextSummary) => c.importable && !c.exists
 
+const NO_NAMES: ReadonlySet<string> = new Set()
+
 async function readFiles(list: FileList): Promise<CliContextFile[]> {
   return Promise.all(Array.from(list, async (f) => ({ name: f.name, content: new Uint8Array(await f.arrayBuffer()) })))
 }
 
 export function CliContextImportDialog({ isOpen, onClose }: Props) {
   const [upload, setUpload] = useState<{ id: number; files: CliContextFile[] }>({ id: 0, files: [] })
-  const [chosen, setChosen] = useState<Set<string>>(new Set())
+  const [excluded, setExcluded] = useState<{ for: unknown; names: Set<string> }>({ for: undefined, names: new Set() })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { data, isLoading, error, refetch } = useCliContexts(upload, isOpen)
   const importMutation = useImportCliContexts()
 
   const contexts = useMemo(() => data?.contexts ?? [], [data])
-  useEffect(() => {
-    setChosen(new Set(contexts.filter(selectable).map((c) => c.name)))
-  }, [contexts])
+  const unchosen = excluded.for === contexts ? excluded.names : NO_NAMES
+  const chosen = useMemo(
+    () => new Set(contexts.filter((c) => selectable(c) && !unchosen.has(c.name)).map((c) => c.name)),
+    [contexts, unchosen],
+  )
 
-  const toggle = (name: string) =>
-    setChosen((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
+  const toggle = (name: string) => {
+    const next = new Set(unchosen)
+    if (next.has(name)) next.delete(name)
+    else next.add(name)
+    setExcluded({ for: contexts, names: next })
+  }
 
   const handleFiles = async (list: FileList | null) => {
     if (!list || list.length === 0) return
