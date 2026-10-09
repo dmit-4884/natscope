@@ -215,6 +215,21 @@ describe('ServicesPage', () => {
     expect(screen.getByTestId('service-detail')).toBeInTheDocument()
   })
 
+  it('keeps Refresh focusable while it refreshes and ignores clicks meanwhile', async () => {
+    mockedList.mockResolvedValueOnce(discovery({ services: [service()] }))
+    mockedList.mockReturnValueOnce(new Promise(() => {}))
+    renderAt()
+    await screen.findByTestId('service-detail')
+    const refresh = screen.getByRole('button', { name: 'Refresh' })
+
+    fireEvent.click(refresh)
+    fireEvent.click(refresh)
+
+    expect(refresh).not.toBeDisabled()
+    expect(refresh).toHaveAttribute('aria-disabled', 'true')
+    expect(mockedList).toHaveBeenCalledTimes(2)
+  })
+
   it('filters the list without changing the open service', async () => {
     mockedList.mockResolvedValue(
       discovery({ services: [service(), service({ name: 'users', description: 'Profiles', endpoints: [endpoint({ name: 'get', subject: 'users.get' })] })] }),

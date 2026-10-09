@@ -98,10 +98,13 @@ export function PublishActionBar({
         )}
         <ValidationBadge state={validationState} violationCount={violationCount} />
         <button
-          onClick={onPublish}
-          disabled={isPublishing || !canPublish}
+          onClick={() => {
+            if (!isPublishing) onPublish()
+          }}
+          disabled={!canPublish}
+          aria-disabled={isPublishing}
           aria-describedby={showDisabledReason ? DISABLED_REASON_ID : undefined}
-          className="px-6 py-2.5 bg-accent text-content-inverse font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="px-6 py-2.5 bg-accent text-content-inverse font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:cursor-not-allowed flex items-center gap-2"
         >
           {isPublishing ? (
             <>

@@ -295,8 +295,11 @@ export default function ConsumersPage() {
                 size="sm"
                 variant="secondary"
                 icon={<RefreshIcon className={`w-3.5 h-3.5 ${manualRefresh ? 'animate-spin' : ''}`} />}
-                onClick={refresh}
-                disabled={manualRefresh}
+                onClick={() => {
+                  if (!manualRefresh) refresh()
+                }}
+                aria-disabled={manualRefresh}
+                className="aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
               >
                 Refresh
               </Button>

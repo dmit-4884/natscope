@@ -522,9 +522,12 @@ export function ConnectionForm({
 
         <div className="flex gap-2">
           <button
-            onClick={onTest}
-            disabled={isTesting || value.urls.filter(Boolean).length === 0}
-            className="px-4 py-2 text-sm border border-border-strong text-gray-700 rounded-lg hover:bg-surface-secondary disabled:opacity-50 transition-colors flex items-center gap-2"
+            onClick={() => {
+              if (!isTesting) onTest()
+            }}
+            disabled={value.urls.filter(Boolean).length === 0}
+            aria-disabled={isTesting}
+            className="px-4 py-2 text-sm border border-border-strong text-gray-700 rounded-lg hover:bg-surface-secondary disabled:opacity-50 aria-disabled:opacity-50 transition-colors flex items-center gap-2"
           >
             {isTesting && (
               <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
