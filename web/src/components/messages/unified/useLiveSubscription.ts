@@ -86,6 +86,14 @@ export function useLiveSubscription({
   const [messagesDropped, setMessagesDropped] = useState<number | undefined>(undefined)
   const skippedRef = useRef({ carried: 0, session: 0, cleared: 0 })
   const [pausedCount, setPausedCount] = useState(0)
+  const [feedFor, setFeedFor] = useState(connectionId)
+  if (feedFor !== connectionId) {
+    setFeedFor(connectionId)
+    setLiveMessages([])
+    setSubjectCounts({})
+    setNewMessageIds(new Set())
+    setDeniedSubjects([])
+  }
 
   const [ws, setWs] = useState<LiveStreamClient | null>(null)
   const wsRef = useRef<LiveStreamClient | null>(null)

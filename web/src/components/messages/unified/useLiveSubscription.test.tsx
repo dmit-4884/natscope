@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useLayoutEffect } from 'react'
 import { act, renderHook } from '@testing-library/react'
 import type { WSBatchPayload, WSErrorPayload, WSMessagePayload, WSStatsPayload } from '@/contexts/live'
 import { useLiveSubscription } from './useLiveSubscription'
@@ -197,6 +198,26 @@ describe('useLiveSubscription subjects', () => {
     act(() => client.deliver({ messages: [core('orders.new')], count: 1 }))
     expect(result.current.liveMessages.map((m) => m.subject)).toEqual(['orders.new'])
     expect(result.current.liveMessages[0].reply).toBe('_INBOX.1')
+  })
+
+  it('drops the messages of the previous connection from the first render on another one', () => {
+    const seen: number[] = []
+    const { rerender } = renderHook(
+      ({ conn }: { conn: string }) => {
+        const live = useLiveSubscription({ connectionId: conn, streamName: null, subjects: ['>'], enabled: true, initialLimit: 100 })
+        useLayoutEffect(() => {
+          seen.push(live.liveMessages.length)
+        })
+        return live
+      },
+      { initialProps: { conn: 'conn-1' } },
+    )
+    act(() => clients[clients.length - 1].deliver({ messages: [core('orders.new')], count: 1 }))
+    seen.length = 0
+
+    rerender({ conn: 'conn-2' })
+
+    expect(seen[0]).toBe(0)
   })
 
   it('reads as connecting from the first render once it is turned on', () => {

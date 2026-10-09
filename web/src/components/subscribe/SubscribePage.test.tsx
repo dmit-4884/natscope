@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@/test/utils'
 import { clearAllSubscribeDrafts } from '@/stores/subscribeDraftStore'
@@ -257,6 +257,30 @@ describe('SubscribePage', () => {
     expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Live')
     expect(chips().map((c) => c.textContent)).toEqual(['orders.>'])
     expect(within(screen.getByTestId('feed')).getByText('orders.new')).toBeInTheDocument()
+  })
+
+  it('drops the session in the first frame on another connection', () => {
+    const frames: string[] = []
+    function Frame() {
+      useLayoutEffect(() => {
+        frames.push(screen.queryByTestId('subscribe-status')?.textContent ?? '')
+      })
+      return null
+    }
+    const page = (connectionId: string) => (
+      <SubscribeSessionProvider connectionId={connectionId}>
+        <SubscribePage />
+        <Frame />
+      </SubscribeSessionProvider>
+    )
+    const view = render(page('conn-1'))
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    frames.length = 0
+
+    view.rerender(page('conn-2'))
+
+    expect(frames[0]).not.toContain('Live')
   })
 
   it('keeps a stopped feed while another page is open', () => {

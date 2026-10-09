@@ -31,6 +31,16 @@ export function SubscribeSessionProvider({ connectionId, children }: Props) {
   const [selected, setSelected] = useState<SelectedMessage | null>(null)
   const [muted, setMuted] = useState<string[]>([])
   const [rateOverride, setDisplayRate] = useState<number | null>(null)
+  const [sessionFor, setSessionFor] = useState(connectionId)
+  if (sessionFor !== connectionId) {
+    setSessionFor(connectionId)
+    setRunning(false)
+    setQuery('')
+    setSubjectFilter(null)
+    setSelected(null)
+    setMuted([])
+    setDisplayRate(null)
+  }
   const liveSettings = useLivePolicy()
   const displayRate = rateOverride ?? liveSettings.maxDisplayRate ?? 0
 
@@ -52,12 +62,6 @@ export function SubscribeSessionProvider({ connectionId, children }: Props) {
 
   const { clearMessages } = live
   useEffect(() => {
-    setRunning(false)
-    setQuery('')
-    setSubjectFilter(null)
-    setSelected(null)
-    setMuted([])
-    setDisplayRate(null)
     clearMessages()
   }, [connectionId, clearMessages])
 
