@@ -87,10 +87,14 @@ func streamSourceRefToEntity(src *natspb.StreamSourceRef) *entities.StreamSource
 		return nil
 	}
 	result := converter.Convert(src, &entities.StreamSource{},
-		converter.WithIgnoreFields("External"),
+		converter.WithIgnoreFields("External", "OptStartTime"),
 	)
 	if src.GetExternal() != nil {
 		result.External = converter.Convert(src.GetExternal(), &entities.ExternalStream{})
+	}
+	if src.GetOptStartTime() != nil {
+		start := src.GetOptStartTime().AsTime()
+		result.OptStartTime = &start
 	}
 	return result
 }

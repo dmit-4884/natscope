@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
 	managementpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/management"
@@ -242,6 +243,49 @@ func TestKVBucketSettingsRoundTrip(t *testing.T) {
 	}))
 	require.Error(t, err)
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a marker under one second is invalid")
+}
+
+// TestKVBucketCreateCarriesMirrorSourcesAndRepublish checks that a bucket keeps the mirror, sources and republish it was created with.
+func TestKVBucketCreateCarriesMirrorSourcesAndRepublish(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kvlinks")
+	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+
+	for _, cfg := range []*natstypes.KVBucketConfig{
+		{Bucket: "origin"},
+		{Bucket: "copy", Mirror: &natstypes.StreamSourceRef{Name: "origin", OptStartTime: timestamppb.New(start)}},
+		{
+			Bucket:    "agg",
+			Sources:   []*natstypes.StreamSourceRef{{Name: "origin"}},
+			Republish: &natstypes.RePublish{Src: ">", Dest: "repub.>"},
+		},
+	} {
+		_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{ConnectionId: connID, Config: cfg}))
+		require.NoError(t, err, cfg.GetBucket())
+	}
+
+	nc, err := nats.Connect(env.natsURL)
+	require.NoError(t, err)
+	defer nc.Close()
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+
+	mirror, err := js.Stream(ctx, "KV_copy")
+	require.NoError(t, err)
+	m := mirror.CachedInfo().Config.Mirror
+	require.NotNil(t, m)
+	assert.Equal(t, "KV_origin", m.Name)
+	require.NotNil(t, m.OptStartTime)
+	assert.True(t, start.Equal(*m.OptStartTime))
+
+	agg, err := js.Stream(ctx, "KV_agg")
+	require.NoError(t, err)
+	cfg := agg.CachedInfo().Config
+	require.Len(t, cfg.Sources, 1)
+	assert.Equal(t, "KV_origin", cfg.Sources[0].Name)
+	require.NotNil(t, cfg.RePublish)
+	assert.Equal(t, "repub.>", cfg.RePublish.Destination)
 }
 
 // TestBucketDeleteSealRefusesPlainStream checks that Delete and Seal refuse a plain stream named like a bucket.

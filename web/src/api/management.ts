@@ -1,4 +1,4 @@
-import type { Timestamp } from '@bufbuild/protobuf/wkt'
+import { timestampFromDate, type Timestamp } from '@bufbuild/protobuf/wkt'
 import { ConnectError } from '@connectrpc/connect'
 import { getErrorReason } from '@/api/errors'
 import { durToNanos, nanosToDur, tsToMillis } from '@/utils/timestamp'
@@ -46,6 +46,19 @@ function toStreamSourceInit(s: StreamSource) {
     optStartTime: s.opt_start_time,
     filterSubject: s.filter_subject ?? '',
     subjectTransforms: (s.subject_transforms ?? []).map((t) => ({ source: t.src, destination: t.dest })),
+    external: s.external
+      ? { apiPrefix: s.external.api, deliverPrefix: s.external.deliver ?? '' }
+      : undefined,
+  }
+}
+
+function toStreamSourceRefInit(s: StreamSource) {
+  return {
+    name: s.name,
+    optStartSeq: s.opt_start_seq != null ? BigInt(s.opt_start_seq) : BigInt(0),
+    optStartTime: s.opt_start_time ? timestampFromDate(new Date(s.opt_start_time)) : undefined,
+    filterSubject: s.filter_subject ?? '',
+    subjectTransforms: (s.subject_transforms ?? []).map(toSubjectTransformInit),
     external: s.external
       ? { apiPrefix: s.external.api, deliverPrefix: s.external.deliver ?? '' }
       : undefined,
@@ -425,6 +438,10 @@ export async function createKVBucket(
       metadata: config.metadata ?? {},
       compression: config.compression ?? false,
       limitMarkerTtl: config.limit_marker_ttl ? nanosToDur(config.limit_marker_ttl) : undefined,
+      placement: config.placement ? toPlacementInit(config.placement) : undefined,
+      mirror: config.mirror ? toStreamSourceRefInit(config.mirror) : undefined,
+      sources: (config.sources ?? []).map(toStreamSourceRefInit),
+      republish: config.republish ? toRePublishInit(config.republish) : undefined,
     },
   })
   return toKVBucketInfo(response.bucket!)

@@ -275,6 +275,37 @@ describe('KV bucket settings', () => {
     expect(config.limitMarkerTtl.seconds).toBe(5n)
   })
 
+  it('creates a bucket with the placement, mirror, sources and republish the form sets', async () => {
+    await createKVBucket('conn-1', {
+      bucket: 'CONFIG',
+      placement: { cluster: 'east', tags: ['ssd'] },
+      mirror: {
+        name: 'ORIGIN',
+        opt_start_seq: 5,
+        opt_start_time: '2026-10-01T00:00:00Z',
+        filter_subject: '$KV.ORIGIN.a.>',
+        subject_transforms: [{ src: '$KV.ORIGIN.>', dest: '$KV.CONFIG.>' }],
+        external: { api: '$JS.hub.API', deliver: 'deliver.hub' },
+      },
+      sources: [{ name: 'OTHER' }],
+      republish: { src: '>', dest: 'repub.>', headers_only: true },
+    })
+
+    const { config } = createKVBucketCall.mock.calls[0][0]
+    expect(config.placement).toEqual({ cluster: 'east', tags: ['ssd'] })
+    expect(config.mirror).toMatchObject({
+      name: 'ORIGIN',
+      optStartSeq: 5n,
+      filterSubject: '$KV.ORIGIN.a.>',
+      subjectTransforms: [{ source: '$KV.ORIGIN.>', destination: '$KV.CONFIG.>' }],
+      external: { apiPrefix: '$JS.hub.API', deliverPrefix: 'deliver.hub' },
+    })
+    expect(new Date(Number(config.mirror.optStartTime.seconds) * 1000).toISOString()).toBe('2026-10-01T00:00:00.000Z')
+    expect(config.sources).toHaveLength(1)
+    expect(config.sources[0].name).toBe('OTHER')
+    expect(config.republish).toEqual({ src: '>', dest: 'repub.>', headersOnly: true })
+  })
+
   it('maps limits and the key TTL marker back from the bucket', async () => {
     const info = await createKVBucket('conn-1', { bucket: 'CONFIG' })
 
