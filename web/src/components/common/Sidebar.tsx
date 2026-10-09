@@ -228,6 +228,7 @@ export default function Sidebar({ connectionId }: SidebarProps) {
           title="Streams"
           icon={STREAMS_ICON}
           defaultOpen={true}
+          storageKey="streams"
           isActive={isStreams}
           onOpen={invalidateStreams}
           actions={<CreateLink to="/streams/new" label="Create stream" />}
@@ -239,6 +240,7 @@ export default function Sidebar({ connectionId }: SidebarProps) {
           title="KV Stores"
           icon={KV_ICON}
           defaultOpen={false}
+          storageKey="kv"
           isActive={isKV}
           onOpen={invalidateStreams}
           actions={<CreateLink to="/kv/new" label="Create KV bucket" />}
@@ -250,6 +252,7 @@ export default function Sidebar({ connectionId }: SidebarProps) {
           title="Object Store"
           icon={OBJECTS_ICON}
           defaultOpen={false}
+          storageKey="objects"
           isActive={isObjects}
           onOpen={invalidateObjects}
           actions={<CreateLink to="/objects/new" label="Create object bucket" />}

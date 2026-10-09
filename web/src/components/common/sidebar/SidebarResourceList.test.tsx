@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { render, screen, fireEvent, waitFor } from '@/test/utils'
 import { getSidebarLayout, updateSidebarLayout, type SidebarLayout } from '@/api/connections'
+import { resetSidebarUi } from '@/stores/sidebarUiStore'
 import { SidebarResourceList } from './SidebarResourceList'
 
 vi.mock('@/api/connections', () => ({
@@ -46,6 +47,7 @@ const lastPatch = () => mockedUpdate.mock.lastCall?.[1]
 
 describe('SidebarResourceList', () => {
   beforeEach(() => {
+    resetSidebarUi()
     mockedGet.mockReset()
     mockedUpdate.mockReset()
     mockedUpdate.mockImplementation(async (_id, patch) => ({ ...layout(), ...patch }))
@@ -67,6 +69,17 @@ describe('SidebarResourceList', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Filter streams' }), { target: { value: 'ORDER' } })
 
     expect(itemNames()).toEqual(['order_audit', 'orders'])
+  })
+
+  it('keeps the filter when the sidebar is shown again', () => {
+    mockedGet.mockResolvedValue(layout())
+    const first = renderList(['orders', 'events'])
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filter streams' }), { target: { value: 'ord' } })
+    first.unmount()
+
+    renderList(['orders', 'events'])
+
+    expect(screen.getByRole('textbox', { name: 'Filter streams' })).toHaveValue('ord')
   })
 
   it('says when nothing matches', async () => {

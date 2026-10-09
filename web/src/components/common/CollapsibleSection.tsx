@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDownIcon } from '@/components/ui'
+import { useSidebarUiStore } from '@/stores/sidebarUiStore'
 
 interface CollapsibleSectionProps {
   title: string
@@ -14,6 +15,7 @@ interface CollapsibleSectionProps {
   onOpen?: () => void
   linkTo?: string
   actions?: ReactNode
+  storageKey?: string
 }
 
 export default function CollapsibleSection({
@@ -27,8 +29,13 @@ export default function CollapsibleSection({
   onOpen,
   linkTo,
   actions,
+  storageKey,
 }: CollapsibleSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
+  const [localOpen, setLocalOpen] = useState(defaultOpen)
+  const storedOpen = useSidebarUiStore((s) => (storageKey ? s.open[storageKey] : undefined))
+  const storeOpen = useSidebarUiStore((s) => s.setOpen)
+  const isOpen = storageKey ? (storedOpen ?? defaultOpen) : localOpen
+  const setIsOpen = (next: boolean) => (storageKey ? storeOpen(storageKey, next) : setLocalOpen(next))
   const panelId = useId()
 
   const toggle = () => {

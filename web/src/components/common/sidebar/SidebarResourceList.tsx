@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type Keybo
 import { Link } from 'react-router-dom'
 import { useSidebarLayout, useUpdateSidebarLayout, type SectionLayout, type SidebarSection } from '@/contexts/connection'
 import { DragHandleIcon, OverflowMenu, RefreshIcon, SearchInput, StarIcon, StarSolidIcon } from '@/components/ui'
+import { useSidebarUiStore } from '@/stores/sidebarUiStore'
 import { cn } from '@/utils/cn'
 import { formatCount } from '@/utils/formatters'
 import Tooltip from '../Tooltip'
@@ -46,7 +47,9 @@ export function SidebarResourceList({
 }: SidebarResourceListProps) {
   const layout = useSidebarLayout(connectionId)[section]
   const { mutate: updateLayout } = useUpdateSidebarLayout(connectionId)
-  const [query, setQuery] = useState('')
+  const query = useSidebarUiStore((s) => s.filters[section] ?? '')
+  const storeFilter = useSidebarUiStore((s) => s.setFilter)
+  const setQuery = (next: string) => storeFilter(section, next)
   const [paging, setPaging] = useState({ query: '', limit: INITIAL_COUNT })
   const [drag, setDrag] = useState<DragState | null>(null)
   const [announcement, setAnnouncement] = useState('')
