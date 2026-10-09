@@ -57,6 +57,18 @@ describe('useMessageSearch', () => {
     expect(mockedSearch).not.toHaveBeenCalled()
   })
 
+  it('reads as running from the first render of a new query', () => {
+    mockedSearch.mockImplementation(scripted([], new Promise(() => {})))
+    const seen: string[] = []
+    renderHook(() => {
+      const search = useMessageSearch('conn-1', 'ORDERS', query)
+      seen.push(search.status)
+      return search
+    })
+
+    expect(seen[0]).toBe('running')
+  })
+
   it('collects matches and ends with the summary', async () => {
     mockedSearch.mockImplementation(scripted([progress(900, 100), { kind: 'matches', messages: [msg(950)] }, done(899)]))
     const { result } = renderHook(() => useMessageSearch('conn-1', 'ORDERS', query))

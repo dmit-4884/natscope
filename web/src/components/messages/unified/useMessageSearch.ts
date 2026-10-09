@@ -41,9 +41,10 @@ interface SearchState {
   range: { first: number; last: number } | null
   runCursor?: number
   resume?: number
+  key: string | null
 }
 
-const IDLE: SearchState = { status: 'idle', messages: [], progress: null, done: null, error: null, carried: 0, range: null }
+const IDLE: SearchState = { status: 'idle', messages: [], progress: null, done: null, error: null, carried: 0, range: null, key: null }
 
 function applyEvent(prev: SearchState, event: SearchEvent): SearchState {
   switch (event.kind) {
@@ -72,9 +73,11 @@ function resumeAfter(state: SearchState): number | undefined {
 }
 
 export function useMessageSearch(connectionId: string | null, streamName: string | null, query: SearchQuery | null): MessageSearch {
-  const [state, setState] = useState<SearchState>(IDLE)
+  const [runState, setState] = useState<SearchState>(IDLE)
   const controllerRef = useRef<AbortController | null>(null)
   const queryKey = query ? JSON.stringify(query) : null
+  const starting = queryKey !== null && !!connectionId && !!streamName && runState.key !== queryKey
+  const state: SearchState = starting ? { ...IDLE, status: 'running', key: queryKey } : runState
 
   const run = useCallback(
     (cursor: number | undefined, append: boolean) => {
@@ -92,6 +95,7 @@ export function useMessageSearch(connectionId: string | null, streamName: string
         carried: append ? prev.carried + runScanned(prev) : 0,
         range: append ? prev.range : null,
         runCursor: cursor,
+        key: queryKey,
       }))
       void (async () => {
         try {
