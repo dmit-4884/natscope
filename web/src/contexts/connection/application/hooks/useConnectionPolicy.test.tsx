@@ -83,9 +83,20 @@ describe('useConnectionPolicy', () => {
     const { result } = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
 
     expect(result.current.readOnly).toBe(true)
+    expect(result.current.known).toBe(false)
 
     act(() => answer([saved({ id: 'dev' })]))
     await waitFor(() => expect(result.current.readOnly).toBe(false))
+    expect(result.current.known).toBe(true)
+  })
+
+  it('does not count a stored entry without a read-only flag as known', () => {
+    getConnectionsMock.mockReturnValue(new Promise(() => {}))
+    stored.info = { id: 'dev', name: 'dev', urls: ['nats://x'] }
+    setActiveConnectionId('dev')
+    const { result } = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
+
+    expect(result.current.known).toBe(false)
   })
 
   it('takes the stored policy of the active connection until the list answers', () => {
@@ -93,11 +104,11 @@ describe('useConnectionPolicy', () => {
     stored.info = { id: 'dev', name: 'dev', urls: ['nats://x'], readOnly: false, label: null }
     setActiveConnectionId('dev')
     const writable = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
-    expect(writable.result.current).toEqual({ readOnly: false, label: null })
+    expect(writable.result.current).toEqual({ readOnly: false, label: null, known: true })
 
     stored.info = { id: 'prod', name: 'prod', urls: ['nats://x'], readOnly: true, label: { text: 'PROD', color: 'red' } }
     setActiveConnectionId('prod')
     const prod = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
-    expect(prod.result.current).toEqual({ readOnly: true, label: { text: 'PROD', color: 'red' } })
+    expect(prod.result.current).toEqual({ readOnly: true, label: { text: 'PROD', color: 'red' }, known: true })
   })
 })

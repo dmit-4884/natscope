@@ -4,11 +4,11 @@ import { MemoryRouter } from 'react-router-dom'
 import { render as renderWithClient, screen } from '@/test/utils'
 import { ReadOnlyGate } from './ReadOnlyGate'
 
-const policy = vi.hoisted(() => ({ readOnly: false }))
+const policy = vi.hoisted(() => ({ readOnly: false, known: true }))
 
 vi.mock('@/contexts/connection', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/contexts/connection')>()),
-  useConnectionPolicy: () => ({ readOnly: policy.readOnly, label: null }),
+  useConnectionPolicy: () => ({ readOnly: policy.readOnly, label: null, known: policy.known }),
   useActiveConnection: () => ({ connectionId: 'prod-1', connection: null, isLoading: false, isConnected: true }),
 }))
 
@@ -19,6 +19,16 @@ describe('ReadOnlyGate', () => {
     policy.readOnly = false
     render(<ReadOnlyGate><p>publish form</p></ReadOnlyGate>)
     expect(screen.getByText('publish form')).toBeInTheDocument()
+  })
+
+  it('shows nothing while the connection policy is still unknown', () => {
+    policy.readOnly = true
+    policy.known = false
+    render(<ReadOnlyGate><p>publish form</p></ReadOnlyGate>)
+
+    expect(screen.queryByText('publish form')).not.toBeInTheDocument()
+    expect(screen.queryByText('This connection is read-only')).not.toBeInTheDocument()
+    policy.known = true
   })
 
   it('explains a read-only connection and links to its settings', () => {

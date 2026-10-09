@@ -4,8 +4,9 @@ import { EmptyState, LockClosedIcon } from '@/components/ui'
 import { useActiveConnection, useConnectionPolicy } from '@/contexts/connection'
 
 export function ReadOnlyGate({ children }: { children: ReactNode }) {
-  const { readOnly } = useConnectionPolicy()
+  const { readOnly, known } = useConnectionPolicy()
   const { connectionId } = useActiveConnection()
+  if (!known) return null
   if (!readOnly) return children
   return (
     <div className="flex-1 flex items-center justify-center">
