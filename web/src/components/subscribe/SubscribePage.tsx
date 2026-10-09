@@ -187,15 +187,13 @@ export default function SubscribePage() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-surface-primary">
-      <div className={`px-6 border-b border-border ${hasFeed ? 'pt-4 pb-3' : 'pt-5 pb-4'}`}>
+      <div className="px-6 border-b border-border pt-4 pb-3">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-content-primary">Subscribe</h2>
-            {!hasFeed && (
-              <p className="text-sm text-content-tertiary mt-0.5">
-                Watch any subject over core NATS. Nothing is stored: the feed starts when you subscribe.
-              </p>
-            )}
+            <p className="text-sm text-content-tertiary mt-0.5">
+              Watch any subject over core NATS. Nothing is stored: the feed starts when you subscribe.
+            </p>
           </div>
           <StatusPill
             running={running}

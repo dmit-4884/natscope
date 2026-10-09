@@ -172,6 +172,17 @@ describe('SubscribePage', () => {
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
   })
 
+  it('keeps its header the same when the feed starts, so Stop lands where Start was', () => {
+    renderPage()
+    const header = () => screen.getByRole('heading', { name: 'Subscribe' }).closest('.border-b')
+    const before = header()?.className
+    fireEvent.change(input(), { target: { value: 'orders.>' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    expect(header()?.className).toBe(before)
+    expect(screen.getByText(/Watch any subject over core NATS/)).toBeInTheDocument()
+  })
+
   it('marks a refused subject while the others keep receiving', () => {
     mockedLive.mockReturnValue(liveState({ deniedSubjects: ['secret.>'], liveMessages: [message('1', 'orders.new')] }))
     renderPage()
