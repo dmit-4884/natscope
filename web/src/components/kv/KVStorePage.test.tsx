@@ -209,6 +209,15 @@ describe('KVStorePage', () => {
     await waitFor(() => expect(keys.filters[keys.filters.length - 1]).toBe('orders.*'))
   })
 
+  it('keeps a wildcard that is not a whole token off the server and says how to write it', async () => {
+    renderPage()
+
+    fireEvent.change(screen.getByPlaceholderText(/search keys/i), { target: { value: 'ord*' } })
+
+    expect(await screen.findByText(/whole part of the key/i)).toBeInTheDocument()
+    expect(keys.filters.every((f) => !f)).toBe(true)
+  })
+
   it('filters loaded keys by plain text without asking the server', async () => {
     renderPage()
 

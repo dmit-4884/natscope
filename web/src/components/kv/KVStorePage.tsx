@@ -88,6 +88,13 @@ function isKeyPattern(text: string): boolean {
   return /[*>]/.test(text)
 }
 
+function isValidKeyPattern(text: string): boolean {
+  const tokens = text.split('.')
+  return tokens.every(
+    (token, i) => token !== '' && (!/[*>]/.test(token) || token === '*' || (token === '>' && i === tokens.length - 1)),
+  )
+}
+
 type KVConfirmAction = {
   type: 'delete-bucket' | 'clear-bucket' | 'delete-key' | 'purge-key'
   name: string
@@ -122,7 +129,8 @@ export default function KVStorePage() {
   const keyTtl = allowsKeyTtl ? parseKeyTtl(newKeyTtl) : {}
 
   const searchText = keySearchQuery.trim()
-  const keyPattern = isKeyPattern(searchText) ? searchText : ''
+  const badPattern = isKeyPattern(searchText) && !isValidKeyPattern(searchText)
+  const keyPattern = isKeyPattern(searchText) && !badPattern ? searchText : ''
   const { data: keyList, isLoading: keysLoading, error: keysError, refetch: refetchKeys } = useKVKeys(
     connectionId,
     bucketName,
@@ -349,6 +357,12 @@ export default function KVStorePage() {
                 </Button>
               )}
             </div>
+            {badPattern && (
+              <p className="mt-1 text-xs text-status-warning-text">
+                Use * or &gt; as a whole part of the key, like <span className="font-mono">orders.*</span> or{' '}
+                <span className="font-mono">orders.&gt;</span>
+              </p>
+            )}
             {keyList?.truncated && (
               <p className="mt-1 text-xs text-content-tertiary" data-testid="kv-keys-truncated">
                 Only the first {plural(keys.length, 'key')} are loaded. Narrow the search with a pattern like{' '}
