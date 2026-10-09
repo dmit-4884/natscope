@@ -32,3 +32,22 @@ test('the relations tab opens on what the stream already loaded, without a loadi
 
   expect(await page.evaluate(() => (window as unknown as { sawLoading: boolean }).sawLoading)).toBe(false)
 })
+
+test('a selected message names its consumers without a checking state', async ({ page, env: _env }) => {
+  await page.goto(`/streams/${STREAM}/messages`)
+  await expect(page.getByRole('row').nth(1)).toBeVisible()
+  await page.waitForTimeout(1_500)
+  await page.evaluate(() => {
+    const w = window as unknown as { sawChecking: boolean }
+    w.sawChecking = false
+    new MutationObserver(() => {
+      if (document.body.textContent?.includes('checking…')) w.sawChecking = true
+    }).observe(document.body, { subtree: true, childList: true, characterData: true })
+  })
+
+  await page.getByRole('row').nth(1).click()
+  await expect(page.getByRole('complementary', { name: 'Details panel' })).toContainText('Consumers:')
+  await page.waitForTimeout(500)
+
+  expect(await page.evaluate(() => (window as unknown as { sawChecking: boolean }).sawChecking)).toBe(false)
+})

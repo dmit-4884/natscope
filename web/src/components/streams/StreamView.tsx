@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { Code } from '@connectrpc/connect'
 import { getErrorMessage, isErrorCode } from '@/api/errors'
-import { useStreamDetail, useStreamRelations } from '@/contexts/streams'
+import { useConsumers, useStreamDetail, useStreamRelations } from '@/contexts/streams'
 import {
   type StreamScope,
   isScopeReady,
@@ -134,6 +134,7 @@ export default function StreamView() {
 
   const { data: streamDetail, error: streamError } = useStreamDetail(streamName ?? null, connectionId)
   useStreamRelations(connectionId)
+  useConsumers(connectionId ?? undefined, streamName)
 
   useEffect(() => {
     if (!isScopeReady(scope)) return
