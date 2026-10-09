@@ -654,6 +654,12 @@ export default function KVStorePage() {
               )}
 
               <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+                {keyEntry?.ttl && !readOnly && (
+                  <p className="text-xs text-content-tertiary">
+                    A TTL can only be set when a key is created, so saving writes a revision without one and the key
+                    will stop expiring.
+                  </p>
+                )}
                 {changedWhileEditing && (
                   <Alert variant="warning">
                     This key changed on the server (revision {keyEntry.revision}) while you were editing. Saving will

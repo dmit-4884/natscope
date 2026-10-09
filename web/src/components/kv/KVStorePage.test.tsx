@@ -180,6 +180,17 @@ describe('KVStorePage', () => {
     expect(screen.getByText(/key ttl marker/i)).toBeInTheDocument()
   })
 
+  it('warns that saving a key with a TTL drops the TTL', () => {
+    keys.list = { keys: ['session', 'alpha'], truncated: false }
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'alpha' }))
+    expect(screen.queryByText(/stop expiring/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'session' }))
+    expect(screen.getByText(/stop expiring/i)).toBeInTheDocument()
+  })
+
   it('shows when a key with a TTL expires', () => {
     keys.list = { keys: ['session'], truncated: false }
     renderPage()
