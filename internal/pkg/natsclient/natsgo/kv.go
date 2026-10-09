@@ -7,7 +7,9 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -233,7 +235,81 @@ func (c *Client) GetKVKey(ctx context.Context, bucket string, key string) (*enti
 	}
 
 	result := toKVEntry(bucket, entry)
+	result.TTL = c.kvEntryTTL(kvCtx, bucket, key, entry.Revision())
 	return &result, nil
+}
+
+// kvEntryTTL reads the Nats-TTL header of a key revision. It is zero when the bucket allows no TTL per key, the
+// revision carries none, or the revision cannot be read: the TTL only adds to an entry that was already read.
+func (c *Client) kvEntryTTL(ctx context.Context, bucket, key string, revision uint64) time.Duration {
+	stream, err := c.jetStream.Stream(ctx, kvStreamPrefix+bucket)
+	if err != nil || !stream.CachedInfo().Config.AllowMsgTTL {
+		return 0
+	}
+	msg, err := stream.GetMsg(ctx, revision)
+	if err != nil || !strings.HasSuffix(msg.Subject, "."+key) {
+		return 0
+	}
+	return parseMsgTTL(msg.Header.Get(jetstream.MsgTTLHeader))
+}
+
+// parseMsgTTL reads a Nats-TTL value the way the server does: a Go duration or whole seconds; "never" and
+// anything unreadable mean no expiry.
+func parseMsgTTL(value string) time.Duration {
+	if d, err := time.ParseDuration(value); err == nil {
+		return d
+	}
+	if secs, err := strconv.Atoi(value); err == nil && secs > 0 {
+		return time.Duration(secs) * time.Second
+	}
+	return 0
+}
+
+// minKeyTTL is the shortest TTL the server accepts on a message.
+const minKeyTTL = time.Second
+
+// CreateKVKey creates a key that must not exist yet. A non-zero ttl expires the key after that long; the bucket must
+// allow a TTL per key.
+func (c *Client) CreateKVKey(ctx context.Context, bucket string, key string, value []byte, ttl time.Duration) (uint64, error) {
+	if err := validateNATSSubjectLength("key", key); err != nil {
+		return 0, wrapErr(err)
+	}
+	if err := validateKVKey(key); err != nil {
+		return 0, err
+	}
+	if ttl != 0 && ttl < minKeyTTL {
+		return 0, &errs.NATSValidationError{Description: "a key TTL must be at least 1s"}
+	}
+
+	ctx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)
+	defer cancel()
+
+	var opts []jetstream.KVCreateOpt
+	if ttl > 0 {
+		if err := c.requireFeatures(ctx, featMessageTTL); err != nil {
+			return 0, err
+		}
+		opts = append(opts, jetstream.KeyTTL(ttl))
+	}
+
+	kv, err := c.jetStream.KeyValue(ctx, bucket)
+	if err != nil {
+		return 0, wrapErr(err)
+	}
+
+	revision, err := kv.Create(ctx, key, value, opts...)
+	switch {
+	case errors.Is(err, jetstream.ErrKeyExists):
+		return 0, &errs.NATSValidationError{Description: fmt.Sprintf("key %q already exists; a TTL can only be set on a new key", key), Cause: err}
+	case isAPIErrorCode(err, jsErrCodeMessageTTLDisabled):
+		return 0, &errs.NATSValidationError{
+			Description: fmt.Sprintf("bucket %q does not allow a TTL per key; turn on the key TTL marker in its settings", bucket),
+			Cause:       err,
+		}
+	case err != nil:
+		return 0, wrapErr(err)
+	}
+	return revision, nil
 }
 
 // GetKVKeyHistory returns the stored revisions of a key, oldest first,

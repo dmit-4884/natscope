@@ -504,6 +504,7 @@ function toKVEntry(entry: PbKVEntry, bucket: string): KVEntry {
       validBytes: entry.decoded.validBytes,
       unknownFields: entry.decoded.unknownFields.length,
     },
+    ttl: durToNanos(entry.ttl) || undefined,
   }
 }
 
@@ -545,7 +546,8 @@ export async function putKVKey(
   bucket: string,
   key: string,
   value: string | Uint8Array | KVProtoValue,
-  expectedRevision?: number
+  expectedRevision?: number,
+  ttl?: number,
 ): Promise<RevisionResponse> {
   const payload =
     typeof value === 'string' || value instanceof Uint8Array
@@ -570,6 +572,7 @@ export async function putKVKey(
     key,
     payload,
     revision: expectedRevision != null ? BigInt(expectedRevision) : BigInt(0),
+    ttl: ttl ? nanosToDur(ttl) : undefined,
   })
   return { revision: Number(response.revision) }
 }

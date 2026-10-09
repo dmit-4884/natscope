@@ -925,6 +925,17 @@ message GetKVKeyHistoryResponse {
 
 // Defines the request message for creating or updating a key-value entry.
 message PutKVKeyRequest {
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.kv.key_ttl_on_create"
+    message: "a key TTL can only be set when creating a key, without an expected revision"
+    expression: "!has(this.ttl) || this.ttl == duration('0s') || this.revision == 0u"
+  };
+  option (buf.validate.message).cel = {
+    id: "natscope.nats.kv.key_ttl_min"
+    message: "a key TTL must be at least 1s"
+    expression: "!has(this.ttl) || this.ttl == duration('0s') || this.ttl >= duration('1s')"
+  };
+
   // Required. Identifier of the NATS connection the bucket belongs to.
   string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
 
@@ -945,6 +956,10 @@ message PutKVKeyRequest {
   // Optional. Expected revision number for compare-and-swap updates.
   // When non-zero, the update will fail if the current revision does not match.
   uint64 revision = 5;
+
+  // Optional. Expires the key after this long (at least 1s). Set, the call only creates the key and fails when it
+  // exists; the bucket must allow a TTL per key (NATS 2.11+).
+  google.protobuf.Duration ttl = 7;
 }
 
 // JSON stored as a Protobuf message.

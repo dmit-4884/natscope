@@ -5,6 +5,7 @@ package natsclient
 
 import (
 	"context"
+	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -140,6 +141,10 @@ func (r *readOnlyClient) GetKVKeyHistory(ctx context.Context, bucket, key string
 }
 
 func (r *readOnlyClient) PutKVKey(context.Context, string, string, []byte, uint64) (uint64, error) {
+	return 0, errs.ErrConnectionReadOnly
+}
+
+func (r *readOnlyClient) CreateKVKey(context.Context, string, string, []byte, time.Duration) (uint64, error) {
 	return 0, errs.ErrConnectionReadOnly
 }
 

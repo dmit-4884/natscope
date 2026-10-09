@@ -5,6 +5,7 @@ package nats
 
 import (
 	"context"
+	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 )
@@ -119,6 +120,22 @@ func (s *Service) PutKVKey(
 		return 0, err
 	}
 	return c.PutKVKey(ctx, bucket, key, value, expectedRevision)
+}
+
+// CreateKVKey creates a key that must not exist yet; a non-zero ttl expires it after that long.
+func (s *Service) CreateKVKey(
+	ctx context.Context,
+	connectionID string,
+	bucket string,
+	key string,
+	value []byte,
+	ttl time.Duration,
+) (uint64, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return 0, err
+	}
+	return c.CreateKVKey(ctx, bucket, key, value, ttl)
 }
 
 // DeleteKVKey deletes a key from a KeyValue bucket.

@@ -220,6 +220,18 @@ describe('putKVKey', () => {
     expect(result).toEqual({ revision: 7 })
   })
 
+  it('sends a key TTL as a Duration', async () => {
+    await putKVKey('conn-1', 'CONFIG', 'session', 'v', undefined, 90_000_000_000)
+
+    expect(putKVKeyCall.mock.calls[0][0].ttl.seconds).toBe(90n)
+  })
+
+  it('sends no TTL for a plain write', async () => {
+    await putKVKey('conn-1', 'CONFIG', 'session', 'v')
+
+    expect(putKVKeyCall.mock.calls[0][0].ttl).toBeUndefined()
+  })
+
   it('sends no expected revision when creating a key', async () => {
     await putKVKey('conn-1', 'config', 'greeting', 'hello')
 

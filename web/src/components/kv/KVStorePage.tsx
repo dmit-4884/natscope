@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, useOutletContext } from 'react-router-dom'
+import { Link, useParams, useNavigate, useOutletContext } from 'react-router-dom'
 import { useConnectionPolicy } from '@/contexts/connection'
 import {
   useKVBuckets,
@@ -13,7 +13,7 @@ import {
 } from '@/contexts/kv'
 import { decodeBase64, type KVProtoValue } from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
-import { formatBytes, formatDateTime } from '@/utils/formatters'
+import { formatBytes, formatDateTime, formatNsDuration } from '@/utils/formatters'
 import { decodeBase64ToBytes } from '@/utils/base64'
 import { plural } from '@/utils/plural'
 import { useConfirmation } from '@/contexts/settings'
@@ -24,6 +24,7 @@ import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import { WireView } from '../messages/WireView'
 import { KVProtoBar } from './KVProtoBar'
 import { useKVProtoTarget, type KVProtoTarget } from './useKVProtoTarget'
+import { parseKeyTtl } from './keyTtl'
 
 function editableValue(entry: KVEntry, asProto: boolean): string {
   if (!asProto) return decodeBase64(entry.value)
@@ -64,6 +65,7 @@ export default function KVStorePage() {
   const [keySearchQuery, setKeySearchQuery] = useState('')
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyValue, setNewKeyValue] = useState('')
+  const [newKeyTtl, setNewKeyTtl] = useState('')
   const [draft, setDraft] = useState<{ key: string | null; value: string } | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [rawChoice, setRawChoice] = useState<{ key: string | null; revision?: number; on: boolean } | null>(null)
@@ -75,6 +77,8 @@ export default function KVStorePage() {
   // Fetch bucket info
   const { data: buckets = [] } = useKVBuckets(connectionId)
   const bucketInfo = buckets.find(b => b.bucket === bucketName)
+  const allowsKeyTtl = !!bucketInfo?.limit_marker_ttl
+  const keyTtl = allowsKeyTtl ? parseKeyTtl(newKeyTtl) : {}
 
   const searchText = keySearchQuery.trim()
   const keyPattern = isKeyPattern(searchText) ? searchText : ''
@@ -142,11 +146,12 @@ export default function KVStorePage() {
   const handleSaveKey = async () => {
     try {
       if (isCreatingKey) {
-        if (!newKeyName.trim()) return
-        await putKey.mutateAsync({ key: newKeyName, value: storedValue(newKeyTarget, newKeyValue) })
+        if (!newKeyName.trim() || keyTtl.error) return
+        await putKey.mutateAsync({ key: newKeyName, value: storedValue(newKeyTarget, newKeyValue), ttl: keyTtl.ns })
         setIsCreatingKey(false)
         setNewKeyName('')
         setNewKeyValue('')
+        setNewKeyTtl('')
       } else if (selectedKey) {
         await putKey.mutateAsync({
           key: selectedKey,
@@ -273,6 +278,7 @@ export default function KVStorePage() {
                     setSelectedKey(null)
                     setNewKeyName('')
                     setNewKeyValue('')
+                    setNewKeyTtl('')
                   }}
                 >
                   <PlusIcon className="w-4 h-4" />
@@ -394,6 +400,28 @@ export default function KVStorePage() {
                   )}
                 </div>
 
+                {allowsKeyTtl ? (
+                  <div>
+                    <label htmlFor="kv-new-key-ttl" className="block text-sm font-medium text-gray-700 mb-1">TTL</label>
+                    <Input
+                      id="kv-new-key-ttl"
+                      value={newKeyTtl}
+                      onChange={(e) => setNewKeyTtl(e.target.value)}
+                      placeholder="e.g. 30s, 5m or 1h; empty keeps the key"
+                      error={!!keyTtl.error}
+                      errorMessage={keyTtl.error}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-content-tertiary">
+                    To give keys a TTL, set a key TTL marker in the{' '}
+                    <Link to={`/kv/${encodeURIComponent(bucketName)}/edit`} className="text-accent hover:text-accent-text">
+                      bucket settings
+                    </Link>
+                    .
+                  </p>
+                )}
+
                 <div className="flex-1 flex flex-col">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
                   <textarea
@@ -412,7 +440,7 @@ export default function KVStorePage() {
                 </Button>
                 <Button
                   onClick={handleSaveKey}
-                  disabled={putKey.isPending || !newKeyName.trim()}
+                  disabled={putKey.isPending || !newKeyName.trim() || !!keyTtl.error}
                 >
                   {putKey.isPending ? 'Creating...' : 'Create Key'}
                 </Button>
@@ -429,6 +457,11 @@ export default function KVStorePage() {
                         <span className="flex gap-2">
                           <Badge variant="default" size="sm">Rev {keyEntry.revision}</Badge>
                           <span>Last updated: {formatDateTime(keyEntry.created)}</span>
+                          {keyEntry.ttl && (
+                            <span data-testid="kv-key-expiry">
+                              TTL {formatNsDuration(keyEntry.ttl)}, expires {formatDateTime(keyEntry.created + keyEntry.ttl / 1_000_000)}
+                            </span>
+                          )}
                         </span>
                       )}
                     </p>
@@ -537,6 +570,7 @@ export default function KVStorePage() {
                       setSelectedKey(null)
                       setNewKeyName('')
                       setNewKeyValue('')
+                      setNewKeyTtl('')
                     }}
                   >
                     <PlusIcon className="w-4 h-4 mr-2" />

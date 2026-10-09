@@ -47,7 +47,7 @@ func (t *Toolset) listKeys(ctx context.Context, _ *mcp.CallToolRequest, in listK
 }
 
 func newEntryView(e *entities.KVEntry, limit int, r *entities.DecodeResult) entryView {
-	v := converter.Convert(e, &entryView{}, converter.WithIgnoreFields("Value"))
+	v := converter.Convert(e, &entryView{}, mcptransport.ViewCodecs, converter.WithIgnoreFields("Value"))
 	if r != nil {
 		v.DecodedType, v.DecodedAuto, v.DecodeError = r.MessageType, r.Auto, r.Error
 		if r.Success && len(r.Decoded) <= limit {

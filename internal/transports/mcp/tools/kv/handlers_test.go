@@ -47,4 +47,11 @@ func TestNewEntryView(t *testing.T) {
 	v = newEntryView(proto, 1024, &entities.DecodeResult{MessageType: "shop.User", Error: "bad wire"})
 	assert.Equal(t, "bad wire", v.DecodeError)
 	assert.NotNil(t, v.Value)
+
+	v = newEntryView(&entities.KVEntry{Key: "s1", Created: created, TTL: 90 * time.Second}, 1024, nil)
+	assert.Equal(t, "1m30s", v.TTL)
+	assert.Equal(t, created, v.Created)
+
+	v = newEntryView(&entities.KVEntry{Key: "s2"}, 1024, nil)
+	assert.Empty(t, v.TTL)
 }

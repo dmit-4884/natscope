@@ -581,6 +581,9 @@ type KVEntry struct {
 
 	// Operation is the operation type: put, delete, or purge.
 	Operation string
+
+	// TTL is how long the revision lives after Created; zero when it does not expire on its own.
+	TTL time.Duration
 }
 
 // Subject is the stream subject holding the entry; subject mappings match it.

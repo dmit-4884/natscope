@@ -288,6 +288,53 @@ func TestKVBucketCreateCarriesMirrorSourcesAndRepublish(t *testing.T) {
 	assert.Equal(t, "repub.>", cfg.RePublish.Destination)
 }
 
+// TestKVKeyTTL checks that a key created with a TTL reports it, and that a TTL is refused where it cannot apply.
+func TestKVKeyTTL(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kvttl")
+	value := base64.StdEncoding.EncodeToString([]byte("v"))
+	for _, cfg := range []*natstypes.KVBucketConfig{
+		{Bucket: "sessions", LimitMarkerTtl: durationpb.New(time.Second)},
+		{Bucket: "plain"},
+	} {
+		_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{ConnectionId: connID, Config: cfg}))
+		require.NoError(t, err)
+	}
+
+	_, err := env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+		ConnectionId: connID, Bucket: "sessions", Key: "s1",
+		Payload: &managementpb.PutKVKeyRequest_Value{Value: value}, Ttl: durationpb.New(time.Hour),
+	}))
+	require.NoError(t, err)
+	got, err := env.management.GetKVKey(ctx, connect.NewRequest(&managementpb.GetKVKeyRequest{ConnectionId: connID, Bucket: "sessions", Key: "s1"}))
+	require.NoError(t, err)
+	assert.Equal(t, time.Hour, got.Msg.GetEntry().GetTtl().AsDuration())
+
+	for name, req := range map[string]*managementpb.PutKVKeyRequest{
+		"key exists": {
+			ConnectionId: connID, Bucket: "sessions", Key: "s1",
+			Payload: &managementpb.PutKVKeyRequest_Value{Value: value}, Ttl: durationpb.New(time.Hour),
+		},
+		"with a revision": {
+			ConnectionId: connID, Bucket: "sessions", Key: "s2", Revision: 3,
+			Payload: &managementpb.PutKVKeyRequest_Value{Value: value}, Ttl: durationpb.New(time.Hour),
+		},
+		"under a second": {
+			ConnectionId: connID, Bucket: "sessions", Key: "s3",
+			Payload: &managementpb.PutKVKeyRequest_Value{Value: value}, Ttl: durationpb.New(time.Millisecond),
+		},
+		"bucket without key TTL": {
+			ConnectionId: connID, Bucket: "plain", Key: "a",
+			Payload: &managementpb.PutKVKeyRequest_Value{Value: value}, Ttl: durationpb.New(time.Hour),
+		},
+	} {
+		_, err := env.management.PutKVKey(ctx, connect.NewRequest(req))
+		require.Error(t, err, name)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), name)
+	}
+}
+
 // TestBucketDeleteSealRefusesPlainStream checks that Delete and Seal refuse a plain stream named like a bucket.
 func TestBucketDeleteSealRefusesPlainStream(t *testing.T) {
 	env := setupE2E(t)

@@ -82,13 +82,15 @@ export function usePutKVKey(connectionId: string | undefined, bucket: string | u
       key,
       value,
       expectedRevision,
+      ttl,
     }: {
       key: string
       value: string | Uint8Array | api.KVProtoValue
       expectedRevision?: number
+      ttl?: number
     }) => {
       if (!connectionId || !bucket) throw new Error('No connection or bucket')
-      return api.putKVKey(connectionId, bucket, key, value, expectedRevision)
+      return api.putKVKey(connectionId, bucket, key, value, expectedRevision, ttl)
     },
     onSuccess: (result, { key }) => {
       toast.success(`Key "${key}" saved (revision ${result.revision})`)

@@ -169,6 +169,9 @@ message KVEntry {
 
   // Value decoded through the mapping of $KV.<bucket>.<key>, or as a detected type; unset when neither applies.
   .natscope.types.proto.DecodeResult decoded = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. How long this revision lives after created; unset when it does not expire on its own.
+  google.protobuf.Duration ttl = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the placement preferences for a NATS JetStream resource.

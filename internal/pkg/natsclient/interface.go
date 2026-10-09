@@ -235,6 +235,9 @@ type KVStore interface {
 	// expectedRevision performs a compare-and-swap update.
 	PutKVKey(ctx context.Context, bucket string, key string, value []byte, expectedRevision uint64) (uint64, error)
 
+	// CreateKVKey creates a key that must not exist yet; a non-zero ttl expires it after that long.
+	CreateKVKey(ctx context.Context, bucket string, key string, value []byte, ttl time.Duration) (uint64, error)
+
 	// DeleteKVKey deletes a key.
 	DeleteKVKey(ctx context.Context, bucket string, key string) error
 

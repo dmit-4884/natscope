@@ -19,7 +19,7 @@ var writeMethods = map[string]bool{
 	"CreateConsumer": true, "UpdateConsumer": true, "DeleteConsumer": true, "PauseConsumer": true, "ResumeConsumer": true,
 	"ResetConsumer": true, "UnpinConsumer": true,
 	"Publish": true, "PublishToStream": true, "Request": true,
-	"CreateKVBucket": true, "UpdateKVBucket": true, "DeleteKVBucket": true, "PutKVKey": true, "DeleteKVKey": true, "PurgeKVKey": true,
+	"CreateKVBucket": true, "UpdateKVBucket": true, "DeleteKVBucket": true, "PutKVKey": true, "CreateKVKey": true, "DeleteKVKey": true, "PurgeKVKey": true,
 	"CreateObjectBucket": true, "DeleteObjectBucket": true, "PutObject": true, "DeleteObject": true, "SealObjectBucket": true,
 }
 

@@ -197,7 +197,12 @@ func (h *Handler) PutKVKey(
 		return nil, err
 	}
 
-	revision, err := h.natsService.PutKVKey(ctx, in.GetConnectionId(), in.GetBucket(), in.GetKey(), value, in.GetRevision())
+	var revision uint64
+	if ttl := in.GetTtl().AsDuration(); ttl > 0 {
+		revision, err = h.natsService.CreateKVKey(ctx, in.GetConnectionId(), in.GetBucket(), in.GetKey(), value, ttl)
+	} else {
+		revision, err = h.natsService.PutKVKey(ctx, in.GetConnectionId(), in.GetBucket(), in.GetKey(), value, in.GetRevision())
+	}
 	if err != nil {
 		return nil, err
 	}

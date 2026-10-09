@@ -259,6 +259,7 @@ export interface KVEntry {
   operation: 'put' | 'delete' | 'purge'
   /** Set when the $KV.<bucket>.<key> mapping or a detected type applies. */
   decoded?: KVDecodedValue
+  ttl?: number
 }
 
 export interface KVDecodedValue {

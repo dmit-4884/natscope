@@ -6,11 +6,13 @@ import KVStorePage from './KVStorePage'
 const keys = vi.hoisted(() => ({
   list: { keys: ['alpha', 'beta'], truncated: false },
   filters: [] as Array<string | undefined>,
+  buckets: [] as Array<{ bucket: string; values: number; bytes: number; limit_marker_ttl?: number }>,
 }))
 
-const entries: Record<string, { key: string; value: string; revision: number; created: number; operation: string }> = {
+const entries: Record<string, { key: string; value: string; revision: number; created: number; operation: string; ttl?: number }> = {
   alpha: { key: 'alpha', value: btoa('first value'), revision: 1, created: 0, operation: 'PUT' },
   beta: { key: 'beta', value: btoa('second value'), revision: 2, created: 0, operation: 'PUT' },
+  session: { key: 'session', value: btoa('s'), revision: 3, created: Date.UTC(2026, 9, 9, 12, 0, 0), operation: 'PUT', ttl: 90_000_000_000 },
 }
 
 const mutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }
@@ -27,7 +29,7 @@ vi.mock('@/contexts/connection', async (importOriginal) => ({
 
 vi.mock('@/contexts/kv', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/contexts/kv')>()),
-  useKVBuckets: () => ({ data: [] }),
+  useKVBuckets: () => ({ data: keys.buckets }),
   useKVKeys: (_conn: string, _bucket: string, filter?: string) => {
     keys.filters.push(filter)
     return { data: keys.list, isLoading: false, error: null, refetch: vi.fn() }
@@ -57,6 +59,53 @@ describe('KVStorePage', () => {
   beforeEach(() => {
     keys.list = { keys: ['alpha', 'beta'], truncated: false }
     keys.filters = []
+    keys.buckets = []
+    mutation.mutateAsync.mockReset()
+  })
+
+  it('creates a key with a TTL when the bucket allows one', async () => {
+    keys.buckets = [{ bucket: 'CONFIG', values: 0, bytes: 0, limit_marker_ttl: 1_000_000_000 }]
+    mutation.mutateAsync.mockResolvedValue({ revision: 1 })
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'New key' }))
+    fireEvent.change(screen.getByPlaceholderText('my.key.name'), { target: { value: 'session.1' } })
+    fireEvent.change(screen.getByLabelText(/^ttl$/i), { target: { value: '1m30s' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create Key' }))
+
+    await waitFor(() => expect(mutation.mutateAsync).toHaveBeenCalled())
+    expect(mutation.mutateAsync.mock.calls[0][0]).toMatchObject({ key: 'session.1', ttl: 90_000_000_000 })
+  })
+
+  it('refuses a TTL it cannot read', () => {
+    keys.buckets = [{ bucket: 'CONFIG', values: 0, bytes: 0, limit_marker_ttl: 1_000_000_000 }]
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'New key' }))
+    fireEvent.change(screen.getByPlaceholderText('my.key.name'), { target: { value: 'session.1' } })
+    fireEvent.change(screen.getByLabelText(/^ttl$/i), { target: { value: 'soon' } })
+
+    expect(screen.getByText(/duration like 30s/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create Key' })).toBeDisabled()
+  })
+
+  it('points to the bucket settings when the bucket allows no TTL per key', () => {
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'New key' }))
+
+    expect(screen.queryByLabelText(/^ttl$/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/key ttl marker/i)).toBeInTheDocument()
+  })
+
+  it('shows when a key with a TTL expires', () => {
+    keys.list = { keys: ['session'], truncated: false }
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'session' }))
+
+    expect(screen.getByText(/expires/i)).toBeInTheDocument()
+    expect(screen.getByText(/1m 30s|1m30s|90s/i)).toBeInTheDocument()
   })
 
   it('sends a wildcard pattern to the server', async () => {

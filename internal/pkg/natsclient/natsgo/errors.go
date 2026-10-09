@@ -23,6 +23,15 @@ const permissionViolationSubstr = "permissions violation"
 const invalidResetDescription = "consumer reset refused: a consumer can only be reset to a sequence when its deliver policy is " +
 	"all, by_start_sequence or by_start_time, and never to a sequence before its start sequence or start time"
 
+// jsErrCodeMessageTTLDisabled is the server's "per-message TTL is disabled" error, which nats.go has no constant for.
+const jsErrCodeMessageTTLDisabled jetstream.ErrorCode = 10166
+
+// isAPIErrorCode reports whether err carries a JetStream API error with the given code.
+func isAPIErrorCode(err error, code jetstream.ErrorCode) bool {
+	jsErr, ok := errors.AsType[jetstream.JetStreamError](err)
+	return ok && jsErr.APIError() != nil && jsErr.APIError().ErrorCode == code
+}
+
 // natsSentinelMap maps NATS/JetStream SDK sentinels → domain errs sentinels,
 // matched via errors.Is.
 var natsSentinelMap = []struct {

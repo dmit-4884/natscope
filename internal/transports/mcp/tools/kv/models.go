@@ -48,6 +48,7 @@ type entryView struct {
 	Revision    uint64             `json:"revision"`
 	Created     time.Time          `json:"created"`
 	Operation   string             `json:"operation" jsonschema:"put, delete or purge"`
+	TTL         string             `json:"ttl,omitempty" jsonschema:"how long this revision lives after created; absent when it does not expire on its own"`
 	DecodedType string             `json:"decodedType,omitempty" jsonschema:"Protobuf message type the value was decoded as"`
 	DecodedAuto bool               `json:"decodedAuto,omitempty" jsonschema:"no mapping matched; natscope detected decodedType"`
 	Decoded     json.RawMessage    `json:"decoded,omitempty" jsonschema:"value decoded from Protobuf to JSON"`
