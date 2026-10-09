@@ -9,7 +9,7 @@ export interface ConnectionPolicy {
 
 export function useConnectionPolicy(): ConnectionPolicy {
   const { connection } = useActiveConnection()
-  const readOnly = connection?.readOnly ?? false
+  const readOnly = connection?.readOnly ?? true
   const label = connection?.label ?? null
   return useMemo(() => ({ readOnly, label }), [readOnly, label])
 }

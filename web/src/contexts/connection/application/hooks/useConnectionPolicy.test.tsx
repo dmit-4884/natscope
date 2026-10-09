@@ -58,18 +58,30 @@ describe('useConnectionPolicy', () => {
     setActiveConnectionId('prod')
     const { result } = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
 
-    await waitFor(() => expect(result.current.readOnly).toBe(true))
-    expect(result.current.label).toEqual({ text: 'PROD', color: 'red' })
+    await waitFor(() => expect(result.current.label).toEqual({ text: 'PROD', color: 'red' }))
+    expect(result.current.readOnly).toBe(true)
   })
 
   it('follows a switch to a writable connection', async () => {
     setActiveConnectionId('prod')
     const { result } = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
-    await waitFor(() => expect(result.current.readOnly).toBe(true))
+    await waitFor(() => expect(result.current.label).not.toBeNull())
 
     act(() => setActiveConnectionId('dev'))
 
     expect(result.current.readOnly).toBe(false)
     expect(result.current.label).toBeNull()
+  })
+
+  it('stays read-only until the connection list says otherwise', async () => {
+    let answer: (list: SavedConnection[]) => void = () => {}
+    getConnectionsMock.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    setActiveConnectionId('dev')
+    const { result } = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
+
+    expect(result.current.readOnly).toBe(true)
+
+    act(() => answer([saved({ id: 'dev' })]))
+    await waitFor(() => expect(result.current.readOnly).toBe(false))
   })
 })
