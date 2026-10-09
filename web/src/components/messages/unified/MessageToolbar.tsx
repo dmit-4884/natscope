@@ -162,32 +162,31 @@ export function MessageToolbar(props: Props) {
                 onChange={(v) => onLiveLimitChange(Number(v) as LiveMessageLimit)}
                 options={LIVE_MESSAGE_LIMITS.map((l) => ({ value: String(l), label: String(l) }))}
               />
-              {wsStatus === 'connected' && (
-                <button
-                  onClick={onTogglePause}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
-                    isPaused
-                      ? 'bg-status-success-light text-green-700 hover:bg-green-200'
-                      : 'bg-status-warning-light text-amber-700 hover:bg-amber-200'
-                  }`}
-                >
-                  {isPaused ? (
-                    <>
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      Resume
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
-                      </svg>
-                      Pause
-                    </>
-                  )}
-                </button>
-              )}
+              <button
+                onClick={onTogglePause}
+                disabled={wsStatus !== 'connected'}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 disabled:opacity-50 ${
+                  isPaused
+                    ? 'bg-status-success-light text-green-700 hover:bg-green-200'
+                    : 'bg-status-warning-light text-amber-700 hover:bg-amber-200'
+                }`}
+              >
+                {isPaused ? (
+                  <>
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
+                    </svg>
+                    Pause
+                  </>
+                )}
+              </button>
               <button
                 onClick={onClearLive}
                 className="px-3 py-1.5 text-xs font-medium text-content-secondary bg-surface-tertiary hover:bg-surface-hover rounded-md transition-colors"

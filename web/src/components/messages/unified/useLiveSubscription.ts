@@ -350,7 +350,8 @@ export function useLiveSubscription({
     setMessagesDropped((prev) => (prev === undefined ? prev : 0))
   }, [stopDrip])
 
-  const shownStatus = natsDown && wsStatus === 'connected' ? 'reconnecting' : wsStatus
+  const opening = !!connectionId && enabled && ws === null && wsStatus === 'disconnected'
+  const shownStatus = opening ? 'connecting' : natsDown && wsStatus === 'connected' ? 'reconnecting' : wsStatus
 
   return useMemo(
     () => ({

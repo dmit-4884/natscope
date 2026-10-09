@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { EmptyState, WarningIcon, InfoIcon } from '@/components/ui'
 import type { WsStatus } from './messageListUtils'
 
@@ -19,7 +20,15 @@ export function MessagesLoading() {
   )
 }
 
+const STATUS_BAR_DELAY_MS = 200
+
 export function RealtimeStatusBar({ status }: { status: WsStatus }) {
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setShown(true), STATUS_BAR_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [])
+  if (!shown) return null
   return (
     <div className="px-4 py-2 bg-status-warning-bg text-amber-700 text-sm border-b flex items-center gap-2">
       <span aria-hidden="true" className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />

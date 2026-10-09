@@ -199,6 +199,17 @@ describe('useLiveSubscription subjects', () => {
     expect(result.current.liveMessages[0].reply).toBe('_INBOX.1')
   })
 
+  it('reads as connecting from the first render once it is turned on', () => {
+    const seen: string[] = []
+    renderHook(() => {
+      const live = useLiveSubscription({ connectionId: 'conn-1', streamName: 'ORDERS', enabled: true, initialLimit: 100 })
+      seen.push(live.wsStatus)
+      return live
+    })
+
+    expect(seen[0]).toBe('connecting')
+  })
+
   it('calls the subscription live only once the server answers', () => {
     const { result } = renderSubjects(['>'])
     const client = clients[clients.length - 1]
