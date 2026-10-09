@@ -178,13 +178,13 @@ describe('consumerState', () => {
 })
 
 describe('compareByHealth', () => {
-  it('puts stuck consumers first, then the most pending, then by name', () => {
+  it('puts stuck consumers first, then by name, so a refresh does not reshuffle them', () => {
     const row = (name: string, state: ReturnType<typeof consumerState>, pending: number) => ({
       consumer: consumer({ name, num_pending: pending }),
       state,
     })
     const rows = [row('b', 'caught_up', 0), row('a', 'working', 5), row('c', 'stuck', 1), row('d', 'working', 9), row('e', 'warning', 0)]
-    expect(rows.sort(compareByHealth).map((r) => r.consumer.name)).toEqual(['c', 'e', 'd', 'a', 'b'])
+    expect(rows.sort(compareByHealth).map((r) => r.consumer.name)).toEqual(['c', 'e', 'a', 'd', 'b'])
   })
 })
 

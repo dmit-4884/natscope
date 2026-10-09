@@ -184,7 +184,7 @@ export function compareByHealth(
 ): number {
   return (
     STATE_RANK[a.state] - STATE_RANK[b.state] ||
-    b.consumer.num_pending - a.consumer.num_pending ||
+    (a.consumer.stream_name ?? '').localeCompare(b.consumer.stream_name ?? '') ||
     a.consumer.name.localeCompare(b.consumer.name)
   )
 }

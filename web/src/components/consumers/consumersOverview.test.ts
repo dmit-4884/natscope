@@ -45,7 +45,7 @@ const overview: ConsumersOverview = {
 describe('buildRows', () => {
   it('joins each consumer with its stream and sorts the troubled ones first', () => {
     const rows = buildRows(overview, NOW)
-    expect(rows.map((r) => r.consumer.name)).toEqual(['billing', 'mailer', 'ghost', 'archiver'])
+    expect(rows.map((r) => r.consumer.name)).toEqual(['billing', 'ghost', 'mailer', 'archiver'])
     expect(rows[0].state).toBe('stuck')
     expect(rows[1].issues.map((i) => i.kind)).toEqual(['stream_full'])
     expect(rows[0].stream?.name).toBe('ORDERS')
@@ -57,12 +57,12 @@ describe('filterRows', () => {
 
   it('matches the consumer, the stream or a filter subject, ignoring case', () => {
     expect(filterRows(rows, 'BILL', false).map((r) => r.consumer.name)).toEqual(['billing'])
-    expect(filterRows(rows, 'events', false).map((r) => r.consumer.name)).toEqual(['mailer', 'ghost'])
+    expect(filterRows(rows, 'events', false).map((r) => r.consumer.name)).toEqual(['ghost', 'mailer'])
     expect(filterRows(rows, 'orders.created', false).map((r) => r.consumer.name)).toEqual(['billing'])
   })
 
   it('keeps only consumers with problems on request', () => {
-    expect(filterRows(rows, '', true).map((r) => r.consumer.name)).toEqual(['billing', 'mailer', 'ghost'])
+    expect(filterRows(rows, '', true).map((r) => r.consumer.name)).toEqual(['billing', 'ghost', 'mailer'])
   })
 })
 
