@@ -126,11 +126,7 @@ export default function ConnectedLayout() {
   useConnectionValidation(connectionId, handleInvalidConnection)
 
   const handleSwitchConnection = useCallback(async (connection: SavedConnection) => {
-    // Cancel + drop every connection-scoped query in one call — any hook
-    // built on useConnectionQuery is auto-caught via CONNECTION_QUERY_PREFIX.
-    const filter = { queryKey: [CONNECTION_QUERY_PREFIX] }
-    await queryClient.cancelQueries(filter)
-    queryClient.removeQueries(filter)
+    if (connectionId) await queryClient.cancelQueries({ queryKey: [CONNECTION_QUERY_PREFIX, connectionId] })
     resetAllStores()
 
     setActiveConnectionId(connection.id)
@@ -140,7 +136,7 @@ export default function ConnectedLayout() {
 
     // Always navigate to streams list to avoid stale stream from previous connection
     navigate('/streams')
-  }, [queryClient, navigate])
+  }, [connectionId, queryClient, navigate])
 
   // When CompactHeader resolves full connection data from lazy-loaded connections
   const handleConnectionResolved = useCallback((connection: SavedConnection) => {
