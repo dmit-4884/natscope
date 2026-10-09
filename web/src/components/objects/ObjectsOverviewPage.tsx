@@ -24,7 +24,7 @@ export default function ObjectsOverviewPage() {
         <div>
           <h2 className="text-lg font-semibold text-content-primary">Object Store</h2>
           <p className="text-sm text-content-tertiary mt-0.5">
-            {plural(buckets.length, 'bucket')}
+            {isLoading ? '\u00a0' : plural(buckets.length, 'bucket')}
           </p>
         </div>
         {!readOnly && (

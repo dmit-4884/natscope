@@ -325,7 +325,7 @@ export default function TemplatesPage() {
     <SettingsPage
       title="Templates"
       description="Reusable publish payloads — saved subject, message type, JSON body, and headers"
-      meta={`${plural(total, 'template')}${query ? ` · ${visible} matching` : ''}`}
+      meta={templatesLoaded ? `${plural(total, 'template')}${query ? ` · ${visible} matching` : ''}` : null}
       scroll="fill"
       actions={
         <>

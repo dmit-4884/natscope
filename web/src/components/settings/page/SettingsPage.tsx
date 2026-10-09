@@ -15,7 +15,7 @@ const CONTAINER = 'mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8'
 interface SettingsPageProps {
   title: string
   description?: string
-  meta?: string
+  meta?: string | null
   actions?: ReactNode
   scroll?: 'page' | 'fill'
   children: ReactNode
@@ -47,9 +47,9 @@ export function SettingsPage({
                 {description}
               </p>
             )}
-            {meta && (
-              <p className="mt-1.5 text-xs text-content-muted font-medium uppercase tracking-wider">
-                {meta}
+            {meta !== undefined && (
+              <p data-testid="settings-meta" className="mt-1.5 text-xs text-content-muted font-medium uppercase tracking-wider">
+                {meta ?? '\u00a0'}
               </p>
             )}
           </div>

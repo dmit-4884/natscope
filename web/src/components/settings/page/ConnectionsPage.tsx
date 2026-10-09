@@ -165,7 +165,7 @@ export default function ConnectionsPage() {
     <SettingsPage
       title="Connections"
       description="Manage saved NATS server connections"
-      meta={plural(connections.length, 'saved connection')}
+      meta={connectionsLoading ? null : plural(connections.length, 'saved connection')}
       actions={
         <>
           <input

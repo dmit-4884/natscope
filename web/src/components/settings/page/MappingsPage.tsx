@@ -19,8 +19,7 @@ export default function MappingsPage() {
 
   const [showImportModal, setShowImportModal] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
-  const { data: mappings = [] } = useMappingItems()
-  const mappingsCount = mappings.length
+  const { data: mappings } = useMappingItems()
 
   const {
     importError,
@@ -37,7 +36,7 @@ export default function MappingsPage() {
     <SettingsPage
       title="Mappings"
       description="Bind NATS subject patterns to proto message types"
-      meta={`${plural(mappingsCount, 'mapping')} configured`}
+      meta={mappings ? `${plural(mappings.length, 'mapping')} configured` : null}
       scroll="fill"
       actions={
         <>
