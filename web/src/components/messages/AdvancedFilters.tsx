@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { CloseIcon, SearchIcon, Toggle } from '@/components/ui'
 import { parseIntOr } from '@/utils/numbers'
 import { toDatetimeLocal, minutesAgoLocal } from './jumpToTime'
 import { EMPTY_FILTERS, type FilterValues } from './searchQuery'
 
 export type { FilterValues } from './searchQuery'
+
+const VIEWPORT_MARGIN_PX = 8
 
 interface AdvancedFiltersProps {
   filters: FilterValues
@@ -23,6 +25,18 @@ export default function AdvancedFilters({
   const [showSubjectSuggestions, setShowSubjectSuggestions] = useState(false)
   const subjectInputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLFormElement>(null)
+  const [maxHeight, setMaxHeight] = useState<number>()
+
+  useLayoutEffect(() => {
+    const fit = () => {
+      const panel = panelRef.current
+      if (panel) setMaxHeight(window.innerHeight - panel.getBoundingClientRect().top - VIEWPORT_MARGIN_PX)
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [])
 
   // Resync the local draft when the parent's filters actually change (e.g. a
   // chip is removed in the toolbar). Keying on the serialized value avoids
@@ -55,6 +69,16 @@ export default function AdvancedFilters({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (showSubjectSuggestions) setShowSubjectSuggestions(false)
+      else onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showSubjectSuggestions, onClose])
+
   const handleApply = () => {
     onFiltersChange(localFilters)
     onClose()
@@ -66,14 +90,25 @@ export default function AdvancedFilters({
   }
 
   return (
-    <div className="absolute top-full left-0 mt-1 w-80 bg-surface-primary border border-border rounded-lg shadow-lg z-30">
+    <form
+      ref={panelRef}
+      role="dialog"
+      aria-label="Filters"
+      onSubmit={(e) => {
+        e.preventDefault()
+        handleApply()
+      }}
+      style={{ maxHeight }}
+      className="absolute top-full left-0 mt-1 w-80 flex flex-col bg-surface-primary border border-border rounded-lg shadow-lg z-30"
+    >
       {/* Header */}
-      <div className="px-4 py-3 border-b bg-surface-secondary flex items-center justify-between">
+      <div className="shrink-0 px-4 py-3 border-b bg-surface-secondary flex items-center justify-between">
         <div className="flex items-center gap-2">
           <SearchIcon className="w-4 h-4 text-content-tertiary" />
           <span className="text-sm font-medium text-gray-700">Filters</span>
         </div>
         <button
+          type="button"
           onClick={onClose}
           aria-label="Close filters"
           className="text-content-muted hover:text-content-secondary"
@@ -83,7 +118,7 @@ export default function AdvancedFilters({
       </div>
 
       {/* Filters */}
-      <div className="p-4 space-y-4 max-h-[min(70vh,40rem)] overflow-auto">
+      <div className="flex-1 min-h-0 p-4 space-y-4 overflow-auto">
         {/* Subject Filter */}
         <div>
           <label htmlFor="filter-subject" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
@@ -112,6 +147,7 @@ export default function AdvancedFilters({
                 {filteredSuggestions.map((subject, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => {
                       setLocalFilters({ ...localFilters, subject })
                       setShowSubjectSuggestions(false)
@@ -334,8 +370,9 @@ export default function AdvancedFilters({
       </div>
 
       {/* Actions */}
-      <div className="px-4 py-3 border-t bg-surface-secondary flex items-center justify-between">
+      <div className="shrink-0 px-4 py-3 border-t bg-surface-secondary flex items-center justify-between">
         <button
+          type="button"
           onClick={handleReset}
           className="text-sm text-content-secondary hover:text-gray-800"
         >
@@ -343,19 +380,20 @@ export default function AdvancedFilters({
         </button>
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={onClose}
             className="px-3 py-1.5 text-sm text-content-secondary hover:bg-surface-tertiary rounded-md"
           >
             Cancel
           </button>
           <button
-            onClick={handleApply}
+            type="submit"
             className="px-3 py-1.5 text-sm bg-accent text-content-inverse hover:bg-accent-hover rounded-md"
           >
             Apply
           </button>
         </div>
       </div>
-    </div>
+    </form>
   )
 }
