@@ -32,4 +32,42 @@ describe('useConnectionQuery', () => {
     await waitFor(() => expect(result.current.data).toBe(1))
     expect(observerOptions()).toMatchObject({ retry: 2, staleTime: 0 })
   })
+
+  it('keeps the previous answer on screen while a related key loads', async () => {
+    const { wrapper } = setup()
+    const { result, rerender } = renderHook(
+      ({ size }: { size: number }) =>
+        useConnectionQuery({
+          key: ['page', 'ORDERS', size],
+          connectionId: 'conn-1',
+          fetcher: () => (size === 50 ? Promise.resolve('first page') : new Promise<string>(() => {})),
+          keepPreviousWhen: (previous) => previous[1] === 'ORDERS',
+        }),
+      { wrapper, initialProps: { size: 50 } },
+    )
+    await waitFor(() => expect(result.current.data).toBe('first page'))
+
+    rerender({ size: 100 })
+
+    expect(result.current.data).toBe('first page')
+  })
+
+  it('never carries an answer over to another connection', async () => {
+    const { wrapper } = setup()
+    const { result, rerender } = renderHook(
+      ({ conn }: { conn: string }) =>
+        useConnectionQuery({
+          key: ['page', 'ORDERS'],
+          connectionId: conn,
+          fetcher: () => (conn === 'conn-1' ? Promise.resolve('conn-1 page') : new Promise<string>(() => {})),
+          keepPreviousWhen: () => true,
+        }),
+      { wrapper, initialProps: { conn: 'conn-1' } },
+    )
+    await waitFor(() => expect(result.current.data).toBe('conn-1 page'))
+
+    rerender({ conn: 'conn-2' })
+
+    expect(result.current.data).toBeUndefined()
+  })
 })

@@ -2,22 +2,27 @@ import { getMessages } from '@/api/messages'
 import type { GetMessagesParams } from '@/api/messages'
 import { useConnectionQuery } from '@/hooks/useConnectionQuery'
 
+const LIMIT_INDEX = 4
+
 export function useMessages(
   streamName: string | null,
   params: Omit<GetMessagesParams, 'connection_id'> & { connection_id: string | null },
   options?: { enabled?: boolean }
 ) {
+  const key = [
+    'messages',
+    streamName,
+    params.start_seq ?? null,
+    params.start_time ?? null,
+    params.limit ?? null,
+    params.subject_filter ?? null,
+    params.direction ?? null,
+    params.max_payload_bytes ?? null,
+  ]
   return useConnectionQuery({
-    key: [
-      'messages',
-      streamName,
-      params.start_seq ?? null,
-      params.start_time ?? null,
-      params.limit ?? null,
-      params.subject_filter ?? null,
-      params.direction ?? null,
-      params.max_payload_bytes ?? null,
-    ],
+    key,
+    keepPreviousWhen: (previous) =>
+      previous.length === key.length && key.every((part, i) => i === LIMIT_INDEX || previous[i] === part),
     connectionId: params.connection_id,
     enabled: !!streamName && (options?.enabled ?? true),
     fetcher: (signal) =>

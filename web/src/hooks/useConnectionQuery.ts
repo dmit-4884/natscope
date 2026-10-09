@@ -22,6 +22,8 @@ export interface UseConnectionQueryOptions<T> {
   refetchOnReconnect?: boolean | 'always'
   refetchInterval?: number | false | ((data: T | undefined, error: unknown) => number | false)
   retry?: boolean | number
+  /** Keeps the last answer of the same connection on screen while this key loads, when the previous key suffix passes. */
+  keepPreviousWhen?: (previousKey: readonly unknown[]) => boolean
 }
 
 /**
@@ -35,6 +37,7 @@ export function useConnectionQuery<T>(opts: UseConnectionQueryOptions<T>): UseQu
   const connectionId = opts.connectionId ?? null
   const queryKey: QueryKey = [CONNECTION_QUERY_PREFIX, connectionId, ...opts.key]
   const interval = opts.refetchInterval
+  const keepPreviousWhen = opts.keepPreviousWhen
   const tuned = {
     staleTime: opts.staleTime,
     gcTime: opts.gcTime,
@@ -43,6 +46,12 @@ export function useConnectionQuery<T>(opts: UseConnectionQueryOptions<T>): UseQu
     refetchOnReconnect: opts.refetchOnReconnect,
     refetchInterval: typeof interval === 'function' ? (query: Query<T>) => interval(query.state.data, query.state.error) : interval,
     retry: opts.retry,
+    placeholderData: keepPreviousWhen
+      ? (previous: T | undefined, previousQuery: Query<T> | undefined) => {
+          const key = previousQuery?.queryKey
+          return key && key[1] === connectionId && keepPreviousWhen(key.slice(2)) ? previous : undefined
+        }
+      : undefined,
   }
 
   return useQuery<T>({
