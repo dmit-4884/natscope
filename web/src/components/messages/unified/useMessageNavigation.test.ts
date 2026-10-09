@@ -61,6 +61,29 @@ describe('useMessageNavigation', () => {
     vi.clearAllMocks()
   })
 
+  it('keeps both buttons steady through a quick step', () => {
+    api.getMessages.mockReturnValueOnce(new Promise(() => {}))
+    const { result } = renderHook(() => useMessageNavigation(opts()))
+
+    act(() => { result.current.goNext() })
+
+    expect(result.current.prevDisabled).toBe(false)
+    expect(result.current.nextDisabled).toBe(false)
+    expect(result.current.nextLoading).toBe(false)
+  })
+
+  it('shows a slow step as loading', async () => {
+    vi.useFakeTimers()
+    api.getMessages.mockReturnValueOnce(new Promise(() => {}))
+    const { result } = renderHook(() => useMessageNavigation(opts()))
+
+    act(() => { result.current.goNext() })
+    act(() => { vi.advanceTimersByTime(250) })
+
+    expect(result.current.nextLoading).toBe(true)
+    vi.useRealTimers()
+  })
+
   it('goNext on a backward list fetches seq-1 backward with the list filters', async () => {
     api.getMessages.mockResolvedValueOnce(res([9]))
     const o = opts()

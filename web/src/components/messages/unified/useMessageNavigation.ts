@@ -58,6 +58,8 @@ async function firstStoredMatch(connectionId: string, streamName: string, matche
  * navigation works past page boundaries and identically for both fetch
  * policies (direct/consumer — a server-side concern).
  */
+const SLOW_STEP_MS = 200
+
 export function useMessageNavigation({
   streamName,
   connectionId,
@@ -98,7 +100,7 @@ export function useMessageNavigation({
       }
       const idAtCall = selectedIdRef.current
       inFlightRef.current = true
-      setLoadingDir(visual)
+      const slow = setTimeout(() => setLoadingDir(visual), SLOW_STEP_MS)
       try {
         const next = matches
           ? await firstStoredMatch(connectionId!, streamName!, matches, matchIndex, visual === 'up' ? -1 : 1)
@@ -120,6 +122,7 @@ export function useMessageNavigation({
       } catch (err) {
         if (selectedIdRef.current === idAtCall) toast.error(getErrorMessage(err))
       } finally {
+        clearTimeout(slow)
         inFlightRef.current = false
         setLoadingDir(null)
       }
@@ -152,8 +155,8 @@ export function useMessageNavigation({
     goPrev,
     goNext,
     canNavigate,
-    prevDisabled: !canNavigate || edges.up || loadingDir !== null,
-    nextDisabled: !canNavigate || edges.down || loadingDir !== null,
+    prevDisabled: !canNavigate || edges.up,
+    nextDisabled: !canNavigate || edges.down,
     prevLoading: loadingDir === 'up',
     nextLoading: loadingDir === 'down',
   }
