@@ -4,7 +4,7 @@ import type { ConnectionPolicy } from '@/contexts/connection'
 import { LABEL_BADGE_CLASSES } from './labelStyles'
 
 interface Props {
-  policy: ConnectionPolicy
+  policy: Pick<ConnectionPolicy, 'readOnly' | 'label'>
 }
 
 export function ConnectionBadges({ policy }: Props) {

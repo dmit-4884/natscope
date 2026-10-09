@@ -115,7 +115,7 @@ export function ReplyPanel({ pending, request, reply, error, decodeAs, onDecodeA
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+      <div className="min-h-[63px] px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
           <h3 className="text-sm font-semibold text-content-primary">Reply</h3>
           {reply && !pending && (

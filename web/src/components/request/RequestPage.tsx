@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { getErrorMessage } from '@/api/errors'
 import { getProtoMessageExample } from '@/api/proto'
 import { useMappingItems, useSubjectMappingEntity } from '@/contexts/mappings'
-import { useRequestMessage } from '@/contexts/messages'
+import { useLastRequest, useRequestMessage } from '@/contexts/messages'
 import { useMessageTypes, useTypeDescription } from '@/contexts/proto'
 import { useRequestDraft, withRecentSubject } from '@/stores/requestDraftStore'
 import { SubjectAutocomplete } from '@/components/common/SubjectAutocomplete'
@@ -40,7 +40,14 @@ export default function RequestPage() {
   const [draft, updateDraft] = useRequestDraft(connectionId)
   const [encodingMode, setEncodingMode] = useState<EncodingMode>('auto')
   const [exampleLoading, setExampleLoading] = useState(false)
-  const request = useRequestMessage()
+  const request = useRequestMessage(connectionId)
+  const lastRequest = useLastRequest(connectionId)
+  const pending = lastRequest?.status === 'pending'
+  const replySectionRef = useRef<HTMLElement>(null)
+  const answeredAt = pending ? 0 : (lastRequest?.submittedAt ?? 0)
+  useEffect(() => {
+    if (answeredAt) replySectionRef.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [answeredAt])
 
   const subject = draft.subject.trim()
   const subjectError = literalSubjectError(subject)
@@ -92,15 +99,15 @@ export default function RequestPage() {
           : null
   const canSend = disabledReason === null
 
-  const repliedSubject = request.variables?.subject ?? subject
+  const repliedSubject = lastRequest?.variables?.subject ?? subject
   const storedReplyType = draft.replyTypes[repliedSubject]
   const decodeAs =
-    storedReplyType ?? guessReplyType(request.variables?.message_type, request.variables?.source_id, protoTypes)
+    storedReplyType ?? guessReplyType(lastRequest?.variables?.message_type, lastRequest?.variables?.source_id, protoTypes)
 
   const setHeaders = (headers: HeaderEntry[]) => updateDraft({ headers })
 
   const handleSend = () => {
-    if (!canSend || request.isPending) return
+    if (!canSend || pending) return
     const shared: Record<string, string> = {}
     const headers = Object.fromEntries(
       draft.headers.filter((h) => h.key.trim()).map((h) => [h.key.trim(), processHelpers(h.value, shared)]),
@@ -298,7 +305,7 @@ export default function RequestPage() {
             validationState="none"
             canPublish={canSend}
             disabledReason={disabledReason}
-            isPublishing={request.isPending}
+            isPublishing={pending}
             onPublish={handleSend}
             submitLabel="Send Request"
             pendingLabel="Waiting for reply…"
@@ -307,14 +314,15 @@ export default function RequestPage() {
         </section>
 
         <section
+          ref={replySectionRef}
           aria-label="Reply"
           className="min-h-[24rem] flex flex-col border-t border-border xl:border-t-0 xl:min-h-0 xl:overflow-hidden"
         >
           <ReplyPanel
-            pending={request.isPending}
-            request={request.variables}
-            reply={request.data}
-            error={request.error}
+            pending={pending}
+            request={lastRequest?.variables}
+            reply={lastRequest?.data}
+            error={lastRequest?.error ?? null}
             decodeAs={decodeAs}
             onDecodeAsChange={(typeId) =>
               updateDraft({ replyTypes: { ...draft.replyTypes, [repliedSubject]: typeId } })

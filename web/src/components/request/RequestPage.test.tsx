@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { useState } from 'react'
 import { Code, ConnectError } from '@connectrpc/connect'
 import { create, toBinary } from '@bufbuild/protobuf'
 import { ErrorInfoSchema } from '@/gen/google/rpc/error_details_pb'
@@ -103,6 +104,45 @@ describe('RequestPage', () => {
     })
     expect(screen.getByText('Received')).toBeInTheDocument()
     expect(screen.getByText('_INBOX.abc.1')).toBeInTheDocument()
+  })
+
+  it('still shows the last reply after a visit to another page', async () => {
+    mockedRequest.mockResolvedValue(reply('{"pong":true}'))
+    function AwayAndBack() {
+      const [here, setHere] = useState(true)
+      return (
+        <>
+          <button type="button" onClick={() => setHere((v) => !v)}>
+            Toggle page
+          </button>
+          {here ? <RequestPage /> : <p>Another page</p>}
+        </>
+      )
+    }
+    render(<AwayAndBack />)
+    fireEvent.change(await screen.findByLabelText('Subject'), { target: { value: 'svc.echo' } })
+    fireEvent.click(sendButton())
+    await screen.findByTestId('reply-success')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle page' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle page' }))
+
+    expect(await screen.findByTestId('reply-success')).toBeInTheDocument()
+  })
+
+  it('brings a new reply into view when the reply sits below the request', async () => {
+    const original = Element.prototype.scrollIntoView
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    mockedRequest.mockResolvedValue(reply('{"pong":true}'))
+    await renderPage()
+    fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'svc.echo' } })
+
+    fireEvent.click(sendButton())
+    await screen.findByTestId('reply-success')
+
+    expect(scrollIntoView.mock.instances).toContain(screen.getByRole('region', { name: 'Reply' }))
+    Element.prototype.scrollIntoView = original
   })
 
   it('sends with the chosen timeout', async () => {
