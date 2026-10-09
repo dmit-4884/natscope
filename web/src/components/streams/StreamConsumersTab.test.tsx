@@ -114,6 +114,20 @@ describe('StreamConsumersTab opened through a consumer link', () => {
     expect(screen.getByRole('heading', { name: 'audit' })).toBeInTheDocument()
   })
 
+  it('handles a link that arrives while the list is still loading once', () => {
+    policy.readOnly = false
+    list.isLoading = true
+    list.updatedAt = 0
+    list.refetch.mockClear()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    render(tabAt('/?consumer=ghost'))
+
+    expect(errors.mock.calls.flat().join(' ')).not.toMatch(/Maximum update depth/)
+    expect(list.refetch).not.toHaveBeenCalled()
+    errors.mockRestore()
+  })
+
   it('lets go of a linked consumer the fresh list does not have', () => {
     policy.readOnly = false
     list.isLoading = false

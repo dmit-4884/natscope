@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import type { ConsumerInfo, Message } from '@/types/nats'
 import {
@@ -28,6 +28,8 @@ import { consumerToConfig, defaultConsumerConfig, parseResetSequence, toConsumer
 import { consumerIssues } from './consumers/consumerHealth'
 import { ConsumerPosition } from './consumers/ConsumerPosition'
 
+const NO_CONSUMERS: ConsumerInfo[] = []
+
 export default function StreamConsumersTab() {
   const { scope, connectionId, streamName } = useOutletContext<StreamViewOutletContext>()
 
@@ -40,7 +42,7 @@ export default function StreamConsumersTab() {
   const [confirmAction, setConfirmAction] = useState<ConsumerConfirmAction | null>(null)
 
   const {
-    data: consumers = [],
+    data: consumers = NO_CONSUMERS,
     isLoading,
     error: consumersError,
     refetch,
@@ -60,12 +62,18 @@ export default function StreamConsumersTab() {
   const answeredAt = Math.max(dataUpdatedAt, errorUpdatedAt)
   const [linkedAt, setLinkedAt] = useState<number | null>(null)
   const awaitingLink = linkedAt !== null && answeredAt <= linkedAt
+  const handledLink = useRef<string | null>(null)
   useEffect(() => {
-    if (!requestedConsumer) return
+    if (!requestedConsumer) {
+      handledLink.current = null
+      return
+    }
+    if (handledLink.current === requestedConsumer) return
+    handledLink.current = requestedConsumer
     setEditorState({ selectedName: requestedConsumer, isCreating: false, isEditing: false, editorMode: 'form', formDraft: null })
     if (!consumers.some((c) => c.name === requestedConsumer)) {
       setLinkedAt(answeredAt)
-      void refetch()
+      if (!isLoading) void refetch()
     }
     setSearchParams(
       (params) => {
@@ -74,7 +82,7 @@ export default function StreamConsumersTab() {
       },
       { replace: true },
     )
-  }, [requestedConsumer, consumers, answeredAt, refetch, setEditorState, setSearchParams])
+  }, [requestedConsumer, consumers, answeredAt, isLoading, refetch, setEditorState, setSearchParams])
 
   const [, setMessagesView] = useMessagesViewEntry(scope)
   const openMessage = (message: Message) => {
