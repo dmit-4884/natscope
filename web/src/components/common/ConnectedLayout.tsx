@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { z } from 'zod'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  ACTIVE_CONNECTION_INFO_KEY,
   clearActiveConnection,
   getActiveConnectionId,
+  getStoredConnectionInfo,
   setActiveConnectionId,
+  storeActiveConnectionInfo,
   useConnectionValidation,
 } from '@/contexts/connection'
 import type { SavedConnection } from '@/api/connections'
@@ -15,7 +15,7 @@ import { CONNECTION_QUERY_PREFIX } from '@/hooks/useConnectionQuery'
 import { resetAllStores } from '@/stores/resetAllStores'
 import { logger } from '@/utils/logger'
 import { toast } from '@/utils/toast'
-import { safeGetItem, safeSetItem } from '@/utils/safeStorage'
+import { safeGetItem } from '@/utils/safeStorage'
 import {
   rememberSettingsReturn,
   isSettingsTab,
@@ -29,33 +29,6 @@ import Sidebar from './Sidebar'
 function getLastSettingsTab(): SettingsTab {
   const v = safeGetItem(SETTINGS_LAST_TAB_KEY)
   return isSettingsTab(v) ? v : 'connections'
-}
-
-/** Minimal connection info stored in localStorage for instant header display */
-const storedConnectionInfoSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  urls: z.array(z.string()),
-})
-type StoredConnectionInfo = z.infer<typeof storedConnectionInfoSchema>
-
-function getStoredConnectionInfo(): StoredConnectionInfo | null {
-  const raw = safeGetItem(ACTIVE_CONNECTION_INFO_KEY)
-  if (!raw) return null
-  try {
-    const parsed = storedConnectionInfoSchema.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
-}
-
-function storeConnectionInfo(connection: SavedConnection) {
-  safeSetItem(ACTIVE_CONNECTION_INFO_KEY, JSON.stringify({
-    id: connection.id,
-    name: connection.name,
-    urls: connection.urls,
-  }))
 }
 
 export type ConnectionSummary = Pick<SavedConnection, 'id' | 'name' | 'urls'>
@@ -130,7 +103,7 @@ export default function ConnectedLayout() {
     resetAllStores()
 
     setActiveConnectionId(connection.id)
-    storeConnectionInfo(connection)
+    storeActiveConnectionInfo(connection)
     setConnectionId(connection.id)
     setCurrentConnection(connection)
 
@@ -141,7 +114,7 @@ export default function ConnectedLayout() {
   // When CompactHeader resolves full connection data from lazy-loaded connections
   const handleConnectionResolved = useCallback((connection: SavedConnection) => {
     setCurrentConnection(connection)
-    storeConnectionInfo(connection)
+    storeActiveConnectionInfo(connection)
   }, [])
 
   // Remembers where to return via location, plus the last-visited settings

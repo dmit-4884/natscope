@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import type { ConnectionLabel } from '@/api/connections'
 import { safeGetItem, safeSetItem, safeRemoveItem } from '@/utils/safeStorage'
 
 const ACTIVE_CONNECTION_KEY = 'nats_active_connection_id'
@@ -27,4 +29,44 @@ export function subscribeActiveConnection(callback: () => void): () => void {
     window.removeEventListener(CHANGE_EVENT, callback)
     window.removeEventListener('storage', callback)
   }
+}
+
+const storedConnectionInfoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  urls: z.array(z.string()),
+  readOnly: z.boolean().optional(),
+  label: z.object({ text: z.string(), color: z.enum(['gray', 'blue', 'green', 'amber', 'red']) }).nullable().optional(),
+})
+
+export type StoredConnectionInfo = z.infer<typeof storedConnectionInfoSchema>
+
+export function getStoredConnectionInfo(): StoredConnectionInfo | null {
+  const raw = safeGetItem(ACTIVE_CONNECTION_INFO_KEY)
+  if (!raw) return null
+  try {
+    const parsed = storedConnectionInfoSchema.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+export function storeActiveConnectionInfo(connection: {
+  id: string
+  name: string
+  urls: string[]
+  readOnly?: boolean
+  label?: ConnectionLabel | null
+}): void {
+  safeSetItem(
+    ACTIVE_CONNECTION_INFO_KEY,
+    JSON.stringify({
+      id: connection.id,
+      name: connection.name,
+      urls: connection.urls,
+      readOnly: connection.readOnly ?? false,
+      label: connection.label ?? null,
+    }),
+  )
 }

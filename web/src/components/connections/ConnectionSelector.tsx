@@ -4,9 +4,8 @@ import { toast } from '@/utils/toast'
 import { getErrorMessage, stripErrorCodePrefix } from '@/api/errors'
 import { useRowKeys } from '@/hooks/useRowKeys'
 import type { SavedConnection } from '@/api/connections'
-import { safeSetItem } from '@/utils/safeStorage'
 import {
-  ACTIVE_CONNECTION_INFO_KEY,
+  storeActiveConnectionInfo,
   AuthConfig,
   clearActiveConnection,
   getActiveConnectionId,
@@ -93,9 +92,7 @@ export default function ConnectionSelector() {
       }
 
       setActiveConnectionId(connection.id)
-      safeSetItem(ACTIVE_CONNECTION_INFO_KEY, JSON.stringify({
-        id: connection.id, name: connection.name, urls: connection.urls,
-      }))
+      storeActiveConnectionInfo(connection)
       navigate('/streams')
     } catch (err) {
       // The global MutationCache.onError already toasts; keep the row inline.
@@ -177,9 +174,7 @@ export default function ConnectionSelector() {
       })
 
       setActiveConnectionId(savedConnection.id)
-      safeSetItem(ACTIVE_CONNECTION_INFO_KEY, JSON.stringify({
-        id: savedConnection.id, name: savedConnection.name, urls: savedConnection.urls,
-      }))
+      storeActiveConnectionInfo(savedConnection)
       navigate('/streams')
     } catch (err) {
       setError({ id: '__new__', message: getErrorMessage(err) || 'Connection failed' })

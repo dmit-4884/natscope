@@ -24,7 +24,9 @@ const active = vi.hoisted(() => {
   }
 })
 
-vi.mock('../activeConnectionStorage', () => active)
+const stored = vi.hoisted(() => ({ info: null as unknown }))
+
+vi.mock('../activeConnectionStorage', () => ({ ...active, getStoredConnectionInfo: () => stored.info }))
 
 const setActiveConnectionId = (id: string) => active.set(id)
 
@@ -47,6 +49,7 @@ const saved = (over: Partial<SavedConnection>): SavedConnection => ({
 
 describe('useConnectionPolicy', () => {
   beforeEach(() => {
+    stored.info = null
     active.set(null)
     getConnectionsMock.mockResolvedValue([
       saved({ id: 'prod', readOnly: true, label: { text: 'PROD', color: 'red' } }),
@@ -83,5 +86,18 @@ describe('useConnectionPolicy', () => {
 
     act(() => answer([saved({ id: 'dev' })]))
     await waitFor(() => expect(result.current.readOnly).toBe(false))
+  })
+
+  it('takes the stored policy of the active connection until the list answers', () => {
+    getConnectionsMock.mockReturnValue(new Promise(() => {}))
+    stored.info = { id: 'dev', name: 'dev', urls: ['nats://x'], readOnly: false, label: null }
+    setActiveConnectionId('dev')
+    const writable = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
+    expect(writable.result.current).toEqual({ readOnly: false, label: null })
+
+    stored.info = { id: 'prod', name: 'prod', urls: ['nats://x'], readOnly: true, label: { text: 'PROD', color: 'red' } }
+    setActiveConnectionId('prod')
+    const prod = renderHook(() => useConnectionPolicy(), { wrapper: makeWrapper() })
+    expect(prod.result.current).toEqual({ readOnly: true, label: { text: 'PROD', color: 'red' } })
   })
 })
