@@ -40,6 +40,7 @@ vi.mock('@/contexts/kv', async (importOriginal) => ({
   useDeleteKVKey: () => mutation,
   usePurgeKVKey: () => mutation,
   useDeleteKVBucket: () => mutation,
+  usePurgeKVBucket: () => mutation,
 }))
 
 vi.mock('./useKVProtoTarget', () => ({ useKVProtoTarget: () => null }))
@@ -133,6 +134,22 @@ describe('KVStorePage', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: /edit bucket/i }))
 
     expect(await screen.findByText('edit page')).toBeInTheDocument()
+  })
+
+  it('clears the bucket after its name is typed, warning that watchers are not told', async () => {
+    mutation.mutateAsync.mockResolvedValue(undefined)
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bucket actions' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /clear bucket/i }))
+
+    expect(screen.getByText(/watching the bucket are not told/i)).toBeInTheDocument()
+    const confirm = screen.getByRole('button', { name: 'Clear KV Store' })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(screen.getByPlaceholderText('CONFIG'), { target: { value: 'CONFIG' } })
+    fireEvent.click(confirm)
+
+    await waitFor(() => expect(mutation.mutateAsync).toHaveBeenCalledWith('CONFIG'))
   })
 
   it('says when the server cut the list at the limit', () => {

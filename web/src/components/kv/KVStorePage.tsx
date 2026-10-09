@@ -10,6 +10,7 @@ import {
   useDeleteKVKey,
   usePurgeKVKey,
   useDeleteKVBucket,
+  usePurgeKVBucket,
 } from '@/contexts/kv'
 import { decodeBase64, type KVProtoValue } from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
@@ -50,7 +51,7 @@ function isKeyPattern(text: string): boolean {
 }
 
 type KVConfirmAction = {
-  type: 'delete-bucket' | 'delete-key' | 'purge-key'
+  type: 'delete-bucket' | 'clear-bucket' | 'delete-key' | 'purge-key'
   name: string
   confirmText: string
 }
@@ -115,6 +116,7 @@ export default function KVStorePage() {
 
   // Mutations
   const deleteBucket = useDeleteKVBucket(connectionId)
+  const purgeBucket = usePurgeKVBucket(connectionId)
   const putKey = usePutKVKey(connectionId, bucketName)
   const deleteKey = useDeleteKVKey(connectionId, bucketName)
   const purgeKey = usePurgeKVKey(connectionId, bucketName)
@@ -171,6 +173,11 @@ export default function KVStorePage() {
       if (action.type === 'delete-bucket') {
         await deleteBucket.mutateAsync(action.name)
         navigate('/kv')
+      } else if (action.type === 'clear-bucket') {
+        await purgeBucket.mutateAsync(action.name)
+        setSelectedKey(null)
+        setDraft(null)
+        refetchKeys()
       } else if (action.type === 'delete-key') {
         await deleteKey.mutateAsync(action.name)
         if (selectedKey === action.name) {
@@ -235,6 +242,15 @@ export default function KVStorePage() {
                 {
                   label: 'Edit bucket…',
                   onSelect: () => navigate(`/kv/${encodeURIComponent(bucketName)}/edit`),
+                },
+                {
+                  label: 'Clear bucket…',
+                  destructive: true,
+                  onSelect: () => setConfirmAction({
+                    type: 'clear-bucket',
+                    name: bucketName,
+                    confirmText: '',
+                  }),
                 },
                 {
                   label: 'Delete bucket…',
@@ -655,6 +671,8 @@ export default function KVStorePage() {
           title={
             confirmAction.type === 'delete-bucket'
               ? 'Delete KV Store'
+              : confirmAction.type === 'clear-bucket'
+              ? 'Clear KV Store'
               : confirmAction.type === 'delete-key'
               ? 'Delete Key'
               : 'Purge Key'
@@ -665,6 +683,13 @@ export default function KVStorePage() {
               {confirmAction.type === 'delete-bucket' && (
                 <span>This will permanently delete the KV store <strong>{confirmAction.name}</strong> and all its keys. This action cannot be undone.</span>
               )}
+              {confirmAction.type === 'clear-bucket' && (
+                <span>
+                  This removes every key and every revision of the KV store <strong>{confirmAction.name}</strong> at once and
+                  keeps the bucket. Apps watching the bucket are not told: no delete markers are left, so the values they
+                  cached stay until they reload. This action cannot be undone.
+                </span>
+              )}
               {confirmAction.type === 'delete-key' && (
                 <span>This will delete the key <strong>{confirmAction.name}</strong>. The deletion will be recorded in the key's history.</span>
               )}
@@ -673,7 +698,7 @@ export default function KVStorePage() {
               )}
             </Alert>
 
-            {confirmAction.type === 'delete-bucket' && (
+            {(confirmAction.type === 'delete-bucket' || confirmAction.type === 'clear-bucket') && (
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Type "{confirmAction.name}" to confirm
@@ -695,12 +720,15 @@ export default function KVStorePage() {
               variant="danger"
               onClick={handleConfirmAction}
               disabled={
-                (confirmAction.type === 'delete-bucket' && confirmAction.confirmText !== confirmAction.name) ||
-                deleteBucket.isPending || deleteKey.isPending || purgeKey.isPending
+                ((confirmAction.type === 'delete-bucket' || confirmAction.type === 'clear-bucket') &&
+                  confirmAction.confirmText !== confirmAction.name) ||
+                deleteBucket.isPending || purgeBucket.isPending || deleteKey.isPending || purgeKey.isPending
               }
             >
               {confirmAction.type === 'delete-bucket'
                 ? deleteBucket.isPending ? 'Deleting...' : 'Delete KV Store'
+                : confirmAction.type === 'clear-bucket'
+                ? purgeBucket.isPending ? 'Clearing...' : 'Clear KV Store'
                 : confirmAction.type === 'delete-key'
                 ? deleteKey.isPending ? 'Deleting...' : 'Delete Key'
                 : purgeKey.isPending ? 'Purging...' : 'Purge Key'}

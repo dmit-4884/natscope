@@ -74,6 +74,9 @@ service ManagementService {
   // Applies new settings to a KeyValue bucket, keeping every other setting of its stream.
   rpc UpdateKVBucket(UpdateKVBucketRequest) returns (UpdateKVBucketResponse) {}
 
+  // Removes every key and revision of a KeyValue bucket in one stream purge; watchers get no delete markers.
+  rpc PurgeKVBucket(PurgeKVBucketRequest) returns (PurgeKVBucketResponse) {}
+
   // Permanently deletes a KeyValue bucket and all of its entries.
   rpc DeleteKVBucket(DeleteKVBucketRequest) returns (DeleteKVBucketResponse) {}
 
@@ -849,6 +852,18 @@ message UpdateKVBucketResponse {
   // Required. The bucket after the change.
   .natscope.types.nats.KVBucketInfo bucket = 1;
 }
+
+// Defines the request message for removing every key of a KeyValue bucket.
+message PurgeKVBucketRequest {
+  // Required. Identifier of the NATS connection the bucket belongs to.
+  string connection_id = 1 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.uuid = true];
+
+  // Required. Name of the KeyValue bucket to clear.
+  string bucket = 2 [(google.api.field_behavior) = REQUIRED, (buf.validate.field).required = true, (buf.validate.field).string.min_len = 1];
+}
+
+// Defines the response message for removing every key of a KeyValue bucket.
+message PurgeKVBucketResponse {}
 
 // Defines the request message for deleting a KeyValue bucket.
 message DeleteKVBucketRequest {

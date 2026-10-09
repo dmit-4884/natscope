@@ -148,6 +148,32 @@ func TestUpdateKVBucket_KeyTTLStaysOnceAllowed(t *testing.T) {
 	assert.Equal(t, time.Minute, info.LimitMarkerTTL)
 }
 
+func TestPurgeKVBucket_RemovesEveryKeyAndKeepsTheBucket(t *testing.T) {
+	t.Parallel()
+	c, kv := kvWithKeys(t, "cfg", "a", "b.c", "d")
+
+	require.NoError(t, c.PurgeKVBucket(t.Context(), "cfg"))
+
+	list, err := c.ListKVKeys(t.Context(), "cfg", entities.KVKeysQuery{})
+	require.NoError(t, err)
+	assert.Empty(t, list.Keys)
+	_, err = kv.Get(t.Context(), "a")
+	require.Error(t, err)
+	_, err = kv.PutString(t.Context(), "a", "again")
+	require.NoError(t, err, "the bucket stays usable")
+}
+
+func TestPurgeKVBucket_RefusesWhatIsNotABucket(t *testing.T) {
+	t.Parallel()
+	_, url := jetStreamServer(t)
+	c := dialClient(t, url)
+	_, err := rawJetStream(t, url).CreateStream(t.Context(), jetstream.StreamConfig{Name: "KV_plain", Subjects: []string{"plain.>"}})
+	require.NoError(t, err)
+
+	require.ErrorIs(t, c.PurgeKVBucket(t.Context(), "plain"), errs.ErrNotAKVOrObjectBucket)
+	require.ErrorIs(t, c.PurgeKVBucket(t.Context(), "missing"), errs.ErrBucketNotFound)
+}
+
 func TestUpdateKVBucket_RefusesWhatIsNotABucket(t *testing.T) {
 	t.Parallel()
 	_, url := jetStreamServer(t)

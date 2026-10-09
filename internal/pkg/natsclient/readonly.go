@@ -120,6 +120,10 @@ func (r *readOnlyClient) UpdateKVBucket(context.Context, string, entities.KVBuck
 	return nil, errs.ErrConnectionReadOnly
 }
 
+func (r *readOnlyClient) PurgeKVBucket(context.Context, string) error {
+	return errs.ErrConnectionReadOnly
+}
+
 func (r *readOnlyClient) DeleteKVBucket(context.Context, string) error {
 	return errs.ErrConnectionReadOnly
 }

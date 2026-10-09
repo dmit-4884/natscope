@@ -447,6 +447,10 @@ export async function createKVBucket(
   return toKVBucketInfo(response.bucket!)
 }
 
+export async function purgeKVBucket(connectionId: string, bucket: string): Promise<void> {
+  await managementClient.purgeKVBucket({ connectionId, bucket })
+}
+
 export async function deleteKVBucket(
   connectionId: string,
   bucket: string

@@ -314,6 +314,9 @@ type KVStore interface {
 		settings entities.KVBucketSettings,
 	) (*entities.KVBucketInfo, error)
 
+	// PurgeKVBucket removes every key and revision of a bucket, leaving no delete markers.
+	PurgeKVBucket(ctx context.Context, connectionID string, bucket string) error
+
 	// DeleteKVBucket deletes a KeyValue bucket and its data.
 	DeleteKVBucket(ctx context.Context, connectionID string, bucket string) error
 

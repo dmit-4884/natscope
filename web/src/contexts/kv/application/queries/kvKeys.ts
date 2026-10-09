@@ -18,6 +18,8 @@ export const kvKeys = {
     bucket: string | undefined,
     key: string | undefined,
   ) => [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'kv', 'key', bucket, key] as const,
+  keyAll: (connectionId: string | undefined, bucket: string | undefined) =>
+    [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'kv', 'key', bucket] as const,
   // Prefix without the key — invalidates every key's history in the bucket.
   historyAll: (connectionId: string | undefined, bucket: string | undefined) =>
     [CONNECTION_QUERY_PREFIX, connectionId ?? null, 'kv', 'history', bucket] as const,

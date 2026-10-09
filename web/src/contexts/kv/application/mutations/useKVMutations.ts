@@ -56,6 +56,26 @@ export function useUpdateKVBucket(connectionId: string | undefined) {
   })
 }
 
+export function usePurgeKVBucket(connectionId: string | undefined) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (bucket: string) => {
+      if (!connectionId) throw new Error('No connection')
+      return api.purgeKVBucket(connectionId, bucket)
+    },
+    onSuccess: (_, bucket) => {
+      toast.success(`KV bucket "${bucket}" cleared`)
+      queryClient.removeQueries({ queryKey: kvKeys.keyAll(connectionId, bucket) })
+      queryClient.invalidateQueries({ queryKey: kvKeys.keys(connectionId, bucket) })
+      queryClient.invalidateQueries({ queryKey: kvKeys.historyAll(connectionId, bucket) })
+      invalidateAllKVViews(queryClient, connectionId, bucket)
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to clear KV bucket: ${getErrorMessage(error)}`)
+    },
+  })
+}
+
 export function useDeleteKVBucket(connectionId: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({

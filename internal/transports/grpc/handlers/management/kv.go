@@ -110,6 +110,18 @@ func (h *Handler) UpdateKVBucket(
 	}), nil
 }
 
+// PurgeKVBucket removes every key and revision of a KeyValue bucket.
+func (h *Handler) PurgeKVBucket(
+	ctx context.Context,
+	req *connect.Request[managementpb.PurgeKVBucketRequest],
+) (*connect.Response[managementpb.PurgeKVBucketResponse], error) {
+	in := req.Msg
+	if err := h.natsService.PurgeKVBucket(ctx, in.GetConnectionId(), in.GetBucket()); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&managementpb.PurgeKVBucketResponse{}), nil
+}
+
 // DeleteKVBucket deletes a KeyValue bucket.
 func (h *Handler) DeleteKVBucket(
 	ctx context.Context,

@@ -46,6 +46,15 @@ func (s *Service) UpdateKVBucket(
 	return c.UpdateKVBucket(ctx, bucket, settings)
 }
 
+// PurgeKVBucket removes every key and revision of a bucket, leaving no delete markers.
+func (s *Service) PurgeKVBucket(ctx context.Context, connectionID string, bucket string) error {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return err
+	}
+	return c.PurgeKVBucket(ctx, bucket)
+}
+
 // DeleteKVBucket deletes a KeyValue bucket and all its data.
 func (s *Service) DeleteKVBucket(ctx context.Context, connectionID string, bucket string) error {
 	c, err := s.client(ctx, connectionID)

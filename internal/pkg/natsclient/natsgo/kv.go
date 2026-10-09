@@ -135,6 +135,25 @@ func (c *Client) DeleteKVBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
+// PurgeKVBucket removes every key and every revision of a bucket in one stream purge after confirming the stream is a
+// KV bucket. It leaves no delete markers, so watchers of the bucket are not told.
+func (c *Client) PurgeKVBucket(ctx context.Context, bucket string) error {
+	ctx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)
+	defer cancel()
+
+	if _, err := c.jetStream.KeyValue(ctx, bucket); err != nil {
+		return wrapBucketErr(err)
+	}
+	stream, err := c.jetStream.Stream(ctx, kvStreamPrefix+bucket)
+	if err != nil {
+		return wrapBucketErr(err)
+	}
+	if err := stream.Purge(ctx); err != nil {
+		return wrapErr(err)
+	}
+	return nil
+}
+
 // GetKVBucket returns information about a specific KeyValue bucket.
 func (c *Client) GetKVBucket(ctx context.Context, bucket string) (*entities.KVBucketInfo, error) {
 	ctx, cancel := corecontext.ApplyTimeout(ctx, kvOperationTimeout)

@@ -335,6 +335,33 @@ func TestKVKeyTTL(t *testing.T) {
 	}
 }
 
+// TestPurgeKVBucket checks that clearing a bucket removes its keys and keeps the bucket.
+func TestPurgeKVBucket(t *testing.T) {
+	env := setupE2E(t)
+	ctx := t.Context()
+	connID := kvObjTestConn(t, env, "qa-kvpurge")
+	_, err := env.management.CreateKVBucket(ctx, connect.NewRequest(&managementpb.CreateKVBucketRequest{
+		ConnectionId: connID, Config: &natstypes.KVBucketConfig{Bucket: "clear"},
+	}))
+	require.NoError(t, err)
+	for _, k := range []string{"a", "b"} {
+		_, err = env.management.PutKVKey(ctx, connect.NewRequest(&managementpb.PutKVKeyRequest{
+			ConnectionId: connID, Bucket: "clear", Key: k, Payload: &managementpb.PutKVKeyRequest_Value{Value: base64.StdEncoding.EncodeToString([]byte("v"))},
+		}))
+		require.NoError(t, err)
+	}
+
+	_, err = env.management.PurgeKVBucket(ctx, connect.NewRequest(&managementpb.PurgeKVBucketRequest{ConnectionId: connID, Bucket: "clear"}))
+	require.NoError(t, err)
+
+	keys, err := env.management.ListKVKeys(ctx, connect.NewRequest(&managementpb.ListKVKeysRequest{ConnectionId: connID, Bucket: "clear"}))
+	require.NoError(t, err)
+	assert.Empty(t, keys.Msg.GetKeys())
+	info, err := env.management.GetKVBucket(ctx, connect.NewRequest(&managementpb.GetKVBucketRequest{ConnectionId: connID, Bucket: "clear"}))
+	require.NoError(t, err)
+	assert.Zero(t, info.Msg.GetBucket().GetValues())
+}
+
 // TestBucketDeleteSealRefusesPlainStream checks that Delete and Seal refuse a plain stream named like a bucket.
 func TestBucketDeleteSealRefusesPlainStream(t *testing.T) {
 	env := setupE2E(t)

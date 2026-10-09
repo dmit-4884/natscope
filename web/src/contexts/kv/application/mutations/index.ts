@@ -1,6 +1,7 @@
 export {
   useCreateKVBucket,
   useUpdateKVBucket,
+  usePurgeKVBucket,
   useDeleteKVBucket,
   usePutKVKey,
   useDeleteKVKey,
