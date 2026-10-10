@@ -20,7 +20,8 @@ var writeMethods = map[string]bool{
 	"ResetConsumer": true, "UnpinConsumer": true,
 	"Publish": true, "PublishToStream": true, "Request": true,
 	"CreateKVBucket": true, "UpdateKVBucket": true, "PurgeKVBucket": true, "DeleteKVBucket": true, "PutKVKey": true, "CreateKVKey": true, "DeleteKVKey": true, "PurgeKVKey": true,
-	"CreateObjectBucket": true, "DeleteObjectBucket": true, "PutObject": true, "DeleteObject": true, "SealObjectBucket": true,
+	"CreateObjectBucket": true, "DeleteObjectBucket": true, "PutObject": true, "PutObjectStream": true, "DeleteObject": true,
+	"SealObjectBucket": true,
 }
 
 type panicClient struct{ Client }

@@ -274,6 +274,69 @@ func (c *Client) PutObject(
 	return toObjectInfo(info), nil
 }
 
+// OpenObject streams an object's content for as long as ctx lives; the caller closes the reader.
+func (c *Client) OpenObject(ctx context.Context, bucket, name string) (io.ReadCloser, *entities.ObjectInfo, error) {
+	if err := validateNATSSubjectLength("object name", name); err != nil {
+		return nil, nil, wrapErr(err)
+	}
+
+	lookupCtx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	obj, err := c.jetStream.ObjectStore(lookupCtx, bucket)
+	cancel()
+	if err != nil {
+		return nil, nil, wrapErr(err)
+	}
+
+	result, err := obj.Get(ctx, name)
+	if err != nil {
+		if errors.Is(err, jetstream.ErrCantGetBucket) {
+			return nil, nil, errs.ErrObjectLinkToBucket
+		}
+		return nil, nil, wrapErr(err)
+	}
+	info, err := result.Info()
+	if err != nil {
+		_ = result.Close() //nolint:errcheck // the Info error wins
+		return nil, nil, wrapErr(err)
+	}
+	return result, toObjectInfo(info), nil
+}
+
+// PutObjectStream stores an object read from r for as long as ctx lives, serializing writes per (bucket, name); size,
+// when not negative, lets it refuse one that would overflow the bucket before writing.
+func (c *Client) PutObjectStream(
+	ctx context.Context,
+	bucket string,
+	meta entities.ObjectMeta,
+	r io.Reader,
+	size int64,
+) (*entities.ObjectInfo, error) {
+	if err := validateNATSSubjectLength("object name", meta.Name); err != nil {
+		return nil, wrapErr(err)
+	}
+
+	unlock := c.lockObjectPut(bucket, meta.Name)
+	defer unlock()
+
+	lookupCtx, cancel := corecontext.ApplyTimeout(ctx, objectOperationTimeout)
+	defer cancel()
+	obj, err := c.jetStream.ObjectStore(lookupCtx, bucket)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	if size >= 0 {
+		if capErr := checkObjectCapacity(lookupCtx, obj, meta.Name, size); capErr != nil {
+			return nil, capErr
+		}
+	}
+
+	info, err := obj.Put(ctx, *converter.Convert(meta, &jetstream.ObjectMeta{}), r)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return toObjectInfo(info), nil
+}
+
 // lockObjectPut serializes PutObject calls for the same (bucket, name); the lock table is never trimmed.
 func (c *Client) lockObjectPut(bucket, name string) (unlock func()) {
 	key := bucket + "\x00" + name

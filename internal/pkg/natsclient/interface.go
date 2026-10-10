@@ -5,6 +5,7 @@ package natsclient
 
 import (
 	"context"
+	"io"
 	"iter"
 	"time"
 
@@ -273,6 +274,12 @@ type ObjectStore interface {
 
 	// PutObject stores an object.
 	PutObject(ctx context.Context, bucket string, meta entities.ObjectMeta, data []byte) (*entities.ObjectInfo, error)
+
+	// OpenObject streams an object's content for as long as ctx lives; the caller closes the reader.
+	OpenObject(ctx context.Context, bucket string, name string) (io.ReadCloser, *entities.ObjectInfo, error)
+
+	// PutObjectStream stores an object read from r; size, when not negative, is its length.
+	PutObjectStream(ctx context.Context, bucket string, meta entities.ObjectMeta, r io.Reader, size int64) (*entities.ObjectInfo, error)
 
 	// DeleteObject deletes an object.
 	DeleteObject(ctx context.Context, bucket string, name string) error

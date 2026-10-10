@@ -5,6 +5,7 @@ package natsclient
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -189,6 +190,14 @@ func (r *readOnlyClient) GetObject(ctx context.Context, bucket, name string) ([]
 }
 
 func (r *readOnlyClient) PutObject(context.Context, string, entities.ObjectMeta, []byte) (*entities.ObjectInfo, error) {
+	return nil, errs.ErrConnectionReadOnly
+}
+
+func (r *readOnlyClient) OpenObject(ctx context.Context, bucket, name string) (io.ReadCloser, *entities.ObjectInfo, error) {
+	return r.inner.OpenObject(ctx, bucket, name)
+}
+
+func (r *readOnlyClient) PutObjectStream(context.Context, string, entities.ObjectMeta, io.Reader, int64) (*entities.ObjectInfo, error) {
 	return nil, errs.ErrConnectionReadOnly
 }
 

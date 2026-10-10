@@ -48,6 +48,7 @@ import (
 	publishTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/publish"
 	schemaTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/schema"
 	streamsTools "github.com/dmit-4884/natscope/internal/transports/mcp/tools/streams"
+	objectstransport "github.com/dmit-4884/natscope/internal/transports/objects"
 )
 
 // maxRequestBytes caps a single decoded request message to protect the process
@@ -108,6 +109,14 @@ func TransportsModule() fx.Option {
 		fx.Invoke(func(t *grpctransport.Transport, e *mcptransport.Endpoint) {
 			if t != nil && e != nil {
 				t.Mount(mcptransport.Path, e)
+			}
+		}),
+
+		// Object Store downloads and uploads stream over plain HTTP at /api/objects.
+		fx.Provide(objectstransport.New),
+		fx.Invoke(func(t *grpctransport.Transport, h *objectstransport.Handler) {
+			if t != nil {
+				t.Mount(objectstransport.Path, h)
 			}
 		}),
 

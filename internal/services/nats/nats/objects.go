@@ -5,6 +5,7 @@ package nats
 
 import (
 	"context"
+	"io"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 )
@@ -89,6 +90,36 @@ func (s *Service) PutObject(
 		return nil, err
 	}
 	return c.PutObject(ctx, bucket, meta, data)
+}
+
+// OpenObject streams an object's content; the caller closes the reader.
+func (s *Service) OpenObject(
+	ctx context.Context,
+	connectionID string,
+	bucket string,
+	name string,
+) (io.ReadCloser, *entities.ObjectInfo, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.OpenObject(ctx, bucket, name)
+}
+
+// PutObjectStream stores an object read from r in an Object Store bucket.
+func (s *Service) PutObjectStream(
+	ctx context.Context,
+	connectionID string,
+	bucket string,
+	meta entities.ObjectMeta,
+	r io.Reader,
+	size int64,
+) (*entities.ObjectInfo, error) {
+	c, err := s.client(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	return c.PutObjectStream(ctx, bucket, meta, r, size)
 }
 
 // DeleteObject deletes an object from an Object Store bucket.
