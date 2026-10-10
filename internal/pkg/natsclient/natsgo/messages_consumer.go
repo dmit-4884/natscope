@@ -120,12 +120,12 @@ func (c *Client) fetchBrowseWindow(
 	messages := make([]*entities.Message, 0, min(limit, scanFetchMax))
 	var lastConsumerSeq uint64
 	for read := 0; read < limit; {
-		batch, err := consumer.Fetch(min(limit-read, scanFetchMax), jetstream.FetchMaxWait(wait))
+		batch, err := fetchPull(ctx, consumer, min(limit-read, scanFetchMax), wait)
 		if err != nil {
 			return nil, wrapErr(coreerrs.Wrap(err, "fetch messages"))
 		}
 		got, done := 0, false
-		for msg := range batch.Messages() {
+		for msg := range batch.All() {
 			got++
 			meta, metaErr := msg.Metadata()
 			if metaErr != nil || meta == nil {

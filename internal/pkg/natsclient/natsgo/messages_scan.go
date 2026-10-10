@@ -185,13 +185,13 @@ func (c *Client) scanConsumerFrom(
 	var bytesRead, msgsRead int
 	batchSize, empty := scanFetchFirst, 0
 	for {
-		batch, err := consumer.Fetch(batchSize, jetstream.FetchMaxWait(wait))
+		batch, err := fetchPull(ctx, consumer, batchSize, wait)
 		if err != nil {
 			yield(nil, wrapErr(err))
 			return 0, false
 		}
 		got := 0
-		for msg := range batch.Messages() {
+		for msg := range batch.All() {
 			got++
 			meta, metaErr := msg.Metadata()
 			if metaErr != nil || meta == nil {
