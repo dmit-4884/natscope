@@ -200,7 +200,7 @@ func (c *Client) resolveSeqByTimeConsumer(
 		}
 		return meta.Sequence.Stream, nil
 	}
-	if batchErr := batch.Error(); batchErr != nil && !errors.Is(batchErr, context.DeadlineExceeded) &&
+	if batchErr := batch.Error(); batchErr != nil && !coreerrs.IsContextDeadlineExceeded(batchErr) &&
 		!errors.Is(batchErr, nats.ErrTimeout) {
 		return 0, wrapErr(batchErr)
 	}

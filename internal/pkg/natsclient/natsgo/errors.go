@@ -4,7 +4,6 @@
 package natsgo
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,6 +12,8 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/dmit-4884/natscope/internal/errs"
+
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
 // permissionViolationSubstr matches NATS async permission errors that arrive as
@@ -132,7 +133,7 @@ func wrapErr(err error) error {
 		return &errs.NATSValidationError{Description: invalidResetDescription, Cause: err}
 	}
 
-	if errors.Is(err, context.DeadlineExceeded) {
+	if coreerrs.IsContextDeadlineExceeded(err) {
 		return errors.Join(errs.ErrNATSTimeout, err)
 	}
 

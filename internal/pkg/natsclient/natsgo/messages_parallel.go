@@ -19,6 +19,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 
 	corecontext "github.com/altessa-s/go-atlas/core/context"
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 )
 
@@ -217,7 +218,7 @@ func (c *Client) fetchMessagesParallel(
 
 	// A parent-context cancel returns whatever was collected; any other cause
 	// discards the partial result.
-	if err != nil && !errors.Is(err, context.Canceled) {
+	if err != nil && !coreerrs.IsContextCanceled(err) {
 		c.logger.WarnContext(ctx, "fetchMessagesParallel: fetch failed",
 			slog.Int("total", len(seqs)),
 			slog.Int("fetched_before_abort", len(msgMap)),
@@ -263,6 +264,6 @@ func fetchRetryable(parent context.Context) retry.ShouldRetryFunc {
 		if parent.Err() != nil || errors.Is(err, jetstream.ErrMsgNotFound) {
 			return false
 		}
-		return errors.Is(err, context.DeadlineExceeded) || isTransientFetchError(err)
+		return coreerrs.IsContextDeadlineExceeded(err) || isTransientFetchError(err)
 	}
 }

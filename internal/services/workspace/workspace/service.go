@@ -8,13 +8,13 @@ package workspace
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"sort"
 	"time"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 	workspacesvc "github.com/dmit-4884/natscope/internal/services/workspace"
 )
 
@@ -135,7 +135,7 @@ func (s *Service) Import(
 		if iErr != nil {
 			// Canceled/expired context aborts the run, surfacing as the RPC error;
 			// already-applied results returned alongside.
-			if ctx.Err() != nil || errors.Is(iErr, context.Canceled) || errors.Is(iErr, context.DeadlineExceeded) {
+			if ctx.Err() != nil || coreerrs.IsContextCanceledOrDeadlineExceeded(iErr) {
 				results = append(results, res)
 				return results, iErr
 			}

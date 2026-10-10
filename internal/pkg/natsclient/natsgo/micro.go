@@ -6,7 +6,6 @@ package natsgo
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/nats-io/nats.go/micro"
@@ -15,6 +14,8 @@ import (
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
 const (
@@ -88,7 +89,7 @@ func (c *Client) gather(ctx context.Context, subject string) ([]microReply, erro
 			msg, err := sub.NextMsgWithContext(waitCtx)
 			waitCancel()
 			if err != nil {
-				if errors.Is(ctx.Err(), context.Canceled) {
+				if coreerrs.IsContextCanceled(ctx.Err()) {
 					return ctx.Err()
 				}
 				return nil

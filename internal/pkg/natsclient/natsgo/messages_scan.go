@@ -21,6 +21,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	corecontext "github.com/altessa-s/go-atlas/core/context"
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
 // fetchMethodConsumer reads messages through a short-lived consumer; any other method reads them one by one.
@@ -213,7 +214,7 @@ func (c *Client) scanConsumerFrom(
 			msgsRead++
 			bytesRead += len(msg.Data())
 		}
-		if batchErr := batch.Error(); batchErr != nil && !errors.Is(batchErr, context.DeadlineExceeded) &&
+		if batchErr := batch.Error(); batchErr != nil && !coreerrs.IsContextDeadlineExceeded(batchErr) &&
 			!errors.Is(batchErr, nats.ErrTimeout) {
 			yield(nil, wrapErr(batchErr))
 			return 0, false

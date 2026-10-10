@@ -25,6 +25,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
 	corecontext "github.com/altessa-s/go-atlas/core/context"
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
 // kvKeyPattern mirrors nats.go's key charset (jetstream/kv.go validKeyRe).
@@ -245,7 +246,7 @@ func (c *Client) ListKVKeys(ctx context.Context, bucket string, query entities.K
 	}
 
 	list, err := collectKVKeys(kvCtx, watcher, limit)
-	if errors.Is(err, context.DeadlineExceeded) {
+	if coreerrs.IsContextDeadlineExceeded(err) {
 		if asyncErr := c.takeAsyncError(browseAsyncErrorWait); asyncErr != nil {
 			return entities.KVKeyList{}, asyncErr
 		}
@@ -492,7 +493,7 @@ func (c *Client) GetKVKeyHistory(ctx context.Context, bucket string, key string)
 
 	entries, err := kv.History(kvCtx, key)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, nats.ErrTimeout) {
+		if coreerrs.IsContextDeadlineExceeded(err) || errors.Is(err, nats.ErrTimeout) {
 			if asyncErr := c.takeAsyncError(browseAsyncErrorWait); asyncErr != nil {
 				return nil, asyncErr
 			}

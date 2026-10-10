@@ -30,6 +30,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 
 	corectx "github.com/altessa-s/go-atlas/core/context"
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
 const (
@@ -245,7 +246,7 @@ func (d *diagnosis) connectedDespiteSlowness() {
 
 // isTimeout reports whether err is a network or context timeout.
 func isTimeout(err error) bool {
-	if errors.Is(err, context.DeadlineExceeded) {
+	if coreerrs.IsContextDeadlineExceeded(err) {
 		return true
 	}
 	netErr, ok := errors.AsType[net.Error](err)

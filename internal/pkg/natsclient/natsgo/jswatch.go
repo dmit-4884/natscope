@@ -13,6 +13,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+
+	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
 // fallbackWindow is how long an uncorrelated async error is still considered
@@ -113,7 +115,7 @@ func (w *jetStreamWatch) translate(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, nats.ErrTimeout) {
+	if coreerrs.IsContextDeadlineExceeded(err) || errors.Is(err, nats.ErrTimeout) {
 		if async := w.pw.TakeRecent(fallbackWindow); async != nil {
 			return wrapErr(async)
 		}
