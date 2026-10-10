@@ -277,5 +277,5 @@ func (c *Client) GetNextMessage(ctx context.Context, streamName string, startSeq
 	if next == nil {
 		return nil, nil //nolint:nilnil // nil, nil means no message matches
 	}
-	return toMessageWithHex(next), nil
+	return toMessage(next), nil
 }

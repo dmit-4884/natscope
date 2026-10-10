@@ -4,7 +4,6 @@
 package natsgo
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -97,7 +96,7 @@ func toConsumerInfo(info *jetstream.ConsumerInfo, streamName string) *entities.C
 }
 
 // rawMessageOpts maps jetstream.RawStreamMsg → entities.Message. IgnoreZeroValues
-// preserves nil-header→nil-map; DataSize/ContentType/DataRawHex set explicitly.
+// preserves nil-header→nil-map; DataSize/ContentType set explicitly.
 var rawMessageOpts = []converter.Option{
 	converter.WithCodecs(
 		convcodecs.BytesBase64,
@@ -120,10 +119,4 @@ func toMessage(msg *jetstream.RawStreamMsg) *entities.Message {
 		result.HeaderValues = msg.Header
 	}
 	return result
-}
-
-func toMessageWithHex(msg *jetstream.RawStreamMsg) *entities.Message {
-	message := toMessage(msg)
-	message.DataRawHex = hex.EncodeToString(msg.Data)
-	return message
 }

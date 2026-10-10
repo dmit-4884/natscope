@@ -22,9 +22,6 @@ type Message struct {
 	// DataBase64 is the message data encoded as base64.
 	DataBase64 string
 
-	// DataRawHex is the raw hex representation (for single message view).
-	DataRawHex string
-
 	// DataSize is the size of the message data in bytes.
 	DataSize int
 

@@ -35,7 +35,6 @@ function toMessage(m: NatsMessage): Message {
     subject: m.subject,
     timestamp: tsToMillis(m.timestamp),
     data_base64: m.dataBase64,
-    data_raw_hex: m.dataRawHex || undefined,
     data_size: m.dataSize,
     content_type: (m.contentType as 'json' | 'text' | 'binary') || 'binary',
     headers: Object.keys(m.headers).length > 0 ? m.headers : undefined,

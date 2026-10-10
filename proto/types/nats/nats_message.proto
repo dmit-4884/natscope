@@ -19,8 +19,8 @@ message NatsMessage {
   // Required. Message payload encoded as base64 string.
   string data_base64 = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Optional. Message payload as hexadecimal string for binary inspection.
-  string data_raw_hex = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  reserved 5;
+  reserved "data_raw_hex";
 
   // Required. Size of the original message payload in bytes.
   int32 data_size = 6 [(google.api.field_behavior) = OUTPUT_ONLY];

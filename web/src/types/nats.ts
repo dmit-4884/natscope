@@ -207,7 +207,6 @@ export interface Message {
   subject: string
   timestamp: number // Unix milliseconds
   data_base64: string
-  data_raw_hex?: string
   data_size: number
   content_type: 'json' | 'text' | 'binary'
   headers?: Record<string, string>

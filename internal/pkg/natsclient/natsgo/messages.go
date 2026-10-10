@@ -95,7 +95,7 @@ func (c *Client) GetMessage(ctx context.Context, streamName string, sequence uin
 		return nil, wrapErr(errors.WrapOperation(err, "get message"))
 	}
 
-	return toMessageWithHex(msg), nil
+	return toMessage(msg), nil
 }
 
 // Publish sends a core NATS message and flushes it.
