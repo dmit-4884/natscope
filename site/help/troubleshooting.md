@@ -20,7 +20,7 @@ requirement and logs a warning. Read [Remote access](/reference/remote-access) b
 
 ## The UI returns 404
 
-This one is specific to builds from source. The React app is embedded from `web/dist` at compile time,
+This affects builds from source only. The React app is embedded from `web/dist` at compile time,
 so a binary built without a frontend serves 404 on every UI route while the API keeps working.
 
 Run `make build-frontend` and rebuild, or `make stub-dist` if you only need the backend. Released
@@ -39,7 +39,7 @@ Check, in order:
 - For self-signed certs in development, tick **Skip certificate verification**
 - For NATS 2.10+ servers running `tls_handshake_first`, tick **TLS handshake first**
 
-Remember that the NATS connection is made by the Natscope process, not your browser. A server reachable
+The NATS connection is made by the Natscope process, not your browser. A server reachable
 from your laptop is not automatically reachable from a container.
 
 ## Payloads show as hex instead of JSON
@@ -47,9 +47,9 @@ from your laptop is not automatically reachable from a container.
 Natscope decodes a payload only when a subject mapping resolves a message type for that subject. Check
 in this order:
 
-1. **Settings → Proto Files** — is a source present and compiled without errors? Compile diagnostics
+1. **Settings → Proto Files**: is a source present and compiled without errors? Compile diagnostics
    name the file, line and any missing import.
-2. **Settings → Mappings** — does a mapping cover this subject? Wildcards count: `*` matches one token,
+2. **Settings → Mappings**: does a mapping cover this subject? Wildcards count: `*` matches one token,
    a trailing `>` matches one or more.
 3. The mapping's health badge. A missing source, a stale version selection or a type that no longer
    exists all break decoding, and the badge says which.

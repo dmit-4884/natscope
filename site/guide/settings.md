@@ -25,31 +25,31 @@ Five collapsible sections.
 
 ### Messages
 
-- **Fetch method** — Direct or Consumer
-- **Default page size** — 25, 50, 100 or 250
-- **Default direction** — Backward or Forward
-- **Preview payload cap (KB)** — how much of a large payload the list preview renders before you ask for
+- **Fetch method**: Direct or Consumer
+- **Default page size**: 25, 50, 100 or 250
+- **Default direction**: Backward or Forward
+- **Preview payload cap (KB)**: how much of a large payload the list preview renders before you ask for
   the whole thing
-- **Detect message types** — decode binary payloads on unmapped subjects as the Protobuf type that fits
+- **Detect message types**: decode binary payloads on unmapped subjects as the Protobuf type that fits
   them best. See [Type detection](/guide/protobuf#type-detection).
 
 ### Live
 
-- **Subscription mode** — Core NATS or JetStream Ordered
-- **Max display rate** — messages per second, `0` for unlimited. This throttles rendering, not the
+- **Subscription mode**: Core NATS or JetStream Ordered
+- **Max display rate**: messages per second, `0` for unlimited. This throttles rendering, not the
   subscription. See [Live tail](/guide/live-tail).
 
 ### Display
 
-- **Density** — Comfortable or Compact
-- **Default view mode** — History or Realtime
-- **Timestamp format** — Relative, Absolute or ISO 8601
-- **JSON indent size** — 2 or 4 spaces
-- **Auto-scroll live** — follow new messages in Realtime mode
+- **Density**: Comfortable or Compact
+- **Default view mode**: History or Realtime
+- **Timestamp format**: Relative, Absolute or ISO 8601
+- **JSON indent size**: 2 or 4 spaces
+- **Auto-scroll live**: follow new messages in Realtime mode
 
 ### Publish
 
-- **Publish timeout** — JetStream ack timeout, in seconds
+- **Publish timeout**: JetStream ack timeout, in seconds
 
 ### Behavior
 

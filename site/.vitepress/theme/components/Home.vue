@@ -46,7 +46,7 @@ const fullscreen = () => {
     <section class="ns-hero">
       <h1>Natscope</h1>
       <p class="ns-lead">Web UI for NATS JetStream</p>
-      <p class="ns-sub">Browse, tail, publish and manage streams. Protobuf payloads decoded.</p>
+      <p class="ns-sub">Browse, tail, publish and manage streams, with Protobuf payloads decoded.</p>
       <div class="ns-actions">
         <VPButton tag="a" size="big" theme="brand" text="Get started" :href="withBase('/guide/what-is-natscope')" />
         <VPButton tag="a" size="big" theme="alt" text="GitHub" href="https://github.com/dmit-4884/natscope" />
@@ -66,7 +66,7 @@ const fullscreen = () => {
       :poster="withBase('/media/demo.jpg')"
       :autoplay="!reducedMotion"
       :controls="reducedMotion"
-      aria-label="Natscope walkthrough: live tail, stream relations, consumers, Protobuf decoding, publishing and Key/Value history."
+      aria-label="Natscope walkthrough: live tail, stream relations, Protobuf decoding and publishing."
       muted
       loop
       playsinline

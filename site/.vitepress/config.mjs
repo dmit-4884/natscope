@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 const SITE_URL = 'https://natscope.app/'
-const DESCRIPTION = 'Web UI for NATS JetStream — browse, decode, publish and manage streams.'
+const DESCRIPTION = 'Web UI for NATS JetStream that decodes Protobuf payloads. Ships as a single binary.'
 
 function pageUrl(relativePath) {
   const path = relativePath.replace(/index\.md$/, '').replace(/\.md$/, '.html')

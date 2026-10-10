@@ -30,8 +30,8 @@ Deleting the connection removes them.
 Click the **+** next to **Streams** in the sidebar, or open `/streams/new`. The **Create New Stream**
 page offers two editing modes:
 
-- **Form View** — every config field as a form control
-- **JSON View** — paste or edit the raw stream config
+- **Form View**: every config field as a form control
+- **JSON View**: paste or edit the raw stream config
 
 The form covers the name and subjects, retention policy, storage backend, limits, replicas, discard
 policy, compression and the advanced flags (deny delete/purge, allow direct, rollup, per-message TTL).
@@ -90,10 +90,10 @@ its links. Drag or use the arrow keys to pan. Scroll or press `+` and `-` to zoo
 
 The **Config** tab holds the destructive actions:
 
-- **Purge** — drop messages, keep the stream. Purge everything, or scope it by subject, by sequence, or
+- **Purge**: drop messages, keep the stream. Purge everything, or scope it by subject, by sequence, or
   to keep the last N messages.
-- **Seal** — make the stream read-only for good
-- **Delete** — remove the stream
+- **Seal**: make the stream read-only for good
+- **Delete**: remove the stream
 
 Each one asks for confirmation. Irreversible operations keep type-to-confirm even after you disable the
 other prompts. See [Settings](/guide/settings).

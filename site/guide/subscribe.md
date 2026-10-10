@@ -80,4 +80,4 @@ the missing permission in the dialog.
 
 When your permissions deny only part of a wildcard, for example `secret.>` under `>`, the server accepts
 the subscription and silently leaves the denied subjects out. Nothing tells Natscope about it, so those
-subjects simply don't show up.
+subjects don't show up.

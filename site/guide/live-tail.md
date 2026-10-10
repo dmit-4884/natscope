@@ -25,9 +25,9 @@ dropped-message tracking.
 
 Realtime mode adds three controls to the toolbar:
 
-- **Pause** / **Resume** — stop and restart intake without dropping the subscription
-- **Clear** — empty the live buffer
-- **Display rate** — **No limit**, **1 msg/s**, **5 msg/s**, **10 msg/s**, **25 msg/s** or **50 msg/s**
+- **Pause** / **Resume**: stop and restart intake without dropping the subscription
+- **Clear**: empty the live buffer
+- **Display rate**: **No limit**, **1 msg/s**, **5 msg/s**, **10 msg/s**, **25 msg/s** or **50 msg/s**
 
 The rate limit throttles what the UI renders. It does not slow the stream or the subscription. A busy
 work queue at 1 msg/s stays readable while the server keeps running at full speed.
@@ -43,8 +43,8 @@ tabs stay usable.
 
 **Settings → Preferences → Live** picks how the tail subscribes:
 
-- **Core NATS** — a plain subject subscription
-- **JetStream Ordered** — an ordered ephemeral consumer bound to the stream
+- **Core NATS**: a plain subject subscription
+- **JetStream Ordered**: an ordered ephemeral consumer bound to the stream
 
 The same section sets **Max display rate** as a default, so new tails start throttled. Under **Display**,
 **Default view mode** decides whether a stream opens in **History** or **Realtime**, and **Auto-scroll

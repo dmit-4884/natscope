@@ -25,12 +25,12 @@ marker stays after a key expires, so watchers see the expiry. Once on, it can't 
 
 The **⋯** menu of an open bucket has:
 
-- **Edit bucket…** — change the description, history, TTL, size limits, replicas, compression, key TTL
+- **Edit bucket…**: change the description, history, TTL, size limits, replicas, compression, key TTL
   marker and metadata. You review the changes before they apply. Storage type, mirror, sources, republish
   and placement stay as they are.
-- **Clear bucket…** — remove every key and every revision in one purge and keep the bucket. Apps watching
+- **Clear bucket…**: remove every key and every revision in one purge and keep the bucket. Apps watching
   the bucket aren't told: no delete markers are left, so the values they cached stay until they reload.
-- **Delete bucket…** — remove the bucket and its data.
+- **Delete bucket…**: remove the bucket and its data.
 
 Clearing and deleting ask you to type the bucket name.
 
@@ -48,11 +48,11 @@ The list loads up to 1,000 keys. When more match, a note says so; narrow the pat
 
 Select a bucket, then a key. The editor gives you:
 
-- **Save Value** — write a new revision (compare-and-set on the revision you loaded)
-- **Reset** — discard your edits
-- **History** — open the revision history
-- **Purge** — drop the key's history
-- **Delete** — remove the key
+- **Save Value**: write a new revision (compare-and-set on the revision you loaded)
+- **Reset**: discard your edits
+- **History**: open the revision history
+- **Purge**: drop the key's history
+- **Delete**: remove the key
 
 **New key** or **Create New Key** adds one. In create mode the save button reads **Create Key**.
 

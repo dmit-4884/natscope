@@ -55,8 +55,8 @@ once at startup: restart the client after changing `mcp.allowWrites`.
 
 Tools that talk to NATS take a `connection` argument, a saved connection's name or id. With a single saved
 connection it can be omitted. A payload or value decoded by [type detection](/guide/protobuf#type-detection)
-rather than a mapping carries `decodedAuto`, so the agent knows the type is a guess. Payloads are clipped to a byte budget (a page or tail carries at most 256 KiB);
-a clipped message is marked `truncated` and `get_message` fetches more of it.
+rather than a mapping carries `decodedAuto`, so the agent knows the type is a guess. Payloads are clipped to a byte budget (a page or tail carries
+at most 256 KiB); a clipped message is marked `truncated` and `get_message` fetches more of it.
 
 ## Writes
 

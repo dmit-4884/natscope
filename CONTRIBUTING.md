@@ -1,6 +1,6 @@
 # Contributing to Natscope
 
-Thanks for your interest! Bug reports, feature requests and pull requests are welcome.
+Open an issue for a bug or a feature request, or send a pull request.
 
 ## Prerequisites
 
@@ -33,11 +33,11 @@ make web-verify  # full frontend verification (typecheck, eslint, vitest, build)
 ```
 
 - Proto contracts live under `proto/services/` and `proto/types/`; after editing them run
-  `make proto-generate`. Never edit `proto/gen/` or `web/src/gen/` by hand — both trees are generated.
+  `make proto-generate`. Never edit `proto/gen/` or `web/src/gen/` by hand: `make proto-generate` writes both.
 - Commit messages follow Conventional Commits: `fix(scope): ...`, `feat(scope): ...`, `docs: ...`.
-- Keep PRs focused — one concern per PR.
+- Keep each PR to one concern.
 
 ## Reporting issues
 
-Use the issue templates. For security vulnerabilities see [SECURITY.md](SECURITY.md) —
-please do not open a public issue.
+Use the issue templates. Report security vulnerabilities the way [SECURITY.md](SECURITY.md) describes,
+not in a public issue.

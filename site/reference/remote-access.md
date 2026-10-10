@@ -20,9 +20,9 @@ GRPC_WEB_ADDRESS=0.0.0.0:4280 ALLOW_REMOTE=true \
 WEB_AUTH__USERNAME=admin WEB_AUTH__PASSWORD=change-me natscope
 ```
 
-- `GRPC_WEB_ADDRESS` — the wider bind
-- `ALLOW_REMOTE=true` — permits it. Without this the server exits at startup.
-- `WEB_AUTH__USERNAME` and `WEB_AUTH__PASSWORD` — HTTP basic auth over the whole listener, UI and API
+- `GRPC_WEB_ADDRESS`: the wider bind
+- `ALLOW_REMOTE=true`: permits it. Without this the server exits at startup.
+- `WEB_AUTH__USERNAME` and `WEB_AUTH__PASSWORD`: HTTP basic auth over the whole listener, UI and API
   alike. Browsers show their native credentials prompt; API clients send an `Authorization` header.
 
 Both basic-auth values must be non-empty. Whitespace does not count.

@@ -22,10 +22,10 @@ Go to **Settings → Connections** (or click **New Connection** on the start scr
    failover. Supported schemes: `nats://`, `tls://`, `ws://`, `wss://`.
 3. Choose an auth method:
    - **None**
-   - **User/Pass** — username and password
+   - **User/Pass**: username and password
    - **Token**
-   - **NKey** — paste a seed or upload a `.nk` file
-   - **Credentials** — paste or upload a `.creds` file (JWT + seed)
+   - **NKey**: paste a seed or upload a `.nk` file
+   - **Credentials**: paste or upload a `.creds` file (JWT + seed)
 4. Optional: click **Add TLS configuration** for a **CA certificate (PEM)**, a **Client certificate**
    and **Client key** (mutual TLS), **Skip certificate verification** for self-signed dev certs, and
    **TLS handshake first** for NATS 2.10+ servers running `tls_handshake_first`.
@@ -85,9 +85,9 @@ would refuse is listed with the reason but cannot be imported.
 
 Each connection row carries its own actions:
 
-- **Connect** — make it the active connection
-- **Ping** — test it without switching
-- **Duplicate** — copy it as a starting point for a similar endpoint
+- **Connect**: make it the active connection
+- **Ping**: test it without switching
+- **Duplicate**: copy it as a starting point for a similar endpoint
 - **Edit**
 - **Delete**
 

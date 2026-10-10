@@ -22,9 +22,9 @@ the same slot the message viewer uses on the other tabs.
 
 Each entry has two actions:
 
-- **Load into form** — put its subject, payload and headers back into the publish form, ready to send
+- **Load into form**: put its subject, payload and headers back into the publish form, ready to send
   again or edit first
-- **Copy payload** — copy the body to the clipboard
+- **Copy payload**: copy the body to the clipboard
 
 To turn a recurring entry into a named preset, load it into the form and click **Save as template**. See
 [Templates](/guide/templates).

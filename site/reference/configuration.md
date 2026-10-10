@@ -146,7 +146,7 @@ secrets:
 
 ## Docker defaults
 
-The published image sets its own environment so port mapping and containers work out of the box:
+The published image sets its own environment, so port mapping works in a container with no extra flags:
 
 ```
 GRPC_WEB_ADDRESS=0.0.0.0:4280

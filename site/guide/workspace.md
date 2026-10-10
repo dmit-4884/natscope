@@ -22,8 +22,8 @@ count, then click **Download workspace**.
 1. Go to **Settings → Workspace → Import workspace**.
 2. Click **Choose file…** and pick an exported JSON file.
 3. Pick a **Strategy**:
-   - **Merge** — keep what you have, add and update from the file
-   - **Replace** — make your workspace match the file, deleting what the file omits
+   - **Merge**: keep what you have, add and update from the file
+   - **Replace**: make your workspace match the file, deleting what the file omits
 4. Read the preview. Each section reports how many entries are new, updated or deleted, plus any
    conflicts. Unsupported sections say so and get skipped.
 5. Click **Apply merge import** or **Apply replace import**.

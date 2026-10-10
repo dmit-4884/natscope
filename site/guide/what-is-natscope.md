@@ -9,7 +9,7 @@ Natscope is a web UI for [NATS](https://nats.io) JetStream. It ships as one Go b
 frontend embedded, serves the UI and its API from a single listener on `127.0.0.1:4280`, and keeps all
 state in one local [bbolt](https://github.com/etcd-io/bbolt) file.
 
-The reason it exists: NATS payloads are often binary Protobuf, so answering "did the service publish the
+NATS payloads are often binary Protobuf, so answering "did the service publish the
 right event?" used to mean writing a throwaway decoder or pasting base64 into a converter. Natscope
 compiles your `.proto` files, maps subjects to message types, and renders those payloads as JSON in the
 message browser, in live tail, and in the publish preview.

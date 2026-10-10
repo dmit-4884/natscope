@@ -23,7 +23,7 @@ On a keychain backend, the secrets sit in the OS keychain instead and neither va
 
 ## Service directories
 
-Separate from the data directory, and rarely interesting:
+Separate from the data directory:
 
 | Path | Env | What it holds |
 |------|-----|---------------|

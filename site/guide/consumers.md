@@ -84,10 +84,10 @@ Consumers whose filter leaves the subject out are counted separately.
 
 The form covers the JetStream consumer surface:
 
-- **Delivery policy** — all, last, new, by start sequence, by start time
-- **Ack policy** — none, all, explicit
-- **Filter subjects** — one or several
-- **Backoff** — an array of redelivery delays
+- **Delivery policy**: all, last, new, by start sequence, by start time
+- **Ack policy**: none, all, explicit
+- **Filter subjects**: one or several
+- **Backoff**: an array of redelivery delays
 - **Max deliver** and **max ack pending**
 - **Flow control** for push consumers
 - **Deliver subject** and **deliver group** for push consumers
