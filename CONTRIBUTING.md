@@ -4,7 +4,7 @@ Thanks for your interest! Bug reports, feature requests and pull requests are we
 
 ## Prerequisites
 
-- Go 1.26+
+- Go 1.27+
 - Node.js 22+
 - make
 

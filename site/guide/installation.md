@@ -37,7 +37,7 @@ Download an archive for your OS and architecture from
 
 ## From source
 
-Requires Go 1.26+ and Node.js 22+.
+Requires Go 1.27+ and Node.js 22+.
 
 ```bash
 make deps
