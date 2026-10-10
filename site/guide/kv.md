@@ -58,7 +58,8 @@ Select a bucket, then a key. The editor gives you:
 
 On a bucket with a key TTL marker, the new key form also takes a **TTL** such as `30s`, `5m` or `1h`.
 The key is removed once it expires, and its header shows the TTL and when it expires. A TTL can only be set
-when a key is created.
+when a key is created. A TTL shorter than the bucket's key TTL marker is raised to the marker by NATS; the
+form warns you when that happens.
 
 ## Watch changes
 
@@ -72,6 +73,9 @@ Turn on **Live updates** above the key list to watch the bucket. Natscope then:
 The watch follows the pattern in the search box, and it reports changes made after you turned it on.
 If you're editing a value and someone else changes the key, the editor says so. Saving then fails the revision
 check instead of overwriting their change.
+
+A key that expires by its TTL shows up under **Changes** as a `purge`: NATS writes a delete marker for it with the
+reason `MaxAge`, and the marker is what the watch reports.
 
 ## Protobuf values
 
