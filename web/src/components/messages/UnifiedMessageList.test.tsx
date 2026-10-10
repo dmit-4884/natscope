@@ -10,6 +10,7 @@ const { fixtures } = vi.hoisted(() => ({
   fixtures: {
     defaultViewMode: 'history',
     messagesError: null as unknown,
+    messagesData: undefined as unknown,
     messagesEnabled: [] as unknown[],
     workQueueStream: {
       name: 'ORDERS_WORKQUEUE',
@@ -34,7 +35,7 @@ vi.mock('@/hooks/useConnectionQuery', () => ({
   useConnectionQuery: (opts: { key: readonly unknown[]; enabled?: boolean }) => {
     if (opts.key[0] === 'messages') {
       fixtures.messagesEnabled.push(opts.enabled)
-      return { data: undefined, isLoading: false, isFetching: false, error: fixtures.messagesError, refetch: vi.fn() }
+      return { data: fixtures.messagesData, isLoading: false, isFetching: false, error: fixtures.messagesError, refetch: vi.fn() }
     }
     if (opts.key[0] === 'stream') {
       return { data: fixtures.workQueueStream, isLoading: false, isFetching: false, error: null, refetch: vi.fn() }
@@ -122,6 +123,18 @@ function renderList(scope = { connectionUrl: 'nats://a', streamName: `ORDERS_WOR
 
 afterEach(() => {
   fixtures.defaultViewMode = 'history'
+  fixtures.messagesData = undefined
+})
+
+describe('UnifiedMessageList paging', () => {
+  it('offers older messages when a page came back empty but more remain', () => {
+    fixtures.messagesError = null
+    fixtures.messagesData = { messages: [], has_more: true, next_seq: 4999 }
+
+    renderList()
+
+    expect(screen.getByTestId('load-more')).toBeInTheDocument()
+  })
 })
 
 describe('UnifiedMessageList view state', () => {

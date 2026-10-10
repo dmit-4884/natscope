@@ -317,6 +317,18 @@ export default function UnifiedMessageList({
   // The backend refuses on purpose (would drain the queue); WorkQueueWarning
   // below already explains it and offers the fix, so the red alert is noise.
   const isWorkQueueConsumerError = isWorkQueue && getErrorReason(error) === 'NATS_WORKQUEUE_CONSUMER_NOT_ALLOWED'
+  const canLoadMore = mode === 'history' && !searchActive && hasMore
+  const loadMoreButton = (
+    <button
+      onClick={loadMore}
+      disabled={isLoadingMore}
+      data-testid="load-more"
+      className="px-3 py-1 text-xs font-medium border border-border-strong text-gray-700 rounded-md hover:bg-surface-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
+    >
+      {isLoadingMore && <RefreshIcon className="w-3 h-3 animate-spin" />}
+      {isLoadingMore ? 'Loading…' : 'Load more'}
+    </button>
+  )
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -412,6 +424,11 @@ export default function UnifiedMessageList({
             <div className="flex-1 flex items-center justify-center p-6 text-sm text-content-tertiary" data-testid="search-empty">
               {searchEmptyText(search)}
             </div>
+          ) : canLoadMore ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-sm text-content-tertiary">
+              <span>Nothing on this page yet; older messages remain.</span>
+              {loadMoreButton}
+            </div>
           ) : (
             <EmptyMessagesState subjectFilter={filters.subject} isRealtime={mode === 'realtime'} />
           )
@@ -434,18 +451,10 @@ export default function UnifiedMessageList({
               onSelectLive={handleSelectLiveMessage}
               onCompareSelect={handleCompareSelect}
             />
-            {mode === 'history' && !searchActive && hasMore && (
+            {canLoadMore && (
               <div className="p-2 bg-surface-secondary border-t flex items-center justify-center gap-3 text-sm text-content-secondary">
                 <span>Showing {displayMessages.length} messages.</span>
-                <button
-                  onClick={loadMore}
-                  disabled={isLoadingMore}
-                  data-testid="load-more"
-                  className="px-3 py-1 text-xs font-medium border border-border-strong text-gray-700 rounded-md hover:bg-surface-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
-                >
-                  {isLoadingMore && <RefreshIcon className="w-3 h-3 animate-spin" />}
-                  {isLoadingMore ? 'Loading…' : 'Load more'}
-                </button>
+                {loadMoreButton}
               </div>
             )}
           </>
