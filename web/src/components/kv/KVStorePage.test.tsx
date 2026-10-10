@@ -120,6 +120,15 @@ describe('KVStorePage', () => {
     expect(screen.getByLabelText('Key value')).toHaveValue('second value')
   })
 
+  it('says the watch is reconnecting and why', () => {
+    keys.watch = { ...keys.watch, status: 'reconnecting', error: 'Failed to fetch' }
+    renderPage()
+
+    fireEvent.click(screen.getByRole('switch', { name: /live updates/i }))
+
+    expect(screen.getByText(/reconnecting/i)).toHaveTextContent('Reconnecting… (Failed to fetch)')
+  })
+
   it('offers a restart when the watch stops', () => {
     keys.watch = { ...keys.watch, status: 'stopped', error: 'connection closed' }
     renderPage()

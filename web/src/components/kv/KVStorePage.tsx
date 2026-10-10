@@ -395,6 +395,11 @@ export default function KVStorePage() {
                 />
                 <span className="text-content-secondary">Live updates</span>
                 {watch.status === 'starting' && <span className="text-content-tertiary">Starting…</span>}
+                {watch.status === 'reconnecting' && (
+                  <span className="min-w-0 truncate text-status-warning-text" title={watch.error}>
+                    Reconnecting… ({watch.error})
+                  </span>
+                )}
                 {watch.status === 'live' && (
                   <span className="flex items-center gap-1 text-status-success-text">
                     <span className="w-1.5 h-1.5 rounded-full bg-status-success-text" aria-hidden="true" />

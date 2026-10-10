@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Code, ConnectError } from '@connectrpc/connect'
 import type { KVChange, KVKeyList } from '@/types/management'
 import { kvKeys } from './kvKeys'
 import { useKVWatch } from './useKVWatch'
@@ -135,13 +136,37 @@ describe('useKVWatch', () => {
     expect(client.getQueryData<KVKeyList>(kvKeys.keyList('conn-1', 'CONFIG', ''))?.keys).toHaveLength(1000)
   })
 
-  it('reports a watch that stops and starts again on restart', async () => {
+  it('reconnects by itself when the watch drops or ends', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const { hook } = setup()
+      act(() => watch.push!([]))
+      act(() => watch.fail!(new Error('Failed to fetch')))
+
+      await waitFor(() => expect(hook.result.current.status).toBe('reconnecting'))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      expect(watch.calls).toHaveLength(2)
+
+      act(() => watch.end!())
+      await waitFor(() => expect(hook.result.current.status).toBe('reconnecting'))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+      expect(watch.calls).toHaveLength(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports a watch that stops for good and starts again on restart', async () => {
     const { hook } = setup()
     act(() => watch.push!([]))
-    act(() => watch.fail!(new Error('connection closed')))
+    act(() => watch.fail!(new ConnectError('bucket not found', Code.NotFound)))
 
     await waitFor(() => expect(hook.result.current.status).toBe('stopped'))
-    expect(hook.result.current.error).toMatch(/connection closed/)
+    expect(hook.result.current.error).toMatch(/bucket not found/)
 
     act(() => hook.result.current.restart())
 
