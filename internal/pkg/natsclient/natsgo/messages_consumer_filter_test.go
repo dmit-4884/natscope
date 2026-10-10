@@ -32,6 +32,9 @@ func streamWithRareSubject(t *testing.T, total uint64, rareSeqs ...uint64) *Clie
 		}
 		_, err = js.PublishAsync(subject, nil)
 		require.NoError(t, err)
+		if seq%1000 == 0 {
+			<-js.PublishAsyncComplete()
+		}
 	}
 	<-js.PublishAsyncComplete()
 	return dialClient(t, url)
