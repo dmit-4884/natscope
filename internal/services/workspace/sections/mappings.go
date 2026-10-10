@@ -9,6 +9,7 @@ import (
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
 	"github.com/altessa-s/go-atlas/core/collections/slices"
+	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
@@ -38,14 +39,14 @@ func exportFraming(f entities.Framing) *framingItem {
 	if f.Kind == entities.FramingNone {
 		return nil
 	}
-	return &framingItem{Kind: string(f.Kind), SchemaID: f.SchemaID, Prefix: f.Prefix, Suffix: f.Suffix}
+	return converter.Convert(&f, &framingItem{})
 }
 
 func (it mappingItem) framing() entities.Framing {
 	if it.Framing == nil {
 		return entities.Framing{}
 	}
-	return entities.Framing{Kind: entities.FramingKind(it.Framing.Kind), SchemaID: it.Framing.SchemaID, Prefix: it.Framing.Prefix, Suffix: it.Framing.Suffix}
+	return *converter.Convert(it.Framing, &entities.Framing{})
 }
 
 // MappingsSection exports/imports subject→message-type mappings, keyed by

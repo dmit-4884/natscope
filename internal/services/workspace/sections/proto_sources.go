@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
+	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
@@ -169,7 +170,7 @@ func (s *ProtoSourcesSection) Import(
 }
 
 func (s *ProtoSourcesSection) create(ctx context.Context, it protoSourceItem, res *entities.WorkspaceSectionResult) error {
-	src, err := s.svc.CreateSource(ctx, toProtoSourceCreate(it))
+	src, err := s.svc.CreateSource(ctx, converter.Convert(&it, &entities.ProtoSourceCreate{}))
 	if err != nil {
 		return err
 	}
@@ -201,32 +202,11 @@ func (s *ProtoSourcesSection) create(ctx context.Context, it protoSourceItem, re
 }
 
 func redactProtoSource(src *entities.ProtoSource) protoSourceItem {
-	var ref string
+	item := converter.Convert(src, &protoSourceItem{})
 	if src.SelectedRef != nil {
-		ref = src.SelectedRef.Name
+		item.Ref = src.SelectedRef.Name
 	}
-	return protoSourceItem{
-		Ref:             ref,
-		Name:            src.Name,
-		SourceType:      string(src.SourceType),
-		Repository:      src.Repository,
-		LocalPath:       src.LocalPath,
-		WatcherEnabled:  src.WatcherEnabled,
-		ImportRoots:     src.ImportRoots,
-		ExcludePrefixes: src.ExcludePrefixes,
-	}
-}
-
-func toProtoSourceCreate(it protoSourceItem) *entities.ProtoSourceCreate {
-	return &entities.ProtoSourceCreate{
-		Name:            it.Name,
-		SourceType:      entities.SourceType(it.SourceType),
-		Repository:      it.Repository,
-		LocalPath:       it.LocalPath,
-		WatcherEnabled:  new(it.WatcherEnabled),
-		ImportRoots:     it.ImportRoots,
-		ExcludePrefixes: it.ExcludePrefixes,
-	}
+	return *item
 }
 
 func hasTokenSource(items []protoSourceItem) bool {

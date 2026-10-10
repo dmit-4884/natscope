@@ -568,3 +568,88 @@ func TestConnectionsSection_RefusesABadFileBeforeChangingAnything(t *testing.T) 
 		})
 	}
 }
+
+func TestProtoSourcesSection_ImportPassesEveryField(t *testing.T) {
+	t.Parallel()
+	src := &entities.ProtoSource{
+		Name: "local-src", SourceType: entities.SourceTypeLocal, LocalPath: new("/srv/proto"), WatcherEnabled: true,
+		ImportRoots: []string{"a", "b"}, ExcludePrefixes: []string{"vendor/"}, Token: new("secret"),
+	}
+	payload, err := json.Marshal(newItemsPayload([]protoSourceItem{redactProtoSource(src)}))
+	require.NoError(t, err)
+	assertNoSecrets(t, payload, "secret")
+
+	fake := &fakeSources{selected: map[string]string{}}
+	_, err = NewProtoSourcesSection(fake).Import(t.Context(), payload, entities.WorkspaceStrategyMerge)
+	require.NoError(t, err)
+	require.Len(t, fake.created, 1)
+	got := fake.created[0]
+	assert.Equal(t, "local-src", got.Name)
+	assert.Equal(t, entities.SourceTypeLocal, got.SourceType)
+	assert.Equal(t, "/srv/proto", *got.LocalPath)
+	require.NotNil(t, got.WatcherEnabled)
+	assert.True(t, *got.WatcherEnabled)
+	assert.Equal(t, []string{"a", "b"}, got.ImportRoots)
+	assert.Equal(t, []string{"vendor/"}, got.ExcludePrefixes)
+	assert.Nil(t, got.Token)
+
+	off := redactProtoSource(&entities.ProtoSource{Name: "n", SourceType: entities.SourceTypeGit})
+	assert.Empty(t, off.Ref)
+	assert.False(t, off.WatcherEnabled)
+}
+
+func TestMappingsSection_ExportOmitsNoneFraming(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	src := newMappingsSvc(t)
+	_, err := src.Create(ctx, &entities.SubjectMappingCreate{Pattern: "a.*", MessageType: "pkg.A", SourceID: "s1"})
+	require.NoError(t, err)
+
+	raw, err := NewMappingsSection(src, nil).Export(ctx)
+	require.NoError(t, err)
+	assert.NotContains(t, string(raw), "framing")
+}
+
+func TestTemplatesSection_ImportKeepsHeadersAndWildcards(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	newSvc := func() *templatesService.Service {
+		store, err := templatesBbolt.New(ctx, bbstoretest.NewMemoryDB(t))
+		require.NoError(t, err)
+		return templatesService.New(store)
+	}
+	src := newSvc()
+	_, err := src.Create(ctx, &entities.MessageTemplateCreate{
+		Name: "t1", Subject: "a.*.>", MessageType: "pkg.T", Data: "{}",
+		Headers: map[string]string{"H": "1"}, Wildcards: []string{"x", "y"},
+	})
+	require.NoError(t, err)
+	raw, err := NewTemplatesSection(src).Export(ctx)
+	require.NoError(t, err)
+
+	dst := newSvc()
+	_, err = dst.Create(ctx, &entities.MessageTemplateCreate{Name: "t1", Subject: "old", Data: "old", Headers: map[string]string{"Z": "9"}})
+	require.NoError(t, err)
+	res, err := NewTemplatesSection(dst).Import(ctx, raw, entities.WorkspaceStrategyMerge)
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), res.Updated)
+
+	listed, err := dst.List(ctx, &entities.MessageTemplatesList{Limit: new(int64(100))})
+	require.NoError(t, err)
+	require.Len(t, listed.Items, 1)
+	got := listed.Items[0]
+	assert.Equal(t, "a.*.>", got.Subject)
+	assert.Equal(t, "pkg.T", got.MessageType)
+	assert.Equal(t, "{}", got.Data)
+	assert.Equal(t, map[string]string{"H": "1"}, got.Headers)
+	assert.Equal(t, []string{"x", "y"}, got.Wildcards)
+
+	fresh := newSvc()
+	_, err = NewTemplatesSection(fresh).Import(ctx, raw, entities.WorkspaceStrategyReplace)
+	require.NoError(t, err)
+	listed, err = fresh.List(ctx, &entities.MessageTemplatesList{Limit: new(int64(100))})
+	require.NoError(t, err)
+	require.Len(t, listed.Items, 1)
+	assert.Equal(t, map[string]string{"H": "1"}, listed.Items[0].Headers)
+	assert.Equal(t, []string{"x", "y"}, listed.Items[0].Wildcards)
+}

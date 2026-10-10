@@ -9,6 +9,7 @@ import (
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
 	"github.com/altessa-s/go-atlas/core/collections/slices"
+	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
@@ -55,14 +56,7 @@ func (s *TemplatesSection) Export(ctx context.Context) (json.RawMessage, error) 
 		return nil, err
 	}
 	items := slices.To(all, func(t *entities.MessageTemplate) templateItem {
-		return templateItem{
-			Name:        t.Name,
-			Subject:     t.Subject,
-			MessageType: t.MessageType,
-			Data:        t.Data,
-			Headers:     t.Headers,
-			Wildcards:   t.Wildcards,
-		}
+		return *converter.Convert(t, &templateItem{})
 	})
 	return json.Marshal(newItemsPayload(items))
 }
@@ -108,7 +102,7 @@ func (s *TemplatesSection) Import(
 		// Create first, then delete pre-existing by id (not DeleteAll, which
 		// would wipe the new rows); a mid-import failure leaves originals intact.
 		for _, it := range items {
-			if _, cErr := s.svc.Create(ctx, toTemplateCreate(it)); cErr != nil {
+			if _, cErr := s.svc.Create(ctx, converter.Convert(&it, &entities.MessageTemplateCreate{})); cErr != nil {
 				return res, cErr
 			}
 			res.Created++
@@ -132,7 +126,7 @@ func (s *TemplatesSection) Import(
 	}
 	for _, it := range items {
 		if ex, ok := byName[it.Name]; ok {
-			upd, uErr := s.svc.Update(ctx, toTemplateUpdate(ex.Id, it))
+			upd, uErr := s.svc.Update(ctx, toTemplateUpdate(ex.Id, &it))
 			if uErr != nil {
 				return res, uErr
 			}
@@ -141,7 +135,7 @@ func (s *TemplatesSection) Import(
 			res.Updated++
 			continue
 		}
-		created, cErr := s.svc.Create(ctx, toTemplateCreate(it))
+		created, cErr := s.svc.Create(ctx, converter.Convert(&it, &entities.MessageTemplateCreate{}))
 		if cErr != nil {
 			return res, cErr
 		}
@@ -151,29 +145,12 @@ func (s *TemplatesSection) Import(
 	return res, nil
 }
 
-func toTemplateCreate(it templateItem) *entities.MessageTemplateCreate {
-	return &entities.MessageTemplateCreate{
-		Name:        it.Name,
-		Subject:     it.Subject,
-		MessageType: it.MessageType,
-		Data:        it.Data,
-		Headers:     it.Headers,
-		Wildcards:   it.Wildcards,
-	}
-}
-
 // toTemplateUpdate builds an in-place merge update, preserving id/CreatedAt
 // while replacing editable fields.
-func toTemplateUpdate(id string, it templateItem) *entities.MessageTemplateUpdate {
-	return &entities.MessageTemplateUpdate{
-		Id:          id,
-		Name:        &it.Name,
-		Subject:     &it.Subject,
-		MessageType: &it.MessageType,
-		Data:        &it.Data,
-		Headers:     it.Headers,
-		Wildcards:   it.Wildcards,
-	}
+func toTemplateUpdate(id string, it *templateItem) *entities.MessageTemplateUpdate {
+	upd := converter.Convert(it, &entities.MessageTemplateUpdate{})
+	upd.Id = id
+	return upd
 }
 
 func (s *TemplatesSection) all(ctx context.Context) (entities.MessageTemplates, error) {
