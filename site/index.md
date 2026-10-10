@@ -1,7 +1,7 @@
 ---
 layout: home
 title: Natscope
-description: Web UI for NATS JetStream — browse, decode, publish and manage streams.
+description: Web UI for NATS JetStream that decodes Protobuf payloads. Ships as a single binary.
 markdownStyles: false
 ---
 
