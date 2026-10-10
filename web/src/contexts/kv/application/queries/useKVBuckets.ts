@@ -9,11 +9,11 @@ export function useKVBuckets(connectionId: string | undefined) {
   })
 }
 
-export function useKVKeys(connectionId: string | undefined, bucket: string | undefined, filter = '') {
+export function useKVKeys(connectionId: string | undefined, bucket: string | undefined, filter = '', enabled = true) {
   return useConnectionQuery({
     key: ['kv', 'keys', bucket, filter],
     connectionId: connectionId ?? null,
-    enabled: !!bucket,
+    enabled: !!bucket && enabled,
     fetcher: (signal) => api.listKVKeys(connectionId!, bucket!, filter, signal),
     keepPreviousWhen: (previous) => previous[2] === bucket,
   })

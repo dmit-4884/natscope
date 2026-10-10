@@ -15,7 +15,7 @@ import {
 } from '@/contexts/kv'
 import { decodeBase64, type KVProtoValue } from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
-import { formatBytes, formatDateTime, formatNsDuration, formatTime } from '@/utils/formatters'
+import { formatBytes, formatCount, formatDateTime, formatNsDuration, formatTime } from '@/utils/formatters'
 import { decodeBase64ToBytes } from '@/utils/base64'
 import { plural } from '@/utils/plural'
 import { useConfirmation } from '@/contexts/settings'
@@ -140,6 +140,9 @@ export default function KVStorePage() {
     keyPattern
   )
   const keys = keyList?.keys ?? NO_KEYS
+  const lookupKey = keyList?.truncated && searchText && !isKeyPattern(searchText) && searchText.split('.').every(Boolean) ? searchText : ''
+  const { data: lookup } = useKVKeys(connectionId, bucketName, lookupKey, lookupKey !== '')
+  const exactKey = lookupKey && lookup?.keys.includes(lookupKey) ? lookupKey : ''
   const watch = useKVWatch(connectionId, bucketName, keyPattern, live)
 
   // Fetch selected key value
@@ -173,9 +176,9 @@ export default function KVStorePage() {
   const deleteKey = useDeleteKVKey(connectionId, bucketName)
   const purgeKey = usePurgeKVKey(connectionId, bucketName)
 
-  const filteredKeys = keyPattern
-    ? keys
-    : keys.filter((k) => k.toLowerCase().includes(searchText.toLowerCase()))
+  const textMatches = keyPattern ? keys : keys.filter((k) => k.toLowerCase().includes(searchText.toLowerCase()))
+  const filteredKeys = exactKey && !textMatches.includes(exactKey) ? [exactKey, ...textMatches] : textMatches
+  const partial = !!keyList?.truncated
 
   const valueDirty = draft !== null && draft.key === selectedKey
   const editingValue = valueDirty ? draft.value : keyEntry && !isCreatingKey ? editableValue(keyEntry, !!target) : ''
@@ -353,7 +356,7 @@ export default function KVStorePage() {
               />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-content-tertiary">
-                  {plural(filteredKeys.length, 'key')}
+                  {partial ? `${formatCount(filteredKeys.length)}+ keys` : plural(filteredKeys.length, 'key')}
                 </span>
                 {!readOnly && (
                   <Button
@@ -382,6 +385,7 @@ export default function KVStorePage() {
                 <p className="mt-1 text-xs text-content-tertiary" data-testid="kv-keys-truncated">
                   Only the first {plural(keys.length, 'key')} are loaded. Narrow the search with a pattern like{' '}
                   <span className="font-mono">orders.&gt;</span>
+                  {searchText && !keyPattern && <> The text filter only searched the {plural(keys.length, 'loaded key')}.</>}
                 </p>
               )}
               <div className="mt-2 flex items-center gap-2 text-xs">
@@ -538,7 +542,7 @@ export default function KVStorePage() {
 
                   {filteredKeys.length === 0 && (
                     <div className="p-4 text-center text-sm text-content-tertiary">
-                      {keySearchQuery ? 'No keys match your search' : 'No keys in this bucket'}
+                      {keySearchQuery ? `No keys match your search${partial && !keyPattern ? ' among the loaded keys' : ''}` : 'No keys in this bucket'}
                     </div>
                   )}
                 </>

@@ -6,6 +6,8 @@ import KVStorePage from './KVStorePage'
 const keys = vi.hoisted(() => ({
   list: { keys: ['alpha', 'beta'], truncated: false },
   filters: [] as Array<string | undefined>,
+  lookups: {} as Record<string, string[]>,
+  lookupFilters: [] as string[],
   buckets: [] as Array<{ bucket: string; values: number; bytes: number; limit_marker_ttl?: number; mirror_of?: string }>,
   watch: {
     status: 'off' as string,
@@ -38,8 +40,13 @@ vi.mock('@/contexts/connection', async (importOriginal) => ({
 vi.mock('@/contexts/kv', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/contexts/kv')>()),
   useKVBuckets: () => ({ data: keys.buckets }),
-  useKVKeys: (_conn: string, _bucket: string, filter?: string) => {
+  useKVKeys: (_conn: string, _bucket: string, filter?: string, enabled = true) => {
     keys.filters.push(filter)
+    if (!enabled) return { data: undefined, isLoading: false, error: null, refetch: vi.fn() }
+    if (filter && filter in keys.lookups) {
+      keys.lookupFilters.push(filter)
+      return { data: { keys: keys.lookups[filter], truncated: false }, isLoading: false, error: null, refetch: vi.fn() }
+    }
     return { data: keys.list, isLoading: false, error: null, refetch: vi.fn() }
   },
   useKVKey: (_conn: string, _bucket: string, key?: string) => ({
@@ -75,6 +82,8 @@ describe('KVStorePage', () => {
   beforeEach(() => {
     keys.list = { keys: ['alpha', 'beta'], truncated: false }
     keys.filters = []
+    keys.lookups = {}
+    keys.lookupFilters = []
     keys.buckets = []
     keys.watch = { status: 'live', error: undefined, changes: [], restart: vi.fn() }
     keys.watchEnabled = []
@@ -241,7 +250,7 @@ describe('KVStorePage', () => {
 
     fireEvent.change(screen.getByPlaceholderText(/search keys/i), { target: { value: 'orders.*' } })
 
-    await waitFor(() => expect(keys.filters[keys.filters.length - 1]).toBe('orders.*'))
+    await waitFor(() => expect(keys.filters).toContain('orders.*'))
   })
 
   it('keeps a wildcard that is not a whole token off the server and says how to write it', async () => {
@@ -295,6 +304,39 @@ describe('KVStorePage', () => {
 
     expect(screen.getByText(/first 2 keys/i)).toBeInTheDocument()
     expect(screen.getByText(/narrow/i)).toBeInTheDocument()
+  })
+
+  it('marks the count partial and says the text filter only covers loaded keys when truncated', () => {
+    keys.list = { keys: ['alpha', 'beta'], truncated: true }
+
+    renderPage()
+
+    expect(screen.getByText('2+ keys')).toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText(/search keys/i), { target: { value: 'zeta' } })
+    return waitFor(() => {
+      expect(screen.getByText(/only searched the 2 loaded keys/i)).toBeInTheDocument()
+      expect(screen.getByText(/no keys match your search among the loaded keys/i)).toBeInTheDocument()
+    })
+  })
+
+  it('looks up the typed key on the server when the list is truncated and shows it when it exists', async () => {
+    keys.list = { keys: ['alpha', 'beta'], truncated: true }
+    keys.lookups = { 'user.eu.319536': ['user.eu.319536'] }
+    entries['user.eu.319536'] = { key: 'user.eu.319536', value: btoa('v'), revision: 9, created: 0, operation: 'PUT' }
+
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText(/search keys/i), { target: { value: 'user.eu.319536' } })
+
+    expect(await screen.findByRole('button', { name: 'user.eu.319536' })).toBeInTheDocument()
+    expect(keys.lookupFilters).toContain('user.eu.319536')
+  })
+
+  it('does not look keys up on the server when the list is complete', async () => {
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText(/search keys/i), { target: { value: 'alpha' } })
+
+    await screen.findByRole('button', { name: 'alpha' })
+    expect(keys.lookupFilters).toEqual([])
   })
 
   it('shows each picked key with its own value, also one already loaded before', () => {
