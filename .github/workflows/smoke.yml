@@ -19,10 +19,12 @@ jobs:
             pattern: "*_darwin_arm64.tar.gz"
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Download latest release binary
+      - name: Download the newest release binary
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download --repo ${{ github.repository }} --pattern "${{ matrix.pattern }}"
+        run: |
+          tag=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "${{ matrix.pattern }}"
 
       - name: Unpack
         run: tar xzf natscope_*.tar.gz
@@ -54,10 +56,12 @@ jobs:
     name: smoke (windows-latest)
     runs-on: windows-latest
     steps:
-      - name: Download latest release binary
+      - name: Download the newest release binary
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download --repo ${{ github.repository }} --pattern "*_windows_amd64.zip"
+        run: |
+          $tag = gh release list --repo $env:GITHUB_REPOSITORY --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName'
+          gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "*_windows_amd64.zip"
 
       - name: Unpack
         run: Expand-Archive -Path (Get-Item natscope_*.zip).FullName -DestinationPath app
