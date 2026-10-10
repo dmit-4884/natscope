@@ -68,16 +68,51 @@ func (c *Client) ListKVBuckets(ctx context.Context) ([]entities.KVBucketInfo, er
 	defer cancel()
 
 	var buckets []entities.KVBucketInfo //nolint:prealloc
+	listed := map[string]bool{}
 	lister := c.jetStream.KeyValueStores(ctx)
 	for status := range lister.Status() {
 		buckets = append(buckets, toKVBucketInfo(status))
+		listed[status.Bucket()] = true
 	}
 
 	if err := lister.Error(); err != nil {
 		return nil, wrapErr(err)
 	}
 
+	unlisted, err := c.unlistedKVStatuses(ctx, listed)
+	if err != nil {
+		return nil, err
+	}
+	for _, status := range unlisted {
+		buckets = append(buckets, toKVBucketInfo(status))
+	}
+
 	return buckets, nil
+}
+
+// unlistedKVStatuses reads the buckets a subject-filtered listing misses, such as mirrors, whose streams have no subjects.
+func (c *Client) unlistedKVStatuses(ctx context.Context, listed map[string]bool) ([]jetstream.KeyValueStatus, error) {
+	var statuses []jetstream.KeyValueStatus
+	names := c.jetStream.StreamNames(ctx)
+	for name := range names.Name() {
+		bucket, ok := strings.CutPrefix(name, kvStreamPrefix)
+		if !ok || listed[bucket] {
+			continue
+		}
+		kv, err := c.jetStream.KeyValue(ctx, bucket)
+		if err != nil {
+			continue
+		}
+		status, err := kv.Status(ctx)
+		if err != nil {
+			return nil, wrapErr(err)
+		}
+		statuses = append(statuses, status)
+	}
+	if err := names.Err(); err != nil {
+		return nil, wrapErr(err)
+	}
+	return statuses, nil
 }
 
 // CreateKVBucket creates a new KeyValue bucket.
