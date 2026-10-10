@@ -42,7 +42,7 @@ import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import { WireView } from '../messages/WireView'
 import { KVProtoBar } from './KVProtoBar'
 import { useKVProtoTarget, type KVProtoTarget } from './useKVProtoTarget'
-import { parseKeyTtl } from './keyTtl'
+import { keyTtlRaisedTo, parseKeyTtl } from './keyTtl'
 
 function editableValue(entry: KVEntry, asProto: boolean): string {
   if (!asProto) return decodeBase64(entry.value)
@@ -129,6 +129,7 @@ export default function KVStorePage() {
   const allowsKeyTtl = !!bucketInfo?.limit_marker_ttl
   const mirrorOf = bucketInfo?.mirror_of
   const keyTtl = allowsKeyTtl ? parseKeyTtl(newKeyTtl) : {}
+  const raisedTtlNs = keyTtlRaisedTo(keyTtl.ns, bucketInfo?.limit_marker_ttl)
 
   const searchText = keySearchQuery.trim()
   const badPattern = isKeyPattern(searchText) && !isValidKeyPattern(searchText)
@@ -583,6 +584,11 @@ export default function KVStorePage() {
                         error={!!keyTtl.error}
                         errorMessage={keyTtl.error}
                       />
+                      {raisedTtlNs !== undefined && (
+                        <p className="mt-1 text-xs text-status-warning-text">
+                          This bucket&apos;s marker TTL is {formatNsDuration(raisedTtlNs)}; NATS raises shorter key TTLs to it.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-xs text-content-tertiary">

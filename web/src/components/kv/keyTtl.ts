@@ -24,3 +24,8 @@ export function parseKeyTtl(text: string): KeyTtl {
   if (ns < MIN_TTL_NS) return { error: 'TTL must be at least 1s' }
   return { ns }
 }
+
+export function keyTtlRaisedTo(ttlNs: number | undefined, markerNs: number | undefined): number | undefined {
+  if (ttlNs === undefined || !markerNs || ttlNs >= markerNs) return undefined
+  return markerNs
+}

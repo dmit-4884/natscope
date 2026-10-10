@@ -181,6 +181,19 @@ describe('KVStorePage', () => {
     expect(mutation.mutateAsync.mock.calls[0][0]).toMatchObject({ key: 'session.1', ttl: 90_000_000_000 })
   })
 
+  it('warns when the TTL is below the bucket marker TTL', () => {
+    keys.buckets = [{ bucket: 'CONFIG', values: 0, bytes: 0, limit_marker_ttl: 60_000_000_000 }]
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'New key' }))
+    fireEvent.change(screen.getByLabelText(/^ttl$/i), { target: { value: '5s' } })
+
+    expect(screen.getByText(/marker TTL is 1m; NATS raises shorter key TTLs to it/i)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/^ttl$/i), { target: { value: '5m' } })
+    expect(screen.queryByText(/marker TTL is/i)).not.toBeInTheDocument()
+  })
+
   it('refuses a TTL it cannot read', () => {
     keys.buckets = [{ bucket: 'CONFIG', values: 0, bytes: 0, limit_marker_ttl: 1_000_000_000 }]
     renderPage()

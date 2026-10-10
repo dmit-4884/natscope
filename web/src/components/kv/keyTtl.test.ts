@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseKeyTtl } from './keyTtl'
+import { keyTtlRaisedTo, parseKeyTtl } from './keyTtl'
 
 describe('parseKeyTtl', () => {
   it.each([
@@ -21,5 +21,20 @@ describe('parseKeyTtl', () => {
   it('refuses less than a second', () => {
     expect(parseKeyTtl('500ms').error).toMatch(/at least 1s/)
     expect(parseKeyTtl('0').error).toMatch(/at least 1s/)
+  })
+})
+
+describe('keyTtlRaisedTo', () => {
+  it('returns the marker when the TTL is below it', () => {
+    expect(keyTtlRaisedTo(5_000_000_000, 60_000_000_000)).toBe(60_000_000_000)
+  })
+
+  it.each([
+    [60_000_000_000, 60_000_000_000],
+    [120_000_000_000, 60_000_000_000],
+    [undefined, 60_000_000_000],
+    [5_000_000_000, undefined],
+  ])('returns nothing for %j against marker %j', (ttl, marker) => {
+    expect(keyTtlRaisedTo(ttl, marker)).toBeUndefined()
   })
 })
