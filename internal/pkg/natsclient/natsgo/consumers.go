@@ -74,6 +74,9 @@ func (c *Client) GetConsumersOverview(ctx context.Context) (*entities.ConsumersO
 	perStream, err := concurrency.ProcessCollect(ctx, streams,
 		func(ctx context.Context, stream entities.StreamInfo) (streamConsumers, error) {
 			defer panics.Handle(ctx)
+			if stream.State.Consumers == 0 {
+				return streamConsumers{}, nil
+			}
 			consumers, listErr := c.listConsumers(ctx, stream.Config.Name)
 			return streamConsumers{consumers: consumers, err: listErr}, nil
 		},

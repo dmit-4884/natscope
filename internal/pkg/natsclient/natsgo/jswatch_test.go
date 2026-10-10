@@ -73,6 +73,8 @@ func TestJetStreamWatch_ADomainTheServerServesFailsFastWhenDenied(t *testing.T) 
 		_, err = js.CreateStream(t.Context(), jetstream.StreamConfig{Name: name, Subjects: []string{name + ".>"}})
 		require.NoError(t, err)
 	}
+	_, err = js.CreateConsumer(t.Context(), "SECRET", jetstream.ConsumerConfig{Durable: "reader"})
+	require.NoError(t, err)
 
 	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
 		URLs:       []string{url},
