@@ -112,8 +112,6 @@ func AsWorkspaceSection(f any) any {
 	return fx.Annotate(f, fx.As(new(workspacesvc.Section)), fx.ResultTags(`group:"workspace-sections"`))
 }
 
-var obsoleteProtoBuckets = []string{"proto_descriptors", "proto_versions", "proto_selections"}
-
 const bsrRequestTimeout = 2 * time.Minute
 
 // newProtoService creates a new unified Proto service backed by bbolt stores.
@@ -124,9 +122,6 @@ func newProtoService(
 	mappingsSvc mappingssvc.Service,
 	fileWatcher fwsvc.Service,
 ) (*protoService.Service, error) {
-	if err := db.DropBuckets(context.Background(), obsoleteProtoBuckets...); err != nil {
-		return nil, errors.WrapOperation(err, "drop obsolete proto buckets")
-	}
 	sources, err := sourcesBbolt.New(context.Background(), db, vault)
 	if err != nil {
 		return nil, errors.WrapOperation(err, "create proto sources storage")
