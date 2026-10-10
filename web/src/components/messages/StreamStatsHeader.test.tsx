@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import StreamStatsHeader from './StreamStatsHeader'
 
 const { detail, liveState } = vi.hoisted(() => ({
@@ -93,6 +93,22 @@ describe('StreamStatsHeader', () => {
 
     expect(labels()[0]?.textContent).toBe('Msgs')
     vi.unstubAllGlobals()
+  })
+
+  it('shows a dash with a tooltip instead of zero rates while Realtime is off', async () => {
+    liveState.stats = { isConnected: false, msgPerSecond: 0 }
+    containerWidth = 800
+    try {
+      render(<StreamStatsHeader streamName="ORDERS" connectionId="conn-1" />)
+      const row = screen.getByTestId('stream-stats')
+      const rates = Array.from(row.children).filter((el) => !el.hasAttribute('aria-hidden')).slice(3, 5)
+      expect(rates.map((el) => el.lastElementChild?.textContent)).toEqual(['—', '—'])
+
+      fireEvent.mouseEnter(rates[0].lastElementChild!.firstElementChild!)
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('measured only while Realtime is on')
+    } finally {
+      liveState.stats = { isConnected: true, msgPerSecond: 12 }
+    }
   })
 
   it('wraps as a last resort', () => {

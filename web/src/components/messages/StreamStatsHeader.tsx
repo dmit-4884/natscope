@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
+import Tooltip from '@/components/common/Tooltip'
 import { useStreamDetail } from '@/contexts/streams'
 import { useLiveStatsStore } from '@/contexts/live'
 import { cn } from '@/utils/cn'
@@ -17,8 +18,11 @@ interface Stat {
   value: string
   muted?: boolean
   optional?: boolean
+  hint?: string
 }
 
+const RATE_OFF = '—'
+const RATE_HINT = 'The rate is measured only while Realtime is on'
 const FULL = 0
 const COMPACT = 1
 const MINIMAL = 2
@@ -38,9 +42,11 @@ function StatsRow({ stats, level }: { stats: Stat[]; level: number }) {
                 {s.short}
               </abbr>
             )}
-            <span className={cn('font-semibold', s.muted ? 'text-content-tertiary' : 'text-content-primary')}>
-              {s.value}
-            </span>
+            <Tooltip content={s.hint ?? ''}>
+              <span className={cn('font-semibold', s.muted ? 'text-content-tertiary' : 'text-content-primary')}>
+                {s.value}
+              </span>
+            </Tooltip>
           </div>
         ))}
     </>
@@ -73,16 +79,18 @@ export default function StreamStatsHeader({ streamName, connectionId }: StreamSt
         key: 'rate',
         label: 'Messages/s',
         short: 'Msg/s',
-        value: liveStats?.msgPerSecond?.toFixed(0) || '0',
+        value: live ? liveStats?.msgPerSecond?.toFixed(0) || '0' : RATE_OFF,
         muted: !live,
+        hint: live ? undefined : RATE_HINT,
       },
       {
         key: 'throughput',
         label: 'Bytes/s',
         short: 'B/s',
         value:
-          live && messages > 0 ? formatBytesPerSecond((bytes / messages) * (liveStats?.msgPerSecond || 0)) : '0 B/s',
+          live ? (messages > 0 ? formatBytesPerSecond((bytes / messages) * (liveStats?.msgPerSecond || 0)) : '0 B/s') : RATE_OFF,
         muted: !live,
+        hint: live ? undefined : RATE_HINT,
         optional: true,
       },
     ]

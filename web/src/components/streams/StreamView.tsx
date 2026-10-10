@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { Outlet, useParams, useOutletContext, useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { Code } from '@connectrpc/connect'
+import { useQueryClient } from '@tanstack/react-query'
 import { getErrorMessage, isErrorCode } from '@/api/errors'
-import { useConsumers, useStreamDetail, useStreamRelations } from '@/contexts/streams'
+import { streamKeys, useConsumers, useStreamDetail, useStreamRelations } from '@/contexts/streams'
 import {
   type StreamScope,
   isScopeReady,
@@ -205,6 +206,11 @@ export default function StreamView() {
   const isFullWidthTab = isConfigTab || isConsumersTab || isRelationsTab
 
   const streamMissing = isStreamNotFound(streamError)
+  const streamDeleted = streamMissing && !!streamDetail
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    if (streamDeleted) queryClient.invalidateQueries({ queryKey: streamKeys.list(connectionId) })
+  }, [streamDeleted, queryClient, connectionId])
 
   // Arrow navigation — must be called before the early return (hooks rule).
   const isMessagesTab = !isPublishTab && !isFullWidthTab
@@ -224,7 +230,7 @@ export default function StreamView() {
   if (streamMissing) {
     return (
       <main className="flex-1 flex items-center justify-center bg-surface-primary" id="main-content" role="main">
-        <StreamNotFoundState streamName={streamName} />
+        <StreamNotFoundState streamName={streamName} deleted={streamDeleted} />
       </main>
     )
   }
