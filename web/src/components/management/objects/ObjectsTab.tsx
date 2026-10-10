@@ -17,10 +17,14 @@ import { toast } from '@/utils/toast'
 import { plural } from '@/utils/plural'
 import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { useConfirmation } from '@/contexts/settings'
-import { Button, Modal, Input, Badge, Alert, QueryErrorState, Spinner, JsonEditor, CloseIcon, Tabs, tabPanelProps, OverflowMenu } from '@/components/ui'
+import { Button, Modal, Input, Badge, Alert, QueryErrorState, Spinner, JsonEditor, CloseIcon, CopyButton, Tabs, tabPanelProps, OverflowMenu } from '@/components/ui'
 import type { ConnectionOutletContext } from '@/components/common/ConnectedLayout'
 import Tooltip from '@/components/common/Tooltip'
 import { ObjectBucketFormFields } from './ObjectBucketFormFields'
+
+const TRANSFER_LIMIT_BYTES = 32 * 1024 * 1024
+const TRANSFER_LIMIT_LABEL = '32 MiB'
+const UPLOAD_OVERHEAD_BYTES = 64 * 1024
 
 const defaultBucketConfig: ObjectBucketConfig = {
   bucket: '',
@@ -67,11 +71,13 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
     refetch: refetchObjects,
   } = useObjects(connectionId, bucketName)
 
+  const tooLarge = !!selectedObject && selectedObject.size > TRANSFER_LIMIT_BYTES
+
   // Fetch selected object data
   const { data: objectData, isLoading: objectLoading } = useObject(
     connectionId,
     bucketName,
-    selectedObject?.name
+    tooLarge ? undefined : selectedObject?.name
   )
 
   // Mutations
@@ -121,6 +127,13 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !bucketName) return
+    if (file.size + UPLOAD_OVERHEAD_BYTES > TRANSFER_LIMIT_BYTES) {
+      toast.error(
+        `${file.name} is ${formatBytes(file.size)}; uploads here stop at ${TRANSFER_LIMIT_LABEL}. Use nats object put ${bucketName} ${file.name}`,
+      )
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
 
     const reader = new FileReader()
     reader.onload = async () => {
@@ -423,12 +436,14 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" onClick={handleDownload}>
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download
-                    </Button>
+                    {!tooLarge && (
+                      <Button variant="secondary" size="sm" onClick={handleDownload}>
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download
+                      </Button>
+                    )}
                     {!readOnly && (
                       <Button
                         variant="danger"
@@ -447,7 +462,19 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
               </div>
 
               <div className="flex-1 overflow-auto p-4">
-                {objectLoading ? (
+                {tooLarge ? (
+                  <div className="flex items-center justify-center h-full text-content-tertiary">
+                    <div className="text-center space-y-2">
+                      <p className="text-sm">
+                        Over {TRANSFER_LIMIT_LABEL}, too large to open or download here. Get it with the nats CLI:
+                      </p>
+                      <div className="inline-flex items-center gap-2">
+                        <code className="text-xs text-content-primary">{`nats object get ${bucketName} ${selectedObject.name}`}</code>
+                        <CopyButton value={`nats object get ${bucketName} ${selectedObject.name}`} size="sm" />
+                      </div>
+                    </div>
+                  </div>
+                ) : objectLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <Spinner size="lg" />
                   </div>
