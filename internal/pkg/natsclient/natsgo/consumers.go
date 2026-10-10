@@ -315,6 +315,11 @@ func (c *Client) PauseConsumer(
 			Cause:       err,
 		})
 	}
+	if !pauseUntilTime.After(time.Now()) {
+		return nil, &errs.NATSValidationError{
+			Description: fmt.Sprintf("pause_until %s is not in the future; resume the consumer instead", pauseUntil),
+		}
+	}
 
 	stream, err := c.jetStream.Stream(ctx, streamName)
 	if err != nil {
@@ -382,6 +387,11 @@ func (c *Client) ResetConsumer(
 	}
 	if _, err = stream.Consumer(ctx, consumerName); err != nil {
 		return nil, wrapErr(err)
+	}
+	if info := stream.CachedInfo(); sequence != nil && info != nil && *sequence > info.State.LastSeq+1 {
+		return nil, &errs.NATSValidationError{
+			Description: fmt.Sprintf("sequence %d is beyond the stream's last sequence %d", *sequence, info.State.LastSeq),
+		}
 	}
 
 	var resp *jetstream.ConsumerResetResponse

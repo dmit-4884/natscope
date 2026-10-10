@@ -353,6 +353,9 @@ func (c *Client) PurgeStream(ctx context.Context, name string, req entities.Stre
 	if err := validateNATSNameLength("stream name", name); err != nil {
 		return 0, wrapErr(err)
 	}
+	if req.Sequence > 0 && req.Keep > 0 {
+		return 0, &errs.NATSValidationError{Description: "a purge takes either a sequence or a number of messages to keep, not both"}
+	}
 
 	stream, err := c.jetStream.Stream(ctx, name)
 	if err != nil {
