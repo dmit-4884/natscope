@@ -9,7 +9,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/altessa-s/go-atlas/core/collections/slices"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -31,9 +30,7 @@ func (h *Handler) ListConsumers(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.ListConsumersResponse{
-		Consumers: slices.To(consumers, func(c entities.ConsumerInfo) *natspb.ConsumerInfo {
-			return converter.Convert(&c, &natspb.ConsumerInfo{}, protoCodecs)
-		}),
+		Consumers: *converter.Convert(consumers, &[]*natspb.ConsumerInfo{}, protoCodecs),
 	}), nil
 }
 

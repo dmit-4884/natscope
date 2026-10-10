@@ -30,9 +30,7 @@ func (h *Handler) ListKVBuckets(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.ListKVBucketsResponse{
-		Buckets: slices.To(buckets, func(b entities.KVBucketInfo) *natspb.KVBucketInfo {
-			return converter.Convert(&b, &natspb.KVBucketInfo{}, replicasMapping, protoCodecs)
-		}),
+		Buckets: *converter.Convert(buckets, &[]*natspb.KVBucketInfo{}, replicasMapping, protoCodecs),
 	}), nil
 }
 

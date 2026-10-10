@@ -8,7 +8,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/altessa-s/go-atlas/core/collections/slices"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -27,9 +26,7 @@ func (h *Handler) ListObjectBuckets(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.ListObjectBucketsResponse{
-		Buckets: slices.To(buckets, func(b entities.ObjectBucketInfo) *natspb.ObjectBucketInfo {
-			return converter.Convert(&b, &natspb.ObjectBucketInfo{}, replicasMapping)
-		}),
+		Buckets: *converter.Convert(buckets, &[]*natspb.ObjectBucketInfo{}, replicasMapping),
 	}), nil
 }
 
@@ -105,9 +102,7 @@ func (h *Handler) ListObjects(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.ListObjectsResponse{
-		Objects: slices.To(objects, func(o *entities.ObjectInfo) *natspb.ObjectInfo {
-			return converter.Convert(o, &natspb.ObjectInfo{}, protoCodecs)
-		}),
+		Objects: *converter.Convert(objects, &[]*natspb.ObjectInfo{}, protoCodecs),
 	}), nil
 }
 

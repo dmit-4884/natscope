@@ -9,10 +9,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/altessa-s/go-atlas/core/collections/slices"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
-	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/transports/grpc/helpers"
 
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
@@ -58,9 +56,7 @@ func (h *Handler) GetAllStreamsStats(
 		return nil, err
 	}
 	return connect.NewResponse(&statspb.GetAllStreamsStatsResponse{
-		Streams: slices.To(stats, func(s entities.StreamStats) *natspb.StreamStats {
-			return converter.Convert(s, &natspb.StreamStats{}, grpchelpers.ProtoCodecs)
-		}),
+		Streams: *converter.Convert(stats, &[]*natspb.StreamStats{}, grpchelpers.ProtoCodecs),
 	}), nil
 }
 

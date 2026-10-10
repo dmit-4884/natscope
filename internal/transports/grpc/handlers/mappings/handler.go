@@ -161,8 +161,6 @@ func (h *Handler) BatchCheckMappingHealth(
 		return nil, err
 	}
 
-	items := slices.To(healths, func(hh entities.SubjectMappingHealth) *mappingspb.MappingHealthItem {
-		return converter.Convert(hh, &mappingspb.MappingHealthItem{})
-	})
-	return connect.NewResponse(&mappingspb.BatchCheckMappingHealthResponse{Items: items}), nil
+	items := converter.Convert(healths, &[]*mappingspb.MappingHealthItem{})
+	return connect.NewResponse(&mappingspb.BatchCheckMappingHealthResponse{Items: *items}), nil
 }

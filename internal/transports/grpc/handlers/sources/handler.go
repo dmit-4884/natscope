@@ -288,9 +288,7 @@ func (h *Handler) ListRevisions(
 		return nil, err
 	}
 	return connect.NewResponse(&sourcespb.ListRevisionsResponse{
-		Revisions: slices.To(revisions, func(r entities.SchemaRevision) *protopb.SchemaRevision {
-			return converter.Convert(r, &protopb.SchemaRevision{})
-		}),
+		Revisions: *converter.Convert(revisions, &[]*protopb.SchemaRevision{}),
 	}), nil
 }
 

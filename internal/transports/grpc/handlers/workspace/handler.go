@@ -11,7 +11,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	"github.com/altessa-s/go-atlas/core/collections/slices"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -57,9 +56,7 @@ func (h *Handler) ListSections(
 		return nil, err
 	}
 	return connect.NewResponse(&workspacepb.ListSectionsResponse{
-		Sections: slices.To(infos, func(i entities.WorkspaceSectionInfo) *workspacepb.SectionInfo {
-			return converter.Convert(i, &workspacepb.SectionInfo{})
-		}),
+		Sections: *converter.Convert(infos, &[]*workspacepb.SectionInfo{}),
 	}), nil
 }
 
@@ -90,9 +87,7 @@ func (h *Handler) ValidateWorkspace(
 		return nil, err
 	}
 	return connect.NewResponse(&workspacepb.ValidateWorkspaceResponse{
-		Reports: slices.To(reports, func(r entities.WorkspaceSectionReport) *workspacepb.SectionReport {
-			return converter.Convert(r, &workspacepb.SectionReport{})
-		}),
+		Reports: *converter.Convert(reports, &[]*workspacepb.SectionReport{}),
 	}), nil
 }
 
@@ -111,9 +106,7 @@ func (h *Handler) ImportWorkspace(
 		return nil, err
 	}
 	return connect.NewResponse(&workspacepb.ImportWorkspaceResponse{
-		Results: slices.To(results, func(r entities.WorkspaceSectionResult) *workspacepb.SectionResult {
-			return converter.Convert(r, &workspacepb.SectionResult{})
-		}),
+		Results: *converter.Convert(results, &[]*workspacepb.SectionResult{}),
 	}), nil
 }
 

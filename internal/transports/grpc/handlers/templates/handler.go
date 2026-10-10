@@ -149,10 +149,8 @@ func (h *Handler) BatchCreateTemplates(
 	req *connect.Request[templatespb.BatchCreateTemplatesRequest],
 ) (*connect.Response[templatespb.BatchCreateTemplatesResponse], error) {
 	in := req.Msg
-	items := slices.To(in.Templates, func(t *templatespb.TemplateBulkCreateItem) *entities.MessageTemplateCreate {
-		return converter.Convert(t, &entities.MessageTemplateCreate{})
-	})
-	created, err := h.service.BulkCreate(ctx, items)
+	items := converter.Convert(in.Templates, &[]*entities.MessageTemplateCreate{})
+	created, err := h.service.BulkCreate(ctx, *items)
 	if err != nil {
 		return nil, err
 	}
