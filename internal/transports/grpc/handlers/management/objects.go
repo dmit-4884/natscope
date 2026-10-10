@@ -17,15 +17,6 @@ import (
 	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
 
-// objectInfoToProto converts an object entry to proto; Link is mapped by hand since the converter skips it.
-func objectInfoToProto(info *entities.ObjectInfo) *natspb.ObjectInfo {
-	out := converter.Convert(info, &natspb.ObjectInfo{}, protoCodecs, converter.WithIgnoreFields("Link"))
-	if info.Link != nil {
-		out.Link = converter.Convert(info.Link, &natspb.ObjectLink{})
-	}
-	return out
-}
-
 // ListObjectBuckets lists all Object Store buckets.
 func (h *Handler) ListObjectBuckets(
 	ctx context.Context,
@@ -53,12 +44,7 @@ func (h *Handler) CreateObjectBucket(
 	cr := converter.Convert(cfg, &entities.ObjectBucketConfig{},
 		protoCodecs,
 		replicasMappingToEntity,
-		converter.WithIgnoreFields("Placement"),
 	)
-
-	if cfg.GetPlacement() != nil {
-		cr.Placement = converter.Convert(cfg.GetPlacement(), &entities.Placement{})
-	}
 
 	bucket, err := h.natsService.CreateObjectBucket(ctx, in.GetConnectionId(), *cr)
 	if err != nil {
@@ -119,7 +105,9 @@ func (h *Handler) ListObjects(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.ListObjectsResponse{
-		Objects: slices.To(objects, objectInfoToProto),
+		Objects: slices.To(objects, func(o *entities.ObjectInfo) *natspb.ObjectInfo {
+			return converter.Convert(o, &natspb.ObjectInfo{}, protoCodecs)
+		}),
 	}), nil
 }
 
@@ -134,7 +122,7 @@ func (h *Handler) GetObject(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.GetObjectResponse{
-		Info: objectInfoToProto(info),
+		Info: converter.Convert(info, &natspb.ObjectInfo{}, protoCodecs),
 		Data: data,
 	}), nil
 }
@@ -151,7 +139,7 @@ func (h *Handler) PutObject(
 		return nil, err
 	}
 	return connect.NewResponse(&managementpb.PutObjectResponse{
-		Info: objectInfoToProto(info),
+		Info: converter.Convert(info, &natspb.ObjectInfo{}, protoCodecs),
 	}), nil
 }
 

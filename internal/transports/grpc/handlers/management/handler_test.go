@@ -50,6 +50,8 @@ type mockNatsService struct {
 
 	createdStream entities.StreamCreateRequest
 	updatedStream entities.StreamUpdateRequest
+	createdKV     entities.KVBucketConfig
+	createdObject entities.ObjectBucketConfig
 }
 
 func (m *mockNatsService) CreateStream(
@@ -101,8 +103,9 @@ func (m *mockNatsService) DeleteConsumer(_ context.Context, _ string, _ string, 
 func (m *mockNatsService) CreateKVBucket(
 	_ context.Context,
 	_ string,
-	_ entities.KVBucketConfig,
+	cfg entities.KVBucketConfig,
 ) (*entities.KVBucketInfo, error) {
+	m.createdKV = cfg
 	return m.kvInfo, m.kvErr
 }
 
@@ -118,8 +121,9 @@ func (m *mockNatsService) DeleteKVBucket(_ context.Context, _ string, bucket str
 func (m *mockNatsService) CreateObjectBucket(
 	_ context.Context,
 	_ string,
-	_ entities.ObjectBucketConfig,
+	cfg entities.ObjectBucketConfig,
 ) (*entities.ObjectBucketInfo, error) {
+	m.createdObject = cfg
 	return m.objInfo, m.objErr
 }
 

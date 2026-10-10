@@ -47,22 +47,9 @@ func (h *Handler) CreateKVBucket(
 	cr := converter.Convert(cfg, &entities.KVBucketConfig{},
 		protoCodecs,
 		replicasMappingToEntity,
-		converter.WithIgnoreFields("Placement", "History", "Mirror", "Sources", "Republish"),
+		converter.WithIgnoreFields("History"),
 	)
 	cr.History = uint8(cfg.GetHistory())
-
-	if cfg.GetPlacement() != nil {
-		cr.Placement = converter.Convert(cfg.GetPlacement(), &entities.Placement{})
-	}
-	if cfg.GetMirror() != nil {
-		cr.Mirror = streamSourceRefToEntity(cfg.GetMirror())
-	}
-	cr.Sources = slices.To(cfg.GetSources(), streamSourceRefToEntity)
-	if cfg.GetRepublish() != nil {
-		cr.Republish = converter.Convert(cfg.GetRepublish(), &entities.StreamRePublish{},
-			converter.WithFieldMappings(map[string]string{"Source": "Src", "Destination": "Dest"}),
-		)
-	}
 
 	bucket, err := h.natsService.CreateKVBucket(ctx, in.GetConnectionId(), *cr)
 	if err != nil {

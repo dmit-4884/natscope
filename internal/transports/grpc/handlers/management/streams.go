@@ -24,12 +24,9 @@ func (h *Handler) CreateStream(
 	in := req.Msg
 	cr := converter.Convert(in, &entities.StreamCreateRequest{},
 		protoCodecs,
-		converter.WithIgnoreFields("Placement", "Mirror", "Sources", "SubjectTransform", "Republish", "ConsumerLimits"),
+		converter.WithIgnoreFields("Mirror", "Sources"),
 	)
 
-	if in.GetPlacement() != nil {
-		cr.Placement = converter.Convert(in.GetPlacement(), &entities.Placement{})
-	}
 	if in.GetMirror() != nil {
 		mirror, err := protoStreamSourceToEntity(in.GetMirror())
 		if err != nil {
@@ -42,16 +39,6 @@ func (h *Handler) CreateStream(
 		return nil, err
 	}
 	cr.Sources = sources
-	if in.GetSubjectTransform() != nil {
-		cr.SubjectTransform = converter.Convert(in.GetSubjectTransform(), &entities.SubjectTransformConfig{})
-	}
-	if in.GetRepublish() != nil {
-		cr.Republish = converter.Convert(in.GetRepublish(), &entities.StreamRePublish{})
-	}
-	if in.GetConsumerLimits() != nil {
-		// protoCodecs is required for the InactiveThreshold Duration.
-		cr.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{}, protoCodecs)
-	}
 
 	stream, err := h.natsService.CreateStream(ctx, in.GetConnectionId(), *cr)
 	if err != nil {
@@ -72,18 +59,9 @@ func (h *Handler) UpdateStream(
 	// registry (matching numeric layout); no manual unwrapping.
 	ur := converter.Convert(in, &entities.StreamUpdateRequest{},
 		protoCodecs,
-		converter.WithIgnoreFields("Sources", "Republish", "SubjectTransform", "ConsumerLimits"),
+		converter.WithIgnoreFields("Sources"),
 	)
 
-	if in.GetRepublish() != nil {
-		ur.Republish = converter.Convert(in.GetRepublish(), &entities.StreamRePublish{})
-	}
-	if in.GetSubjectTransform() != nil {
-		ur.SubjectTransform = converter.Convert(in.GetSubjectTransform(), &entities.SubjectTransformConfig{})
-	}
-	if in.GetConsumerLimits() != nil {
-		ur.ConsumerLimits = converter.Convert(in.GetConsumerLimits(), &entities.StreamConsumerLimits{}, protoCodecs)
-	}
 	sources, err := protoStreamSourcesToEntity(in.GetSources())
 	if err != nil {
 		return nil, err
