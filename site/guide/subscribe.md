@@ -53,10 +53,9 @@ messages published in that moment are missed, as core NATS keeps no copy.
 **Stop** ends the subscription and keeps the messages on screen; **Start** listens again and adds to
 them.
 
-The subscription keeps running while you work on other pages, and a dot next to **Subscribe** in the
-sidebar shows that it is listening (amber while it reconnects). Come back to find the latest messages
-that arrived meanwhile, up to the **Keep** limit. It ends when you press **Stop**, disconnect, or switch
-to another connection.
+A dot next to **Subscribe** in the sidebar shows that it is listening (amber while it reconnects). The
+subscription ends when you open another page, press **Stop**, disconnect, or switch to another
+connection; the messages stay on screen, and **Start** picks up from there.
 
 ## Resend and reply
 

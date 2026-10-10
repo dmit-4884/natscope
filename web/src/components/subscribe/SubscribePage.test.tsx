@@ -240,7 +240,7 @@ describe('SubscribePage', () => {
     expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false }))
   })
 
-  it('keeps the subscription and its messages while another page is open', () => {
+  it('stops the subscription when another page opens and keeps its messages', () => {
     mockedLive.mockReturnValue(liveState({ liveMessages: [message('1', 'orders.new')] }))
     render(
       <SubscribeSessionProvider connectionId="conn-1">
@@ -252,10 +252,10 @@ describe('SubscribePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle page' }))
     expect(screen.getByText('Another page')).toBeInTheDocument()
-    expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ subjects: ['orders.>'], enabled: true }))
+    expect(mockedLive).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle page' }))
-    expect(screen.getByTestId('subscribe-status')).toHaveTextContent('Live')
+    expect(screen.getByTestId('subscribe-stopped')).toBeInTheDocument()
     expect(chips().map((c) => c.textContent)).toEqual(['orders.>'])
     expect(within(screen.getByTestId('feed')).getByText('orders.new')).toBeInTheDocument()
   })

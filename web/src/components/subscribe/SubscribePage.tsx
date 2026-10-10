@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useMappingItems } from '@/contexts/mappings'
 import { useDisplayPreferences } from '@/contexts/settings'
@@ -89,6 +89,7 @@ export default function SubscribePage() {
   const session = useSubscribeSession()
   const { running, allDenied, start, stop, live, query, setQuery, subjectFilter, setSubjectFilter, selected, setSelected } = session
   const [dialog, setDialog] = useState<{ mode: 'resend' | 'reply'; initial: CorePublishDraft } | null>(null)
+  useEffect(() => stop, [stop])
 
   const display = useDisplayPreferences()
   const { data: mappings = [] } = useMappingItems()
