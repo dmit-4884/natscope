@@ -3,6 +3,19 @@ import { render, screen } from '@/test/utils'
 import type { Message } from '@/types/nats'
 import MessageDiffViewer from './MessageDiffViewer'
 
+const full = vi.hoisted(() => ({
+  bySeq: {} as Record<number, { data?: unknown; error?: unknown; isLoading?: boolean }>,
+  requested: [] as Array<number | null>,
+}))
+
+vi.mock('@/contexts/messages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/contexts/messages')>()),
+  useStreamMessage: (_conn: string | null, _stream: string | null, seq: number | null) => {
+    full.requested.push(seq)
+    return seq == null ? { data: undefined, error: null, isLoading: false, refetch: vi.fn() } : { error: null, isLoading: false, refetch: vi.fn(), ...full.bySeq[seq] }
+  },
+}))
+
 const createMessage = (overrides: Partial<Message> = {}): Message => ({
   sequence: 1,
   subject: 'test.subject',
@@ -75,5 +88,68 @@ describe('MessageDiffViewer', () => {
       await userInstance.click(closeBtn)
       expect(onClose).toHaveBeenCalled()
     }
+  })
+
+  describe('truncated list payloads', () => {
+    const clipped = (sequence: number) =>
+      createMessage({ sequence, truncated: true, data_base64: btoa('{"a":"same prefix'), data_size: 5_000_000 })
+    const renderDiff = (a: Message, b: Message) =>
+      render(<MessageDiffViewer messageA={a} messageB={b} connectionId="c1" streamName="BLOBS" onClose={vi.fn()} />)
+
+    it('does not ask the server for messages that came whole', () => {
+      full.requested.length = 0
+      renderDiff(createMessage({ sequence: 1 }), createMessage({ sequence: 2 }))
+
+      expect(full.requested.every((seq) => seq === null)).toBe(true)
+    })
+
+    it('loads the full message of a clipped side and diffs that, not the preview', () => {
+      full.bySeq = {
+        1: { data: createMessage({ sequence: 1, data_base64: btoa('{"a":"same prefix","tail":1}') }) },
+        2: { data: createMessage({ sequence: 2, data_base64: btoa('{"a":"same prefix","tail":2}') }) },
+      }
+      renderDiff(clipped(1), clipped(2))
+
+      expect(full.requested).toContain(1)
+      expect(full.requested).toContain(2)
+      expect(screen.queryByText('No payload differences')).toBeNull()
+      expect(screen.getByText(/"tail": 2/)).toBeDefined()
+    })
+
+    it('waits for the full message instead of showing a partial diff', () => {
+      full.bySeq = { 1: { isLoading: true }, 2: { isLoading: true } }
+      renderDiff(clipped(1), clipped(2))
+
+      expect(screen.getByText(/loading the full messages/i)).toBeDefined()
+      expect(screen.queryByText('No payload differences')).toBeNull()
+    })
+
+    it('says so when a full message cannot be loaded', () => {
+      full.bySeq = { 1: { error: new Error('message gone') }, 2: { data: createMessage({ sequence: 2 }) } }
+      renderDiff(clipped(1), clipped(2))
+
+      expect(screen.getByRole('alert')).toHaveTextContent(/message gone/)
+      expect(screen.queryByText('No payload differences')).toBeNull()
+    })
+  })
+
+  describe('headers', () => {
+    it('diffs headers as well as payload', () => {
+      full.bySeq = {}
+      const a = createMessage({ sequence: 1, headers: { 'X-Trace': 'one' } })
+      const b = createMessage({ sequence: 2, headers: { 'X-Trace': 'two', 'X-New': 'y' } })
+      render(<MessageDiffViewer messageA={a} messageB={b} onClose={vi.fn()} />)
+
+      expect(screen.getByRole('heading', { name: /headers/i })).toBeDefined()
+      expect(screen.getByText(/"X-New": "y"/)).toBeDefined()
+    })
+
+    it('says the headers are the same when they are', () => {
+      full.bySeq = {}
+      const headers = { 'X-Trace': 'one' }
+      render(<MessageDiffViewer messageA={createMessage({ sequence: 1, headers })} messageB={createMessage({ sequence: 2, headers })} onClose={vi.fn()} />)
+
+      expect(screen.getByText('No header differences')).toBeDefined()
+    })
   })
 })

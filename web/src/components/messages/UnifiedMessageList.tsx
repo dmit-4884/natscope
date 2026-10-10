@@ -487,6 +487,8 @@ export default function UnifiedMessageList({
         <MessageDiffViewer
           messageA={compareMessages[0]}
           messageB={compareMessages[1]}
+          connectionId={connectionId}
+          streamName={streamName}
           onClose={() => setShowDiffViewer(false)}
         />
       )}
