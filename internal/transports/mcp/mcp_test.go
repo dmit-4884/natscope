@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -211,4 +212,35 @@ func TestItems(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, []int{}, Items[int](nil))
 	assert.Equal(t, []int{1}, Items([]int{1}))
+}
+
+func TestAddToolNormalizesInput(t *testing.T) {
+	t.Parallel()
+	type echoInput struct {
+		Subject   string `json:"subject" normalize:"trim"`
+		Direction string `json:"direction" normalize:"trim,lowercase"`
+	}
+	type echoOutput struct {
+		Subject   string `json:"subject"`
+		Direction string `json:"direction"`
+	}
+	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "v0"}, nil)
+	AddTool(server, &mcp.Tool{Name: "echo"}, func(_ context.Context, _ *mcp.CallToolRequest, in echoInput) (*mcp.CallToolResult, echoOutput, error) {
+		return nil, echoOutput(in), nil
+	})
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	_, err := server.Connect(t.Context(), serverTransport, nil)
+	require.NoError(t, err)
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "client", Version: "v0"}, nil).Connect(t.Context(), clientTransport, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = cs.Close() })
+
+	res, err := cs.CallTool(t.Context(), &mcp.CallToolParams{
+		Name:      "echo",
+		Arguments: map[string]any{"subject": "  orders.>  ", "direction": " Backward "},
+	})
+
+	require.NoError(t, err)
+	require.False(t, res.IsError)
+	assert.Equal(t, map[string]any{"subject": "orders.>", "direction": "backward"}, res.StructuredContent)
 }

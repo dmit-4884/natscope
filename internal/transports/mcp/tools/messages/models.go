@@ -26,15 +26,15 @@ type messageView struct {
 
 type findMessagesInput struct {
 	mcptransport.ConnectionArg
-	Stream          string `json:"stream" jsonschema:"stream name"`
-	Subject         string `json:"subject,omitempty" jsonschema:"subject filter; NATS wildcards * and > are allowed"`
+	Stream          string `json:"stream" jsonschema:"stream name" normalize:"trim"`
+	Subject         string `json:"subject,omitempty" jsonschema:"subject filter; NATS wildcards * and > are allowed" normalize:"trim"`
 	StartSeq        uint64 `json:"startSeq,omitempty" jsonschema:"sequence to start from"`
 	Since           string `json:"since,omitempty" jsonschema:"start at the first message published at or after this time: RFC 3339 or a duration ago like 15m"`
-	Direction       string `json:"direction,omitempty" jsonschema:"backward (newest first) or forward; defaults to forward when startSeq or since is set"`
+	Direction       string `json:"direction,omitempty" jsonschema:"backward (newest first) or forward, default with startSeq/since" normalize:"trim,lowercase"`
 	Limit           int    `json:"limit,omitempty" jsonschema:"messages per page, 1-100 (default 20)"`
-	Contains        string `json:"contains,omitempty" jsonschema:"case-insensitive payload text; searches the whole stream, 100000 messages per call"`
+	Contains        string `json:"contains,omitempty" jsonschema:"case-insensitive payload text; searches the stream, 100000 messages per call" normalize:"trim"`
 	Regex           bool   `json:"regex,omitempty" jsonschema:"treat contains as an RE2 regular expression, matched as written"`
-	Header          string `json:"header,omitempty" jsonschema:"header the message must carry, as name or name=value; searches like contains"`
+	Header          string `json:"header,omitempty" jsonschema:"header the message must carry, as name or name=value; searches like contains" normalize:"trim"`
 	MaxPayloadBytes int    `json:"maxPayloadBytes,omitempty" jsonschema:"per-message payload budget in bytes (default 4096); a page carries at most 256 KiB"`
 }
 
@@ -47,15 +47,15 @@ type findMessagesOutput struct {
 
 type getMessageInput struct {
 	mcptransport.ConnectionArg
-	Stream          string `json:"stream" jsonschema:"stream name"`
+	Stream          string `json:"stream" jsonschema:"stream name" normalize:"trim"`
 	Seq             uint64 `json:"seq" jsonschema:"stream sequence number"`
 	MaxPayloadBytes int    `json:"maxPayloadBytes,omitempty" jsonschema:"payload budget in bytes (default 65536, max 262144)"`
 }
 
 type tailInput struct {
 	mcptransport.ConnectionArg
-	Subject         string `json:"subject" jsonschema:"subject to listen on; NATS wildcards * and > are allowed"`
-	Stream          string `json:"stream,omitempty" jsonschema:"read new messages through this JetStream stream instead of a core NATS subscription"`
+	Subject         string `json:"subject" jsonschema:"subject to listen on; NATS wildcards * and > are allowed" normalize:"trim"`
+	Stream          string `json:"stream,omitempty" jsonschema:"read new messages through this JetStream stream, not a core NATS subscription" normalize:"trim"`
 	Seconds         int    `json:"seconds,omitempty" jsonschema:"how long to listen, 1-30 (default 10)"`
 	MaxMessages     int    `json:"maxMessages,omitempty" jsonschema:"stop after this many messages, 1-200 (default 20)"`
 	MaxPayloadBytes int    `json:"maxPayloadBytes,omitempty" jsonschema:"per-message payload budget in bytes (default 4096); a tail carries at most 256 KiB"`

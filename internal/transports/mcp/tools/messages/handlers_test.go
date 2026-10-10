@@ -100,7 +100,7 @@ func TestListRequest(t *testing.T) {
 	assert.Equal(t, "orders.>", *req.SubjectFilter)
 	assert.Equal(t, int64(maxPageSize), *req.Limit)
 
-	req, err = listRequest(findMessagesInput{Stream: "ORDERS", StartSeq: 40, Direction: "Backward"}, now)
+	req, err = listRequest(findMessagesInput{Stream: "ORDERS", StartSeq: 40, Direction: "backward"}, now)
 	require.NoError(t, err)
 	assert.Equal(t, directionBackward, req.Direction)
 	assert.Equal(t, uint64(40), *req.StartSeq)
@@ -177,7 +177,7 @@ func TestSearchRequest(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
 
-	req, ok, err := searchRequest(findMessagesInput{Stream: "ORDERS", Contains: " needle ", Limit: 7}, now)
+	req, ok, err := searchRequest(findMessagesInput{Stream: "ORDERS", Contains: "needle", Limit: 7}, now)
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "needle", req.Text)

@@ -43,7 +43,7 @@ type listStreamsOutput struct {
 
 type streamInput struct {
 	mcptransport.ConnectionArg
-	Stream string `json:"stream" jsonschema:"stream name"`
+	Stream string `json:"stream" jsonschema:"stream name" normalize:"trim"`
 }
 
 type streamView struct {
@@ -108,7 +108,7 @@ type peerView struct {
 
 type listConsumersInput struct {
 	mcptransport.ConnectionArg
-	Stream string `json:"stream,omitempty" jsonschema:"stream name; omit to list the consumers of every stream"`
+	Stream string `json:"stream,omitempty" jsonschema:"stream name; omit to list the consumers of every stream" normalize:"trim"`
 	Limit  int    `json:"limit,omitempty" jsonschema:"maximum consumers to return, most pending first, 1-1000 (default 200)"`
 }
 
@@ -163,7 +163,7 @@ type unreadableStreamView struct {
 
 type relationsInput struct {
 	mcptransport.ConnectionArg
-	Stream string `json:"stream,omitempty" jsonschema:"stream name; omit for every relation of the connection"`
+	Stream string `json:"stream,omitempty" jsonschema:"stream name; omit for every relation of the connection" normalize:"trim"`
 }
 
 type relationsOutput struct {

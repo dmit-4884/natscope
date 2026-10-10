@@ -6,7 +6,6 @@ package streams
 import (
 	"context"
 	"sort"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -58,7 +57,7 @@ func (t *Toolset) getStreamRelations(
 	if err != nil {
 		return nil, relationsOutput{}, err
 	}
-	return nil, relationsView(relations, strings.TrimSpace(in.Stream)), nil
+	return nil, relationsView(relations, in.Stream), nil
 }
 
 // relationsView keeps the links touching stream (all of them when it is empty) and the nodes they reach.
@@ -91,7 +90,7 @@ func (t *Toolset) listConsumers(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return nil, listConsumersOutput{}, err
 	}
 
-	views, unreadable, err := t.consumers(ctx, connID, strings.TrimSpace(in.Stream))
+	views, unreadable, err := t.consumers(ctx, connID, in.Stream)
 	if err != nil {
 		return nil, listConsumersOutput{}, err
 	}

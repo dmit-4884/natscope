@@ -16,7 +16,7 @@ type typeView struct {
 }
 
 type listTypesInput struct {
-	Filter string `json:"filter,omitempty" jsonschema:"case-insensitive substring of the full type name"`
+	Filter string `json:"filter,omitempty" jsonschema:"case-insensitive substring of the full type name" normalize:"trim,lowercase"`
 	Limit  int    `json:"limit,omitempty" jsonschema:"maximum types to return, 1-2000 (default 200)"`
 }
 
@@ -26,8 +26,8 @@ type listTypesOutput struct {
 }
 
 type typeInput struct {
-	Type     string `json:"type" jsonschema:"fully-qualified message type, e.g. orders.v1.OrderCreated"`
-	SourceID string `json:"sourceId,omitempty" jsonschema:"proto source id; needed only when several sources define the type"`
+	Type     string `json:"type" jsonschema:"fully-qualified message type, e.g. orders.v1.OrderCreated" normalize:"trim"`
+	SourceID string `json:"sourceId,omitempty" jsonschema:"proto source id; needed only when several sources define the type" normalize:"trim"`
 }
 
 type describeOutput struct {
@@ -81,7 +81,7 @@ type mappingView struct {
 }
 
 type subjectInput struct {
-	Subject string `json:"subject" jsonschema:"concrete subject, e.g. orders.eu.created"`
+	Subject string `json:"subject" jsonschema:"concrete subject, e.g. orders.eu.created" normalize:"trim"`
 }
 
 type resolveOutput struct {
@@ -97,10 +97,10 @@ type listMappingsOutput struct {
 }
 
 type decodeInput struct {
-	Base64   string `json:"base64" jsonschema:"payload bytes, base64-encoded"`
-	Type     string `json:"type,omitempty" jsonschema:"fully-qualified message type to decode as; omit with subject to dump wire fields"`
-	SourceID string `json:"sourceId,omitempty" jsonschema:"proto source id; needed only when several sources define the type"`
-	Subject  string `json:"subject,omitempty" jsonschema:"decode through this subject's mapping instead of an explicit type"`
+	Base64   string `json:"base64" jsonschema:"payload bytes, base64-encoded" normalize:"trim"`
+	Type     string `json:"type,omitempty" jsonschema:"fully-qualified message type to decode as; omit with subject to dump wire fields" normalize:"trim"`
+	SourceID string `json:"sourceId,omitempty" jsonschema:"proto source id; needed only when several sources define the type" normalize:"trim"`
+	Subject  string `json:"subject,omitempty" jsonschema:"decode through this subject's mapping instead of an explicit type" normalize:"trim"`
 }
 
 type decodeOutput struct {
@@ -113,8 +113,8 @@ type decodeOutput struct {
 }
 
 type detectInput struct {
-	Base64   string `json:"base64" jsonschema:"payload bytes, base64-encoded"`
-	SourceID string `json:"sourceId,omitempty" jsonschema:"proto source id to search; every enabled source when omitted"`
+	Base64   string `json:"base64" jsonschema:"payload bytes, base64-encoded" normalize:"trim"`
+	SourceID string `json:"sourceId,omitempty" jsonschema:"proto source id to search; every enabled source when omitted" normalize:"trim"`
 	Limit    int    `json:"limit,omitempty" jsonschema:"candidates to return, 1 to 50; 5 when omitted"`
 }
 
@@ -149,8 +149,8 @@ type wireFieldView struct {
 }
 
 type validateInput struct {
-	Type     string         `json:"type" jsonschema:"fully-qualified message type"`
-	SourceID string         `json:"sourceId,omitempty" jsonschema:"proto source id; needed only when several sources define the type"`
+	Type     string         `json:"type" jsonschema:"fully-qualified message type" normalize:"trim"`
+	SourceID string         `json:"sourceId,omitempty" jsonschema:"proto source id; needed only when several sources define the type" normalize:"trim"`
 	Payload  map[string]any `json:"payload" jsonschema:"JSON object to check, in protojson form"`
 }
 

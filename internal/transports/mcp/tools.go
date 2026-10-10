@@ -13,6 +13,8 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/altessa-s/go-atlas/domain/normalizer"
+
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/status"
 
@@ -25,15 +27,18 @@ var schemaOptions = &jsonschema.ForOptions{
 	},
 }
 
-// AddTool registers a typed tool; json.RawMessage fields accept any JSON and handler errors reach
+// AddTool registers a typed tool; its input is normalized by `normalize` tags, json.RawMessage fields accept any JSON and handler errors reach
 // the agent as sanitized, reason-coded messages.
 func AddTool[In, Out any](s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
 	t.InputSchema = mustSchema[In]()
 	t.OutputSchema = mustSchema[Out]()
 	mcp.AddTool(s, t, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
+		var zero Out
+		if err := normalizer.Normalize(&in); err != nil {
+			return nil, zero, toolError(ctx, err)
+		}
 		res, out, err := h(ctx, req, in)
 		if err != nil {
-			var zero Out
 			return nil, zero, toolError(ctx, err)
 		}
 		return res, out, nil

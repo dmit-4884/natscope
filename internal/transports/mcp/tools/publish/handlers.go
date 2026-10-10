@@ -6,7 +6,6 @@ package publish
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -49,7 +48,7 @@ func (t *Toolset) requestMessage(ctx context.Context, _ *mcp.CallToolRequest, in
 		return nil, requestOutput{}, err
 	}
 
-	req := &entities.PublishRequest{Subject: strings.TrimSpace(in.Subject), Headers: in.Headers}
+	req := &entities.PublishRequest{Subject: in.Subject, Headers: in.Headers}
 	enc := publishOutput{Encoding: encodingRaw}
 	if in.JSON != nil || in.Text != "" || in.Type != "" {
 		req, enc, err = t.request(ctx, publishInput{
@@ -84,7 +83,7 @@ func (t *Toolset) requestMessage(ctx context.Context, _ *mcp.CallToolRequest, in
 }
 
 func (t *Toolset) request(ctx context.Context, in publishInput) (*entities.PublishRequest, publishOutput, error) {
-	subject := strings.TrimSpace(in.Subject)
+	subject := in.Subject
 	req := &entities.PublishRequest{Subject: subject, Headers: in.Headers}
 	out := publishOutput{Encoding: encodingRaw}
 

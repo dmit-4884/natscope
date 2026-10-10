@@ -99,7 +99,7 @@ func pageWindow(in findMessagesInput, now time.Time, cursorWithSince bool) (*tim
 		return nil, "", mcptransport.Errorf("pass either startSeq or since, not both")
 	}
 
-	direction := strings.ToLower(strings.TrimSpace(in.Direction))
+	direction := in.Direction
 	switch direction {
 	case "":
 		direction = directionBackward
@@ -115,11 +115,11 @@ func pageWindow(in findMessagesInput, now time.Time, cursorWithSince bool) (*tim
 
 // searchRequest turns a find_messages call with contains or header into a server-side search; ok is false otherwise.
 func searchRequest(in findMessagesInput, now time.Time) (*entities.MessageSearchRequest, bool, error) {
-	contains := strings.TrimSpace(in.Contains)
+	contains := in.Contains
 	if in.Regex && contains != "" {
 		contains = in.Contains
 	}
-	header := strings.TrimSpace(in.Header)
+	header := in.Header
 	if in.Regex && contains == "" {
 		return nil, false, mcptransport.Errorf("regex needs contains")
 	}
@@ -135,7 +135,7 @@ func searchRequest(in findMessagesInput, now time.Time) (*entities.MessageSearch
 	name, value, _ := strings.Cut(header, "=")
 	req := &entities.MessageSearchRequest{
 		StreamName:      in.Stream,
-		SubjectFilter:   strings.TrimSpace(in.Subject),
+		SubjectFilter:   in.Subject,
 		Direction:       direction,
 		FromTime:        since,
 		Text:            contains,
@@ -168,7 +168,7 @@ func listRequest(in findMessagesInput, now time.Time) (*entities.MessageListRequ
 	if in.StartSeq > 0 {
 		req.StartSeq = new(in.StartSeq)
 	}
-	if subject := strings.TrimSpace(in.Subject); subject != "" {
+	if subject := in.Subject; subject != "" {
 		req.SubjectFilter = &subject
 	}
 	return req, nil

@@ -25,7 +25,7 @@ func (t *Toolset) listTypes(ctx context.Context, _ *mcp.CallToolRequest, in list
 	if err != nil {
 		return nil, listTypesOutput{}, err
 	}
-	filter := strings.ToLower(strings.TrimSpace(in.Filter))
+	filter := in.Filter
 	var matched []entities.SchemaType
 	for _, m := range all {
 		if strings.Contains(strings.ToLower(m.FullName), filter) {
@@ -64,7 +64,7 @@ func (t *Toolset) describeType(ctx context.Context, _ *mcp.CallToolRequest, in t
 }
 
 func (t *Toolset) resolveSubject(ctx context.Context, _ *mcp.CallToolRequest, in subjectInput) (*mcp.CallToolResult, resolveOutput, error) {
-	subject := strings.TrimSpace(in.Subject)
+	subject := in.Subject
 	out := resolveOutput{Subject: subject}
 	m := t.mappings.Resolver(ctx).Resolve(subject)
 	if m == nil {
@@ -92,7 +92,7 @@ func (t *Toolset) listMappings(ctx context.Context, _ *mcp.CallToolRequest, _ st
 }
 
 func (t *Toolset) decode(ctx context.Context, _ *mcp.CallToolRequest, in decodeInput) (*mcp.CallToolResult, decodeOutput, error) {
-	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(in.Base64))
+	data, err := base64.StdEncoding.DecodeString(in.Base64)
 	if err != nil {
 		return nil, decodeOutput{}, mcptransport.Errorf("base64 is not valid standard base64: %v", err)
 	}
@@ -102,15 +102,15 @@ func (t *Toolset) decode(ctx context.Context, _ *mcp.CallToolRequest, in decodeI
 		messageType string
 	)
 	switch {
-	case strings.TrimSpace(in.Type) != "":
+	case in.Type != "":
 		info, lookupErr := mcptransport.LookupType(ctx, t.registry, in.Type, in.SourceID)
 		if lookupErr != nil {
 			return nil, decodeOutput{}, lookupErr
 		}
 		messageType = info.FullName
 		res, err = t.codec.Decode(ctx, entities.CodecRequest{Data: data, SourceID: info.SourceID, MessageType: info.FullName})
-	case strings.TrimSpace(in.Subject) != "":
-		m := t.mappings.Resolver(ctx).Resolve(strings.TrimSpace(in.Subject))
+	case in.Subject != "":
+		m := t.mappings.Resolver(ctx).Resolve(in.Subject)
 		if m == nil {
 			return nil, decodeOutput{}, mcptransport.Errorf("subject %q has no mapping; pass type instead", in.Subject)
 		}
@@ -136,7 +136,7 @@ func (t *Toolset) decode(ctx context.Context, _ *mcp.CallToolRequest, in decodeI
 }
 
 func (t *Toolset) detect(ctx context.Context, _ *mcp.CallToolRequest, in detectInput) (*mcp.CallToolResult, detectOutput, error) {
-	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(in.Base64))
+	data, err := base64.StdEncoding.DecodeString(in.Base64)
 	if err != nil {
 		return nil, detectOutput{}, mcptransport.Errorf("base64 is not valid standard base64: %v", err)
 	}
@@ -147,7 +147,7 @@ func (t *Toolset) detect(ctx context.Context, _ *mcp.CallToolRequest, in detectI
 	if limit <= 0 {
 		limit = defaultDetectLimit
 	}
-	candidates, err := t.codec.DetectTypes(ctx, data, strings.TrimSpace(in.SourceID), min(limit, maxDetectLimit))
+	candidates, err := t.codec.DetectTypes(ctx, data, in.SourceID, min(limit, maxDetectLimit))
 	if err != nil {
 		return nil, detectOutput{}, err
 	}

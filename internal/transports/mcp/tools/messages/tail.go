@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"sync"
 	"time"
 
@@ -67,8 +66,8 @@ func (t *Toolset) tailSubject(ctx context.Context, _ *mcp.CallToolRequest, in ta
 
 	maxMessages := mcptransport.Limit(in.MaxMessages, defaultTailMessages, maxTailMessages)
 	limit := payloadLimit(in.MaxPayloadBytes, maxMessages)
-	target := &entities.LiveSubscriptionTarget{Subject: strings.TrimSpace(in.Subject)}
-	if stream := strings.TrimSpace(in.Stream); stream != "" {
+	target := &entities.LiveSubscriptionTarget{Subject: in.Subject}
+	if stream := in.Stream; stream != "" {
 		target.StreamName = &stream
 	}
 	collector := &tailCollector{
