@@ -1,5 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
+import { Code } from '@connectrpc/connect'
+import { isErrorCode } from '@/api/errors'
 import Tooltip from '@/components/common/Tooltip'
 import { useStreamDetail } from '@/contexts/streams'
 import { useLiveStatsStore } from '@/contexts/live'
@@ -23,6 +25,7 @@ interface Stat {
 
 const RATE_OFF = '—'
 const RATE_HINT = 'The rate is measured only while Realtime is on'
+const OFFLINE_HINT = "The stream's server is down; these numbers are from before it went offline"
 const FULL = 0
 const COMPACT = 1
 const MINIMAL = 2
@@ -54,7 +57,8 @@ function StatsRow({ stats, level }: { stats: Stat[]; level: number }) {
 }
 
 export default function StreamStatsHeader({ streamName, connectionId }: StreamStatsHeaderProps) {
-  const { data: streamDetail } = useStreamDetail(streamName, connectionId)
+  const { data: streamDetail, error } = useStreamDetail(streamName, connectionId)
+  const offline = isErrorCode(error, Code.Unavailable)
   const liveStats = useLiveStatsStore((s) => s.stats)
   const containerRef = useRef<HTMLDivElement>(null)
   const measureRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -136,6 +140,13 @@ export default function StreamStatsHeader({ streamName, connectionId }: StreamSt
         level >= LEVELS.length ? 'flex-wrap' : 'overflow-hidden',
       )}
     >
+      {offline && (
+        <Tooltip content={OFFLINE_HINT}>
+          <span className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium bg-status-warning-bg text-status-warning-text">
+            Offline
+          </span>
+        </Tooltip>
+      )}
       <StatsRow stats={stats} level={Math.min(level, MINIMAL)} />
       <div aria-hidden="true" className="invisible absolute left-0 top-0 h-0 w-0 overflow-hidden">
         {LEVELS.map((l) => (

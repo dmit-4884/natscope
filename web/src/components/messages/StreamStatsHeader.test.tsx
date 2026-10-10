@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { Code, ConnectError } from '@connectrpc/connect'
 import StreamStatsHeader from './StreamStatsHeader'
 
 const { detail, liveState } = vi.hoisted(() => ({
@@ -108,6 +109,20 @@ describe('StreamStatsHeader', () => {
       expect(await screen.findByRole('tooltip')).toHaveTextContent('measured only while Realtime is on')
     } finally {
       liveState.stats = { isConnected: true, msgPerSecond: 12 }
+    }
+  })
+
+  it('says the stream is offline and its numbers are from before', async () => {
+    const withError = detail as typeof detail & { error?: unknown }
+    withError.error = new ConnectError('stream is offline', Code.Unavailable)
+    containerWidth = 800
+    try {
+      render(<StreamStatsHeader streamName="ORDERS" connectionId="conn-1" />)
+
+      fireEvent.mouseEnter(screen.getByText('Offline'))
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('from before it went offline')
+    } finally {
+      delete withError.error
     }
   })
 
