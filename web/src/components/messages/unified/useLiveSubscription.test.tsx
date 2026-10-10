@@ -15,6 +15,7 @@ interface FakeClient {
   onLink?: (connected: boolean) => void
   subscribe: ReturnType<typeof vi.fn>
   subscribeSubjects: ReturnType<typeof vi.fn>
+  disconnect: ReturnType<typeof vi.fn>
 }
 
 vi.mock('@/contexts/live', () => {
@@ -333,6 +334,35 @@ describe('useLiveSubscription subjects', () => {
     expect(result.current.messagesReceived).toBe(0)
     act(() => client.onStats?.({ messages_received: 25, messages_dropped: 3, msg_per_second: 2 }))
     expect(result.current.messagesReceived).toBe(15)
+  })
+
+  it('lets go of its connection while the page is hidden and goes on counting once it is shown', () => {
+    let visibility: DocumentVisibilityState = 'visible'
+    const spy = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+    const setVisibility = (next: DocumentVisibilityState) => {
+      visibility = next
+      document.dispatchEvent(new Event('visibilitychange'))
+    }
+    try {
+      const { result } = renderHook(() =>
+        useLiveSubscription({ connectionId: 'conn-1', streamName: null, subjects: ['>'], enabled: true, initialLimit: 100, globalStats: false }),
+      )
+      const first = clients[clients.length - 1]
+      act(() => first.onStats?.({ messages_received: 100, messages_dropped: 4, msg_per_second: 10 }))
+
+      act(() => setVisibility('hidden'))
+      expect(first.disconnect).toHaveBeenCalled()
+      expect(result.current.messagesReceived).toBe(100)
+
+      act(() => setVisibility('visible'))
+      const second = clients[clients.length - 1]
+      expect(second).not.toBe(first)
+      act(() => second.onStats?.({ messages_received: 5, messages_dropped: 1, msg_per_second: 10 }))
+      expect(result.current.messagesReceived).toBe(105)
+      expect(result.current.messagesDropped).toBe(5)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('keeps counting skipped messages when the subscription restarts', () => {

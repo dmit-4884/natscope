@@ -174,6 +174,28 @@ describe('useKVWatch', () => {
     expect(watch.calls).toHaveLength(2)
   })
 
+  it('lets go of the watch while the page is hidden and starts it again once shown', () => {
+    let visibility: DocumentVisibilityState = 'visible'
+    const spy = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+    const setVisibility = (next: DocumentVisibilityState) => {
+      visibility = next
+      document.dispatchEvent(new Event('visibilitychange'))
+    }
+    try {
+      const { hook } = setup()
+      expect(watch.calls).toHaveLength(1)
+
+      act(() => setVisibility('hidden'))
+      expect(hook.result.current.status).toBe('off')
+
+      act(() => setVisibility('visible'))
+      expect(watch.calls).toHaveLength(2)
+      expect(hook.result.current.status).toBe('starting')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('stops the watch when it is turned off', async () => {
     const { hook } = setup()
     act(() => watch.push!([]))

@@ -8,6 +8,7 @@ import {
   type WSMessagePayload,
   type WSStatsPayload,
 } from '@/contexts/live'
+import { usePageVisible } from '@/hooks/usePageVisible'
 import { matchSubject } from '@/shared/domain/subjectMatch'
 import type { LiveMessage, LiveMessageLimit, WsStatus } from './messageListUtils'
 
@@ -126,6 +127,8 @@ export function useLiveSubscription({
     setDeniedSubjects([])
   }
 
+  const visible = usePageVisible()
+  const active = enabled && visible
   const [ws, setWs] = useState<LiveStreamClient | null>(null)
   const wsRef = useRef<LiveStreamClient | null>(null)
   useEffect(() => {
@@ -278,7 +281,7 @@ export function useLiveSubscription({
   )
 
   useEffect(() => {
-    if (!connectionId || !enabled) return
+    if (!connectionId || !active) return
 
     setWsStatus('connecting')
     setIsPaused(false)
@@ -335,16 +338,14 @@ export function useLiveSubscription({
       socket.disconnect()
       setWs(null)
       setMsgPerSecond(undefined)
-      setMessagesDropped(undefined)
-      setMessagesReceived(undefined)
-      talliesRef.current = freshTallies()
+      talliesRef.current = carryTallies(talliesRef.current)
       setPausedCount(0)
       setIsPaused(false)
       stopDrip()
       clearHighlightTimers()
     }
 
-  }, [connectionId, enabled, processBatch, globalStats, setGlobalStats, clearHighlightTimers, stopDrip])
+  }, [connectionId, active, processBatch, globalStats, setGlobalStats, clearHighlightTimers, stopDrip])
 
   // Subscribe / unsubscribe when stream changes on an open connection.
   useEffect(() => {
@@ -391,7 +392,7 @@ export function useLiveSubscription({
     setMessagesReceived((prev) => (prev === undefined ? prev : 0))
   }, [stopDrip])
 
-  const opening = !!connectionId && enabled && ws === null && wsStatus === 'disconnected'
+  const opening = !!connectionId && active && ws === null && wsStatus === 'disconnected'
   const shownStatus = opening ? 'connecting' : natsDown && wsStatus === 'connected' ? 'reconnecting' : wsStatus
 
   return useMemo(

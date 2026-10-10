@@ -34,6 +34,11 @@ work queue at 1 msg/s stays readable while the server keeps running at full spee
 
 A separate dropdown caps how many live messages the buffer holds. Older ones fall off the top.
 
+A browser tab in the background lets go of its live subscriptions, Realtime, Subscribe and KV live
+updates alike, and picks them up again when you come back; messages that arrive meanwhile are not
+shown. A browser keeps only six connections open to one address, so this is what lets many natscope
+tabs stay usable.
+
 ## Subscription mode
 
 **Settings → Preferences → Live** picks how the tail subscribes:

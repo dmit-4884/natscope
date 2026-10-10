@@ -3,6 +3,7 @@ import { Code } from '@connectrpc/connect'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import * as api from '@/api/management'
 import { getErrorMessage, isErrorCode } from '@/api/errors'
+import { usePageVisible } from '@/hooks/usePageVisible'
 import type { KVChange, KVKeyList } from '@/types/management'
 import { kvKeys } from './kvKeys'
 
@@ -56,13 +57,15 @@ function applyChanges(queryClient: QueryClient, connectionId: string, bucket: st
 
 export function useKVWatch(connectionId: string | undefined, bucket: string | undefined, filter: string, enabled: boolean) {
   const queryClient = useQueryClient()
+  const visible = usePageVisible()
+  const on = enabled && visible
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<WatchState | null>(null)
   const failuresRef = useRef(0)
   const watchKey = `${connectionId}|${bucket}|${filter}|${attempt}`
 
   useEffect(() => {
-    if (!enabled || !connectionId || !bucket) return
+    if (!on || !connectionId || !bucket) return
     const key = `${connectionId}|${bucket}|${filter}|${attempt}`
     const controller = new AbortController()
     let retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -104,10 +107,10 @@ export function useKVWatch(connectionId: string | undefined, bucket: string | un
       controller.abort()
       clearTimeout(retryTimer)
     }
-  }, [enabled, connectionId, bucket, filter, attempt, queryClient])
+  }, [on, connectionId, bucket, filter, attempt, queryClient])
 
-  const current = enabled && state?.key === watchKey ? state : null
-  const status: KVWatchStatus = !enabled ? 'off' : current?.status ?? 'starting'
+  const current = on && state?.key === watchKey ? state : null
+  const status: KVWatchStatus = !on ? 'off' : current?.status ?? 'starting'
   return {
     status,
     error: current?.error,
