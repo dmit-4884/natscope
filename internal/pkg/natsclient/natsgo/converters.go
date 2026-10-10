@@ -43,15 +43,22 @@ var consumerConvertOpts = []converter.Option{
 	converter.WithFieldMappings(map[string]string{"Last": "LastActive"}),
 }
 
-// toStreamInfo converts info and sets Raw, TimeStamp and Republish (see streamConvertOpts).
+// toStreamInfo converts info and sets TimeStamp and Republish (see streamConvertOpts); lists use it as is, so the
+// server's JSON is left out of them.
 func toStreamInfo(info *jetstream.StreamInfo) *entities.StreamInfo {
 	result := converter.Convert(info, &entities.StreamInfo{}, streamConvertOpts...)
 	if info.Config.RePublish != nil {
 		result.Config.Republish = converter.Convert(info.Config.RePublish, &entities.StreamRePublish{}, srcDestToEntity)
 	}
+	result.TimeStamp = new(time.Now().UTC())
+	return result
+}
+
+// toStreamDetail is toStreamInfo plus the server's JSON in Raw, for reads of a single stream.
+func toStreamDetail(info *jetstream.StreamInfo) *entities.StreamInfo {
+	result := toStreamInfo(info)
 	rawJSON, _ := json.Marshal(info) //nolint:errcheck // jetstream.StreamInfo marshals deterministically
 	result.Raw = string(rawJSON)
-	result.TimeStamp = new(time.Now().UTC())
 	return result
 }
 

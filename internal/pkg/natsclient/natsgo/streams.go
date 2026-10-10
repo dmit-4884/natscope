@@ -162,7 +162,7 @@ func (c *Client) GetStreamInfo(ctx context.Context, streamName string) (*entitie
 		return nil, wrapErr(coreerrs.WrapOperation(err, "get stream"))
 	}
 
-	return toStreamInfo(stream.CachedInfo()), nil
+	return toStreamDetail(stream.CachedInfo()), nil
 }
 
 // GetStreamConsumers returns detailed consumer information for a stream.
@@ -300,7 +300,7 @@ func (c *Client) CreateStream(ctx context.Context, config entities.StreamCreateR
 		return nil, wrapErr(err)
 	}
 
-	return toStreamInfo(stream.CachedInfo()), nil
+	return toStreamDetail(stream.CachedInfo()), nil
 }
 
 // UpdateStream updates an existing JetStream stream configuration.
@@ -331,7 +331,7 @@ func (c *Client) UpdateStream(
 		return nil, wrapErr(err)
 	}
 
-	return toStreamInfo(stream.CachedInfo()), nil
+	return toStreamDetail(stream.CachedInfo()), nil
 }
 
 // DeleteStream deletes a JetStream stream and all its data.
@@ -463,7 +463,7 @@ func (c *Client) SealStream(ctx context.Context, name string) (*entities.StreamI
 		return nil, wrapErr(err)
 	}
 
-	return toStreamInfo(stream.CachedInfo()), nil
+	return toStreamDetail(stream.CachedInfo()), nil
 }
 
 func (c *Client) mergeStreamUpdate(
