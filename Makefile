@@ -78,25 +78,15 @@ deps: install-tools ## Install all dependencies
 
 .PHONY: install-tools
 install-tools: ## Install pinned dev tools from devtools/
-	@cd ${PROJECT_ROOT}/devtools && go install \
-		github.com/daixiang0/gci \
-		github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+	@cd ${PROJECT_ROOT}/devtools && go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 	@go install github.com/bufbuild/buf/cmd/buf@v1.65.0
 	@go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
 	@go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.2
 	@go install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@v0.6.1-0.20240319094008-0393e58bdf10
 
 .PHONY: fmt
-fmt: tidy ## Run go fmt on all go files
-	@gci write \
-		-s standard \
-		-s default \
-		-s "prefix(google.golang.org)" \
-		-s "prefix(golang.org)" \
-		-s "prefix(github.com/altessa-s/go-atlas)" \
-		-s "prefix(github.com/dmit-4884/natscope)" \
-		-s blank -s alias \
-	 $$(go list -f {{.Dir}} ./... | grep -v /proto/gen/)
+fmt: tidy ## Format Go files with the formatters configured in .golangci.yml
+	@golangci-lint fmt $$(go list -f {{.Dir}} ./... | grep -v /proto/gen/)
 
 .PHONY: lint
 lint: tidy fmt ## Run linter

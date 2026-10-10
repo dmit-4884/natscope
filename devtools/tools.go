@@ -9,6 +9,5 @@
 package devtools
 
 import (
-	_ "github.com/daixiang0/gci"
 	_ "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
 )

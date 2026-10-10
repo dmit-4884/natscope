@@ -37,11 +37,11 @@ repos:
 
   - repo: local
     hooks:
-      - id: gci
-        name: 'gci'
+      - id: golangci-lint-fmt
+        name: 'golangci-lint fmt'
         language: system
         types: [ go ]
-        entry: gci write -s standard -s default -s prefix(google.golang.org) -s prefix(golang.org) -s prefix(github.com/altessa-s/go-atlas) -s prefix(github.com/dmit-4884/natscope) -s blank -s alias
+        entry: golangci-lint fmt
       - id: go-mod-tidy
         name: 'go mod tidy'
         language: system
