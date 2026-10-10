@@ -4,8 +4,11 @@
 package live
 
 import (
+	"context"
 	"slices"
 	"time"
+
+	"github.com/altessa-s/go-atlas/core/runtime/panics"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 )
@@ -64,7 +67,7 @@ func (sess *sessionState) coverageLocked(earlier []coreTarget, subject string) c
 
 // route delivers a copy no earlier subject takes, drops one an earlier live subject takes, and holds one whose
 // earlier subjects have not proved live or been refused yet.
-func (sess *sessionState) route(earlier []coreTarget, msg *entities.NatsMessage, deliver entities.MessageHandler) {
+func (sess *sessionState) route(ctx context.Context, earlier []coreTarget, msg *entities.NatsMessage, deliver entities.MessageHandler) {
 	sess.silentMu.Lock()
 	switch sess.coverageLocked(earlier, msg.Subject) {
 	case coverageTaken:
@@ -73,7 +76,10 @@ func (sess *sessionState) route(earlier []coreTarget, msg *entities.NatsMessage,
 	case coverageUnknown:
 		if !sess.ended && len(sess.held) < maxHeldMessages && sess.heldBytes+len(msg.Data) <= maxHeldBytes {
 			held := &heldMessage{msg: msg, earlier: earlier, deliver: deliver}
-			held.timer = time.AfterFunc(holdTimeout, func() { sess.release(held) })
+			held.timer = time.AfterFunc(holdTimeout, func() {
+				defer panics.Handle(ctx)
+				sess.release(held)
+			})
 			sess.held = append(sess.held, held)
 			sess.heldBytes += len(msg.Data)
 			sess.silentMu.Unlock()

@@ -208,7 +208,7 @@ func (s *Service) startSubscriptions(
 					deliver(msg)
 					return
 				}
-				sess.route(earlier, msg, deliver)
+				sess.route(ctx, earlier, msg, deliver)
 			}
 		}
 		targetSubs, err := s.subscribeTarget(ctx, connectionID, target, mode, handler, sess)
