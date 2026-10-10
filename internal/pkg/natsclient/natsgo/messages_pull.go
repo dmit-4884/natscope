@@ -18,8 +18,18 @@ import (
 // pullRetries is how many times a pull that found no responder is repeated.
 const pullRetries = 5
 
-// pullRetryDelay is the wait before the first repeated pull; each next one waits twice as long.
+// pullRetryDelay is the wait before the first repeated pull.
 const pullRetryDelay = 25 * time.Millisecond
+
+// pullRetryFactor multiplies the wait before each next repeated pull.
+const pullRetryFactor = 2
+
+// pullRetry repeats a pull while JetStream has no responder for it yet.
+var pullRetry = retry.NewPolicy(
+	retry.WithMaxAttempts(pullRetries),
+	retry.WithNextDelay(retry.Exponential(retry.ExponentialConfig{BaseDelay: pullRetryDelay, Factor: pullRetryFactor})),
+	retry.WithShouldRetry(func(err error) bool { return errors.Is(err, nats.ErrNoResponders) }),
+)
 
 // pulledBatch is a fetched batch whose first message was already received.
 type pulledBatch struct {
@@ -49,7 +59,7 @@ func (b pulledBatch) Error() error {
 // fetchPull is consumer.Fetch that pulls again while the pull request finds no responder.
 func fetchPull(ctx context.Context, consumer jetstream.Consumer, n int, wait time.Duration) (pulledBatch, error) {
 	var pulled pulledBatch
-	err := retry.Do(ctx, func(context.Context) error {
+	err := pullRetry.Do(ctx, func(context.Context) error {
 		batch, err := consumer.Fetch(n, jetstream.FetchMaxWait(wait))
 		if err != nil {
 			return err
@@ -60,10 +70,6 @@ func fetchPull(ctx context.Context, consumer jetstream.Consumer, n int, wait tim
 		}
 		pulled = pulledBatch{first: first, batch: batch}
 		return nil
-	},
-		retry.WithMaxAttempts(pullRetries),
-		retry.WithNextDelay(func(attempt int, _ error) time.Duration { return pullRetryDelay << attempt }),
-		retry.WithShouldRetry(func(err error) bool { return errors.Is(err, nats.ErrNoResponders) }),
-	)
+	})
 	return pulled, noAnswer(err)
 }
