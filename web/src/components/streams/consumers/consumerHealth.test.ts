@@ -216,8 +216,26 @@ describe('consumerIssues lost messages for a filtered consumer', () => {
   const behind = (filter: string) =>
     consumer({ num_pending: 1, num_waiting: 1, config: { filter_subject: filter }, delivered: { consumer_seq: 5, stream_seq: 5, last_active: NOW } })
 
-  it('makes no claim about messages on subjects the consumer does not take', () => {
-    expect(kinds(behind('orders.eu'), full)).toEqual([])
+  it('warns that messages matching its filter may be lost once the stream dropped what lies before its position', () => {
+    const issues = consumerIssues(behind('orders.eu'), full, NOW)
+    expect(issues.map((i) => i.kind)).toEqual(['stream_full'])
+    expect(issues[0].label).toBe('Losing messages')
+    expect(issues[0].detail).toContain('#6–#905')
+    expect(issues[0].detail).toContain('matching its filter')
+  })
+
+  it('warns a filtered consumer that never delivered, while its filtered backlog may sit among the oldest', () => {
+    const fresh = consumer({ num_pending: 1_500_000, num_waiting: 1, config: { filter_subject: 'orders.eu' }, delivered: { consumer_seq: 0, stream_seq: 0 } })
+    const issues = consumerIssues(fresh, full, NOW)
+    expect(issues.map((i) => i.kind)).toEqual(['stream_full'])
+    expect(issues[0].label).toBe('May lose messages')
+    expect(issues[0].detail).toContain('1,500,000')
+    expect(issues[0].detail).not.toContain('The next message for this consumer is among the oldest')
+  })
+
+  it('stays quiet for a filtered consumer well ahead of the head of the stream', () => {
+    const ahead = consumer({ num_pending: 1, num_waiting: 1, config: { filter_subject: 'orders.eu' }, delivered: { consumer_seq: 5, stream_seq: 990, last_active: NOW } })
+    expect(kinds(ahead, full)).toEqual([])
   })
 
   it('still warns when its filter takes every subject of the stream', () => {

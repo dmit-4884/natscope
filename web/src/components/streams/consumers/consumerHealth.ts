@@ -85,28 +85,33 @@ function streamFillOf(stream: StreamInfo): number {
 
 function streamFullIssue(consumer: ConsumerInfo, stream: StreamInfo | undefined): ConsumerIssue | null {
   if (!stream?.state || consumer.num_pending === 0 || (stream.config.discard ?? 'old') !== 'old') return null
-  if (!seesWholeStream(consumer, stream.subjects)) return null
+  const filtered = !seesWholeStream(consumer, stream.subjects)
   const fill = streamFillOf(stream)
   const next = (consumer.delivered?.stream_seq ?? 0) + 1
   if (fill < STREAM_FULL_RATIO || next - stream.state.first_seq >= stream.messages * OLDEST_SHARE) return null
   const percent = Math.min(100, Math.floor(fill * 100))
   if (next < stream.state.first_seq && (consumer.delivered?.consumer_seq ?? 0) > 0) {
+    const dropped = `messages #${next}–#${stream.state.first_seq - 1}`
     return {
       kind: 'stream_full',
       severity: 'warning',
       label: 'Losing messages',
-      detail:
-        `Stream ${stream.name} is ${percent}% full and already dropped messages #${next}–#${stream.state.first_seq - 1} ` +
-        'before this consumer reached them. More of its messages may go the same way.',
+      detail: filtered
+        ? `Stream ${stream.name} is ${percent}% full and already dropped ${dropped} past this consumer's position. ` +
+          'Those matching its filter are lost for it, and more may go the same way.'
+        : `Stream ${stream.name} is ${percent}% full and already dropped ${dropped} before this consumer reached them. ` +
+          'More of its messages may go the same way.',
     }
   }
   return {
     kind: 'stream_full',
     severity: 'warning',
     label: 'May lose messages',
-    detail:
-      `Stream ${stream.name} is ${percent}% full and drops its oldest messages when full. ` +
-      'The next message for this consumer is among the oldest, so it may be gone before the consumer gets it.',
+    detail: filtered
+      ? `Stream ${stream.name} is ${percent}% full and drops its oldest messages when full. ` +
+        `${waiting(consumer.num_pending)} for this consumer, and those matching its filter that sit among the oldest may be gone before it gets them.`
+      : `Stream ${stream.name} is ${percent}% full and drops its oldest messages when full. ` +
+        'The next message for this consumer is among the oldest, so it may be gone before the consumer gets it.',
   }
 }
 
