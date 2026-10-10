@@ -243,6 +243,7 @@ export interface KVBucketInfo {
   max_value_size: number
   max_bytes: number
   limit_marker_ttl?: number
+  mirror_of?: string
 }
 
 export interface KVKeyList {

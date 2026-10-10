@@ -295,6 +295,20 @@ func TestHandler_DeleteConsumer(t *testing.T) {
 
 // --- KV tests ---
 
+func TestHandler_GetKVBucket_ReportsTheMirroredBucket(t *testing.T) {
+	t.Parallel()
+	svc := &mockNatsService{kvInfo: &entities.KVBucketInfo{Bucket: "CONFIG_EU", MirrorOf: "CONFIG"}}
+	handler := New(svc, svc, svc, svc, svc, nil, nil)
+
+	resp, err := handler.GetKVBucket(t.Context(), connect.NewRequest(&managementpb.GetKVBucketRequest{
+		ConnectionId: "conn-1",
+		Bucket:       "CONFIG_EU",
+	}))
+
+	require.NoError(t, err)
+	assert.Equal(t, "CONFIG", resp.Msg.Bucket.MirrorOf)
+}
+
 func TestHandler_CreateKVBucket(t *testing.T) {
 	t.Parallel()
 

@@ -387,6 +387,7 @@ function toKVBucketInfo(b: PbKVBucketInfo): KVBucketInfo {
     max_value_size: b.maxValueSize,
     max_bytes: Number(b.maxBytes),
     limit_marker_ttl: durToNanos(b.limitMarkerTtl) || undefined,
+    mirror_of: b.mirrorOf || undefined,
   }
 }
 

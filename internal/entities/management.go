@@ -560,6 +560,9 @@ type KVBucketInfo struct {
 
 	// LimitMarkerTTL is how long a marker stays after a key expires; non-zero means keys may carry their own TTL.
 	LimitMarkerTTL time.Duration
+
+	// MirrorOf is the bucket this one mirrors; empty when it is not a mirror.
+	MirrorOf string
 }
 
 // KVEntry is a single key-value pair from a KV bucket.

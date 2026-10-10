@@ -26,6 +26,7 @@ import {
   Input,
   Badge,
   Alert,
+  EmptyState,
   Spinner,
   SearchInput,
   CloseIcon,
@@ -126,6 +127,7 @@ export default function KVStorePage() {
   const { data: buckets = [] } = useKVBuckets(connectionId)
   const bucketInfo = buckets.find(b => b.bucket === bucketName)
   const allowsKeyTtl = !!bucketInfo?.limit_marker_ttl
+  const mirrorOf = bucketInfo?.mirror_of
   const keyTtl = allowsKeyTtl ? parseKeyTtl(newKeyTtl) : {}
 
   const searchText = keySearchQuery.trim()
@@ -295,19 +297,21 @@ export default function KVStorePage() {
             <OverflowMenu
               label="Bucket actions"
               items={[
-                {
-                  label: 'Edit bucket…',
-                  onSelect: () => navigate(`/kv/${encodeURIComponent(bucketName)}/edit`),
-                },
-                {
-                  label: 'Clear bucket…',
-                  destructive: true,
-                  onSelect: () => setConfirmAction({
-                    type: 'clear-bucket',
-                    name: bucketName,
-                    confirmText: '',
-                  }),
-                },
+                ...(mirrorOf ? [] : [
+                  {
+                    label: 'Edit bucket…',
+                    onSelect: () => navigate(`/kv/${encodeURIComponent(bucketName)}/edit`),
+                  },
+                  {
+                    label: 'Clear bucket…',
+                    destructive: true,
+                    onSelect: () => setConfirmAction({
+                      type: 'clear-bucket',
+                      name: bucketName,
+                      confirmText: '',
+                    }),
+                  },
+                ]),
                 {
                   label: 'Delete bucket…',
                   destructive: true,
@@ -323,413 +327,38 @@ export default function KVStorePage() {
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex min-h-0">
-        {/* Keys List */}
-        <div className="w-72 border-r bg-surface-primary flex flex-col">
-          <div className="p-3 border-b">
-            <SearchInput
-              placeholder="Search keys, or a pattern like orders.>"
-              value={keySearchQuery}
-              onChange={setKeySearchQuery}
-              debounce={200}
-              size="sm"
-              className="mb-2"
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-content-tertiary">
-                {plural(filteredKeys.length, 'key')}
-              </span>
-              {!readOnly && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label="New key"
-                  onClick={() => {
-                    setIsCreatingKey(true)
-                    setSelectedKey(null)
-                    setNewKeyName('')
-                    setNewKeyValue('')
-                    setNewKeyTtl('')
-                  }}
-                >
-                  <PlusIcon className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-            {badPattern && (
-              <p className="mt-1 text-xs text-status-warning-text">
-                Use * or &gt; as a whole part of the key, like <span className="font-mono">orders.*</span> or{' '}
-                <span className="font-mono">orders.&gt;</span>
-              </p>
-            )}
-            {keyList?.truncated && (
-              <p className="mt-1 text-xs text-content-tertiary" data-testid="kv-keys-truncated">
-                Only the first {plural(keys.length, 'key')} are loaded. Narrow the search with a pattern like{' '}
-                <span className="font-mono">orders.&gt;</span>
-              </p>
-            )}
-            <div className="mt-2 flex items-center gap-2 text-xs">
-              <Toggle
-                size="xs"
-                checked={live}
-                onChange={(on) => {
-                  setLive(on)
-                  if (!on) setListView('keys')
-                }}
-                label="Live updates"
+      {mirrorOf ? (
+        <EmptyState
+          title={`Mirror of ${mirrorOf}`}
+          description="NATS serves a mirror's keys under the name of the bucket it mirrors, so they are read and written there."
+          action={
+            <Link to={`/kv/${encodeURIComponent(mirrorOf)}`} className="text-accent hover:text-accent-text">
+              {mirrorOf}
+            </Link>
+          }
+        />
+      ) : (
+        <div className="flex-1 flex min-h-0">
+          {/* Keys List */}
+          <div className="w-72 border-r bg-surface-primary flex flex-col">
+            <div className="p-3 border-b">
+              <SearchInput
+                placeholder="Search keys, or a pattern like orders.>"
+                value={keySearchQuery}
+                onChange={setKeySearchQuery}
+                debounce={200}
+                size="sm"
+                className="mb-2"
               />
-              <span className="text-content-secondary">Live updates</span>
-              {watch.status === 'starting' && <span className="text-content-tertiary">Starting…</span>}
-              {watch.status === 'live' && (
-                <span className="flex items-center gap-1 text-status-success-text">
-                  <span className="w-1.5 h-1.5 rounded-full bg-status-success-text" aria-hidden="true" />
-                  <span>Live</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-content-tertiary">
+                  {plural(filteredKeys.length, 'key')}
                 </span>
-              )}
-            </div>
-            {watch.status === 'stopped' && (
-              <div className="mt-1 flex items-center gap-2 text-xs text-status-error-text">
-                <span className="min-w-0 truncate" title={watch.error}>Stopped: {watch.error}</span>
-                <Button size="sm" variant="ghost" onClick={watch.restart}>
-                  Restart
-                </Button>
-              </div>
-            )}
-            {live && (
-              <Tabs
-                variant="pills"
-                label="Key list view"
-                idPrefix="kv-list"
-                className="mt-2 w-fit"
-                value={listView}
-                onChange={(view) => setListView(view as 'keys' | 'changes')}
-                tabs={[
-                  { value: 'keys', label: 'Keys' },
-                  { value: 'changes', label: `Changes (${watch.changes.length})` },
-                ]}
-              />
-            )}
-          </div>
-
-          <div className="flex-1 overflow-auto" {...(live ? tabPanelProps('kv-list', listView) : {})}>
-            {live && listView === 'changes' ? (
-              watch.changes.length === 0 ? (
-                <p className="p-4 text-center text-sm text-content-tertiary">
-                  No changes yet. Changes made from now on show up here.
-                </p>
-              ) : (
-                <ul>
-                  {watch.changes.map((change) => (
-                    <li key={`${change.revision}-${change.key}`} className="border-b">
-                      <button
-                        type="button"
-                        className={`w-full text-left p-2 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
-                          selectedKey === change.key ? 'bg-accent-light' : ''
-                        }`}
-                        onClick={() => {
-                          setSelectedKey(change.key)
-                          setIsCreatingKey(false)
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="font-mono text-sm truncate min-w-0">{change.key}</span>
-                          <Badge size="sm" variant={change.operation === 'put' ? 'success' : change.operation === 'delete' ? 'warning' : 'error'}>
-                            {change.operation}
-                          </Badge>
-                        </span>
-                        <span className="block text-2xs text-content-tertiary truncate">
-                          rev {change.revision} · {formatTime(change.created)}
-                          {change.operation === 'put' && ` · ${changePreview(change)}`}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )
-            ) : keysLoading ? (
-              <div className="flex items-center justify-center p-4">
-                <Spinner size="sm" />
-              </div>
-            ) : keysError ? (
-              <div className="p-3">
-                <Alert variant="error">
-                  {getErrorMessage(keysError)}
-                </Alert>
-              </div>
-            ) : (
-              <>
-                {filteredKeys.map((key: string) => (
-                  <div
-                    key={key}
-                    className={`pr-2 border-b hover:bg-surface-secondary flex items-center justify-between group ${
-                      selectedKey === key ? 'bg-accent-light' : ''
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      aria-current={selectedKey === key ? 'true' : undefined}
-                      className="w-full text-left p-2 text-sm truncate flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus rounded"
-                      onClick={() => {
-                        setSelectedKey(key)
-                        setIsCreatingKey(false)
-                      }}
-                    >
-                      {key}
-                    </button>
-                    {!readOnly && (
-                      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-                        <Tooltip content="Purge all revisions">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              requestAction({
-                                type: 'purge-key',
-                                name: key,
-                                confirmText: '',
-                              })
-                            }}
-                            className="p-1 hover:text-orange-600"
-                            aria-label={`Purge all revisions of ${key}`}
-                          >
-                            <RefreshIcon className="w-3.5 h-3.5" />
-                          </button>
-                        </Tooltip>
-                        <Tooltip content="Delete key">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              requestAction({
-                                type: 'delete-key',
-                                name: key,
-                                confirmText: '',
-                              })
-                            }}
-                            className="p-1 hover:text-status-error-text"
-                            aria-label={`Delete key ${key}`}
-                          >
-                            <CloseIcon className="w-3.5 h-3.5" />
-                          </button>
-                        </Tooltip>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {filteredKeys.length === 0 && (
-                  <div className="p-4 text-center text-sm text-content-tertiary">
-                    {keySearchQuery ? 'No keys match your search' : 'No keys in this bucket'}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Key Editor */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {isCreatingKey && !readOnly ? (
-            <>
-              <div className="p-4 border-b bg-surface-secondary">
-                <h3 className="font-semibold text-content-primary">Create New Key</h3>
-                <p className="text-sm text-content-tertiary mt-1">
-                  Add a new key to bucket "{bucketName}"
-                </p>
-              </div>
-
-              <div className="flex-1 overflow-auto p-4 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Key Name</label>
-                  <Input
-                    value={newKeyName}
-                    onChange={(e) => setNewKeyName(e.target.value)}
-                    placeholder="my.key.name"
-                  />
-                  {newKeyTarget && (
-                    <p className="mt-1 text-xs text-content-tertiary" data-testid="kv-new-proto">
-                      Stored as Protobuf <span className="font-mono">{newKeyTarget.messageType}</span> (mapping{' '}
-                      <span className="font-mono">{newKeyTarget.pattern}</span>)
-                    </p>
-                  )}
-                </div>
-
-                {allowsKeyTtl ? (
-                  <div>
-                    <label htmlFor="kv-new-key-ttl" className="block text-sm font-medium text-gray-700 mb-1">TTL</label>
-                    <Input
-                      id="kv-new-key-ttl"
-                      value={newKeyTtl}
-                      onChange={(e) => setNewKeyTtl(e.target.value)}
-                      placeholder="e.g. 30s, 5m or 1h; empty keeps the key"
-                      error={!!keyTtl.error}
-                      errorMessage={keyTtl.error}
-                    />
-                  </div>
-                ) : (
-                  <p className="text-xs text-content-tertiary">
-                    To give keys a TTL, set a key TTL marker in the{' '}
-                    <Link to={`/kv/${encodeURIComponent(bucketName)}/edit`} className="text-accent hover:text-accent-text">
-                      bucket settings
-                    </Link>
-                    .
-                  </p>
-                )}
-
-                <div className="flex-1 flex flex-col">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
-                  <textarea
-                    value={newKeyValue}
-                    onChange={(e) => setNewKeyValue(e.target.value)}
-                    className="flex-1 w-full p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
-                    placeholder={newKeyTarget ? `JSON for ${newKeyTarget.messageType}` : 'Enter value (text or JSON)'}
-                    spellCheck={false}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 p-3 border-t bg-surface-secondary">
-                <Button variant="secondary" onClick={() => setIsCreatingKey(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveKey}
-                  disabled={putKey.isPending || !newKeyName.trim() || !!keyTtl.error}
-                >
-                  {putKey.isPending ? 'Creating...' : 'Create Key'}
-                </Button>
-              </div>
-            </>
-          ) : selectedKey ? (
-            <>
-              <div className="p-4 border-b bg-surface-secondary">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-content-primary">{selectedKey}</h3>
-                    <p className="text-sm text-content-tertiary mt-1">
-                      {keyEntry && (
-                        <span className="flex gap-2">
-                          <Badge variant="default" size="sm">Rev {keyEntry.revision}</Badge>
-                          <span>Last updated: {formatDateTime(keyEntry.created)}</span>
-                          {keyEntry.ttl && (
-                            <span data-testid="kv-key-expiry">
-                              TTL {formatNsDuration(keyEntry.ttl)}, expires {formatDateTime(keyEntry.created + keyEntry.ttl / 1_000_000)}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowHistory(true)}
-                    >
-                      History
-                    </Button>
-                    {!readOnly && (
-                      <>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => requestAction({
-                            type: 'purge-key',
-                            name: selectedKey,
-                            confirmText: '',
-                          })}
-                        >
-                          Purge
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => requestAction({
-                            type: 'delete-key',
-                            name: selectedKey,
-                            confirmText: '',
-                          })}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {target && keyEntry && (
-                <KVProtoBar
-                  bucket={bucketName}
-                  target={target}
-                  decoded={keyEntry.decoded}
-                  showRaw={showRaw}
-                  onToggleRaw={() => setRawChoice({ key: selectedKey, revision: keyEntry.revision, on: !showRaw })}
-                />
-              )}
-
-              <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-                {keyEntry?.ttl && !readOnly && (
-                  <p className="text-xs text-content-tertiary">
-                    A TTL can only be set when a key is created, so saving writes a revision without one and the key
-                    will stop expiring.
-                  </p>
-                )}
-                {changedWhileEditing && (
-                  <Alert variant="warning">
-                    This key changed on the server (revision {keyEntry.revision}) while you were editing. Saving will
-                    fail; Reset loads the new value.
-                  </Alert>
-                )}
-                {target && keyEntry?.decoded?.error && (
-                  <Alert variant="warning">
-                    The stored value does not decode as {target.messageType}: {keyEntry.decoded.error}.
-                    {!showRaw && ` Saving encodes the JSON below as ${target.messageType}.`}
-                  </Alert>
-                )}
-                {keyLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Spinner size="lg" />
-                  </div>
-                ) : target && showRaw && keyEntry ? (
-                  <WireView dataBase64={keyEntry.value} totalBytes={decodeBase64ToBytes(keyEntry.value).length} />
-                ) : (
-                  <textarea
-                    value={editingValue}
-                    onChange={(e) => setEditingValue(e.target.value)}
-                    aria-label="Key value"
-                    readOnly={readOnly}
-                    className="w-full flex-1 min-h-0 p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
-                    spellCheck={false}
-                  />
-                )}
-              </div>
-
-              {!readOnly && (
-                <div className="flex justify-end gap-2 p-3 border-t bg-surface-secondary">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setDraft(null)}
-                  >
-                    Reset
-                  </Button>
-                  <Button
-                    onClick={handleSaveKey}
-                    disabled={putKey.isPending || showRaw}
-                  >
-                    {putKey.isPending ? 'Saving...' : 'Save Value'}
-                  </Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-content-tertiary">
-              <div className="text-center">
-                <svg className="mx-auto h-12 w-12 text-content-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                <p className="text-sm mb-4">Select a key to view/edit</p>
                 {!readOnly && (
                   <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label="New key"
                     onClick={() => {
                       setIsCreatingKey(true)
                       setSelectedKey(null)
@@ -738,15 +367,401 @@ export default function KVStorePage() {
                       setNewKeyTtl('')
                     }}
                   >
-                    <PlusIcon className="w-4 h-4 mr-2" />
-                    Create New Key
+                    <PlusIcon className="w-4 h-4" />
                   </Button>
                 )}
               </div>
+              {badPattern && (
+                <p className="mt-1 text-xs text-status-warning-text">
+                  Use * or &gt; as a whole part of the key, like <span className="font-mono">orders.*</span> or{' '}
+                  <span className="font-mono">orders.&gt;</span>
+                </p>
+              )}
+              {keyList?.truncated && (
+                <p className="mt-1 text-xs text-content-tertiary" data-testid="kv-keys-truncated">
+                  Only the first {plural(keys.length, 'key')} are loaded. Narrow the search with a pattern like{' '}
+                  <span className="font-mono">orders.&gt;</span>
+                </p>
+              )}
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <Toggle
+                  size="xs"
+                  checked={live}
+                  onChange={(on) => {
+                    setLive(on)
+                    if (!on) setListView('keys')
+                  }}
+                  label="Live updates"
+                />
+                <span className="text-content-secondary">Live updates</span>
+                {watch.status === 'starting' && <span className="text-content-tertiary">Starting…</span>}
+                {watch.status === 'live' && (
+                  <span className="flex items-center gap-1 text-status-success-text">
+                    <span className="w-1.5 h-1.5 rounded-full bg-status-success-text" aria-hidden="true" />
+                    <span>Live</span>
+                  </span>
+                )}
+              </div>
+              {watch.status === 'stopped' && (
+                <div className="mt-1 flex items-center gap-2 text-xs text-status-error-text">
+                  <span className="min-w-0 truncate" title={watch.error}>Stopped: {watch.error}</span>
+                  <Button size="sm" variant="ghost" onClick={watch.restart}>
+                    Restart
+                  </Button>
+                </div>
+              )}
+              {live && (
+                <Tabs
+                  variant="pills"
+                  label="Key list view"
+                  idPrefix="kv-list"
+                  className="mt-2 w-fit"
+                  value={listView}
+                  onChange={(view) => setListView(view as 'keys' | 'changes')}
+                  tabs={[
+                    { value: 'keys', label: 'Keys' },
+                    { value: 'changes', label: `Changes (${watch.changes.length})` },
+                  ]}
+                />
+              )}
             </div>
-          )}
+
+            <div className="flex-1 overflow-auto" {...(live ? tabPanelProps('kv-list', listView) : {})}>
+              {live && listView === 'changes' ? (
+                watch.changes.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-content-tertiary">
+                    No changes yet. Changes made from now on show up here.
+                  </p>
+                ) : (
+                  <ul>
+                    {watch.changes.map((change) => (
+                      <li key={`${change.revision}-${change.key}`} className="border-b">
+                        <button
+                          type="button"
+                          className={`w-full text-left p-2 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${
+                            selectedKey === change.key ? 'bg-accent-light' : ''
+                          }`}
+                          onClick={() => {
+                            setSelectedKey(change.key)
+                            setIsCreatingKey(false)
+                          }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="font-mono text-sm truncate min-w-0">{change.key}</span>
+                            <Badge size="sm" variant={change.operation === 'put' ? 'success' : change.operation === 'delete' ? 'warning' : 'error'}>
+                              {change.operation}
+                            </Badge>
+                          </span>
+                          <span className="block text-2xs text-content-tertiary truncate">
+                            rev {change.revision} · {formatTime(change.created)}
+                            {change.operation === 'put' && ` · ${changePreview(change)}`}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : keysLoading ? (
+                <div className="flex items-center justify-center p-4">
+                  <Spinner size="sm" />
+                </div>
+              ) : keysError ? (
+                <div className="p-3">
+                  <Alert variant="error">
+                    {getErrorMessage(keysError)}
+                  </Alert>
+                </div>
+              ) : (
+                <>
+                  {filteredKeys.map((key: string) => (
+                    <div
+                      key={key}
+                      className={`pr-2 border-b hover:bg-surface-secondary flex items-center justify-between group ${
+                        selectedKey === key ? 'bg-accent-light' : ''
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        aria-current={selectedKey === key ? 'true' : undefined}
+                        className="w-full text-left p-2 text-sm truncate flex-1 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus rounded"
+                        onClick={() => {
+                          setSelectedKey(key)
+                          setIsCreatingKey(false)
+                        }}
+                      >
+                        {key}
+                      </button>
+                      {!readOnly && (
+                        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                          <Tooltip content="Purge all revisions">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                requestAction({
+                                  type: 'purge-key',
+                                  name: key,
+                                  confirmText: '',
+                                })
+                              }}
+                              className="p-1 hover:text-orange-600"
+                              aria-label={`Purge all revisions of ${key}`}
+                            >
+                              <RefreshIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="Delete key">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                requestAction({
+                                  type: 'delete-key',
+                                  name: key,
+                                  confirmText: '',
+                                })
+                              }}
+                              className="p-1 hover:text-status-error-text"
+                              aria-label={`Delete key ${key}`}
+                            >
+                              <CloseIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </Tooltip>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {filteredKeys.length === 0 && (
+                    <div className="p-4 text-center text-sm text-content-tertiary">
+                      {keySearchQuery ? 'No keys match your search' : 'No keys in this bucket'}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Key Editor */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {isCreatingKey && !readOnly ? (
+              <>
+                <div className="p-4 border-b bg-surface-secondary">
+                  <h3 className="font-semibold text-content-primary">Create New Key</h3>
+                  <p className="text-sm text-content-tertiary mt-1">
+                    Add a new key to bucket "{bucketName}"
+                  </p>
+                </div>
+
+                <div className="flex-1 overflow-auto p-4 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Key Name</label>
+                    <Input
+                      value={newKeyName}
+                      onChange={(e) => setNewKeyName(e.target.value)}
+                      placeholder="my.key.name"
+                    />
+                    {newKeyTarget && (
+                      <p className="mt-1 text-xs text-content-tertiary" data-testid="kv-new-proto">
+                        Stored as Protobuf <span className="font-mono">{newKeyTarget.messageType}</span> (mapping{' '}
+                        <span className="font-mono">{newKeyTarget.pattern}</span>)
+                      </p>
+                    )}
+                  </div>
+
+                  {allowsKeyTtl ? (
+                    <div>
+                      <label htmlFor="kv-new-key-ttl" className="block text-sm font-medium text-gray-700 mb-1">TTL</label>
+                      <Input
+                        id="kv-new-key-ttl"
+                        value={newKeyTtl}
+                        onChange={(e) => setNewKeyTtl(e.target.value)}
+                        placeholder="e.g. 30s, 5m or 1h; empty keeps the key"
+                        error={!!keyTtl.error}
+                        errorMessage={keyTtl.error}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-content-tertiary">
+                      To give keys a TTL, set a key TTL marker in the{' '}
+                      <Link to={`/kv/${encodeURIComponent(bucketName)}/edit`} className="text-accent hover:text-accent-text">
+                        bucket settings
+                      </Link>
+                      .
+                    </p>
+                  )}
+
+                  <div className="flex-1 flex flex-col">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+                    <textarea
+                      value={newKeyValue}
+                      onChange={(e) => setNewKeyValue(e.target.value)}
+                      className="flex-1 w-full p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
+                      placeholder={newKeyTarget ? `JSON for ${newKeyTarget.messageType}` : 'Enter value (text or JSON)'}
+                      spellCheck={false}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 p-3 border-t bg-surface-secondary">
+                  <Button variant="secondary" onClick={() => setIsCreatingKey(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveKey}
+                    disabled={putKey.isPending || !newKeyName.trim() || !!keyTtl.error}
+                  >
+                    {putKey.isPending ? 'Creating...' : 'Create Key'}
+                  </Button>
+                </div>
+              </>
+            ) : selectedKey ? (
+              <>
+                <div className="p-4 border-b bg-surface-secondary">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-content-primary">{selectedKey}</h3>
+                      <p className="text-sm text-content-tertiary mt-1">
+                        {keyEntry && (
+                          <span className="flex gap-2">
+                            <Badge variant="default" size="sm">Rev {keyEntry.revision}</Badge>
+                            <span>Last updated: {formatDateTime(keyEntry.created)}</span>
+                            {keyEntry.ttl && (
+                              <span data-testid="kv-key-expiry">
+                                TTL {formatNsDuration(keyEntry.ttl)}, expires {formatDateTime(keyEntry.created + keyEntry.ttl / 1_000_000)}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowHistory(true)}
+                      >
+                        History
+                      </Button>
+                      {!readOnly && (
+                        <>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => requestAction({
+                              type: 'purge-key',
+                              name: selectedKey,
+                              confirmText: '',
+                            })}
+                          >
+                            Purge
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => requestAction({
+                              type: 'delete-key',
+                              name: selectedKey,
+                              confirmText: '',
+                            })}
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {target && keyEntry && (
+                  <KVProtoBar
+                    bucket={bucketName}
+                    target={target}
+                    decoded={keyEntry.decoded}
+                    showRaw={showRaw}
+                    onToggleRaw={() => setRawChoice({ key: selectedKey, revision: keyEntry.revision, on: !showRaw })}
+                  />
+                )}
+
+                <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+                  {keyEntry?.ttl && !readOnly && (
+                    <p className="text-xs text-content-tertiary">
+                      A TTL can only be set when a key is created, so saving writes a revision without one and the key
+                      will stop expiring.
+                    </p>
+                  )}
+                  {changedWhileEditing && (
+                    <Alert variant="warning">
+                      This key changed on the server (revision {keyEntry.revision}) while you were editing. Saving will
+                      fail; Reset loads the new value.
+                    </Alert>
+                  )}
+                  {target && keyEntry?.decoded?.error && (
+                    <Alert variant="warning">
+                      The stored value does not decode as {target.messageType}: {keyEntry.decoded.error}.
+                      {!showRaw && ` Saving encodes the JSON below as ${target.messageType}.`}
+                    </Alert>
+                  )}
+                  {keyLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Spinner size="lg" />
+                    </div>
+                  ) : target && showRaw && keyEntry ? (
+                    <WireView dataBase64={keyEntry.value} totalBytes={decodeBase64ToBytes(keyEntry.value).length} />
+                  ) : (
+                    <textarea
+                      value={editingValue}
+                      onChange={(e) => setEditingValue(e.target.value)}
+                      aria-label="Key value"
+                      readOnly={readOnly}
+                      className="w-full flex-1 min-h-0 p-3 font-mono text-sm border border-border-strong rounded resize-none focus:outline-none focus:ring-2 focus:ring-border-focus"
+                      spellCheck={false}
+                    />
+                  )}
+                </div>
+
+                {!readOnly && (
+                  <div className="flex justify-end gap-2 p-3 border-t bg-surface-secondary">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setDraft(null)}
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      onClick={handleSaveKey}
+                      disabled={putKey.isPending || showRaw}
+                    >
+                      {putKey.isPending ? 'Saving...' : 'Save Value'}
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-content-tertiary">
+                <div className="text-center">
+                  <svg className="mx-auto h-12 w-12 text-content-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  <p className="text-sm mb-4">Select a key to view/edit</p>
+                  {!readOnly && (
+                    <Button
+                      onClick={() => {
+                        setIsCreatingKey(true)
+                        setSelectedKey(null)
+                        setNewKeyName('')
+                        setNewKeyValue('')
+                        setNewKeyTtl('')
+                      }}
+                    >
+                      <PlusIcon className="w-4 h-4 mr-2" />
+                      Create New Key
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Key History */}
       {showHistory && selectedKey && (

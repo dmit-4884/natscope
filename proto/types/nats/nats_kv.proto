@@ -49,6 +49,9 @@ message KVBucketInfo {
 
   // Optional. How long a marker stays after a key expires; set when keys may carry their own TTL (NATS 2.11+).
   google.protobuf.Duration limit_marker_ttl = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Bucket this one mirrors; NATS serves a mirror's keys under that bucket's name.
+  string mirror_of = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Defines the settings of an existing Key-Value bucket that can change.

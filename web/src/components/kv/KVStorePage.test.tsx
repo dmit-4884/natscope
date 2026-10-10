@@ -6,7 +6,7 @@ import KVStorePage from './KVStorePage'
 const keys = vi.hoisted(() => ({
   list: { keys: ['alpha', 'beta'], truncated: false },
   filters: [] as Array<string | undefined>,
-  buckets: [] as Array<{ bucket: string; values: number; bytes: number; limit_marker_ttl?: number }>,
+  buckets: [] as Array<{ bucket: string; values: number; bytes: number; limit_marker_ttl?: number; mirror_of?: string }>,
   watch: {
     status: 'off' as string,
     error: undefined as string | undefined,
@@ -80,6 +80,19 @@ describe('KVStorePage', () => {
     keys.watchEnabled = []
     keys.revisions = {}
     mutation.mutateAsync.mockReset()
+  })
+
+  it('sends a mirror to the bucket it mirrors instead of listing no keys', () => {
+    keys.buckets = [{ bucket: 'CONFIG', values: 190, bytes: 1, mirror_of: 'CONFIG_US' }]
+    keys.list = { keys: [], truncated: false }
+
+    renderPage()
+
+    expect(screen.getByRole('link', { name: 'CONFIG_US' })).toHaveAttribute('href', '/kv/CONFIG_US')
+    expect(screen.queryByPlaceholderText(/search keys/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /bucket actions/i }))
+    expect(screen.queryByText('Edit bucket…')).not.toBeInTheDocument()
+    expect(screen.queryByText('Clear bucket…')).not.toBeInTheDocument()
   })
 
   it('watches the bucket only after Live is turned on', () => {

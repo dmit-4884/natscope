@@ -44,9 +44,12 @@ func TestKVMirror_IsListed(t *testing.T) {
 		names = append(names, b.Bucket)
 	}
 	assert.ElementsMatch(t, []string{"CONFIG", "CONFIG_EU"}, names)
+	mirrorOf := map[string]string{}
 	for _, b := range buckets {
+		mirrorOf[b.Bucket] = b.MirrorOf
 		if b.Bucket == "CONFIG_EU" {
 			assert.Equal(t, uint64(2), b.Values)
 		}
 	}
+	assert.Equal(t, map[string]string{"CONFIG": "", "CONFIG_EU": "CONFIG"}, mirrorOf)
 }

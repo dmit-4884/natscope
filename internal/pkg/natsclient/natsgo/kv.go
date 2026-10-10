@@ -648,7 +648,16 @@ func toKVBucketInfo(status jetstream.KeyValueStatus) entities.KVBucketInfo {
 		MaxValueSize:   cfg.MaxValueSize,
 		MaxBytes:       cfg.MaxBytes,
 		LimitMarkerTTL: cfg.LimitMarkerTTL,
+		MirrorOf:       mirroredBucket(cfg.Mirror),
 	}
+}
+
+// mirroredBucket is the bucket a KV mirror source points at.
+func mirroredBucket(mirror *jetstream.StreamSource) string {
+	if mirror == nil {
+		return ""
+	}
+	return strings.TrimPrefix(mirror.Name, kvStreamPrefix)
 }
 
 // kvDuplicateWindow mirrors nats.go: two minutes, or the bucket TTL when that is shorter.
