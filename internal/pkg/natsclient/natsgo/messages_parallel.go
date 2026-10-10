@@ -222,7 +222,7 @@ func (c *Client) fetchMessagesParallel(
 		c.logger.WarnContext(ctx, "fetchMessagesParallel: fetch failed",
 			slog.Int("total", len(seqs)),
 			slog.Int("fetched_before_abort", len(msgMap)),
-			slog.String("error", err.Error()))
+			slogx.Error(err))
 		return nil, err
 	}
 

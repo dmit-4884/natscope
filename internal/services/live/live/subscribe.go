@@ -14,6 +14,8 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
+
+	slogx "github.com/altessa-s/go-atlas/observability/slog"
 )
 
 // Subscribe runs one live subscription session; emit is invoked for every
@@ -288,7 +290,7 @@ func (s *Service) subscribeTarget(
 			s.logger.Error("failed to subscribe via JetStream ordered consumer",
 				slog.String("stream", streamName),
 				slog.String("subject", target.Subject),
-				slog.String("error", err.Error()))
+				slogx.Error(err))
 			return nil, err
 		}
 		return []entities.Subscription{sub}, nil
@@ -300,7 +302,7 @@ func (s *Service) subscribeTarget(
 		if err != nil {
 			s.logger.Error("failed to get stream subjects",
 				slog.String("stream", streamName),
-				slog.String("error", err.Error()))
+				slogx.Error(err))
 			return nil, err
 		}
 		subjects = streamSubjects
@@ -314,7 +316,7 @@ func (s *Service) subscribeTarget(
 		if err != nil {
 			s.logger.Error("failed to subscribe",
 				slog.String("subject", subject),
-				slog.String("error", err.Error()))
+				slogx.Error(err))
 			lastErr = err
 			continue
 		}

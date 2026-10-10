@@ -11,6 +11,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 	"github.com/dmit-4884/natscope/internal/services/proto/registry"
 
+	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 )
 
@@ -81,7 +82,7 @@ func (d *liveDecoder) snapshotFor(ctx context.Context, m *entities.SubjectMappin
 	if err != nil {
 		slog.Debug("live: snapshot unavailable",
 			slog.String("source_id", m.SourceID),
-			slog.String("error", err.Error()))
+			slogx.Error(err))
 		return nil, err
 	}
 	d.snapshotsByKey[key] = snap
