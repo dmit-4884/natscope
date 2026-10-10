@@ -65,5 +65,5 @@ func fetchPull(ctx context.Context, consumer jetstream.Consumer, n int, wait tim
 		retry.WithNextDelay(func(attempt int, _ error) time.Duration { return pullRetryDelay << attempt }),
 		retry.WithShouldRetry(func(err error) bool { return errors.Is(err, nats.ErrNoResponders) }),
 	)
-	return pulled, err
+	return pulled, noAnswer(err)
 }

@@ -6,6 +6,7 @@ package natsgo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/nats-io/nats.go"
@@ -30,6 +31,14 @@ const jsErrCodeMessageTTLDisabled jetstream.ErrorCode = 10166
 func isAPIErrorCode(err error, code jetstream.ErrorCode) bool {
 	jsErr, ok := errors.AsType[jetstream.JetStreamError](err)
 	return ok && jsErr.APIError() != nil && jsErr.APIError().ErrorCode == code
+}
+
+// noAnswer reports a JetStream request on an existing stream that found no responder as a timeout.
+func noAnswer(err error) error {
+	if !errors.Is(err, nats.ErrNoResponders) {
+		return err
+	}
+	return fmt.Errorf("%w: JetStream did not answer, try again: %w", errs.ErrNATSTimeout, err)
 }
 
 // natsSentinelMap maps NATS/JetStream SDK sentinels → domain errs sentinels,

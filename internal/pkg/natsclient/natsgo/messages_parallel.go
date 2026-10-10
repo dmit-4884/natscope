@@ -251,7 +251,7 @@ func (c *Client) getMsgWithRetry(
 		retry.WithShouldRetry(fetchRetryable(ctx)),
 	)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, wrapErr(noAnswer(err))
 	}
 	return msg, nil
 }

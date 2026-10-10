@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dmit-4884/natscope/internal/entities"
+	"github.com/dmit-4884/natscope/internal/errs"
 )
 
 type refusingConsumer struct {
@@ -116,6 +117,34 @@ func TestScanConsumerFrom_ReadsPastARefusedPull(t *testing.T) {
 
 	require.NoError(t, scanErr)
 	assert.Equal(t, []uint64{7}, seqs)
+}
+
+type refusingStream struct {
+	jetstream.Stream
+}
+
+func (refusingStream) GetMsg(context.Context, uint64, ...jetstream.GetMsgOpt) (*jetstream.RawStreamMsg, error) {
+	return nil, nats.ErrNoResponders
+}
+
+func TestNoAnswer_IsATimeoutNotADisabledJetStream(t *testing.T) {
+	t.Parallel()
+	c := &Client{}
+	always := &refusingConsumer{refusals: 1 << 30}
+
+	_, browseErr := c.fetchBrowseWindow(t.Context(), always, 1, time.Second, func(uint64) bool { return false })
+	var scanErr error
+	c.scanConsumerFrom(t.Context(), consumerStream{consumer: always}, entities.ScanOptions{FromSeq: 1, ToSeq: 1}, 1, time.Second,
+		func(_ *entities.Message, err error) bool {
+			scanErr = err
+			return false
+		})
+	_, getErr := c.getMsgWithRetry(t.Context(), refusingStream{}, 1)
+
+	for name, err := range map[string]error{"browse": browseErr, "scan": scanErr, "get": getErr} {
+		require.ErrorIs(t, err, errs.ErrNATSTimeout, name)
+		assert.NotErrorIs(t, err, errs.ErrJetStreamNotEnabled, name)
+	}
 }
 
 func pulledSubjects(batch pulledBatch) []string {
