@@ -10,7 +10,9 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/altessa-s/go-atlas/core/collections/slices"
+	"github.com/altessa-s/go-atlas/core/runtime/panics"
 	"github.com/altessa-s/go-atlas/domain/converter"
+	"github.com/altessa-s/go-atlas/domain/proto/fieldbehavior"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -188,8 +190,8 @@ func toProtoConnection(conn *entities.SavedConnection) *natspb.SavedConnection {
 	return pb
 }
 
-// redactSecrets clears every secret value on the wire message and sets the
-// matching presence flag when a value was stored.
+// redactSecrets sets the presence flag of every stored secret, then strips the
+// INPUT_ONLY secret values from the wire message.
 func redactSecrets(pb *natspb.SavedConnection) {
 	if a := pb.GetAuth(); a != nil {
 		a.HasPassword = a.Password != nil
@@ -197,12 +199,11 @@ func redactSecrets(pb *natspb.SavedConnection) {
 		a.HasNkeySeed = a.NkeySeed != nil
 		a.HasCredentials = a.Credentials != nil
 		a.HasJwt = a.Jwt != nil
-		a.Password, a.Token, a.NkeySeed, a.Credentials, a.Jwt = nil, nil, nil, nil, nil
 	}
 	if t := pb.GetTls(); t != nil {
 		t.HasClientKey = t.ClientKey != nil
-		t.ClientKey = nil
 	}
+	panics.MustError(fieldbehavior.StripResponse(pb))
 }
 
 // ListCliContexts lists nats CLI contexts on this host or in uploaded files, without their secrets.

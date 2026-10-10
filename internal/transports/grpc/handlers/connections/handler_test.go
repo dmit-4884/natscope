@@ -409,3 +409,31 @@ func TestHandler_CliContexts_ProxiedRequestsDoNotReadTheHost(t *testing.T) {
 		})
 	}
 }
+
+func TestHandler_List_NeverEchoesSecrets(t *testing.T) {
+	t.Parallel()
+	conn := entities.SavedConnectionNew()
+	conn.Auth = &entities.AuthConfig{
+		Method: entities.AuthMethodToken, Username: new("svc"),
+		Password: new("p"), Token: new("t"), NkeySeed: new("s"), Credentials: new("c"), JWT: new("j"),
+	}
+	conn.TLS = &entities.TlsConfig{CaCert: new("ca"), ClientKey: new("key")}
+	handler := New(&mockConnService{listResult: &entities.List[entities.SavedConnections]{Items: entities.SavedConnections{conn}}})
+
+	resp, err := handler.ListConnections(t.Context(), connect.NewRequest(&connectionspb.ListConnectionsRequest{}))
+
+	require.NoError(t, err)
+	require.Len(t, resp.Msg.GetConnections(), 1)
+	auth := resp.Msg.GetConnections()[0].GetAuth()
+	assert.Equal(t, "svc", auth.GetUsername())
+	assert.Nil(t, auth.Password)
+	assert.Nil(t, auth.Token)
+	assert.Nil(t, auth.NkeySeed)
+	assert.Nil(t, auth.Credentials)
+	assert.Nil(t, auth.Jwt)
+	assert.True(t, auth.GetHasPassword() && auth.GetHasToken() && auth.GetHasNkeySeed() && auth.GetHasCredentials() && auth.GetHasJwt())
+	tls := resp.Msg.GetConnections()[0].GetTls()
+	assert.Equal(t, "ca", tls.GetCaCert())
+	assert.Nil(t, tls.ClientKey)
+	assert.True(t, tls.GetHasClientKey())
+}

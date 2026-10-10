@@ -34,19 +34,19 @@ message AuthConfig {
   optional string username = 2;
 
   // Optional. Password for USER_PASSWORD auth.
-  optional string password = 3;
+  optional string password = 3 [(google.api.field_behavior) = INPUT_ONLY];
 
   // Optional. Token for TOKEN auth.
-  optional string token = 4;
+  optional string token = 4 [(google.api.field_behavior) = INPUT_ONLY];
 
   // Optional. NKey seed content for NKEY auth (e.g., "SUAM...").
-  optional string nkey_seed = 5;
+  optional string nkey_seed = 5 [(google.api.field_behavior) = INPUT_ONLY];
 
   // Optional. Full credentials file content for CREDENTIALS auth (.creds file).
-  optional string credentials = 6;
+  optional string credentials = 6 [(google.api.field_behavior) = INPUT_ONLY];
 
   // Optional. JWT content for CREDENTIALS auth. Used as alternative to full credentials file.
-  optional string jwt = 7;
+  optional string jwt = 7 [(google.api.field_behavior) = INPUT_ONLY];
 
   // Secret-presence flags. The secret *values* above are input-only: the server
   // never echoes them back. These read-only booleans tell the UI whether a
@@ -67,7 +67,7 @@ message TlsConfig {
   optional string client_cert = 2;
 
   // Optional. Client private key in PEM format. Required for mutual TLS authentication.
-  optional string client_key = 3;
+  optional string client_key = 3 [(google.api.field_behavior) = INPUT_ONLY];
 
   // Optional. Skip server certificate verification. Use only in development/testing.
   bool skip_verify = 4;
