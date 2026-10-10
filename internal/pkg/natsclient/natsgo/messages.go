@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/altessa-s/go-atlas/core/errors"
 
@@ -59,13 +60,23 @@ func (c *Client) GetMessages(
 		return nil, wrapErr(errors.WrapOperation(err, "get stream"))
 	}
 
-	info := stream.CachedInfo()
+	return c.getMessagesByGet(ctx, stream, stream.CachedInfo(), opts.SubjectFilter, opts.StartSeq, limit, direction)
+}
 
-	if opts.SubjectFilter != "" {
-		return c.getMessagesWithSubjectFilter(ctx, stream, info, opts.SubjectFilter, opts.StartSeq, limit, direction)
+// getMessagesByGet reads a page with per-sequence gets, which never consume a message.
+func (c *Client) getMessagesByGet(
+	ctx context.Context,
+	stream jetstream.Stream,
+	info *jetstream.StreamInfo,
+	subjectFilter string,
+	startSeq uint64,
+	limit int,
+	direction string,
+) (*entities.MessagesResponse, error) {
+	if subjectFilter != "" {
+		return c.getMessagesWithSubjectFilter(ctx, stream, info, subjectFilter, startSeq, limit, direction)
 	}
-
-	return c.getMessagesParallel(ctx, stream, info, opts.StartSeq, limit, direction)
+	return c.getMessagesParallel(ctx, stream, info, startSeq, limit, direction)
 }
 
 // GetMessage fetches a single message by sequence number.

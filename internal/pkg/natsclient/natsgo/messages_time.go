@@ -85,7 +85,7 @@ func (c *Client) resolveSeqByTime(
 		return 0, nil
 	}
 
-	if fetchMethod == fetchMethodConsumer {
+	if fetchMethod == fetchMethodConsumer && info.Config.Retention != jetstream.WorkQueuePolicy {
 		return c.resolveSeqByTimeConsumer(ctx, stream, info, target)
 	}
 	return c.resolveSeqByTimeDirect(ctx, stream, info, target)

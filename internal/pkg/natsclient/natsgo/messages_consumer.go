@@ -58,7 +58,7 @@ func (c *Client) getMessagesViaConsumer(
 
 	info := stream.CachedInfo()
 	if info != nil && info.Config.Retention == jetstream.WorkQueuePolicy {
-		return nil, errs.ErrWorkQueueConsumerNotAllowed
+		return c.getMessagesByGet(ctx, stream, info, subjectFilter, startSeq, limit, direction)
 	}
 	// An empty stream has no valid start sequence, so return an empty page.
 	if info != nil && info.State.Msgs == 0 {
