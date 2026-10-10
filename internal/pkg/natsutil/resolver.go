@@ -7,13 +7,14 @@ import (
 	"cmp"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
+
+	"github.com/altessa-s/go-atlas/core/runtime/panics"
+	"github.com/altessa-s/go-atlas/data/cache/lru"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 )
 
-// maxResolverCacheEntries bounds the wildcard-resolution cache; lookups past the cap use the linear scan.
+// maxResolverCacheEntries bounds the wildcard-resolution cache; the least recently used subjects are evicted past it.
 const maxResolverCacheEntries = 10000
 
 // MappingResolver resolves NATS subjects to SubjectMapping entries deterministically.
@@ -24,13 +25,7 @@ type MappingResolver struct {
 	wild  []*entities.SubjectMapping
 
 	// cache memoizes wildcard Resolve results per subject, nil included.
-	cache     sync.Map
-	cacheSize atomic.Int64
-}
-
-// resolverCacheEntry wraps a possibly nil mapping so a cached miss differs from no entry.
-type resolverCacheEntry struct {
-	mapping *entities.SubjectMapping
+	cache *lru.ShardedCache[string, *entities.SubjectMapping]
 }
 
 // NewMappingResolver builds a resolver from the given mappings.
@@ -39,6 +34,7 @@ func NewMappingResolver(ms entities.SubjectMappings) *MappingResolver {
 	r := &MappingResolver{
 		exact: make(map[string]*entities.SubjectMapping, len(ms)),
 		wild:  make([]*entities.SubjectMapping, 0, len(ms)),
+		cache: panics.MustResult(lru.NewShardedCache[string, *entities.SubjectMapping](maxResolverCacheEntries)),
 	}
 	for _, m := range ms {
 		if m == nil {
@@ -77,10 +73,8 @@ func (r *MappingResolver) Resolve(subject string) *entities.SubjectMapping {
 		return nil
 	}
 
-	if v, ok := r.cache.Load(subject); ok {
-		if entry, ok := v.(resolverCacheEntry); ok {
-			return entry.mapping
-		}
+	if m, ok := r.cache.Get(subject); ok {
+		return m
 	}
 
 	subjectTokens := strings.Split(subject, ".")
@@ -92,11 +86,7 @@ func (r *MappingResolver) Resolve(subject string) *entities.SubjectMapping {
 		}
 	}
 
-	if r.cacheSize.Load() < maxResolverCacheEntries {
-		if _, loaded := r.cache.LoadOrStore(subject, resolverCacheEntry{mapping: found}); !loaded {
-			r.cacheSize.Add(1)
-		}
-	}
+	r.cache.Put(subject, found)
 	return found
 }
 

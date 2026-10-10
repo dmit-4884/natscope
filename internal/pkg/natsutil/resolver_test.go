@@ -145,8 +145,24 @@ func TestResolver_CacheBoundedSize(t *testing.T) {
 		r.Resolve(fmt.Sprintf("wild.%d", i))
 	}
 
-	if got := r.cacheSize.Load(); got > maxResolverCacheEntries {
+	if got := r.cache.Len(); got > maxResolverCacheEntries {
 		t.Fatalf("cache grew past the cap: %d > %d", got, maxResolverCacheEntries)
+	}
+}
+
+// TestResolver_CacheKeepsRecentSubjectsPastTheCap checks that new subjects still get cached once the cap is reached.
+func TestResolver_CacheKeepsRecentSubjectsPastTheCap(t *testing.T) {
+	r := NewMappingResolver(entities.SubjectMappings{
+		mapping("w", "wild.>", "T1", "src", 100),
+	})
+	last := ""
+	for i := range maxResolverCacheEntries + 500 {
+		last = fmt.Sprintf("wild.%d", i)
+		r.Resolve(last)
+	}
+
+	if !r.cache.Has(last) {
+		t.Fatalf("the most recent subject %q is not cached", last)
 	}
 }
 
@@ -160,6 +176,26 @@ func BenchmarkResolve10kWildcards(b *testing.B) {
 	for b.Loop() {
 		r.Resolve("wild.09999.created")
 	}
+}
+
+func BenchmarkResolveParallel(b *testing.B) {
+	ms := make(entities.SubjectMappings, 0, 1000)
+	for i := range 1000 {
+		ms = append(ms, mapping(fmt.Sprintf("m%d", i), fmt.Sprintf("wild.%04d.*", i), "T", "src", int64(i)))
+	}
+	r := NewMappingResolver(ms)
+	subjects := make([]string, 0, 1000)
+	for i := range 1000 {
+		subjects = append(subjects, fmt.Sprintf("wild.%04d.created", i))
+	}
+
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			r.Resolve(subjects[i%len(subjects)])
+			i++
+		}
+	})
 }
 
 func TestSpecificity(t *testing.T) {
