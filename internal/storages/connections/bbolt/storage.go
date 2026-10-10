@@ -12,6 +12,8 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/altessa-s/go-atlas/core/types/ptr"
+
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
@@ -163,9 +165,7 @@ func (s *Storage) List(
 		items = append(items, e)
 	}
 	out := &entities.List[entities.SavedConnections]{Items: items, Total: total}
-	if next != "" {
-		out.NextCursor = new(next)
-	}
+	out.NextCursor = ptr.WrapNonZero(next)
 	return out, nil
 }
 

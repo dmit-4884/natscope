@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/normalizer"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -107,12 +108,10 @@ func (s *Service) Publish(ctx context.Context, in *entities.PublishRequest) (*en
 
 	s.recordHistory(ctx, in, ack, len(data), nil)
 	result := &entities.PublishResult{
-		Stream:    ack.Stream,
-		Sequence:  ack.Sequence,
-		Duplicate: ack.Duplicate,
-	}
-	if ack.Value != "" {
-		result.CounterValue = &ack.Value
+		Stream:       ack.Stream,
+		Sequence:     ack.Sequence,
+		Duplicate:    ack.Duplicate,
+		CounterValue: ptr.WrapNonZero(ack.Value),
 	}
 	return result, nil
 }
@@ -219,9 +218,7 @@ func (s *Service) recordHistory(
 	if ack != nil {
 		create.Stream = ack.Stream
 		create.Duplicate = ack.Duplicate
-		if ack.Sequence > 0 {
-			create.Sequence = &ack.Sequence
-		}
+		create.Sequence = ptr.WrapNonZero(ack.Sequence)
 	}
 
 	if _, err := s.historyService.Record(ctx, create); err != nil {

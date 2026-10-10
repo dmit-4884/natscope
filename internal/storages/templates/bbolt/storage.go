@@ -8,6 +8,7 @@ package bbolt
 import (
 	"context"
 
+	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -86,9 +87,7 @@ func (s *Storage) List(
 		Items: bbstore.ToEntities[entities.MessageTemplate](docs),
 		Total: total,
 	}
-	if next != "" {
-		out.NextCursor = new(next)
-	}
+	out.NextCursor = ptr.WrapNonZero(next)
 	return out, nil
 }
 
