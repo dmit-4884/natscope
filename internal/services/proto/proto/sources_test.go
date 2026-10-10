@@ -548,6 +548,23 @@ func TestCreateSource(t *testing.T) {
 		assert.False(t, env.watcher.isWatching(plain.Id))
 	})
 
+	t.Run("a watched local source builds its schema without a refresh", func(t *testing.T) {
+		t.Parallel()
+		env := newTestEnv(t)
+		dir := t.TempDir()
+		writeTree(t, dir, map[string]string{"shop.proto": orderV1})
+
+		src, err := env.svc.CreateSource(t.Context(), &entities.ProtoSourceCreate{
+			Name: "watched", SourceType: entities.SourceTypeLocal, LocalPath: &dir, WatcherEnabled: new(true),
+		})
+
+		require.NoError(t, err)
+		require.Eventually(t, func() bool {
+			ok, _ := env.svc.hasSchema(t.Context(), src.Id, LocalRevision)
+			return ok
+		}, 10*time.Second, 20*time.Millisecond)
+	})
+
 	t.Run("duplicate name", func(t *testing.T) {
 		t.Parallel()
 		env := newTestEnv(t)
@@ -621,6 +638,20 @@ func TestSetWatcher(t *testing.T) {
 
 	_, err = env.svc.SetWatcher(t.Context(), "missing", true)
 	require.ErrorIs(t, err, errs.ErrProtoSourceNotFound)
+}
+
+func TestSetWatcher_BuildsAMissingSchema(t *testing.T) {
+	t.Parallel()
+	env := newTestEnv(t)
+	local, _ := env.createLocal(t, map[string]string{"shop.proto": orderV1})
+
+	_, err := env.svc.SetWatcher(t.Context(), local.Id, true)
+
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		ok, _ := env.svc.hasSchema(t.Context(), local.Id, LocalRevision)
+		return ok
+	}, 10*time.Second, 20*time.Millisecond)
 }
 
 func TestValidateLocalPath(t *testing.T) {

@@ -78,6 +78,22 @@ func (s *Service) warmUp(ctx context.Context, src *entities.ProtoSource) {
 	s.logRefresh(ctx, src)
 }
 
+// watchLocal starts watching a local source's directory and, for an enabled source without a schema, builds one in
+// the background, so a watched source decodes without waiting for a file change, a refresh or a restart.
+func (s *Service) watchLocal(ctx context.Context, src *entities.ProtoSource) {
+	if s.fileWatcher != nil {
+		_ = s.fileWatcher.Watch(src.Id, *src.LocalPath) //nolint:errcheck // best-effort: the caller can re-toggle the watcher
+	}
+	if !src.Enabled {
+		return
+	}
+	bg := context.WithoutCancel(ctx)
+	go func() {
+		defer panics.Handle(bg)
+		s.warmUp(bg, src)
+	}()
+}
+
 func (s *Service) logRefresh(ctx context.Context, src *entities.ProtoSource) {
 	if _, _, err := s.RefreshSource(ctx, src.Id); err != nil {
 		s.logger.WarnContext(ctx, "startup: refresh source failed", slog.String("source_id", src.Id), slogx.Error(err))

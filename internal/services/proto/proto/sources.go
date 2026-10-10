@@ -71,9 +71,8 @@ func (s *Service) CreateSource(ctx context.Context, in *entities.ProtoSourceCrea
 		return nil, err
 	}
 
-	// Start filewatcher for local sources with watcher enabled.
-	if s.fileWatcher != nil && source.SourceType == entities.SourceTypeLocal && source.WatcherEnabled && source.LocalPath != nil {
-		_ = s.fileWatcher.Watch(source.Id, *source.LocalPath) //nolint:errcheck // best-effort
+	if source.SourceType == entities.SourceTypeLocal && source.WatcherEnabled && source.LocalPath != nil {
+		s.watchLocal(ctx, source)
 	}
 
 	s.logger.InfoContext(ctx, "created proto source",
@@ -206,12 +205,11 @@ func (s *Service) SetWatcher(ctx context.Context, sourceID string, enabled bool)
 		return nil, err
 	}
 
-	if s.fileWatcher != nil {
-		if enabled && source.LocalPath != nil {
-			_ = s.fileWatcher.Watch(sourceID, *source.LocalPath) //nolint:errcheck // best-effort: caller can re-toggle watcher
-		} else {
-			s.fileWatcher.Unwatch(sourceID)
-		}
+	switch {
+	case enabled && source.LocalPath != nil:
+		s.watchLocal(ctx, source)
+	case s.fileWatcher != nil:
+		s.fileWatcher.Unwatch(sourceID)
 	}
 
 	s.logger.InfoContext(ctx, "watcher state changed",
