@@ -10,8 +10,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
@@ -105,7 +103,7 @@ func (s *Storage) List(
 	}
 	out := &entities.List[entities.ProtoSources]{Items: items, Total: total}
 	if next != "" {
-		out.NextCursor = ptr.Wrap(next)
+		out.NextCursor = new(next)
 	}
 	return out, nil
 }

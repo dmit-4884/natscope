@@ -14,8 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 )
@@ -315,8 +313,8 @@ func TestRequireFeatures_RefusedLevelDoesNotHoldTheCall(t *testing.T) {
 	})
 	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
 		URLs:       []string{url},
-		Auth:       &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("pw")},
-		Connection: &entities.ConnectionConfig{JetstreamDomain: ptr.Wrap("hub")},
+		Auth:       &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: new("app"), Password: new("pw")},
+		Connection: &entities.ConnectionConfig{JetstreamDomain: new("hub")},
 	})
 	require.NoError(t, err)
 	t.Cleanup(conn.Close)
@@ -350,7 +348,7 @@ func TestRequireFeatures_TheDefaultJetStreamGatesOnTheConnectedServer(t *testing
 	})
 	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
 		URLs: []string{url},
-		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("pw")},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: new("app"), Password: new("pw")},
 	})
 	require.NoError(t, err)
 	t.Cleanup(conn.Close)

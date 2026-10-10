@@ -10,8 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
@@ -167,7 +165,7 @@ func TestTemplates_ListPagination(t *testing.T) {
 		}
 	}
 	page, err := s.List(ctx, &entities.MessageTemplatesList{
-		ListBase: entities.ListBase{Limit: ptr.Wrap(int64(2)), IncludeTotalCount: true},
+		ListBase: entities.ListBase{Limit: new(int64(2)), IncludeTotalCount: true},
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)

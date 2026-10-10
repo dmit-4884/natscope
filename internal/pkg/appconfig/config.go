@@ -13,16 +13,19 @@ import (
 
 	"github.com/go-ozzo/ozzo-validation/v4"
 
-	"github.com/altessa-s/go-atlas/config"
+	"github.com/altessa-s/go-atlas/config/http"
 	"github.com/altessa-s/go-atlas/config/loader"
 	"github.com/altessa-s/go-atlas/config/loader/backend/yaml3"
+	"github.com/altessa-s/go-atlas/config/node"
+	"github.com/altessa-s/go-atlas/config/observability"
+	"github.com/altessa-s/go-atlas/config/validation"
 
 	"github.com/dmit-4884/natscope/internal/pkg/logconsole"
 )
 
 // Config is the main natscope service configuration.
 type Config struct {
-	Logger *config.Logger `yaml:"logger"`
+	Logger *observabilityconfig.Logger `yaml:"logger"`
 
 	// GRPCWebAddress serves Connect/gRPC/gRPC-web plus the embedded SPA.
 	GRPCWebAddress string `yaml:"grpcWebAddress" default:"127.0.0.1:4280"`
@@ -42,11 +45,11 @@ type Config struct {
 	WebAuth *WebAuthConfig `yaml:"webAuth" default:"-"`
 
 	// Node supplies only a static service instance ID via Node.Id.
-	Node *config.Node `yaml:"node" default:"-"`
+	Node *nodeconfig.Config `yaml:"node" default:"-"`
 
-	Http *config.Http `yaml:"http" default:"-"`
+	Http *httpconfig.Config `yaml:"http" default:"-"`
 
-	Metrics *config.Metrics `yaml:"metrics" default:"-"`
+	Metrics *observabilityconfig.Metrics `yaml:"metrics" default:"-"`
 
 	// Storage. No default:"-" so the loader allocates it and applies nested
 	// storage defaults even when the YAML omits the section.
@@ -78,7 +81,7 @@ type SecretsConfig struct {
 
 // Validate restricts Backend to the known vault backends.
 func (c *SecretsConfig) Validate() error {
-	return validation.ValidateStruct(c,
+	return validationconfig.ValidateStruct(c,
 		validation.Field(&c.Backend, validation.In(
 			SecretsBackendAuto, SecretsBackendKeyring, SecretsBackendFile)),
 	)
@@ -101,7 +104,7 @@ func (c *Config) SecretsFileKey() string {
 }
 
 // Load loads the configuration from the specified file or files.
-func Load(filePath string, logger *config.Logger) (*Config, error) {
+func Load(filePath string, logger *observabilityconfig.Logger) (*Config, error) {
 	if filePath != "" {
 		if err := validateConfigPath(filePath); err != nil {
 			return nil, err
@@ -125,12 +128,6 @@ func Load(filePath string, logger *config.Logger) (*Config, error) {
 		return nil, err
 	}
 
-	if filePath != "" {
-		if err := checkKnownFields(filePath); err != nil {
-			return nil, err
-		}
-	}
-
 	conf := cfg.Config().(*Config) //nolint:errcheck
 
 	if err := conf.Validate(); err != nil {
@@ -142,7 +139,7 @@ func Load(filePath string, logger *config.Logger) (*Config, error) {
 
 // Validate validates the configuration.
 func (c *Config) Validate() error {
-	return validation.ValidateStruct(c,
+	return validationconfig.ValidateStruct(c,
 		validation.Field(&c.Logger, validation.NilOrNotEmpty, validation.By(validateLoggerOutputFormat)),
 		validation.Field(&c.Node, validation.NilOrNotEmpty),
 		validation.Field(&c.Http, validation.NilOrNotEmpty, validation.By(validateHTTP), validation.Skip),
@@ -155,7 +152,7 @@ func (c *Config) Validate() error {
 
 // validateHTTP applies go-atlas's rules, except the listen address only has to parse as host:port.
 func validateHTTP(value any) error {
-	h, ok := value.(*config.Http)
+	h, ok := value.(*httpconfig.Config)
 	if !ok || h == nil {
 		return nil
 	}
@@ -169,11 +166,11 @@ func validateHTTP(value any) error {
 }
 
 // knownLogOutputFormats lists go-atlas's text and json formats plus [logconsole.Format].
-var knownLogOutputFormats = []string{config.LogFormatText, config.LogFormatJSON, logconsole.Format}
+var knownLogOutputFormats = []string{observabilityconfig.LogFormatText, observabilityconfig.LogFormatJSON, logconsole.Format}
 
 // validateLoggerOutputFormat rejects an OutputFormat not in knownLogOutputFormats.
 func validateLoggerOutputFormat(value any) error {
-	l, ok := value.(*config.Logger)
+	l, ok := value.(*observabilityconfig.Logger)
 	if !ok || l == nil || l.OutputFormat == "" {
 		return nil
 	}
@@ -209,7 +206,7 @@ type WebAuthConfig struct {
 
 // Validate requires both credentials to be non-blank once the section is present.
 func (c *WebAuthConfig) Validate() error {
-	return validation.ValidateStruct(c,
+	return validationconfig.ValidateStruct(c,
 		validation.Field(&c.Username, validation.Required, validation.By(notBlank)),
 		validation.Field(&c.Password, validation.Required, validation.By(notBlank)),
 	)

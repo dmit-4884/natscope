@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
 	"github.com/dmit-4884/natscope/internal/pkg/secrets"
@@ -42,12 +40,12 @@ func TestSources_LastCompileAndChildrenRoundTrip(t *testing.T) {
 		p.SourceType = entities.SourceTypeGit
 		p.Enabled = true
 		p.Repository = "https://example.com/repo.git"
-		p.Token = ptr.Wrap("plain-token")
+		p.Token = new("plain-token")
 		p.WatcherEnabled = false
 		p.ImportRoots = []string{"root1"}
 		p.ExcludePrefixes = []string{"gen", "pb"}
 		p.LastCompile = &entities.ProtoCompileResult{
-			At: 1700000000, Ok: true, Error: ptr.Wrap("warn"),
+			At: 1700000000, Ok: true, Error: new("warn"),
 			MessageCount: 1434, FileCount: 283, RootsOrigin: "buf",
 			Diagnostics: []entities.CompileDiagnostic{
 				{Severity: entities.DiagnosticWarning, File: "a/x.proto", Line: 12, Column: 3, Message: "m", MissingImport: "google/x.proto", Hint: "add inc"},

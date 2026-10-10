@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
 )
 
@@ -93,7 +91,7 @@ func TestSaveGetRoundTrip(t *testing.T) {
 	ctx := t.Context()
 
 	in := mk("w1", "alpha", 100)
-	in.Color = ptr.Wrap("red")
+	in.Color = new("red")
 	in.Tags = []string{"a", "b"}
 	in.Spec = &widgetSpec{Size: 7, Note: "hi"}
 	if err := s.Save(ctx, in); err != nil {
@@ -348,7 +346,7 @@ func TestListByListAllDeleteBy(t *testing.T) {
 	ctx := t.Context()
 	mkc := func(id, color string) *widget {
 		w := mk(id, id, 1)
-		w.Color = ptr.Wrap(color)
+		w.Color = new(color)
 		return w
 	}
 	for _, w := range []*widget{mkc("a", "red"), mkc("b", "red"), mkc("c", "blue")} {
@@ -388,7 +386,7 @@ func TestListFiltered(t *testing.T) {
 	ctx := t.Context()
 	mkc := func(id, color string, created int64) *widget {
 		w := mk(id, id, created)
-		w.Color = ptr.Wrap(color)
+		w.Color = new(color)
 		return w
 	}
 	for _, w := range []*widget{mkc("a", "red", 1), mkc("b", "red", 2), mkc("c", "blue", 3)} {

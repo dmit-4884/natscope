@@ -5,12 +5,9 @@ package appconfig
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/altessa-s/go-atlas/core/runtime/appinfo"
 )
@@ -25,52 +22,6 @@ func validateConfigPath(filePath string) error {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	if ext != ".yaml" && ext != ".yml" {
 		return fmt.Errorf("unsupported config file extension %q (expected .yaml or .yml): %s", filepath.Ext(filePath), filePath)
-	}
-	return nil
-}
-
-// checkKnownFields re-decodes the config file(s) with strict field checking to catch unknown keys.
-func checkKnownFields(filePath string) error {
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return nil // the real loader reports this
-	}
-	if !info.IsDir() {
-		return checkKnownFieldsFile(filePath)
-	}
-	entries, err := os.ReadDir(filePath)
-	if err != nil {
-		return nil
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext != ".yaml" && ext != ".yml" {
-			continue
-		}
-		if err := checkKnownFieldsFile(filepath.Join(filePath, entry.Name())); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// checkKnownFieldsFile strictly decodes one file into a throwaway Config.
-func checkKnownFieldsFile(path string) error {
-	f, err := os.Open(path) //nolint:gosec // operator-supplied path
-	if err != nil {
-		return nil // the real loader reports this
-	}
-	defer f.Close() //nolint:errcheck
-
-	dec := yaml.NewDecoder(f)
-	dec.KnownFields(true)
-
-	var probe Config
-	if err := dec.Decode(&probe); err != nil && err != io.EOF { //nolint:errorlint // yaml.v3 returns io.EOF unwrapped
-		return fmt.Errorf("config file %s: %w", path, err)
 	}
 	return nil
 }

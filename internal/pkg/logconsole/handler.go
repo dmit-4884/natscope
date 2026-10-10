@@ -8,7 +8,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/altessa-s/go-atlas/config"
+	"github.com/altessa-s/go-atlas/config/observability"
 	"github.com/altessa-s/go-atlas/observability/slog/handler/colorized"
 
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
@@ -16,7 +16,7 @@ import (
 )
 
 // Format is the logger outputFormat value that selects this handler.
-const Format config.LogFormat = "console"
+const Format observabilityconfig.LogFormat = "console"
 
 const (
 	timeFormat      = "15:04:05"
@@ -29,7 +29,7 @@ func Register() {
 }
 
 // NewHandler is a slogfactory.HandlerFactory for the console format.
-func NewHandler(w io.Writer, cfg *config.Logger, opts *slog.HandlerOptions) slog.Handler {
+func NewHandler(w io.Writer, cfg *observabilityconfig.Logger, opts *slog.HandlerOptions) slog.Handler {
 	colorOpts := []colorized.Option{
 		colorized.WithTimeFormat(timeFormat),
 		colorized.WithPrefixAttributeKey(slogx.ModuleKey),

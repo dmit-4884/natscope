@@ -8,27 +8,27 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/altessa-s/go-atlas/config"
+	"github.com/altessa-s/go-atlas/config/observability"
 
 	"github.com/dmit-4884/natscope/internal/pkg/logconsole"
 )
 
 var (
 	logLevels = []string{
-		config.LoggerLevelError,
-		config.LoggerLevelWarning,
-		config.LoggerLevelInfo,
-		config.LoggerLevelDebug,
-		config.LoggerLevelNone,
+		observabilityconfig.LoggerLevelError,
+		observabilityconfig.LoggerLevelWarning,
+		observabilityconfig.LoggerLevelInfo,
+		observabilityconfig.LoggerLevelDebug,
+		observabilityconfig.LoggerLevelNone,
 	}
 	logFormats = []string{
 		logconsole.Format,
-		config.LogFormatText,
-		config.LogFormatJSON,
+		observabilityconfig.LogFormatText,
+		observabilityconfig.LogFormatJSON,
 	}
 )
 
-func applyLogFlags(cfg *config.Logger, level, format string) error {
+func applyLogFlags(cfg *observabilityconfig.Logger, level, format string) error {
 	if level != "" {
 		if !slices.Contains(logLevels, level) {
 			return fmt.Errorf("invalid log level %q: expected one of %s", level, strings.Join(logLevels, ", "))

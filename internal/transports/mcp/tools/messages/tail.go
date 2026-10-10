@@ -83,7 +83,7 @@ func (t *Toolset) tailSubject(ctx context.Context, _ *mcp.CallToolRequest, in ta
 	err = t.live.Subscribe(tailCtx, &entities.LiveSubscribeRequest{
 		ConnectionId:    connID,
 		Subscriptions:   []*entities.LiveSubscriptionTarget{target},
-		MaxPayloadBytes: ptr.Wrap(int32(limit)),
+		MaxPayloadBytes: new(int32(limit)),
 	}, collector.emit)
 	switch {
 	case err != nil && !errors.Is(err, errTailFull):

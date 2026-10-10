@@ -10,8 +10,6 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 )
 
@@ -103,7 +101,7 @@ func TestMergeStreamUpdate_NewFields(t *testing.T) {
 		current.AllowMsgTTL = false
 
 		out := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-			AllowMsgTTL: ptr.Wrap(true),
+			AllowMsgTTL: new(true),
 		})
 
 		assert.True(t, out.AllowMsgTTL)
@@ -114,7 +112,7 @@ func TestMergeStreamUpdate_NewFields(t *testing.T) {
 		current.AllowAtomicPublish = false
 
 		out := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-			AllowAtomicPublish: ptr.Wrap(true),
+			AllowAtomicPublish: new(true),
 		})
 
 		assert.True(t, out.AllowAtomicPublish)

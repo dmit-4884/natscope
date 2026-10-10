@@ -13,13 +13,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/bufbuild/protocompile"
 	"github.com/bufbuild/protocompile/linker"
 	"github.com/bufbuild/protocompile/reporter"
-
-	"github.com/altessa-s/go-atlas/core/collections/slices"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
@@ -29,6 +28,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
+	atlasslices "github.com/altessa-s/go-atlas/core/collections/slices"
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
@@ -133,7 +133,7 @@ func (s *Service) compile(
 	if out.HasErrors() {
 		return out, nil
 	}
-	out.FDS = slices.To(compiled, func(f linker.File) protoreflect.FileDescriptor { return f })
+	out.FDS = atlasslices.To(compiled, func(f linker.File) protoreflect.FileDescriptor { return f })
 	return out, nil
 }
 
@@ -184,7 +184,7 @@ func filterExcluded(files []entities.ProtoFileEntry, prefixes []string) ([]entit
 	kept := files[:0:0]
 	excluded := 0
 	for _, f := range files {
-		drop := slices.Any(prefixes, func(p string) bool {
+		drop := slices.ContainsFunc(prefixes, func(p string) bool {
 			return f.Path == p || strings.HasPrefix(f.Path, p+"/")
 		})
 		if drop {

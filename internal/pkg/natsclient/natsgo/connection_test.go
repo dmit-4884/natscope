@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 )
 
@@ -23,7 +21,7 @@ func TestSubscribe_HidesTheConnectionsOwnInboxUnlessNamed(t *testing.T) {
 	_, url := jetStreamServer(t)
 	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
 		URLs:       []string{url},
-		Connection: &entities.ConnectionConfig{InboxPrefix: ptr.Wrap("_INBOX_alice")},
+		Connection: &entities.ConnectionConfig{InboxPrefix: new("_INBOX_alice")},
 	})
 	require.NoError(t, err)
 	t.Cleanup(conn.Close)
@@ -66,7 +64,7 @@ func TestSubscribe_SaysWhichSubjectsItDelivers(t *testing.T) {
 	_, url := jetStreamServer(t)
 	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
 		URLs:       []string{url},
-		Connection: &entities.ConnectionConfig{InboxPrefix: ptr.Wrap("_INBOX_alice")},
+		Connection: &entities.ConnectionConfig{InboxPrefix: new("_INBOX_alice")},
 	})
 	require.NoError(t, err)
 	t.Cleanup(conn.Close)

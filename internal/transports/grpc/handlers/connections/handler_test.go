@@ -15,7 +15,6 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 
-	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
 	natspb "github.com/dmit-4884/natscope/proto/gen/types/nats"
 )
@@ -143,7 +142,7 @@ func TestHandler_List(t *testing.T) {
 		svc := &mockConnService{
 			listResult: &entities.List[entities.SavedConnections]{
 				Items:      entities.SavedConnections{entities.SavedConnectionNew()},
-				NextCursor: ptr.Wrap("next"),
+				NextCursor: new("next"),
 			},
 		}
 		handler := New(svc)
@@ -190,7 +189,7 @@ func TestHandler_Update(t *testing.T) {
 
 		resp, err := handler.UpdateConnection(t.Context(), connect.NewRequest(&connectionspb.UpdateConnectionRequest{
 			Id:   existing.Id,
-			Name: ptr.Wrap("updated"),
+			Name: new("updated"),
 			Urls: []string{"nats://new:4222"},
 		}))
 		require.NoError(t, err)
@@ -287,7 +286,7 @@ func TestHandler_TestConnection_Checks(t *testing.T) {
 		svc := &mockConnService{testResult: &entities.TestConnectionResult{Error: "refused", Checks: checks}}
 		resp, err := New(svc).TestConnection(t.Context(), connect.NewRequest(&connectionspb.TestConnectionRequest{
 			Urls:       []string{"nats://127.0.0.1:1"},
-			Connection: &natspb.ConnectionConfig{JetstreamDomain: ptr.Wrap("hub")},
+			Connection: &natspb.ConnectionConfig{JetstreamDomain: new("hub")},
 		}))
 		require.NoError(t, err)
 		require.Len(t, resp.Msg.GetChecks(), 2)

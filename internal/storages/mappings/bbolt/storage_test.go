@@ -9,8 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
@@ -40,7 +38,7 @@ func TestMappings_SaveGetRoundTrip(t *testing.T) {
 		m.Pattern = "orders.>"
 		m.MessageType = "api.v1.OrderEvent"
 		m.SourceID = "src-1"
-		m.PinnedFingerprint = ptr.Wrap("fp-123")
+		m.PinnedFingerprint = new("fp-123")
 		m.Framing = entities.Framing{Kind: entities.FramingCustom, SchemaID: 7, Prefix: []byte{0xca, 0xfe}, Suffix: []byte{0x0a}}
 	})
 	if err := s.Save(ctx, in); err != nil {
@@ -258,7 +256,7 @@ func TestMappings_BulkSavePreservesPinsWhenUnset(t *testing.T) {
 		m.Pattern = "pin.me"
 		m.SourceID = "src1"
 		m.MessageType = "T"
-		m.PinnedFingerprint = ptr.Wrap("deadbeef")
+		m.PinnedFingerprint = new("deadbeef")
 	})
 	if err := s.Save(ctx, pinned); err != nil {
 		t.Fatalf("save: %v", err)
@@ -291,7 +289,7 @@ func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
 		m.Pattern = "pin.me"
 		m.SourceID = "src1"
 		m.MessageType = "T"
-		m.PinnedFingerprint = ptr.Wrap("fp-1")
+		m.PinnedFingerprint = new("fp-1")
 	})
 	if err := s.Save(ctx, pinned); err != nil {
 		t.Fatalf("save: %v", err)
@@ -301,7 +299,7 @@ func TestMappings_BulkSaveExplicitPinOverridesPrevious(t *testing.T) {
 		m.Pattern = "pin.me"
 		m.SourceID = "src1"
 		m.MessageType = "T"
-		m.PinnedFingerprint = ptr.Wrap("fp-2")
+		m.PinnedFingerprint = new("fp-2")
 	})
 	if _, err := s.BulkSave(ctx, entities.SubjectMappings{repinned}); err != nil {
 		t.Fatalf("bulk: %v", err)

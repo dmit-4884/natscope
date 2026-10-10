@@ -8,8 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
 
@@ -37,20 +35,20 @@ func TestSettings_AllGroupsRoundTrip(t *testing.T) {
 
 	in := entities.UserSettingsNew(func(u *entities.UserSettings) {
 		u.Messages = &entities.MessageSettings{
-			FetchMethod: ptr.Wrap("batch"), DefaultPageSize: ptr.Wrap(int32(50)),
-			DefaultDirection: ptr.Wrap("forward"), MaxPayloadBytesInList: ptr.Wrap(int32(4096)),
-			DefaultExportFormat: ptr.Wrap("ndjson"), ExportRangeLimit: ptr.Wrap(int32(1000)), DetectTypes: ptr.Wrap(false),
+			FetchMethod: new("batch"), DefaultPageSize: new(int32(50)),
+			DefaultDirection: new("forward"), MaxPayloadBytesInList: new(int32(4096)),
+			DefaultExportFormat: new("ndjson"), ExportRangeLimit: new(int32(1000)), DetectTypes: new(false),
 		}
-		u.Live = &entities.LiveSettings{SubscriptionMode: ptr.Wrap("ordered"), MaxDisplayRate: ptr.Wrap(int32(30))}
+		u.Live = &entities.LiveSettings{SubscriptionMode: new("ordered"), MaxDisplayRate: new(int32(30))}
 		u.Display = &entities.DisplaySettings{
-			Density: ptr.Wrap("compact"), DefaultViewMode: ptr.Wrap("json"), PayloadPreviewLen: ptr.Wrap(int32(256)),
-			TimestampFormat: ptr.Wrap("iso"), JsonIndentSize: ptr.Wrap(int32(2)), AutoScrollLive: ptr.Wrap(true),
+			Density: new("compact"), DefaultViewMode: new("json"), PayloadPreviewLen: new(int32(256)),
+			TimestampFormat: new("iso"), JsonIndentSize: new(int32(2)), AutoScrollLive: new(true),
 		}
-		u.Publish = &entities.PublishSettings{PublishTimeoutSec: ptr.Wrap(int32(15))}
+		u.Publish = &entities.PublishSettings{PublishTimeoutSec: new(int32(15))}
 		u.Behavior = &entities.BehaviorSettings{
-			ConfirmDeleteConsumer: ptr.Wrap(true), ConfirmDeleteMessage: ptr.Wrap(false),
-			ConfirmDeleteKvKey: ptr.Wrap(true), ConfirmDeleteObject: ptr.Wrap(false),
-			ConfirmPurgeKvHistory: ptr.Wrap(true), SecureDeleteDefault: ptr.Wrap(false),
+			ConfirmDeleteConsumer: new(true), ConfirmDeleteMessage: new(false),
+			ConfirmDeleteKvKey: new(true), ConfirmDeleteObject: new(false),
+			ConfirmPurgeKvHistory: new(true), SecureDeleteDefault: new(false),
 		}
 	})
 	if err := s.Save(ctx, in); err != nil {
@@ -90,7 +88,7 @@ func TestSettings_EmptyGroupsStayNil(t *testing.T) {
 	ctx := t.Context()
 
 	in := entities.UserSettingsNew(func(u *entities.UserSettings) {
-		u.Display = &entities.DisplaySettings{Density: ptr.Wrap("comfortable")}
+		u.Display = &entities.DisplaySettings{Density: new("comfortable")}
 	})
 	if err := s.Save(ctx, in); err != nil {
 		t.Fatalf("save: %v", err)
@@ -126,7 +124,7 @@ func TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
 				if existing.Messages == nil {
 					existing.Messages = &entities.MessageSettings{}
 				}
-				existing.Messages.DefaultPageSize = ptr.Wrap(int32(r))
+				existing.Messages.DefaultPageSize = new(int32(r))
 			})
 		}()
 		go func() {
@@ -135,7 +133,7 @@ func TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
 				if existing.Publish == nil {
 					existing.Publish = &entities.PublishSettings{}
 				}
-				existing.Publish.PublishTimeoutSec = ptr.Wrap(int32(r))
+				existing.Publish.PublishTimeoutSec = new(int32(r))
 			})
 		}()
 		go func() {
@@ -144,7 +142,7 @@ func TestSettings_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T) {
 				if existing.Live == nil {
 					existing.Live = &entities.LiveSettings{}
 				}
-				existing.Live.MaxDisplayRate = ptr.Wrap(int32(r))
+				existing.Live.MaxDisplayRate = new(int32(r))
 			})
 		}()
 		wg.Wait()

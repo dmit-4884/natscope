@@ -10,7 +10,6 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/altessa-s/go-atlas/core/collections/slices"
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -117,7 +116,7 @@ func (h *Handler) ListTemplates(
 	in := req.Msg
 	listReq := &entities.MessageTemplatesList{}
 	if ps := in.GetPageSize(); ps > 0 {
-		listReq.Limit = ptr.Wrap(int64(ps))
+		listReq.Limit = new(int64(ps))
 	}
 	listReq.Cursor = in.GetPageToken()
 	listReq.IncludeTotalCount = in.GetIncludeTotalCount()

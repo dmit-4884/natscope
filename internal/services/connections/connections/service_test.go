@@ -15,7 +15,6 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 
-	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	natssvc "github.com/dmit-4884/natscope/internal/services/nats"
 	storage "github.com/dmit-4884/natscope/internal/storages/connections"
 )
@@ -266,7 +265,7 @@ func TestService_List(t *testing.T) {
 		t.Parallel()
 		expected := &entities.List[entities.SavedConnections]{
 			Items:      entities.SavedConnections{{BaseEntity: entities.BaseEntity{Id: "1"}}},
-			NextCursor: ptr.Wrap("next"),
+			NextCursor: new("next"),
 		}
 		store := &mockStorage{listResult: expected}
 		svc := New(store, &mockLayouts{}, nil, true)
@@ -669,7 +668,7 @@ func TestService_ValidateCreateChecksWhatCreateWouldWithoutSaving(t *testing.T) 
 	bad := map[string]*entities.SavedConnectionCreate{
 		"blank name":        {Name: "  ", URLs: []string{"nats://h:4222"}},
 		"long label":        {Name: "c", URLs: []string{"nats://h:4222"}, Label: &entities.ConnectionLabel{Text: "seventeen-chars-x", Color: entities.LabelColorRed}},
-		"credentials twice": {Name: "c", URLs: []string{"nats://u:p@h:4222"}, Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("t")}},
+		"credentials twice": {Name: "c", URLs: []string{"nats://u:p@h:4222"}, Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new("t")}},
 	}
 	for name, in := range bad {
 		t.Run(name, func(t *testing.T) {

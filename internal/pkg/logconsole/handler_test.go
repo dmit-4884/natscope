@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/altessa-s/go-atlas/config"
+	"github.com/altessa-s/go-atlas/config/observability"
 
 	"github.com/dmit-4884/natscope/internal/pkg/logconsole"
 
@@ -25,7 +25,7 @@ var recordTime = time.Date(2026, time.September, 4, 18, 0, 15, 0, time.UTC)
 
 func newHandler(t *testing.T, buf *bytes.Buffer) slog.Handler {
 	t.Helper()
-	return logconsole.NewHandler(buf, &config.Logger{}, &slog.HandlerOptions{Level: slog.LevelDebug})
+	return logconsole.NewHandler(buf, &observabilityconfig.Logger{}, &slog.HandlerOptions{Level: slog.LevelDebug})
 }
 
 func record(level slog.Level, msg string, attrs ...slog.Attr) slog.Record {
@@ -70,7 +70,7 @@ func TestHandlerDropsAppGroup(t *testing.T) {
 
 func TestHandlerHonorsAppGroupName(t *testing.T) {
 	var buf bytes.Buffer
-	h := logconsole.NewHandler(&buf, &config.Logger{AppGroupName: "svc"}, &slog.HandlerOptions{Level: slog.LevelDebug}).
+	h := logconsole.NewHandler(&buf, &observabilityconfig.Logger{AppGroupName: "svc"}, &slog.HandlerOptions{Level: slog.LevelDebug}).
 		WithAttrs([]slog.Attr{slog.Group("svc", slog.String("name", "natscope"))})
 
 	err := h.Handle(t.Context(), record(slog.LevelInfo, "hello"))
@@ -94,7 +94,7 @@ func TestHandlerKeepsAppFilterAfterWithGroup(t *testing.T) {
 }
 
 func TestHandlerFiltersByLevel(t *testing.T) {
-	h := logconsole.NewHandler(&bytes.Buffer{}, &config.Logger{}, &slog.HandlerOptions{Level: slog.LevelWarn})
+	h := logconsole.NewHandler(&bytes.Buffer{}, &observabilityconfig.Logger{}, &slog.HandlerOptions{Level: slog.LevelWarn})
 
 	require.False(t, h.Enabled(t.Context(), slog.LevelInfo))
 	require.True(t, h.Enabled(t.Context(), slog.LevelWarn))
@@ -103,9 +103,9 @@ func TestHandlerFiltersByLevel(t *testing.T) {
 func TestRegisterMakesFormatBuildable(t *testing.T) {
 	logconsole.Register()
 
-	logger, err := slogfactory.New(&config.Logger{
-		Level:        config.LoggerLevelWarning,
-		Output:       config.LoggerConsoleOutputStderr,
+	logger, err := slogfactory.New(&observabilityconfig.Logger{
+		Level:        observabilityconfig.LoggerLevelWarning,
+		Output:       observabilityconfig.LoggerConsoleOutputStderr,
 		OutputFormat: logconsole.Format,
 	}).Build()
 

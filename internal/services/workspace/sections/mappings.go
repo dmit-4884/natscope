@@ -9,7 +9,6 @@ import (
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
 	"github.com/altessa-s/go-atlas/core/collections/slices"
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
@@ -153,14 +152,14 @@ func (s *MappingsSection) Import(
 		if ex, ok := byPattern[it.Pattern]; ok {
 			upd := &entities.SubjectMappingUpdate{
 				Id:                ex.Id,
-				MessageType:       ptr.Wrap(it.MessageType),
+				MessageType:       new(it.MessageType),
 				PinnedFingerprint: it.PinnedFingerprint,
 				Framing:           new(it.framing()),
 			}
 			// Only overwrite the source id when concrete — an empty value must NOT
 			// clobber the existing source with "".
 			if resolvedSourceID != "" {
-				upd.SourceID = ptr.Wrap(resolvedSourceID)
+				upd.SourceID = new(resolvedSourceID)
 			}
 			if _, err := s.svc.Update(ctx, upd); err != nil {
 				return res, err
@@ -220,7 +219,7 @@ func (s *MappingsSection) listSources(ctx context.Context) (entities.ProtoSource
 		return nil, nil
 	}
 	res, err := s.protoSvc.ListSources(ctx, &entities.ProtoSourcesList{
-		ListBase: entities.ListBase{Limit: ptr.Wrap(listAllLimit)},
+		ListBase: entities.ListBase{Limit: new(listAllLimit)},
 	})
 	if err != nil {
 		return nil, err

@@ -18,7 +18,6 @@ import (
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore/bbstoretest"
 
-	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	connectionssvc "github.com/dmit-4884/natscope/internal/services/connections"
 	mappingssvc "github.com/dmit-4884/natscope/internal/services/mappings"
 	mappingsService "github.com/dmit-4884/natscope/internal/services/mappings/mappings"
@@ -51,17 +50,17 @@ func TestConnectionsExport_HasNoSecrets(t *testing.T) {
 		URLs: []string{"nats://prod:4222"},
 		Auth: &entities.AuthConfig{
 			Method:      entities.AuthMethodUserPass,
-			Username:    ptr.Wrap("admin"),
-			Password:    ptr.Wrap("super-secret-pw"),
-			Token:       ptr.Wrap("tok-123"),
-			NkeySeed:    ptr.Wrap("SU-nkey"),
-			Credentials: ptr.Wrap("creds-blob"),
-			JWT:         ptr.Wrap("jwt-blob"),
+			Username:    new("admin"),
+			Password:    new("super-secret-pw"),
+			Token:       new("tok-123"),
+			NkeySeed:    new("SU-nkey"),
+			Credentials: new("creds-blob"),
+			JWT:         new("jwt-blob"),
 		},
 		TLS: &entities.TlsConfig{
-			CaCert:     ptr.Wrap("-----CA-----"),
-			ClientCert: ptr.Wrap("-----CLIENT-CERT-----"),
-			ClientKey:  ptr.Wrap("-----PRIVATEKEY-----"),
+			CaCert:     new("-----CA-----"),
+			ClientCert: new("-----CLIENT-CERT-----"),
+			ClientKey:  new("-----PRIVATEKEY-----"),
 			SkipVerify: true,
 		},
 	}
@@ -84,7 +83,7 @@ func TestProtoSourcesExport_HasNoToken(t *testing.T) {
 		Name:       "git-src",
 		SourceType: entities.SourceTypeGit,
 		Repository: "https://github.com/acme/proto.git",
-		Token:      ptr.Wrap("ghp_supersecret"),
+		Token:      new("ghp_supersecret"),
 	}
 	payload, err := json.Marshal(newItemsPayload([]protoSourceItem{redactProtoSource(src)}))
 	require.NoError(t, err)
@@ -298,7 +297,7 @@ func TestTemplatesSection_Roundtrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), res.Created)
 
-	listed, err := dst.List(ctx, &entities.MessageTemplatesList{ListBase: entities.ListBase{Limit: ptr.Wrap(int64(100))}})
+	listed, err := dst.List(ctx, &entities.MessageTemplatesList{ListBase: entities.ListBase{Limit: new(int64(100))}})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, "t1", listed.Items[0].Name)
@@ -313,7 +312,7 @@ func TestSettingsSection_Roundtrip(t *testing.T) {
 	require.NoError(t, err)
 	src := settingsService.New(srcStore)
 	_, err = src.Update(ctx, &entities.UserSettingsUpdate{
-		Behavior: &entities.BehaviorSettings{ConfirmDeleteMessage: ptr.Wrap(false)},
+		Behavior: &entities.BehaviorSettings{ConfirmDeleteMessage: new(false)},
 	})
 	require.NoError(t, err)
 
@@ -384,13 +383,13 @@ func TestConnectionsExport_KeepsNonSecretConfig(t *testing.T) {
 	conn := &entities.SavedConnection{
 		Name: "tuned",
 		URLs: []string{"nats://h:4222"},
-		Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("tok-secret")},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new("tok-secret")},
 		Connection: &entities.ConnectionConfig{
-			ConnectionName: ptr.Wrap("my-client"),
+			ConnectionName: new("my-client"),
 			NoEcho:         true,
 		},
-		Reconnect: &entities.ReconnectConfig{MaxReconnects: ptr.Wrap(int32(7))},
-		Ping:      &entities.PingConfig{MaxPingsOutstanding: ptr.Wrap(int32(3))},
+		Reconnect: &entities.ReconnectConfig{MaxReconnects: new(int32(7))},
+		Ping:      &entities.PingConfig{MaxPingsOutstanding: new(int32(3))},
 	}
 	item := redactConnection(conn)
 	require.NotNil(t, item.Connection)
@@ -430,21 +429,21 @@ func TestRedactConnection_ConverterRoundTrip(t *testing.T) {
 
 	conn := &entities.SavedConnection{
 		Name:        "full",
-		Description: ptr.Wrap("desc"),
+		Description: new("desc"),
 		URLs:        []string{"nats://bob:url-secret@h1:4222", "nats://h2:4222"},
 		Auth: &entities.AuthConfig{
 			Method:      entities.AuthMethodUserPass,
-			Username:    ptr.Wrap("bob"),
-			Password:    ptr.Wrap("pw-secret"),
-			Token:       ptr.Wrap("tok-secret"),
-			NkeySeed:    ptr.Wrap("seed-secret"),
-			Credentials: ptr.Wrap("creds-secret"),
-			JWT:         ptr.Wrap("jwt-secret"),
+			Username:    new("bob"),
+			Password:    new("pw-secret"),
+			Token:       new("tok-secret"),
+			NkeySeed:    new("seed-secret"),
+			Credentials: new("creds-secret"),
+			JWT:         new("jwt-secret"),
 		},
 		TLS: &entities.TlsConfig{
-			CaCert:     ptr.Wrap("ca-public"),
-			ClientCert: ptr.Wrap("clientcert-secret"),
-			ClientKey:  ptr.Wrap("clientkey-secret"),
+			CaCert:     new("ca-public"),
+			ClientCert: new("clientcert-secret"),
+			ClientKey:  new("clientkey-secret"),
 			SkipVerify: true,
 			TlsFirst:   true,
 		},

@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
 
@@ -50,8 +48,8 @@ func TestHistory_SaveAndListFilter(t *testing.T) {
 
 	// Filter by connection URL.
 	byURL, err := s.List(ctx, &entities.PublishHistoryList{
-		ConnectionURL: ptr.Wrap("nats://a:4222"),
-		ListBase:      entities.ListBase{Limit: ptr.Wrap(int64(10)), IncludeTotalCount: true},
+		ConnectionURL: new("nats://a:4222"),
+		ListBase:      entities.ListBase{Limit: new(int64(10)), IncludeTotalCount: true},
 	})
 	if err != nil {
 		t.Fatalf("list by url: %v", err)
@@ -62,9 +60,9 @@ func TestHistory_SaveAndListFilter(t *testing.T) {
 
 	// Filter by connection URL + stream.
 	both, err := s.List(ctx, &entities.PublishHistoryList{
-		ConnectionURL: ptr.Wrap("nats://a:4222"),
-		Stream:        ptr.Wrap("ORDERS"),
-		ListBase:      entities.ListBase{Limit: ptr.Wrap(int64(10))},
+		ConnectionURL: new("nats://a:4222"),
+		Stream:        new("ORDERS"),
+		ListBase:      entities.ListBase{Limit: new(int64(10))},
 	})
 	if err != nil {
 		t.Fatalf("list by url+stream: %v", err)
@@ -80,20 +78,20 @@ func TestHistory_ListFilterByConnectionID(t *testing.T) {
 	ctx := t.Context()
 
 	multi := entry("nats://a:4222,nats://b:4222", "MULTI", "multi.1")
-	multi.ConnectionID = ptr.Wrap("conn-multi")
+	multi.ConnectionID = new("conn-multi")
 	_ = s.Save(ctx, multi)
 
 	shared1 := entry("nats://shared:4222", "SHARED", "shared.1")
-	shared1.ConnectionID = ptr.Wrap("conn-shared-1")
+	shared1.ConnectionID = new("conn-shared-1")
 	_ = s.Save(ctx, shared1)
 
 	shared2 := entry("nats://shared:4222", "SHARED", "shared.2")
-	shared2.ConnectionID = ptr.Wrap("conn-shared-2")
+	shared2.ConnectionID = new("conn-shared-2")
 	_ = s.Save(ctx, shared2)
 
 	byID, err := s.List(ctx, &entities.PublishHistoryList{
-		ConnectionID: ptr.Wrap("conn-multi"),
-		ListBase:     entities.ListBase{Limit: ptr.Wrap(int64(10))},
+		ConnectionID: new("conn-multi"),
+		ListBase:     entities.ListBase{Limit: new(int64(10))},
 	})
 	if err != nil {
 		t.Fatalf("list by connection_id: %v", err)
@@ -103,8 +101,8 @@ func TestHistory_ListFilterByConnectionID(t *testing.T) {
 	}
 
 	sharedFiltered, err := s.List(ctx, &entities.PublishHistoryList{
-		ConnectionID: ptr.Wrap("conn-shared-1"),
-		ListBase:     entities.ListBase{Limit: ptr.Wrap(int64(10))},
+		ConnectionID: new("conn-shared-1"),
+		ListBase:     entities.ListBase{Limit: new(int64(10))},
 	})
 	if err != nil {
 		t.Fatalf("list by connection_id (shared url): %v", err)
@@ -124,7 +122,7 @@ func TestHistory_PaginationNewestFirst(t *testing.T) {
 	}
 
 	page, err := s.List(ctx, &entities.PublishHistoryList{
-		ListBase: entities.ListBase{Limit: ptr.Wrap(int64(2)), IncludeTotalCount: true},
+		ListBase: entities.ListBase{Limit: new(int64(2)), IncludeTotalCount: true},
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)
@@ -141,7 +139,7 @@ func TestHistory_PaginationNewestFirst(t *testing.T) {
 	cursor := ""
 	for {
 		p, err := s.List(ctx, &entities.PublishHistoryList{
-			ListBase: entities.ListBase{Cursor: cursor, Limit: ptr.Wrap(int64(2))},
+			ListBase: entities.ListBase{Cursor: cursor, Limit: new(int64(2))},
 		})
 		if err != nil {
 			t.Fatalf("page walk: %v", err)

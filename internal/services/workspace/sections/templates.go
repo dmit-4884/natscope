@@ -9,7 +9,6 @@ import (
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
 	"github.com/altessa-s/go-atlas/core/collections/slices"
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
@@ -178,7 +177,7 @@ func toTemplateUpdate(id string, it templateItem) *entities.MessageTemplateUpdat
 }
 
 func (s *TemplatesSection) all(ctx context.Context) (entities.MessageTemplates, error) {
-	res, err := s.svc.List(ctx, &entities.MessageTemplatesList{ListBase: entities.ListBase{Limit: ptr.Wrap(listAllLimit)}})
+	res, err := s.svc.List(ctx, &entities.MessageTemplatesList{ListBase: entities.ListBase{Limit: new(listAllLimit)}})
 	if err != nil {
 		return nil, err
 	}

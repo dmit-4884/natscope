@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -280,7 +279,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 				AllowDirect: true,
 			}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				Description: ptr.Wrap("new"),
+				Description: new("new"),
 			})
 			assert.Equal(t, "new", result.Description)
 			assert.Equal(t, int64(100), result.MaxMsgs)
@@ -294,7 +293,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 				AllowDirect: true,
 			}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxMsgs: ptr.Wrap(int64(500)),
+				MaxMsgs: new(int64(500)),
 			})
 			assert.Equal(t, int64(500), result.MaxMsgs)
 			assert.Equal(t, "test", result.Description)
@@ -308,7 +307,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 				MaxMsgs:     100,
 			}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				AllowDirect: ptr.Wrap(false),
+				AllowDirect: new(false),
 			})
 			assert.False(t, result.AllowDirect)
 			assert.Equal(t, "test", result.Description)
@@ -320,7 +319,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set Description to empty string", func(t *testing.T) {
 			current := jetstream.StreamConfig{Description: "old"}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				Description: ptr.Wrap(""),
+				Description: new(""),
 			})
 			assert.Equal(t, "", result.Description)
 		})
@@ -328,7 +327,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set MaxMsgs to zero", func(t *testing.T) {
 			current := jetstream.StreamConfig{MaxMsgs: 100}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxMsgs: ptr.Wrap(int64(0)),
+				MaxMsgs: new(int64(0)),
 			})
 			assert.Equal(t, int64(0), result.MaxMsgs)
 		})
@@ -336,7 +335,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set MaxBytes to zero", func(t *testing.T) {
 			current := jetstream.StreamConfig{MaxBytes: 1000}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxBytes: ptr.Wrap(int64(0)),
+				MaxBytes: new(int64(0)),
 			})
 			assert.Equal(t, int64(0), result.MaxBytes)
 		})
@@ -344,7 +343,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set MaxAge to zero", func(t *testing.T) {
 			current := jetstream.StreamConfig{MaxAge: time.Hour}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxAge: ptr.Wrap(time.Duration(0)),
+				MaxAge: new(time.Duration(0)),
 			})
 			assert.Equal(t, time.Duration(0), result.MaxAge)
 		})
@@ -352,7 +351,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set AllowDirect to false", func(t *testing.T) {
 			current := jetstream.StreamConfig{AllowDirect: true}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				AllowDirect: ptr.Wrap(false),
+				AllowDirect: new(false),
 			})
 			assert.False(t, result.AllowDirect)
 		})
@@ -360,7 +359,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set MirrorDirect to false", func(t *testing.T) {
 			current := jetstream.StreamConfig{MirrorDirect: true}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MirrorDirect: ptr.Wrap(false),
+				MirrorDirect: new(false),
 			})
 			assert.False(t, result.MirrorDirect)
 		})
@@ -368,7 +367,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set DiscardNewPerSubject to false", func(t *testing.T) {
 			current := jetstream.StreamConfig{DiscardNewPerSubject: true}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				DiscardNewPerSubject: ptr.Wrap(false),
+				DiscardNewPerSubject: new(false),
 			})
 			assert.False(t, result.DiscardNewPerSubject)
 		})
@@ -378,7 +377,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("AllowDirect=true preserved when not sent", func(t *testing.T) {
 			current := jetstream.StreamConfig{AllowDirect: true}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				Description: ptr.Wrap("changed"),
+				Description: new("changed"),
 			})
 			assert.True(t, result.AllowDirect)
 		})
@@ -386,7 +385,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("MirrorDirect=true preserved when not sent", func(t *testing.T) {
 			current := jetstream.StreamConfig{MirrorDirect: true}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxMsgs: ptr.Wrap(int64(500)),
+				MaxMsgs: new(int64(500)),
 			})
 			assert.True(t, result.MirrorDirect)
 		})
@@ -394,7 +393,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("DiscardNewPerSubject=true preserved when not sent", func(t *testing.T) {
 			current := jetstream.StreamConfig{DiscardNewPerSubject: true}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxBytes: ptr.Wrap(int64(2000)),
+				MaxBytes: new(int64(2000)),
 			})
 			assert.True(t, result.DiscardNewPerSubject)
 		})
@@ -420,7 +419,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set discard to new", func(t *testing.T) {
 			current := jetstream.StreamConfig{Discard: jetstream.DiscardOld}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				Discard: ptr.Wrap(entities.DiscardNew),
+				Discard: new(entities.DiscardNew),
 			})
 			assert.Equal(t, jetstream.DiscardNew, result.Discard)
 		})
@@ -428,7 +427,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("set discard to old", func(t *testing.T) {
 			current := jetstream.StreamConfig{Discard: jetstream.DiscardNew}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				Discard: ptr.Wrap(entities.DiscardOld),
+				Discard: new(entities.DiscardOld),
 			})
 			assert.Equal(t, jetstream.DiscardOld, result.Discard)
 		})
@@ -482,7 +481,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("MaxMsgsPerSubject", func(t *testing.T) {
 			current := jetstream.StreamConfig{MaxMsgsPerSubject: 10}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxMsgsPerSubject: ptr.Wrap(int64(20)),
+				MaxMsgsPerSubject: new(int64(20)),
 			})
 			assert.Equal(t, int64(20), result.MaxMsgsPerSubject)
 		})
@@ -490,7 +489,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("MaxMsgSize", func(t *testing.T) {
 			current := jetstream.StreamConfig{MaxMsgSize: 1024}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxMsgSize: ptr.Wrap(int32(2048)),
+				MaxMsgSize: new(int32(2048)),
 			})
 			assert.Equal(t, int32(2048), result.MaxMsgSize)
 		})
@@ -498,7 +497,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("MaxConsumers", func(t *testing.T) {
 			current := jetstream.StreamConfig{MaxConsumers: 5}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				MaxConsumers: ptr.Wrap(10),
+				MaxConsumers: new(10),
 			})
 			assert.Equal(t, 10, result.MaxConsumers)
 		})
@@ -506,7 +505,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("Duplicates", func(t *testing.T) {
 			current := jetstream.StreamConfig{Duplicates: 2 * time.Minute}
 			result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
-				Duplicates: ptr.Wrap(5 * time.Minute),
+				Duplicates: new(5 * time.Minute),
 			})
 			assert.Equal(t, 5*time.Minute, result.Duplicates)
 		})
@@ -532,18 +531,18 @@ func TestApplyStreamUpdate(t *testing.T) {
 
 		result := svc.mergeStreamUpdate(current, entities.StreamUpdateRequest{
 			Subjects:             []string{"new.>"},
-			Description:          ptr.Wrap("new"),
-			MaxMsgs:              ptr.Wrap(int64(500)),
-			MaxBytes:             ptr.Wrap(int64(5000)),
-			MaxAge:               ptr.Wrap(2 * time.Hour),
-			MaxMsgsPerSubject:    ptr.Wrap(int64(50)),
-			MaxMsgSize:           ptr.Wrap(int32(2048)),
-			MaxConsumers:         ptr.Wrap(10),
-			Duplicates:           ptr.Wrap(5 * time.Minute),
-			Discard:              ptr.Wrap(entities.DiscardNew),
-			DiscardNewPerSubject: ptr.Wrap(true),
-			AllowDirect:          ptr.Wrap(true),
-			MirrorDirect:         ptr.Wrap(true),
+			Description:          new("new"),
+			MaxMsgs:              new(int64(500)),
+			MaxBytes:             new(int64(5000)),
+			MaxAge:               new(2 * time.Hour),
+			MaxMsgsPerSubject:    new(int64(50)),
+			MaxMsgSize:           new(int32(2048)),
+			MaxConsumers:         new(10),
+			Duplicates:           new(5 * time.Minute),
+			Discard:              new(entities.DiscardNew),
+			DiscardNewPerSubject: new(true),
+			AllowDirect:          new(true),
+			MirrorDirect:         new(true),
 			Metadata:             map[string]string{"new": "val"},
 			Sources:              []*entities.StreamSource{{Name: "src1"}},
 		})
@@ -572,7 +571,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update Description only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				Description: ptr.Wrap("changed"),
+				Description: new("changed"),
 			})
 			assert.Equal(t, "changed", result.Description)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"Description": true})
@@ -581,7 +580,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update MaxMsgs only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				MaxMsgs: ptr.Wrap(int64(9999)),
+				MaxMsgs: new(int64(9999)),
 			})
 			assert.Equal(t, int64(9999), result.MaxMsgs)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"MaxMsgs": true})
@@ -590,7 +589,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update MaxBytes only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				MaxBytes: ptr.Wrap(int64(999999)),
+				MaxBytes: new(int64(999999)),
 			})
 			assert.Equal(t, int64(999999), result.MaxBytes)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"MaxBytes": true})
@@ -599,7 +598,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update MaxAge only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				MaxAge: ptr.Wrap(48 * time.Hour),
+				MaxAge: new(48 * time.Hour),
 			})
 			assert.Equal(t, 48*time.Hour, result.MaxAge)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"MaxAge": true})
@@ -608,7 +607,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update MaxMsgsPerSubject only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				MaxMsgsPerSubject: ptr.Wrap(int64(500)),
+				MaxMsgsPerSubject: new(int64(500)),
 			})
 			assert.Equal(t, int64(500), result.MaxMsgsPerSubject)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"MaxMsgsPerSubject": true})
@@ -617,7 +616,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update MaxMsgSize only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				MaxMsgSize: ptr.Wrap(int32(8192)),
+				MaxMsgSize: new(int32(8192)),
 			})
 			assert.Equal(t, int32(8192), result.MaxMsgSize)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"MaxMsgSize": true})
@@ -626,7 +625,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update MaxConsumers only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				MaxConsumers: ptr.Wrap(20),
+				MaxConsumers: new(20),
 			})
 			assert.Equal(t, 20, result.MaxConsumers)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"MaxConsumers": true})
@@ -635,7 +634,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update Duplicates only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				Duplicates: ptr.Wrap(10 * time.Minute),
+				Duplicates: new(10 * time.Minute),
 			})
 			assert.Equal(t, 10*time.Minute, result.Duplicates)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"Duplicates": true})
@@ -644,7 +643,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update AllowDirect only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				AllowDirect: ptr.Wrap(false),
+				AllowDirect: new(false),
 			})
 			assert.False(t, result.AllowDirect)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"AllowDirect": true})
@@ -653,7 +652,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update MirrorDirect only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				MirrorDirect: ptr.Wrap(false),
+				MirrorDirect: new(false),
 			})
 			assert.False(t, result.MirrorDirect)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"MirrorDirect": true})
@@ -662,7 +661,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update Discard only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				Discard: ptr.Wrap(entities.DiscardOld),
+				Discard: new(entities.DiscardOld),
 			})
 			assert.Equal(t, jetstream.DiscardOld, result.Discard)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"Discard": true})
@@ -671,7 +670,7 @@ func TestApplyStreamUpdate(t *testing.T) {
 		t.Run("update DiscardNewPerSubject only", func(t *testing.T) {
 			base := fullStreamConfig()
 			result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-				DiscardNewPerSubject: ptr.Wrap(false),
+				DiscardNewPerSubject: new(false),
 			})
 			assert.False(t, result.DiscardNewPerSubject)
 			assertStreamUnchangedExcept(t, base, result, map[string]bool{"DiscardNewPerSubject": true})
@@ -701,18 +700,18 @@ func TestApplyStreamUpdate(t *testing.T) {
 	t.Run("immutable fields preserved after full update", func(t *testing.T) {
 		base := fullStreamConfig()
 		result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-			Description:          ptr.Wrap("changed"),
-			MaxMsgs:              ptr.Wrap(int64(1)),
-			MaxBytes:             ptr.Wrap(int64(1)),
-			MaxAge:               ptr.Wrap(time.Second),
-			MaxMsgsPerSubject:    ptr.Wrap(int64(1)),
-			MaxMsgSize:           ptr.Wrap(int32(1)),
-			MaxConsumers:         ptr.Wrap(1),
-			Duplicates:           ptr.Wrap(time.Second),
-			AllowDirect:          ptr.Wrap(false),
-			MirrorDirect:         ptr.Wrap(false),
-			Discard:              ptr.Wrap(entities.DiscardOld),
-			DiscardNewPerSubject: ptr.Wrap(false),
+			Description:          new("changed"),
+			MaxMsgs:              new(int64(1)),
+			MaxBytes:             new(int64(1)),
+			MaxAge:               new(time.Second),
+			MaxMsgsPerSubject:    new(int64(1)),
+			MaxMsgSize:           new(int32(1)),
+			MaxConsumers:         new(1),
+			Duplicates:           new(time.Second),
+			AllowDirect:          new(false),
+			MirrorDirect:         new(false),
+			Discard:              new(entities.DiscardOld),
+			DiscardNewPerSubject: new(false),
 			Subjects:             []string{"x"},
 			Metadata:             map[string]string{"x": "y"},
 			Sources:              []*entities.StreamSource{{Name: "new-src"}},
@@ -740,15 +739,15 @@ func TestApplyStreamUpdate(t *testing.T) {
 
 		// First: update Description.
 		r1 := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-			Description: ptr.Wrap("step1"),
+			Description: new("step1"),
 		})
 		// Second: update MaxMsgs.
 		r2 := svc.mergeStreamUpdate(r1, entities.StreamUpdateRequest{
-			MaxMsgs: ptr.Wrap(int64(42)),
+			MaxMsgs: new(int64(42)),
 		})
 		// Third: update AllowDirect.
 		r3 := svc.mergeStreamUpdate(r2, entities.StreamUpdateRequest{
-			AllowDirect: ptr.Wrap(false),
+			AllowDirect: new(false),
 		})
 
 		assert.Equal(t, "step1", r3.Description)
@@ -764,10 +763,10 @@ func TestApplyStreamUpdate(t *testing.T) {
 		base := fullStreamConfig()
 
 		r1 := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{
-			Description: ptr.Wrap("first"),
+			Description: new("first"),
 		})
 		r2 := svc.mergeStreamUpdate(r1, entities.StreamUpdateRequest{
-			Description: ptr.Wrap("second"),
+			Description: new("second"),
 		})
 
 		assert.Equal(t, "second", r2.Description)
@@ -963,7 +962,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 				MaxAckPending: 100,
 			}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				Description: ptr.Wrap("new"),
+				Description: new("new"),
 			})
 			assert.Equal(t, "new", result.Description)
 			assert.Equal(t, 5, result.MaxDeliver)
@@ -976,7 +975,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 				Description: "test",
 			}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				AckWait: ptr.Wrap(60 * time.Second),
+				AckWait: new(60 * time.Second),
 			})
 			assert.Equal(t, 60*time.Second, result.AckWait)
 			assert.Equal(t, "test", result.Description)
@@ -988,7 +987,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 				MaxAckPending: 100,
 			}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				MaxDeliver: ptr.Wrap(10),
+				MaxDeliver: new(10),
 			})
 			assert.Equal(t, 10, result.MaxDeliver)
 			assert.Equal(t, 100, result.MaxAckPending)
@@ -999,7 +998,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set Description to empty", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{Description: "old"}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				Description: ptr.Wrap(""),
+				Description: new(""),
 			})
 			assert.Equal(t, "", result.Description)
 		})
@@ -1007,7 +1006,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set AckWait to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{AckWait: 30 * time.Second}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				AckWait: ptr.Wrap(time.Duration(0)),
+				AckWait: new(time.Duration(0)),
 			})
 			assert.Equal(t, time.Duration(0), result.AckWait)
 		})
@@ -1015,7 +1014,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set MaxDeliver to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{MaxDeliver: 5}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				MaxDeliver: ptr.Wrap(0),
+				MaxDeliver: new(0),
 			})
 			assert.Equal(t, 0, result.MaxDeliver)
 		})
@@ -1023,7 +1022,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set MaxAckPending to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{MaxAckPending: 100}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				MaxAckPending: ptr.Wrap(0),
+				MaxAckPending: new(0),
 			})
 			assert.Equal(t, 0, result.MaxAckPending)
 		})
@@ -1031,7 +1030,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set MaxWaiting to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{MaxWaiting: 50}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				MaxWaiting: ptr.Wrap(0),
+				MaxWaiting: new(0),
 			})
 			assert.Equal(t, 0, result.MaxWaiting)
 		})
@@ -1039,7 +1038,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set RateLimit to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{RateLimit: 1000}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				RateLimit: ptr.Wrap(uint64(0)),
+				RateLimit: new(uint64(0)),
 			})
 			assert.Equal(t, uint64(0), result.RateLimit)
 		})
@@ -1047,7 +1046,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set SampleFrequency to empty", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{SampleFrequency: "100"}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				SampleFrequency: ptr.Wrap(""),
+				SampleFrequency: new(""),
 			})
 			assert.Equal(t, "", result.SampleFrequency)
 		})
@@ -1055,7 +1054,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set InactiveThreshold to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{InactiveThreshold: time.Hour}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				InactiveThreshold: ptr.Wrap(time.Duration(0)),
+				InactiveThreshold: new(time.Duration(0)),
 			})
 			assert.Equal(t, time.Duration(0), result.InactiveThreshold)
 		})
@@ -1063,7 +1062,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set MaxRequestBatch to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{MaxRequestBatch: 10}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				MaxRequestBatch: ptr.Wrap(0),
+				MaxRequestBatch: new(0),
 			})
 			assert.Equal(t, 0, result.MaxRequestBatch)
 		})
@@ -1071,7 +1070,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set MaxRequestMaxBytes to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{MaxRequestMaxBytes: 1024}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				MaxRequestMaxBytes: ptr.Wrap(int64(0)),
+				MaxRequestMaxBytes: new(int64(0)),
 			})
 			assert.Equal(t, 0, result.MaxRequestMaxBytes)
 		})
@@ -1079,7 +1078,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("set MaxRequestExpires to zero", func(t *testing.T) {
 			current := jetstream.ConsumerConfig{MaxRequestExpires: time.Minute}
 			result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-				MaxRequestExpires: ptr.Wrap(time.Duration(0)),
+				MaxRequestExpires: new(time.Duration(0)),
 			})
 			assert.Equal(t, time.Duration(0), result.MaxRequestExpires)
 		})
@@ -1139,18 +1138,18 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		}
 
 		result := svc.mergeConsumerUpdate(current, entities.ConsumerUpdateRequest{
-			Description:        ptr.Wrap("new"),
-			AckWait:            ptr.Wrap(60 * time.Second),
-			MaxDeliver:         ptr.Wrap(10),
-			MaxAckPending:      ptr.Wrap(200),
-			MaxWaiting:         ptr.Wrap(100),
-			RateLimit:          ptr.Wrap(uint64(2000)),
-			SampleFrequency:    ptr.Wrap("100"),
-			InactiveThreshold:  ptr.Wrap(2 * time.Hour),
+			Description:        new("new"),
+			AckWait:            new(60 * time.Second),
+			MaxDeliver:         new(10),
+			MaxAckPending:      new(200),
+			MaxWaiting:         new(100),
+			RateLimit:          new(uint64(2000)),
+			SampleFrequency:    new("100"),
+			InactiveThreshold:  new(2 * time.Hour),
 			BackOff:            []time.Duration{2 * time.Second, 10 * time.Second},
-			MaxRequestBatch:    ptr.Wrap(20),
-			MaxRequestMaxBytes: ptr.Wrap(int64(2048)),
-			MaxRequestExpires:  ptr.Wrap(2 * time.Minute),
+			MaxRequestBatch:    new(20),
+			MaxRequestMaxBytes: new(int64(2048)),
+			MaxRequestExpires:  new(2 * time.Minute),
 			Metadata:           map[string]string{"new": "val"},
 		})
 
@@ -1175,7 +1174,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update Description only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				Description: ptr.Wrap("changed"),
+				Description: new("changed"),
 			})
 			assert.Equal(t, "changed", result.Description)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"Description": true})
@@ -1184,7 +1183,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update AckWait only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				AckWait: ptr.Wrap(90 * time.Second),
+				AckWait: new(90 * time.Second),
 			})
 			assert.Equal(t, 90*time.Second, result.AckWait)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"AckWait": true})
@@ -1193,7 +1192,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update MaxDeliver only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				MaxDeliver: ptr.Wrap(20),
+				MaxDeliver: new(20),
 			})
 			assert.Equal(t, 20, result.MaxDeliver)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"MaxDeliver": true})
@@ -1202,7 +1201,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update MaxAckPending only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				MaxAckPending: ptr.Wrap(999),
+				MaxAckPending: new(999),
 			})
 			assert.Equal(t, 999, result.MaxAckPending)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"MaxAckPending": true})
@@ -1211,7 +1210,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update MaxWaiting only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				MaxWaiting: ptr.Wrap(200),
+				MaxWaiting: new(200),
 			})
 			assert.Equal(t, 200, result.MaxWaiting)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"MaxWaiting": true})
@@ -1220,7 +1219,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update RateLimit only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				RateLimit: ptr.Wrap(uint64(50000)),
+				RateLimit: new(uint64(50000)),
 			})
 			assert.Equal(t, uint64(50000), result.RateLimit)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"RateLimit": true})
@@ -1229,7 +1228,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update SampleFrequency only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				SampleFrequency: ptr.Wrap("100"),
+				SampleFrequency: new("100"),
 			})
 			assert.Equal(t, "100", result.SampleFrequency)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"SampleFrequency": true})
@@ -1238,7 +1237,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update InactiveThreshold only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				InactiveThreshold: ptr.Wrap(2 * time.Hour),
+				InactiveThreshold: new(2 * time.Hour),
 			})
 			assert.Equal(t, 2*time.Hour, result.InactiveThreshold)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"InactiveThreshold": true})
@@ -1256,7 +1255,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update MaxRequestBatch only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				MaxRequestBatch: ptr.Wrap(50),
+				MaxRequestBatch: new(50),
 			})
 			assert.Equal(t, 50, result.MaxRequestBatch)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"MaxRequestBatch": true})
@@ -1265,7 +1264,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update MaxRequestMaxBytes only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				MaxRequestMaxBytes: ptr.Wrap(int64(8192)),
+				MaxRequestMaxBytes: new(int64(8192)),
 			})
 			assert.Equal(t, 8192, result.MaxRequestMaxBytes)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"MaxRequestMaxBytes": true})
@@ -1274,7 +1273,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("update MaxRequestExpires only", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				MaxRequestExpires: ptr.Wrap(5 * time.Minute),
+				MaxRequestExpires: new(5 * time.Minute),
 			})
 			assert.Equal(t, 5*time.Minute, result.MaxRequestExpires)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"MaxRequestExpires": true})
@@ -1286,18 +1285,18 @@ func TestApplyConsumerUpdate(t *testing.T) {
 	t.Run("immutable fields preserved after full update", func(t *testing.T) {
 		base := fullConsumerConfig()
 		result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-			Description:        ptr.Wrap("changed"),
-			AckWait:            ptr.Wrap(time.Second),
-			MaxDeliver:         ptr.Wrap(1),
-			MaxAckPending:      ptr.Wrap(1),
-			MaxWaiting:         ptr.Wrap(1),
-			RateLimit:          ptr.Wrap(uint64(1)),
-			SampleFrequency:    ptr.Wrap("1"),
-			InactiveThreshold:  ptr.Wrap(time.Second),
+			Description:        new("changed"),
+			AckWait:            new(time.Second),
+			MaxDeliver:         new(1),
+			MaxAckPending:      new(1),
+			MaxWaiting:         new(1),
+			RateLimit:          new(uint64(1)),
+			SampleFrequency:    new("1"),
+			InactiveThreshold:  new(time.Second),
 			BackOff:            []time.Duration{time.Second},
-			MaxRequestBatch:    ptr.Wrap(1),
-			MaxRequestMaxBytes: ptr.Wrap(int64(1)),
-			MaxRequestExpires:  ptr.Wrap(time.Second),
+			MaxRequestBatch:    new(1),
+			MaxRequestMaxBytes: new(int64(1)),
+			MaxRequestExpires:  new(time.Second),
 			Metadata:           map[string]string{"x": "y"},
 		})
 
@@ -1326,15 +1325,15 @@ func TestApplyConsumerUpdate(t *testing.T) {
 
 		// First: update Description.
 		r1 := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-			Description: ptr.Wrap("step1"),
+			Description: new("step1"),
 		})
 		// Second: update AckWait.
 		r2 := svc.mergeConsumerUpdate(r1, entities.ConsumerUpdateRequest{
-			AckWait: ptr.Wrap(90 * time.Second),
+			AckWait: new(90 * time.Second),
 		})
 		// Third: update MaxDeliver.
 		r3 := svc.mergeConsumerUpdate(r2, entities.ConsumerUpdateRequest{
-			MaxDeliver: ptr.Wrap(99),
+			MaxDeliver: new(99),
 		})
 
 		assert.Equal(t, "step1", r3.Description)
@@ -1349,10 +1348,10 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		base := fullConsumerConfig()
 
 		r1 := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-			Description: ptr.Wrap("first"),
+			Description: new("first"),
 		})
 		r2 := svc.mergeConsumerUpdate(r1, entities.ConsumerUpdateRequest{
-			Description: ptr.Wrap("second"),
+			Description: new("second"),
 		})
 
 		assert.Equal(t, "second", r2.Description)
@@ -1420,7 +1419,7 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("MaxRequestMaxBytes int64 to int conversion", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				MaxRequestMaxBytes: ptr.Wrap(int64(math.MaxInt32)),
+				MaxRequestMaxBytes: new(int64(math.MaxInt32)),
 			})
 			assert.Equal(t, math.MaxInt32, result.MaxRequestMaxBytes)
 			assertConsumerUnchangedExcept(t, base, result, map[string]bool{"MaxRequestMaxBytes": true})
@@ -1429,9 +1428,9 @@ func TestApplyConsumerUpdate(t *testing.T) {
 		t.Run("multiple duration fields updated simultaneously", func(t *testing.T) {
 			base := fullConsumerConfig()
 			result := svc.mergeConsumerUpdate(base, entities.ConsumerUpdateRequest{
-				AckWait:           ptr.Wrap(45 * time.Second),
-				InactiveThreshold: ptr.Wrap(30 * time.Minute),
-				MaxRequestExpires: ptr.Wrap(3 * time.Minute),
+				AckWait:           new(45 * time.Second),
+				InactiveThreshold: new(30 * time.Minute),
+				MaxRequestExpires: new(3 * time.Minute),
 			})
 			assert.Equal(t, 45*time.Second, result.AckWait)
 			assert.Equal(t, 30*time.Minute, result.InactiveThreshold)
@@ -1457,7 +1456,7 @@ func TestMergeStreamUpdate_FeatureFlags(t *testing.T) {
 	}
 
 	t.Run("unrelated update preserves flags", func(t *testing.T) {
-		result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{Description: ptr.Wrap("changed")})
+		result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{Description: new("changed")})
 		assert.True(t, result.AllowMsgCounter)
 		assert.True(t, result.AllowMsgSchedules)
 		assert.Equal(t, 10*time.Second, result.SubjectDeleteMarkerTTL)
@@ -1467,9 +1466,9 @@ func TestMergeStreamUpdate_FeatureFlags(t *testing.T) {
 
 	t.Run("mutable flags apply", func(t *testing.T) {
 		result := svc.mergeStreamUpdate(jetstream.StreamConfig{Name: "flags"}, entities.StreamUpdateRequest{
-			AllowMsgSchedules:      ptr.Wrap(true),
-			SubjectDeleteMarkerTTL: ptr.Wrap(time.Minute),
-			AllowBatchPublish:      ptr.Wrap(true),
+			AllowMsgSchedules:      new(true),
+			SubjectDeleteMarkerTTL: new(time.Minute),
+			AllowBatchPublish:      new(true),
 		})
 		assert.True(t, result.AllowMsgSchedules)
 		assert.Equal(t, time.Minute, result.SubjectDeleteMarkerTTL)
@@ -1477,7 +1476,7 @@ func TestMergeStreamUpdate_FeatureFlags(t *testing.T) {
 	})
 
 	t.Run("zero delete marker ttl clears it", func(t *testing.T) {
-		result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{SubjectDeleteMarkerTTL: ptr.Wrap(time.Duration(0))})
+		result := svc.mergeStreamUpdate(base, entities.StreamUpdateRequest{SubjectDeleteMarkerTTL: new(time.Duration(0))})
 		assert.Zero(t, result.SubjectDeleteMarkerTTL)
 		assert.True(t, result.AllowBatchPublish)
 	})
@@ -1494,14 +1493,14 @@ func TestApplyConsumerUpdate_Priority(t *testing.T) {
 	}
 
 	t.Run("unrelated update keeps priority settings", func(t *testing.T) {
-		result := applyConsumerUpdate(pinned, entities.ConsumerUpdateRequest{Description: ptr.Wrap("x")})
+		result := applyConsumerUpdate(pinned, entities.ConsumerUpdateRequest{Description: new("x")})
 		assert.Equal(t, jetstream.PriorityPolicyPinned, result.PriorityPolicy)
 		assert.Equal(t, []string{"jobs"}, result.PriorityGroups)
 		assert.Equal(t, time.Minute, result.PinnedTTL)
 	})
 
 	t.Run("switching the policy off clears groups and pinned ttl", func(t *testing.T) {
-		result := applyConsumerUpdate(pinned, entities.ConsumerUpdateRequest{PriorityPolicy: ptr.Wrap(entities.PriorityNone)})
+		result := applyConsumerUpdate(pinned, entities.ConsumerUpdateRequest{PriorityPolicy: new(entities.PriorityNone)})
 		assert.Equal(t, jetstream.PriorityPolicyNone, result.PriorityPolicy)
 		assert.Nil(t, result.PriorityGroups)
 		assert.Zero(t, result.PinnedTTL)
@@ -1509,9 +1508,9 @@ func TestApplyConsumerUpdate_Priority(t *testing.T) {
 
 	t.Run("groups and ttl replace", func(t *testing.T) {
 		result := applyConsumerUpdate(pinned, entities.ConsumerUpdateRequest{
-			PriorityPolicy: ptr.Wrap(entities.PriorityOverflow),
+			PriorityPolicy: new(entities.PriorityOverflow),
 			PriorityGroups: []string{"a", "b"},
-			PinnedTTL:      ptr.Wrap(30 * time.Second),
+			PinnedTTL:      new(30 * time.Second),
 		})
 		assert.Equal(t, jetstream.PriorityPolicyOverflow, result.PriorityPolicy)
 		assert.Equal(t, []string{"a", "b"}, result.PriorityGroups)
@@ -1520,7 +1519,7 @@ func TestApplyConsumerUpdate_Priority(t *testing.T) {
 
 	t.Run("filter subject handling is unchanged", func(t *testing.T) {
 		result := applyConsumerUpdate(jetstream.ConsumerConfig{FilterSubjects: []string{"a", "b"}},
-			entities.ConsumerUpdateRequest{FilterSubject: ptr.Wrap("c")})
+			entities.ConsumerUpdateRequest{FilterSubject: new("c")})
 		assert.Equal(t, "c", result.FilterSubject)
 		assert.Nil(t, result.FilterSubjects)
 	})

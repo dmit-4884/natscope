@@ -13,7 +13,6 @@ import (
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore/bbstoretest"
 
-	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	templatessvc "github.com/dmit-4884/natscope/internal/services/templates"
 	templatesBbolt "github.com/dmit-4884/natscope/internal/storages/templates/bbolt"
 )
@@ -96,7 +95,7 @@ func TestUpdate_PartialPreservesSiblings(t *testing.T) {
 	// Patch only Name; Subject and Data must survive (WithIgnoreNilValues).
 	updated, err := svc.Update(t.Context(), &entities.MessageTemplateUpdate{
 		Id:   created.Id,
-		Name: ptr.Wrap("renamed"),
+		Name: new("renamed"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "renamed", updated.Name)
@@ -115,7 +114,7 @@ func TestUpdate_HeadersReplaceSemantics(t *testing.T) {
 	require.NoError(t, err)
 
 	// nil Headers keeps the stored map.
-	kept, err := svc.Update(t.Context(), &entities.MessageTemplateUpdate{Id: created.Id, Name: ptr.Wrap("h2")})
+	kept, err := svc.Update(t.Context(), &entities.MessageTemplateUpdate{Id: created.Id, Name: new("h2")})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"old": "1"}, kept.Headers)
 
@@ -134,7 +133,7 @@ func TestUpdate_NotFound(t *testing.T) {
 
 	_, err := svc.Update(t.Context(), &entities.MessageTemplateUpdate{
 		Id:   "missing",
-		Name: ptr.Wrap("x"),
+		Name: new("x"),
 	})
 	assert.ErrorIs(t, err, errs.ErrMessageTemplateNotFound)
 }
@@ -149,7 +148,7 @@ func TestUpdate_WhitespaceOnlyNameRejected(t *testing.T) {
 
 	_, err = svc.Update(t.Context(), &entities.MessageTemplateUpdate{
 		Id:   created.Id,
-		Name: ptr.Wrap("   "),
+		Name: new("   "),
 	})
 	require.ErrorIs(t, err, errs.ErrMessageTemplateNameRequired)
 

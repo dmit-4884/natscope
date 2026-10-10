@@ -10,7 +10,6 @@ import (
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
 	"github.com/altessa-s/go-atlas/core/collections/slices"
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -202,7 +201,7 @@ func redactConnection(c *entities.SavedConnection) connectionItem {
 }
 
 func (s *ConnectionsSection) all(ctx context.Context) (entities.SavedConnections, error) {
-	res, err := s.svc.List(ctx, &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: ptr.Wrap(listAllLimit)}})
+	res, err := s.svc.List(ctx, &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: new(listAllLimit)}})
 	if err != nil {
 		return nil, err
 	}

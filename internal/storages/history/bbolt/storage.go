@@ -8,7 +8,6 @@ package bbolt
 import (
 	"context"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -66,7 +65,7 @@ func (s *Storage) List(
 		Total: total,
 	}
 	if next != "" {
-		out.NextCursor = ptr.Wrap(next)
+		out.NextCursor = new(next)
 	}
 	return out, nil
 }

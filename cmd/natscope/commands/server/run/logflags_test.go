@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/altessa-s/go-atlas/config"
+	"github.com/altessa-s/go-atlas/config/observability"
 
 	"github.com/dmit-4884/natscope/internal/pkg/logconsole"
 )
@@ -24,11 +24,11 @@ func TestApplyLogFlags(t *testing.T) {
 		wantFormat string
 		wantErr    bool
 	}{
-		{"unset flags keep the resolved defaults", "", "", config.LoggerLevelWarning, logconsole.Format, false},
-		{"level flag wins", "debug", "", config.LoggerLevelDebug, logconsole.Format, false},
-		{"format flag wins", "", "json", config.LoggerLevelWarning, config.LogFormatJSON, false},
-		{"both flags", "info", "text", config.LoggerLevelInfo, config.LogFormatText, false},
-		{"explicit error level is honored", "error", "", config.LoggerLevelError, logconsole.Format, false},
+		{"unset flags keep the resolved defaults", "", "", observabilityconfig.LoggerLevelWarning, logconsole.Format, false},
+		{"level flag wins", "debug", "", observabilityconfig.LoggerLevelDebug, logconsole.Format, false},
+		{"format flag wins", "", "json", observabilityconfig.LoggerLevelWarning, observabilityconfig.LogFormatJSON, false},
+		{"both flags", "info", "text", observabilityconfig.LoggerLevelInfo, observabilityconfig.LogFormatText, false},
+		{"explicit error level is honored", "error", "", observabilityconfig.LoggerLevelError, logconsole.Format, false},
 		{"unknown level is rejected", "loud", "", "", "", true},
 		{"unknown format is rejected", "", "xml", "", "", true},
 	}
@@ -36,7 +36,7 @@ func TestApplyLogFlags(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := &config.Logger{Level: config.LoggerLevelWarning, OutputFormat: logconsole.Format}
+			cfg := &observabilityconfig.Logger{Level: observabilityconfig.LoggerLevelWarning, OutputFormat: logconsole.Format}
 
 			err := applyLogFlags(cfg, tc.level, tc.format)
 

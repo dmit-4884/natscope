@@ -13,7 +13,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	badrequestv1 "github.com/altessa-s/proto-gen-go/badrequest/v1"
+	badrequestv1 "github.com/altessa-s/proto-gen-go/io/altessa/badrequest/v1"
 	connectionspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/connections"
 	messagespb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/messages"
 	publishpb "github.com/dmit-4884/natscope/proto/gen/services/grpc/nats/v1/publish"

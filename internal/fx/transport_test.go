@@ -6,7 +6,7 @@ package fx
 import (
 	"testing"
 
-	"github.com/altessa-s/go-atlas/config"
+	"github.com/altessa-s/go-atlas/config/http"
 
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 )
@@ -14,7 +14,7 @@ import (
 // TestNewHTTPServer_WideBindRequiresAllowRemote checks that AllowInsecure alone can't open a wide bind.
 func TestNewHTTPServer_WideBindRequiresAllowRemote(t *testing.T) {
 	cfg := &appconfig.Config{
-		Http:          &config.Http{ListenAddress: "0.0.0.0:9080"},
+		Http:          &httpconfig.Config{ListenAddress: "0.0.0.0:9080"},
 		AllowInsecure: true,
 		// AllowRemote intentionally left false.
 	}
@@ -27,7 +27,7 @@ func TestNewHTTPServer_WideBindRequiresAllowRemote(t *testing.T) {
 // TestNewHTTPServer_WideBindRequiresAllowInsecure checks that AllowRemote alone can't open a wide bind.
 func TestNewHTTPServer_WideBindRequiresAllowInsecure(t *testing.T) {
 	cfg := &appconfig.Config{
-		Http:        &config.Http{ListenAddress: "0.0.0.0:9080"},
+		Http:        &httpconfig.Config{ListenAddress: "0.0.0.0:9080"},
 		AllowRemote: true,
 		// AllowInsecure intentionally left false.
 	}

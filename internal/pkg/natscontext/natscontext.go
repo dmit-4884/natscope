@@ -270,21 +270,21 @@ func (t *translator) userSeed(cli cliContext) []byte {
 
 func (t *translator) auth(cli cliContext) *entities.AuthConfig {
 	if creds := t.file("credentials", cli.Creds); creds != nil {
-		return &entities.AuthConfig{Method: entities.AuthMethodCredentials, Credentials: ptr.Wrap(string(creds))}
+		return &entities.AuthConfig{Method: entities.AuthMethodCredentials, Credentials: new(string(creds))}
 	}
 	if cli.UserJWT != "" {
 		if seed := t.userSeed(cli); seed != nil {
-			return &entities.AuthConfig{Method: entities.AuthMethodCredentials, JWT: ptr.Wrap(cli.UserJWT), NkeySeed: ptr.Wrap(string(seed))}
+			return &entities.AuthConfig{Method: entities.AuthMethodCredentials, JWT: new(cli.UserJWT), NkeySeed: new(string(seed))}
 		}
 		t.warn("the user JWT comes without a seed: add the seed or a credentials file to the connection")
 	} else if seed := t.seed(cli.NKey); seed != nil {
-		return &entities.AuthConfig{Method: entities.AuthMethodNKey, NkeySeed: ptr.Wrap(string(seed))}
+		return &entities.AuthConfig{Method: entities.AuthMethodNKey, NkeySeed: new(string(seed))}
 	}
 	if cli.Token != "" {
-		return &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap(cli.Token)}
+		return &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new(cli.Token)}
 	}
 	if cli.User != "" {
-		return &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap(cli.User), Password: ptr.WrapNonZero(cli.Password)}
+		return &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: new(cli.User), Password: ptr.WrapNonZero(cli.Password)}
 	}
 	return nil
 }
@@ -333,7 +333,7 @@ func wrapBytes(b []byte) *string {
 	if b == nil {
 		return nil
 	}
-	return ptr.Wrap(string(b))
+	return new(string(b))
 }
 
 // readReferenced reads a file a local context points at, expanding a leading ~.

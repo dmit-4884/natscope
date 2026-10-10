@@ -6,7 +6,7 @@ package appconfig_test
 import (
 	"testing"
 
-	"github.com/altessa-s/go-atlas/config"
+	"github.com/altessa-s/go-atlas/config/observability"
 
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 	"github.com/dmit-4884/natscope/internal/pkg/logconsole"
@@ -15,14 +15,14 @@ import (
 func TestLoggerDefaultsInteractive(t *testing.T) {
 	l := appconfig.LoggerDefaults(true)
 
-	if l.Level != config.LoggerLevelWarning {
-		t.Errorf("Level = %q, want %q", l.Level, config.LoggerLevelWarning)
+	if l.Level != observabilityconfig.LoggerLevelWarning {
+		t.Errorf("Level = %q, want %q", l.Level, observabilityconfig.LoggerLevelWarning)
 	}
 	if l.OutputFormat != logconsole.Format {
 		t.Errorf("OutputFormat = %q, want %q", l.OutputFormat, logconsole.Format)
 	}
-	if l.Output != config.LoggerConsoleOutputStderr {
-		t.Errorf("Output = %q, want %q", l.Output, config.LoggerConsoleOutputStderr)
+	if l.Output != observabilityconfig.LoggerConsoleOutputStderr {
+		t.Errorf("Output = %q, want %q", l.Output, observabilityconfig.LoggerConsoleOutputStderr)
 	}
 	if !l.Colorized {
 		t.Error("Colorized = false, want true")
@@ -32,14 +32,14 @@ func TestLoggerDefaultsInteractive(t *testing.T) {
 func TestLoggerDefaultsNonInteractive(t *testing.T) {
 	l := appconfig.LoggerDefaults(false)
 
-	if l.Level != config.LoggerLevelInfo {
-		t.Errorf("Level = %q, want %q", l.Level, config.LoggerLevelInfo)
+	if l.Level != observabilityconfig.LoggerLevelInfo {
+		t.Errorf("Level = %q, want %q", l.Level, observabilityconfig.LoggerLevelInfo)
 	}
-	if l.OutputFormat != config.LogFormatText {
-		t.Errorf("OutputFormat = %q, want %q", l.OutputFormat, config.LogFormatText)
+	if l.OutputFormat != observabilityconfig.LogFormatText {
+		t.Errorf("OutputFormat = %q, want %q", l.OutputFormat, observabilityconfig.LogFormatText)
 	}
-	if l.Output != config.LoggerConsoleOutputStderr {
-		t.Errorf("Output = %q, want %q", l.Output, config.LoggerConsoleOutputStderr)
+	if l.Output != observabilityconfig.LoggerConsoleOutputStderr {
+		t.Errorf("Output = %q, want %q", l.Output, observabilityconfig.LoggerConsoleOutputStderr)
 	}
 }
 
@@ -49,14 +49,14 @@ func TestLoadSeedsLoggerDefaults(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 
-	if cfg.Logger.Level != config.LoggerLevelWarning {
-		t.Errorf("Level = %q, want %q", cfg.Logger.Level, config.LoggerLevelWarning)
+	if cfg.Logger.Level != observabilityconfig.LoggerLevelWarning {
+		t.Errorf("Level = %q, want %q", cfg.Logger.Level, observabilityconfig.LoggerLevelWarning)
 	}
 	if cfg.Logger.OutputFormat != logconsole.Format {
 		t.Errorf("OutputFormat = %q, want %q", cfg.Logger.OutputFormat, logconsole.Format)
 	}
-	if cfg.Logger.Output != config.LoggerConsoleOutputStderr {
-		t.Errorf("Output = %q, want %q", cfg.Logger.Output, config.LoggerConsoleOutputStderr)
+	if cfg.Logger.Output != observabilityconfig.LoggerConsoleOutputStderr {
+		t.Errorf("Output = %q, want %q", cfg.Logger.Output, observabilityconfig.LoggerConsoleOutputStderr)
 	}
 }
 
@@ -69,13 +69,13 @@ func TestLoadEnvOverridesLoggerSeed(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 
-	if cfg.Logger.Level != config.LoggerLevelDebug {
-		t.Errorf("Level = %q, want %q", cfg.Logger.Level, config.LoggerLevelDebug)
+	if cfg.Logger.Level != observabilityconfig.LoggerLevelDebug {
+		t.Errorf("Level = %q, want %q", cfg.Logger.Level, observabilityconfig.LoggerLevelDebug)
 	}
-	if cfg.Logger.OutputFormat != config.LogFormatJSON {
-		t.Errorf("OutputFormat = %q, want %q", cfg.Logger.OutputFormat, config.LogFormatJSON)
+	if cfg.Logger.OutputFormat != observabilityconfig.LogFormatJSON {
+		t.Errorf("OutputFormat = %q, want %q", cfg.Logger.OutputFormat, observabilityconfig.LogFormatJSON)
 	}
-	if cfg.Logger.Output != config.LoggerConsoleOutputStderr {
-		t.Errorf("Output = %q, want %q", cfg.Logger.Output, config.LoggerConsoleOutputStderr)
+	if cfg.Logger.Output != observabilityconfig.LoggerConsoleOutputStderr {
+		t.Errorf("Output = %q, want %q", cfg.Logger.Output, observabilityconfig.LoggerConsoleOutputStderr)
 	}
 }

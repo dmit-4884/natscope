@@ -12,7 +12,6 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore/bbstoretest"
 
-	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	settingssvc "github.com/dmit-4884/natscope/internal/services/settings"
 	settingsBbolt "github.com/dmit-4884/natscope/internal/storages/settings/bbolt"
 )
@@ -45,7 +44,7 @@ func TestGet_ExistingSettings(t *testing.T) {
 	// Save settings via Update first
 	_, err := svc.Update(t.Context(), &entities.UserSettingsUpdate{
 		Messages: &entities.MessageSettings{
-			DefaultPageSize: ptr.Wrap(int32(50)),
+			DefaultPageSize: new(int32(50)),
 		},
 	})
 	require.NoError(t, err)
@@ -64,8 +63,8 @@ func TestUpdate_CreateNew(t *testing.T) {
 
 	result, err := svc.Update(t.Context(), &entities.UserSettingsUpdate{
 		Messages: &entities.MessageSettings{
-			FetchMethod:     ptr.Wrap("direct"),
-			DefaultPageSize: ptr.Wrap(int32(25)),
+			FetchMethod:     new("direct"),
+			DefaultPageSize: new(int32(25)),
 		},
 	})
 
@@ -84,11 +83,11 @@ func TestUpdate_PartialUpdate(t *testing.T) {
 	// Create initial settings with Messages and Live
 	_, err := svc.Update(t.Context(), &entities.UserSettingsUpdate{
 		Messages: &entities.MessageSettings{
-			FetchMethod:     ptr.Wrap("direct"),
-			DefaultPageSize: ptr.Wrap(int32(25)),
+			FetchMethod:     new("direct"),
+			DefaultPageSize: new(int32(25)),
 		},
 		Live: &entities.LiveSettings{
-			SubscriptionMode: ptr.Wrap("core_nats"),
+			SubscriptionMode: new("core_nats"),
 		},
 	})
 	require.NoError(t, err)
@@ -96,7 +95,7 @@ func TestUpdate_PartialUpdate(t *testing.T) {
 	// Update only Messages.DefaultPageSize
 	result, err := svc.Update(t.Context(), &entities.UserSettingsUpdate{
 		Messages: &entities.MessageSettings{
-			DefaultPageSize: ptr.Wrap(int32(100)),
+			DefaultPageSize: new(int32(100)),
 		},
 	})
 	require.NoError(t, err)
@@ -123,11 +122,11 @@ func TestUpdate_MultipleGroups(t *testing.T) {
 
 	result, err := svc.Update(t.Context(), &entities.UserSettingsUpdate{
 		Messages: &entities.MessageSettings{
-			DefaultPageSize: ptr.Wrap(int32(50)),
+			DefaultPageSize: new(int32(50)),
 		},
 		Live: &entities.LiveSettings{
-			SubscriptionMode: ptr.Wrap("jetstream_ordered"),
-			MaxDisplayRate:   ptr.Wrap(int32(100)),
+			SubscriptionMode: new("jetstream_ordered"),
+			MaxDisplayRate:   new(int32(100)),
 		},
 	})
 
@@ -147,10 +146,10 @@ func TestUpdate_BehaviorPartialUpdate(t *testing.T) {
 	// Seed a Messages section plus one behavior toggle.
 	_, err := svc.Update(t.Context(), &entities.UserSettingsUpdate{
 		Messages: &entities.MessageSettings{
-			FetchMethod: ptr.Wrap("direct"),
+			FetchMethod: new("direct"),
 		},
 		Behavior: &entities.BehaviorSettings{
-			ConfirmDeleteConsumer: ptr.Wrap(false),
+			ConfirmDeleteConsumer: new(false),
 		},
 	})
 	require.NoError(t, err)
@@ -158,8 +157,8 @@ func TestUpdate_BehaviorPartialUpdate(t *testing.T) {
 	// Update only a different behavior toggle.
 	result, err := svc.Update(t.Context(), &entities.UserSettingsUpdate{
 		Behavior: &entities.BehaviorSettings{
-			ConfirmDeleteMessage: ptr.Wrap(false),
-			SecureDeleteDefault:  ptr.Wrap(true),
+			ConfirmDeleteMessage: new(false),
+			SecureDeleteDefault:  new(true),
 		},
 	})
 	require.NoError(t, err)
@@ -194,7 +193,7 @@ func TestReset(t *testing.T) {
 	// Save some settings
 	_, err := svc.Update(t.Context(), &entities.UserSettingsUpdate{
 		Messages: &entities.MessageSettings{
-			DefaultPageSize: ptr.Wrap(int32(50)),
+			DefaultPageSize: new(int32(50)),
 		},
 	})
 	require.NoError(t, err)
@@ -226,7 +225,7 @@ func TestGet_CachedUntilUpdateOrReset(t *testing.T) {
 	assert.Same(t, first, again, "repeated reads are served from memory")
 
 	_, err = svc.Update(t.Context(), &entities.UserSettingsUpdate{
-		Messages: &entities.MessageSettings{DefaultPageSize: ptr.Wrap(int32(75))},
+		Messages: &entities.MessageSettings{DefaultPageSize: new(int32(75))},
 	})
 	require.NoError(t, err)
 	afterUpdate, err := svc.Get(t.Context())

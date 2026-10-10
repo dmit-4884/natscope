@@ -11,8 +11,6 @@ import (
 	"sync/atomic"
 
 	"github.com/dmit-4884/natscope/internal/entities"
-
-	atlasslices "github.com/altessa-s/go-atlas/core/collections/slices"
 )
 
 // maxResolverCacheEntries bounds the wildcard-resolution cache; lookups past the cap use the linear scan.
@@ -118,7 +116,7 @@ func (r *MappingResolver) Mappings() entities.SubjectMappings {
 
 // hasWildcard reports whether the NATS pattern contains a wildcard token.
 func hasWildcard(pattern string) bool {
-	return atlasslices.Any(strings.Split(pattern, "."), func(t string) bool {
+	return slices.ContainsFunc(strings.Split(pattern, "."), func(t string) bool {
 		return t == "*" || t == ">"
 	})
 }

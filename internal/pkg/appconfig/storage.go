@@ -5,6 +5,8 @@ package appconfig
 
 import (
 	"github.com/go-ozzo/ozzo-validation/v4"
+
+	"github.com/altessa-s/go-atlas/config/validation"
 )
 
 // StorageConfig is the storage backend configuration.
@@ -22,7 +24,7 @@ type LocalStorageConfig struct {
 
 // Validate performs validation of the StorageConfig configuration.
 func (c *StorageConfig) Validate() error {
-	return validation.ValidateStruct(c,
+	return validationconfig.ValidateStruct(c,
 		validation.Field(&c.Local, validation.NilOrNotEmpty),
 	)
 }
@@ -37,5 +39,5 @@ func (c *StorageConfig) GetDataDir() string {
 
 // Validate performs validation of the LocalStorageConfig configuration.
 func (c *LocalStorageConfig) Validate() error {
-	return validation.ValidateStruct(c)
+	return validationconfig.ValidateStruct(c)
 }

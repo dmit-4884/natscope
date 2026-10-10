@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/bbstore"
@@ -43,8 +41,8 @@ func sampleConn(name string) *entities.SavedConnection {
 		c.URLs = []string{"nats://localhost:4222"}
 		c.Auth = &entities.AuthConfig{
 			Method:   entities.AuthMethodUserPass,
-			Username: ptr.Wrap("admin"),
-			Password: ptr.Wrap("super-secret-pw"),
+			Username: new("admin"),
+			Password: new("super-secret-pw"),
 		}
 	})
 }
@@ -57,37 +55,37 @@ func TestConnections_AllGroupsRoundTrip(t *testing.T) {
 
 	in := entities.SavedConnectionNew(func(c *entities.SavedConnection) {
 		c.Name = "full"
-		c.Description = ptr.Wrap("desc")
+		c.Description = new("desc")
 		c.URLs = []string{"nats://a:4222", "nats://b:4222"}
 		c.Auth = &entities.AuthConfig{
 			Method:   entities.AuthMethodCredentials,
-			Username: ptr.Wrap("u"), Password: ptr.Wrap("p"), Token: ptr.Wrap("tok"),
-			NkeySeed: ptr.Wrap("seed"), Credentials: ptr.Wrap("creds"), JWT: ptr.Wrap("jwt"),
+			Username: new("u"), Password: new("p"), Token: new("tok"),
+			NkeySeed: new("seed"), Credentials: new("creds"), JWT: new("jwt"),
 		}
 		c.TLS = &entities.TlsConfig{
-			CaCert: ptr.Wrap("ca"), ClientCert: ptr.Wrap("cc"), ClientKey: ptr.Wrap("ck"),
+			CaCert: new("ca"), ClientCert: new("cc"), ClientKey: new("ck"),
 			SkipVerify: true, TlsFirst: true,
 		}
 		ct := 7 * time.Second
 		c.Connection = &entities.ConnectionConfig{
-			ConnectTimeout: &ct, ConnectionName: ptr.Wrap("cn"), InboxPrefix: ptr.Wrap("_INBOX"),
+			ConnectTimeout: &ct, ConnectionName: new("cn"), InboxPrefix: new("_INBOX"),
 			NoEcho: true, NoRandomize: true, IgnoreDiscoveredServers: true,
-			JetstreamDomain: ptr.Wrap("hub"), JetstreamAPIPrefix: ptr.Wrap("JS.acc.API"),
+			JetstreamDomain: new("hub"), JetstreamAPIPrefix: new("JS.acc.API"),
 		}
 		rw := 3 * time.Second
 		c.Reconnect = &entities.ReconnectConfig{
-			MaxReconnects: ptr.Wrap(int32(10)), ReconnectWait: &rw,
-			ReconnectBufSize: ptr.Wrap(int32(4096)), RetryOnFailedConnect: true,
+			MaxReconnects: new(int32(10)), ReconnectWait: &rw,
+			ReconnectBufSize: new(int32(4096)), RetryOnFailedConnect: true,
 		}
 		pi := 2 * time.Minute
-		c.Ping = &entities.PingConfig{PingInterval: &pi, MaxPingsOutstanding: ptr.Wrap(int32(3))}
+		c.Ping = &entities.PingConfig{PingInterval: &pi, MaxPingsOutstanding: new(int32(3))}
 		c.ReadOnly = true
 		c.Label = &entities.ConnectionLabel{Text: "PROD", Color: entities.LabelColorRed}
 		c.Meta = &entities.ConnectionMeta{
 			LastTestedAt: time.UnixMilli(1700000000123).UTC(), LastSuccess: true,
-			LastRTTMs: ptr.Wrap(int64(42)), ServerVersion: ptr.Wrap("2.12"), ServerName: ptr.Wrap("n1"),
-			ServerID: ptr.Wrap("ID1"), ClusterName: ptr.Wrap("cl"), MaxPayload: ptr.Wrap(int64(1048576)),
-			JetstreamEnabled: ptr.Wrap(true), ConnectedURL: ptr.Wrap("nats://a:4222"), LastError: ptr.Wrap("none"),
+			LastRTTMs: new(int64(42)), ServerVersion: new("2.12"), ServerName: new("n1"),
+			ServerID: new("ID1"), ClusterName: new("cl"), MaxPayload: new(int64(1048576)),
+			JetstreamEnabled: new(true), ConnectedURL: new("nats://a:4222"), LastError: new("none"),
 		}
 	})
 	if err := s.Save(ctx, in); err != nil {
@@ -189,7 +187,7 @@ func TestConnections_Update(t *testing.T) {
 	}
 	if _, err := s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
 		existing.Name = "c1-renamed"
-		existing.Auth.Password = ptr.Wrap("new-pw")
+		existing.Auth.Password = new("new-pw")
 		return false, false
 	}); err != nil {
 		t.Fatalf("update: %v", err)
@@ -243,7 +241,7 @@ func TestConnections_UpdateAuthReplacePrunesStaleSecret(t *testing.T) {
 
 	// Switch to token auth, as ApplyUpdate does for a request that replaces Auth.
 	if _, err := s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
-		existing.Auth = &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("new-token")}
+		existing.Auth = &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new("new-token")}
 		return true, false
 	}); err != nil {
 		t.Fatalf("update: %v", err)
@@ -302,7 +300,7 @@ func TestConnections_UpdateTLSReplacePrunesStaleClientKey(t *testing.T) {
 	s, vault, _ := newStorage(t)
 	ctx := t.Context()
 	in := sampleConn("c1")
-	in.TLS = &entities.TlsConfig{ClientCert: ptr.Wrap("cc"), ClientKey: ptr.Wrap("super-secret-key")}
+	in.TLS = &entities.TlsConfig{ClientCert: new("cc"), ClientKey: new("super-secret-key")}
 	if err := s.Save(ctx, in); err != nil {
 		t.Fatalf("save: %v", err)
 	}
@@ -364,7 +362,7 @@ func TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T)
 		go func() {
 			defer wg.Done()
 			_, _ = s.Update(ctx, in.Id, func(existing *entities.SavedConnection) (bool, bool) {
-				existing.Description = ptr.Wrap("d" + strconv.Itoa(r))
+				existing.Description = new("d" + strconv.Itoa(r))
 				return false, false
 			})
 		}()
@@ -374,7 +372,7 @@ func TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T)
 				if existing.Connection == nil {
 					existing.Connection = &entities.ConnectionConfig{}
 				}
-				existing.Connection.ConnectionName = ptr.Wrap("cn" + strconv.Itoa(r))
+				existing.Connection.ConnectionName = new("cn" + strconv.Itoa(r))
 				return false, false
 			})
 		}()
@@ -384,7 +382,7 @@ func TestConnections_UpdateConcurrentPartialUpdatesDoNotLoseWrites(t *testing.T)
 				if existing.Ping == nil {
 					existing.Ping = &entities.PingConfig{}
 				}
-				existing.Ping.MaxPingsOutstanding = ptr.Wrap(int32(r))
+				existing.Ping.MaxPingsOutstanding = new(int32(r))
 				return false, false
 			})
 		}()
@@ -417,7 +415,7 @@ func TestConnections_ListPagination(t *testing.T) {
 		}
 	}
 	page, err := s.List(ctx, &entities.SavedConnectionsList{
-		ListBase: entities.ListBase{Limit: ptr.Wrap(int64(2)), IncludeTotalCount: true},
+		ListBase: entities.ListBase{Limit: new(int64(2)), IncludeTotalCount: true},
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)

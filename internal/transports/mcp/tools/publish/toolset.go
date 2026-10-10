@@ -7,8 +7,6 @@ package publish
 import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/pkg/appconfig"
 
 	mappingssvc "github.com/dmit-4884/natscope/internal/services/mappings"
@@ -55,7 +53,7 @@ func (t *Toolset) Register(s *mcp.Server) {
 		Description: "Publish a message to a JetStream subject. A `json` payload is encoded to Protobuf when `type` is given or the " +
 			"subject is mapped (unless raw is set); otherwise it is sent as JSON text. Use `text` for any other raw payload. " +
 			"Check the payload with validate_payload first. The publish is recorded in the natscope publish history.",
-		Annotations: &mcp.ToolAnnotations{Title: "Publish message", DestructiveHint: ptr.Wrap(false)},
+		Annotations: &mcp.ToolAnnotations{Title: "Publish message", DestructiveHint: new(false)},
 	}, t.publishMessage)
 
 	mcptransport.AddTool(s, &mcp.Tool{
@@ -64,6 +62,6 @@ func (t *Toolset) Register(s *mcp.Server) {
 			"omit json and text for an empty request. Fails at once with NATS_NO_RESPONDERS when nothing listens on the subject and " +
 			"with NATS_TIMEOUT when no reply arrives within timeoutMs. Decode a Protobuf reply body with decode_payload. " +
 			"Requests are not recorded in the publish history.",
-		Annotations: &mcp.ToolAnnotations{Title: "Send request", DestructiveHint: ptr.Wrap(false)},
+		Annotations: &mcp.ToolAnnotations{Title: "Send request", DestructiveHint: new(false)},
 	}, t.requestMessage)
 }

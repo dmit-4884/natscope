@@ -226,7 +226,7 @@ func NewConnectionMetaFromTestResult(result *TestConnectionResult) *ConnectionMe
 		meta.ServerID = ptr.WrapNonZero(result.ServerID)
 		meta.ClusterName = ptr.WrapNonZero(result.ClusterName)
 		meta.MaxPayload = ptr.WrapNonZero(result.MaxPayload)
-		meta.JetstreamEnabled = ptr.Wrap(result.JetstreamEnabled)
+		meta.JetstreamEnabled = new(result.JetstreamEnabled)
 		meta.ConnectedURL = ptr.WrapNonZero(result.ConnectedURL)
 	} else {
 		meta.LastError = ptr.WrapNonZero(result.Error)

@@ -347,13 +347,13 @@ func authFromURLCredentials(creds *natsutil.URLCredentials) *entities.AuthConfig
 	if creds.Token != "" {
 		return &entities.AuthConfig{
 			Method: entities.AuthMethodToken,
-			Token:  ptr.Wrap(creds.Token),
+			Token:  new(creds.Token),
 		}
 	}
 	return &entities.AuthConfig{
 		Method:   entities.AuthMethodUserPass,
-		Username: ptr.Wrap(creds.Username),
-		Password: ptr.Wrap(creds.Password),
+		Username: new(creds.Username),
+		Password: new(creds.Password),
 	}
 }
 

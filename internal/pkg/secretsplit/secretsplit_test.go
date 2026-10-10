@@ -24,8 +24,8 @@ type doc struct {
 func TestSplitLiftsAndBlanks(t *testing.T) {
 	d := &doc{
 		Name: "conn",
-		Auth: &auth{Username: ptr.Wrap("u"), Password: ptr.Wrap("p"), Token: ptr.Wrap("t")},
-		Key:  ptr.Wrap("k"),
+		Auth: &auth{Username: new("u"), Password: new("p"), Token: new("t")},
+		Key:  new("k"),
 	}
 
 	secs, err := Split(d)
@@ -55,8 +55,8 @@ func TestSplitLiftsAndBlanks(t *testing.T) {
 func TestRoundTrip(t *testing.T) {
 	d := &doc{
 		Name: "conn",
-		Auth: &auth{Username: ptr.Wrap("u"), Password: ptr.Wrap("p"), Token: ptr.Wrap("t")},
-		Key:  ptr.Wrap("k"),
+		Auth: &auth{Username: new("u"), Password: new("p"), Token: new("t")},
+		Key:  new("k"),
 	}
 
 	secs, err := Split(d)
@@ -75,7 +75,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestSplitNilSubStruct(t *testing.T) {
-	d := &doc{Name: "conn", Key: ptr.Wrap("k")} // Auth nil
+	d := &doc{Name: "conn", Key: new("k")} // Auth nil
 
 	secs, err := Split(d)
 	if err != nil {
@@ -86,7 +86,7 @@ func TestSplitNilSubStruct(t *testing.T) {
 	}
 
 	// Merge back into a fresh doc with the same shape must not panic on nil Auth.
-	got := &doc{Name: "conn", Key: ptr.Wrap("")}
+	got := &doc{Name: "conn", Key: new("")}
 	if err := Merge(got, secs); err != nil {
 		t.Fatalf("Merge: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestSplitNilSubStruct(t *testing.T) {
 
 func TestSplitEmptyValueOmitted(t *testing.T) {
 	d := &doc{
-		Auth: &auth{Password: ptr.Wrap(""), Token: nil}, // empty and nil
+		Auth: &auth{Password: new(""), Token: nil}, // empty and nil
 		Key:  nil,
 	}
 	secs, err := Split(d)
@@ -110,7 +110,7 @@ func TestSplitEmptyValueOmitted(t *testing.T) {
 }
 
 func TestMergeEmptyLeavesNil(t *testing.T) {
-	d := &doc{Auth: &auth{Password: ptr.Wrap("stale")}}
+	d := &doc{Auth: &auth{Password: new("stale")}}
 	if err := Merge(d, map[string]string{}); err != nil {
 		t.Fatalf("Merge: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestMissingSecretTagErrors(t *testing.T) {
 	type bad struct {
 		Secret *string `behavior:"input_only"` // no `secret` tag
 	}
-	if _, err := Split(&bad{Secret: ptr.Wrap("x")}); err == nil {
+	if _, err := Split(&bad{Secret: new("x")}); err == nil {
 		t.Fatal("expected error for input_only field without a secret tag")
 	}
 }

@@ -7,13 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
-	"github.com/altessa-s/go-atlas/core/collections/slices"
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
+	atlasslices "github.com/altessa-s/go-atlas/core/collections/slices"
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 )
 
@@ -77,7 +77,7 @@ func (s *ProtoSourcesSection) Export(ctx context.Context) (json.RawMessage, erro
 			}
 			item.Upload = &uploadItem{
 				DescriptorSet: upload.DescriptorSet,
-				Files: slices.To(upload.Files, func(f entities.ProtoFileEntry) uploadFileItem {
+				Files: atlasslices.To(upload.Files, func(f entities.ProtoFileEntry) uploadFileItem {
 					return uploadFileItem{Path: f.Path, Content: f.Content}
 				}),
 			}
@@ -102,7 +102,7 @@ func (s *ProtoSourcesSection) Validate(
 	}
 	created, deleted, conflicts := createOnlyPlan(
 		existing,
-		slices.To(items, func(i protoSourceItem) string { return i.Name }),
+		atlasslices.To(items, func(i protoSourceItem) string { return i.Name }),
 		strategy,
 	)
 	rep := entities.WorkspaceSectionReport{Created: created, Deleted: deleted, Conflicts: conflicts}
@@ -186,7 +186,7 @@ func (s *ProtoSourcesSection) create(ctx context.Context, it protoSourceItem, re
 	case it.Upload != nil:
 		_, outcome, err := s.svc.UploadSchema(ctx, src.Id, entities.SchemaUpload{
 			DescriptorSet: it.Upload.DescriptorSet,
-			Files: slices.To(it.Upload.Files, func(f uploadFileItem) entities.ProtoFileEntry {
+			Files: atlasslices.To(it.Upload.Files, func(f uploadFileItem) entities.ProtoFileEntry {
 				return entities.ProtoFileEntry{Path: f.Path, Content: f.Content}
 			}),
 		})
@@ -223,21 +223,21 @@ func toProtoSourceCreate(it protoSourceItem) *entities.ProtoSourceCreate {
 		SourceType:      entities.SourceType(it.SourceType),
 		Repository:      it.Repository,
 		LocalPath:       it.LocalPath,
-		WatcherEnabled:  ptr.Wrap(it.WatcherEnabled),
+		WatcherEnabled:  new(it.WatcherEnabled),
 		ImportRoots:     it.ImportRoots,
 		ExcludePrefixes: it.ExcludePrefixes,
 	}
 }
 
 func hasTokenSource(items []protoSourceItem) bool {
-	return slices.Any(items, func(it protoSourceItem) bool {
+	return slices.ContainsFunc(items, func(it protoSourceItem) bool {
 		return it.SourceType == string(entities.SourceTypeGit) || it.SourceType == string(entities.SourceTypeBSR)
 	})
 }
 
 func (s *ProtoSourcesSection) all(ctx context.Context) (entities.ProtoSources, error) {
 	res, err := s.svc.ListSources(ctx, &entities.ProtoSourcesList{
-		ListBase: entities.ListBase{Limit: ptr.Wrap(listAllLimit)},
+		ListBase: entities.ListBase{Limit: new(listAllLimit)},
 	})
 	if err != nil {
 		return nil, err

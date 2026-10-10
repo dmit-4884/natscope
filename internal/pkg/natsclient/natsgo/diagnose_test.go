@@ -27,8 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 )
 
@@ -267,7 +265,7 @@ func TestDiagnose_WrongPassword(t *testing.T) {
 
 	res := diagnoseURL(t, &entities.TestConnectionRequest{
 		URLs: []string{url},
-		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("wrong")},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: new("app"), Password: new("wrong")},
 	})
 
 	assert.False(t, res.Success)
@@ -296,7 +294,7 @@ func TestDiagnose_JetStreamDomainNobodyServes(t *testing.T) {
 
 	res := diagnoseURL(t, &entities.TestConnectionRequest{
 		URLs:       []string{url},
-		Connection: &entities.ConnectionConfig{JetstreamDomain: ptr.Wrap("nowhere")},
+		Connection: &entities.ConnectionConfig{JetstreamDomain: new("nowhere")},
 	})
 
 	require.True(t, res.Success)
@@ -394,7 +392,7 @@ func TestDiagnose_SeveralURLs(t *testing.T) {
 	t.Parallel()
 	good := startTestServer(t, nil)
 	locked := startTestServer(t, func(o *server.Options) { o.Username, o.Password = "app", "right" })
-	wrongPassword := &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("wrong")}
+	wrongPassword := &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: new("app"), Password: new("wrong")}
 
 	t.Run("a dead first server does not hide a working second one", func(t *testing.T) {
 		t.Parallel()
@@ -459,7 +457,7 @@ func TestDiagnose_CredentialsTheServerDoesNotCheck(t *testing.T) {
 
 	res := diagnoseURL(t, &entities.TestConnectionRequest{
 		URLs: []string{url},
-		Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("secret")},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new("secret")},
 	})
 
 	require.True(t, res.Success, res.Error)
@@ -482,7 +480,7 @@ func TestDiagnose_ServerRefusals(t *testing.T) {
 			t.Parallel()
 			res := diagnoseURL(t, &entities.TestConnectionRequest{
 				URLs: []string{fakeNATS(t, info, tc.reply)},
-				Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("secret")},
+				Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new("secret")},
 			})
 			require.False(t, res.Success)
 			auth := check(t, res, entities.CheckStepAuth)
@@ -516,7 +514,7 @@ func TestDiagnose_JetStreamDomainAnswersDisabled(t *testing.T) {
 
 	res := diagnoseURL(t, &entities.TestConnectionRequest{
 		URLs:       []string{url},
-		Connection: &entities.ConnectionConfig{JetstreamDomain: ptr.Wrap("nowhere")},
+		Connection: &entities.ConnectionConfig{JetstreamDomain: new("nowhere")},
 	})
 
 	js := check(t, res, entities.CheckStepJetStream)
@@ -737,7 +735,7 @@ func TestDiagnose_ADeadResolverDoesNotHoldTheTestPastItsSteps(t *testing.T) {
 	t.Cleanup(func() { net.DefaultResolver = previous })
 
 	start := time.Now()
-	res := diagnoseURL(t, &entities.TestConnectionRequest{URLs: []string{"nats://nats.invalid:4222"}, ConnectTimeout: ptr.Wrap(time.Second)})
+	res := diagnoseURL(t, &entities.TestConnectionRequest{URLs: []string{"nats://nats.invalid:4222"}, ConnectTimeout: new(time.Second)})
 
 	assert.False(t, res.Success)
 	assert.Less(t, time.Since(start), 8*time.Second)
@@ -791,7 +789,7 @@ func TestDiagnose_ADefaultUserIsNotIgnoredCredentials(t *testing.T) {
 
 	res := diagnoseURL(t, &entities.TestConnectionRequest{
 		URLs: []string{url},
-		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("pw")},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: new("app"), Password: new("pw")},
 	})
 
 	require.True(t, res.Success, res.Error)
@@ -834,7 +832,7 @@ func TestDiagnose_JetStreamWithoutPermission(t *testing.T) {
 	start := time.Now()
 	res := diagnoseURL(t, &entities.TestConnectionRequest{
 		URLs: []string{url},
-		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: ptr.Wrap("app"), Password: ptr.Wrap("pw")},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodUserPass, Username: new("app"), Password: new("pw")},
 	})
 
 	require.True(t, res.Success, res.Error)
@@ -857,7 +855,7 @@ func TestDiagnose_WebSocketCredentialsTheServerDoesNotNeed(t *testing.T) {
 
 	res := diagnoseURL(t, &entities.TestConnectionRequest{
 		URLs: []string{"ws://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(wsPort))},
-		Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptr.Wrap("secret")},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new("secret")},
 	})
 
 	require.True(t, res.Success, res.Error)

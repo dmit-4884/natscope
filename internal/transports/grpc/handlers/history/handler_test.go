@@ -14,7 +14,6 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
-	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	historypb "github.com/dmit-4884/natscope/proto/gen/services/grpc/history/v1/history"
 )
 
@@ -50,7 +49,7 @@ func TestHandler_ListPublishHistory(t *testing.T) {
 						h.Success = true
 					}),
 				},
-				NextCursor: ptr.Wrap("cursor-2"),
+				NextCursor: new("cursor-2"),
 			},
 		}
 		handler := New(svc)

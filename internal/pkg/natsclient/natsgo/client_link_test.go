@@ -14,8 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/altessa-s/go-atlas/core/types/ptr"
-
 	"github.com/dmit-4884/natscope/internal/entities"
 )
 
@@ -95,8 +93,8 @@ func TestClient_StatusDoesNotWaitOnAReconnectStuckInItsHandshake(t *testing.T) {
 
 	conn, err := NewDialer().Dial(t.Context(), &entities.SavedConnection{
 		URLs:       []string{proxy.url},
-		Connection: &entities.ConnectionConfig{ConnectTimeout: ptr.Wrap(5 * time.Second)},
-		Reconnect:  &entities.ReconnectConfig{ReconnectWait: ptr.Wrap(50 * time.Millisecond)},
+		Connection: &entities.ConnectionConfig{ConnectTimeout: new(5 * time.Second)},
+		Reconnect:  &entities.ReconnectConfig{ReconnectWait: new(50 * time.Millisecond)},
 	})
 	require.NoError(t, err)
 	t.Cleanup(conn.Close)

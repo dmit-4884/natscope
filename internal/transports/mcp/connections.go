@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/altessa-s/go-atlas/core/collections/slices"
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
@@ -28,7 +27,7 @@ func NewConnections(svc connectionssvc.Service) *Connections {
 // List returns every saved connection.
 func (c *Connections) List(ctx context.Context) (entities.SavedConnections, error) {
 	var all entities.SavedConnections
-	req := &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: ptr.Wrap(entities.MaxListLimit)}}
+	req := &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: new(entities.MaxListLimit)}}
 	for {
 		page, err := c.svc.List(ctx, req)
 		if err != nil {

@@ -16,7 +16,6 @@ import (
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
 
-	ptr "github.com/altessa-s/go-atlas/core/types/ptr"
 	protosvc "github.com/dmit-4884/natscope/internal/services/proto"
 	mappingspb "github.com/dmit-4884/natscope/proto/gen/services/grpc/mappings/v1/mappings"
 	protopb "github.com/dmit-4884/natscope/proto/gen/types/proto"
@@ -174,7 +173,7 @@ func TestHandler_List(t *testing.T) {
 						m.SourceID = "src-1"
 					}),
 				},
-				NextCursor: ptr.Wrap("next"),
+				NextCursor: new("next"),
 			},
 		}
 		handler := New(svc, &stubProtoService{})
@@ -337,7 +336,7 @@ func TestHandler_MappingFraming(t *testing.T) {
 			m.Pattern, m.Framing = "orders.>", entities.Framing{Kind: entities.FramingConfluent, SchemaID: 3}
 		})}
 		resp, err := New(svc, nil).UpdateMapping(t.Context(), connect.NewRequest(&mappingspb.UpdateMappingRequest{
-			Id: "m1", PinnedFingerprint: ptr.Wrap(""),
+			Id: "m1", PinnedFingerprint: new(""),
 			Framing: &protopb.Framing{Kind: protopb.FramingKind_FRAMING_KIND_CONFLUENT, SchemaId: 3},
 		}))
 		require.NoError(t, err)

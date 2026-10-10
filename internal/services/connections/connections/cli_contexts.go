@@ -9,7 +9,6 @@ import (
 	"log/slog"
 
 	"github.com/altessa-s/go-atlas/core/collections/maps"
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
@@ -132,7 +131,7 @@ func liftContextCredentials(c *entities.CliContext) {
 }
 
 func (s *Service) savedNames(ctx context.Context) (map[string]struct{}, error) {
-	list, err := s.storage.List(ctx, &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: ptr.Wrap(int64(allConnectionsLimit))}})
+	list, err := s.storage.List(ctx, &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: new(int64(allConnectionsLimit))}})
 	if err != nil {
 		return nil, err
 	}

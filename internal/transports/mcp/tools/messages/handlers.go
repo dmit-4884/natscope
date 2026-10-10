@@ -12,7 +12,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/altessa-s/go-atlas/core/collections/slices"
-	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -143,11 +142,11 @@ func searchRequest(in findMessagesInput, now time.Time) (*entities.MessageSearch
 		Regex:           in.Regex,
 		HeaderName:      strings.TrimSpace(name),
 		HeaderValue:     strings.TrimSpace(value),
-		MaxPayloadBytes: ptr.Wrap(int32(payloadLimit(in.MaxPayloadBytes, pageSize))),
+		MaxPayloadBytes: new(int32(payloadLimit(in.MaxPayloadBytes, pageSize))),
 		MaxMatches:      pageSize,
 	}
 	if in.StartSeq > 0 {
-		req.CursorSeq = ptr.Wrap(in.StartSeq)
+		req.CursorSeq = new(in.StartSeq)
 	}
 	return req, true, nil
 }
@@ -163,11 +162,11 @@ func listRequest(in findMessagesInput, now time.Time) (*entities.MessageListRequ
 		StreamName:      in.Stream,
 		StartTime:       since,
 		Direction:       direction,
-		Limit:           ptr.Wrap(int64(pageSize)),
-		MaxPayloadBytes: ptr.Wrap(int32(payloadLimit(in.MaxPayloadBytes, pageSize))),
+		Limit:           new(int64(pageSize)),
+		MaxPayloadBytes: new(int32(payloadLimit(in.MaxPayloadBytes, pageSize))),
 	}
 	if in.StartSeq > 0 {
-		req.StartSeq = ptr.Wrap(in.StartSeq)
+		req.StartSeq = new(in.StartSeq)
 	}
 	if subject := strings.TrimSpace(in.Subject); subject != "" {
 		req.SubjectFilter = &subject
