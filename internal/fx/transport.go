@@ -54,6 +54,12 @@ import (
 // from memory exhaustion; sized for workspace imports with a wide margin.
 const maxRequestBytes = 32 << 20 // 32 MiB
 
+// gzipCompression is the name Connect registers its default gzip compression under.
+const gzipCompression = "gzip"
+
+// compressMinBytes is the smallest response a listener beyond loopback compresses.
+const compressMinBytes = 1 << 10
+
 // TransportsModule provides the unified Connect-RPC transport plus the
 // optional HTTP server for internal endpoints (health, metrics, pprof).
 func TransportsModule() fx.Option {
@@ -197,6 +203,7 @@ func newConnectTransport(cfg *appconfig.Config, lc fx.Lifecycle) (*grpctransport
 			// conversion is registered separately by each Handler.HTTPHandler.
 			grpchelpers.NewValidationConnectInterceptor(),
 		),
+		compressionOption(cfg.BindsLoopback()),
 	}
 
 	t, err := grpctransport.New(cfg.GRPCWebAddress, frontendFS, lgr, cfg.BindsLoopback(), cfg.AllowedHostsList(), connectOpts...)
@@ -237,6 +244,14 @@ func newConnectTransport(cfg *appconfig.Config, lc fx.Lifecycle) (*grpctransport
 
 // newHTTPServer creates and initializes an HTTP server for internal endpoints
 // (health checks, metrics, pprof). Returns nil if HTTP is not configured.
+// compressionOption leaves responses on a loopback listener uncompressed and compresses only sizeable ones elsewhere.
+func compressionOption(loopback bool) connect.HandlerOption {
+	if loopback {
+		return connect.WithCompression(gzipCompression, nil, nil)
+	}
+	return connect.WithCompressMinBytes(compressMinBytes)
+}
+
 func newHTTPServer(cfg *appconfig.Config, lc fx.Lifecycle) (*httpserver.Server, error) {
 	if !cfg.IsHttpConfigured() {
 		return nil, nil //nolint:nilnil
