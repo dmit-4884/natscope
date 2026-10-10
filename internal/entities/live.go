@@ -11,7 +11,8 @@ type LiveSubscribeRequest struct {
 	// (Messages.MaxPayloadBytesInList), 0 → unlimited.
 	MaxPayloadBytes *int32
 	MaxDisplayRate  *int32
-	// ExcludeSubjects are subject patterns whose messages are counted but not delivered, before the display rate.
+	// ExcludeSubjects are subject patterns whose messages are neither delivered nor counted, left out before the
+	// display rate.
 	ExcludeSubjects []string
 }
 
