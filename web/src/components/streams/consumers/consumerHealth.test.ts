@@ -41,6 +41,11 @@ describe('consumerKind', () => {
 })
 
 describe('consumerIssues', () => {
+  it('groups digits in the diagnosis texts', () => {
+    const issues = consumerIssues(consumer({ num_pending: 5_415_090, num_waiting: 0, delivered: { consumer_seq: 0, stream_seq: 0 } }), stream(), NOW)
+    expect(issues[0].detail).toContain('5,415,090 messages are waiting')
+  })
+
   it('finds nothing wrong with a caught-up consumer', () => {
     expect(consumerIssues(consumer(), stream(), NOW)).toEqual([])
   })
@@ -49,7 +54,7 @@ describe('consumerIssues', () => {
     const issues = consumerIssues(consumer({ num_pending: 50, num_ack_pending: 1000, num_waiting: 1, ack_floor: ackedLongAgo }), stream(), NOW)
     expect(issues.map((i) => i.kind)).toEqual(['ack_limit'])
     expect(issues[0].severity).toBe('error')
-    expect(issues[0].detail).toContain('1000 messages are waiting for an ack')
+    expect(issues[0].detail).toContain('1,000 messages are waiting for an ack')
     expect(issues[0].detail).toContain('5m')
   })
 
