@@ -15,6 +15,7 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/entities"
 
+	corecontext "github.com/altessa-s/go-atlas/core/context"
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
@@ -65,7 +66,7 @@ func (c *Client) gatherMicro(
 }
 
 func (c *Client) gather(ctx context.Context, subject string) ([]microReply, error) {
-	ctx, cancel := context.WithTimeout(ctx, microDiscoveryTimeout)
+	ctx, cancel := corecontext.WithMaxTimeout(ctx, microDiscoveryTimeout)
 	defer cancel()
 
 	var replies []microReply
@@ -84,7 +85,7 @@ func (c *Client) gather(ctx context.Context, subject string) ([]microReply, erro
 		for {
 			waitCtx, waitCancel := ctx, context.CancelFunc(func() {})
 			if len(replies) > 0 {
-				waitCtx, waitCancel = context.WithTimeout(ctx, microDiscoveryIdle)
+				waitCtx, waitCancel = corecontext.WithMaxTimeout(ctx, microDiscoveryIdle)
 			}
 			msg, err := sub.NextMsgWithContext(waitCtx)
 			waitCancel()

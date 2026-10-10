@@ -13,6 +13,8 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/natsutil"
+
+	corecontext "github.com/altessa-s/go-atlas/core/context"
 )
 
 // defaultRequestTimeout applies when a request sets no timeout.
@@ -38,7 +40,7 @@ func (s *Service) Request(ctx context.Context, in *entities.RequestMessage) (*en
 		return nil, &errs.ProtoEncodeError{Description: *encErr}
 	}
 
-	reqCtx, cancel := context.WithTimeout(ctx, cmp.Or(in.Timeout, defaultRequestTimeout))
+	reqCtx, cancel := corecontext.WithMaxTimeout(ctx, cmp.Or(in.Timeout, defaultRequestTimeout))
 	defer cancel()
 
 	return s.natsService.Request(reqCtx, in.ConnectionID, in.Subject, data, in.Headers)

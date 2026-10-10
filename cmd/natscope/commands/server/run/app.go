@@ -32,6 +32,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/pkg/secrets"
 
 	stderrors "errors"
+	corecontext "github.com/altessa-s/go-atlas/core/context"
 	slogx "github.com/altessa-s/go-atlas/observability/slog"
 	slogfactory "github.com/altessa-s/go-atlas/observability/slog/factory"
 	fxmodules "github.com/dmit-4884/natscope/internal/fx"
@@ -197,7 +198,7 @@ func (srv *App) run(ctx context.Context) error {
 		slog.Default().Info("default service directories not writable, using home-local fallback", slog.String("base", srv.dirsFallback))
 	}
 
-	startCtx, startCancel := context.WithTimeout(ctx, startTimeout)
+	startCtx, startCancel := corecontext.WithMaxTimeout(ctx, startTimeout)
 	defer startCancel()
 
 	var vault secrets.Vault
@@ -253,7 +254,7 @@ func (srv *App) gracefulShutdown(ctx context.Context, di *fx.App) error {
 
 	srv.healthCoordinator.BroadcastStatus(health.StatusNotServing)
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
+	shutdownCtx, shutdownCancel := corecontext.WithMaxTimeout(ctx, shutdownTimeout)
 	defer shutdownCancel()
 
 	slog.Default().Debug("shutting down")
