@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 
+	corecontext "github.com/altessa-s/go-atlas/core/context"
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
 
@@ -60,8 +62,39 @@ func (c *Client) isOwnConsumer(name string) bool {
 
 // GetConsumersOverview lists every stream, then the consumers of each in parallel; a stream whose consumers
 // cannot be listed is reported in UnreadableStreams instead of failing the call. Raw JSON is left out to keep
-// a frequent poll small.
+// a frequent poll small. Callers asking while a listing is in flight share it, so open tabs and agents polling
+// the overview together cost one listing; the shared listing outlives a caller that gives up, up to the
+// client's default timeout.
 func (c *Client) GetConsumersOverview(ctx context.Context) (*entities.ConsumersOverview, error) {
+	listing := c.overviews.DoChan("", func() (overview any, err error) {
+		shared, cancel := corecontext.WithMaxTimeout(context.WithoutCancel(ctx), c.defaultTimeout)
+		defer cancel()
+		defer panics.Handle(shared, func(_ context.Context, r any) {
+			err = fmt.Errorf("list consumers overview: panic: %v", r)
+		})
+		return c.consumersOverview(shared)
+	})
+	select {
+	case <-ctx.Done():
+		return nil, wrapErr(ctx.Err())
+	case res := <-listing:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		overview, ok := res.Val.(*entities.ConsumersOverview)
+		if !ok {
+			return nil, fmt.Errorf("list consumers overview: unexpected result %T", res.Val)
+		}
+		shared := *overview
+		shared.Consumers = slices.Clone(overview.Consumers)
+		shared.Streams = slices.Clone(overview.Streams)
+		shared.UnreadableStreams = slices.Clone(overview.UnreadableStreams)
+		return &shared, nil
+	}
+}
+
+// consumersOverview builds one consumers overview.
+func (c *Client) consumersOverview(ctx context.Context) (*entities.ConsumersOverview, error) {
 	streams, err := c.ListStreams(ctx)
 	if err != nil {
 		return nil, err

@@ -17,6 +17,8 @@ import (
 
 	"github.com/dmit-4884/natscope/internal/pkg/natsclient"
 
+	"golang.org/x/sync/singleflight"
+
 	corecontext "github.com/altessa-s/go-atlas/core/context"
 )
 
@@ -83,6 +85,9 @@ type Client struct {
 
 	// putObjectLocks serializes PutObject per (bucket, name).
 	putObjectLocks sync.Map
+
+	// overviews coalesces concurrent consumers overview listings.
+	overviews singleflight.Group
 
 	// ownConsumers holds the names of the short-lived consumers this client created to read streams, and
 	// ownConsumerSeries the name prefixes of the ordered consumers it reads live streams with.
