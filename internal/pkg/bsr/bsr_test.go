@@ -22,6 +22,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
+
+	coreio "github.com/altessa-s/go-atlas/core/io"
 )
 
 const commit = "0123456789abcdef0123456789abcdef"
@@ -182,4 +184,19 @@ func TestClient_Errors(t *testing.T) {
 
 	assert.True(t, bsr.IsCommitID(commit))
 	assert.False(t, bsr.IsCommitID("main"))
+}
+
+func TestClient_RejectsAnOversizedResponse(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("{}"))
+		_, _ = w.Write([]byte(strings.Repeat(" ", 64<<20)))
+	}))
+	t.Cleanup(srv.Close)
+	m, err := bsr.ParseModule(srv.URL + "/acme/payments")
+	require.NoError(t, err)
+
+	_, err = bsr.New(http.DefaultClient).ListLabels(t.Context(), m, "")
+
+	require.ErrorIs(t, err, coreio.ErrReadLimitExceeded)
 }

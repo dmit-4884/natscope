@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
+	coreio "github.com/altessa-s/go-atlas/core/io"
 )
 
 const (
@@ -240,7 +241,7 @@ func (c *Client) call(ctx context.Context, m Module, token, procedure string, in
 		return &errs.RegistryError{Code: "unavailable", Message: "cannot reach " + m.BaseURL}
 	}
 	defer resp.Body.Close() //nolint:errcheck // read-only body
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	data, err := io.ReadAll(coreio.NewLimitedReadCloser(resp.Body, maxResponseBytes))
 	if err != nil {
 		return coreerrs.WrapOperation(err, "read BSR response")
 	}
