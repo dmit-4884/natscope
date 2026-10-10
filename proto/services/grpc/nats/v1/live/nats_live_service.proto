@@ -34,6 +34,10 @@ message WatchKVRequest {
 message WatchKVEvent {
   // Required. Changes seen since the last batch, oldest first.
   repeated .natscope.types.nats.KVChange changes = 1;
+
+  // Optional. True while the bucket's stream cannot be reached because its server is down; the watch resumes by
+  // itself when the stream is back. A frame without changes reports this state turning on or off.
+  bool offline = 2;
 }
 
 // Defines the request message for subscribing to live NATS messages.

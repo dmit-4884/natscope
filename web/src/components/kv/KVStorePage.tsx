@@ -411,6 +411,11 @@ export default function KVStorePage() {
                     <span>Live</span>
                   </span>
                 )}
+                {watch.status === 'offline' && (
+                  <span className="min-w-0 truncate text-status-warning-text">
+                    The bucket's stream is offline; waiting for its server to return
+                  </span>
+                )}
               </div>
               {watch.status === 'stopped' && (
                 <div className="mt-1 flex items-center gap-2 text-xs text-status-error-text">

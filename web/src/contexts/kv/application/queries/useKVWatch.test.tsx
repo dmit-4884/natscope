@@ -9,6 +9,7 @@ import { useKVWatch } from './useKVWatch'
 
 const watch = vi.hoisted(() => ({
   push: null as null | ((batch: KVChange[]) => void),
+  offline: null as null | ((on: boolean) => void),
   fail: null as null | ((err: Error) => void),
   end: null as null | (() => void),
   calls: [] as Array<{ bucket: string; filter: string }>,
@@ -18,7 +19,7 @@ vi.mock('@/api/management', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/management')>()),
   watchKV: (_conn: string, bucket: string, filter: string, signal: AbortSignal) => {
     watch.calls.push({ bucket, filter })
-    const queue: KVChange[][] = []
+    const queue: Array<{ changes: KVChange[]; offline: boolean }> = []
     let wake: (() => void) | null = null
     let error: Error | null = null
     let done = false
@@ -27,7 +28,11 @@ vi.mock('@/api/management', async (importOriginal) => ({
       wake = null
     }
     watch.push = (batch) => {
-      queue.push(batch)
+      queue.push({ changes: batch, offline: false })
+      notify()
+    }
+    watch.offline = (on) => {
+      queue.push({ changes: [], offline: on })
       notify()
     }
     watch.fail = (err) => {
@@ -73,6 +78,7 @@ function setup(enabled = true, filter = '', list: KVKeyList = { keys: ['a', 'b']
 describe('useKVWatch', () => {
   beforeEach(() => {
     watch.push = null
+    watch.offline = null
     watch.fail = null
     watch.end = null
     watch.calls = []
@@ -194,6 +200,19 @@ describe('useKVWatch', () => {
     } finally {
       spy.mockRestore()
     }
+  })
+
+  it('says when the bucket stream goes offline and turns live again when it is back', async () => {
+    const { hook } = setup()
+    act(() => watch.push!([]))
+    await waitFor(() => expect(hook.result.current.status).toBe('live'))
+
+    act(() => watch.offline!(true))
+    await waitFor(() => expect(hook.result.current.status).toBe('offline'))
+
+    act(() => watch.offline!(false))
+    await waitFor(() => expect(hook.result.current.status).toBe('live'))
+    expect(watch.calls).toHaveLength(1)
   })
 
   it('stops the watch when it is turned off', async () => {

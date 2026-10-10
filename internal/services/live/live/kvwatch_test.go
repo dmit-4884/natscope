@@ -9,6 +9,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -26,6 +27,9 @@ type fakeKVWatch struct {
 	err     error
 	bucket  string
 	filter  string
+
+	mu        sync.Mutex
+	bucketErr error
 }
 
 func (f *fakeKVWatch) WatchKV(_ context.Context, _, bucket, filter string) (<-chan entities.KVChange, error) {
@@ -33,15 +37,27 @@ func (f *fakeKVWatch) WatchKV(_ context.Context, _, bucket, filter string) (<-ch
 	return f.changes, f.err
 }
 
-type emitted struct {
-	mu      sync.Mutex
-	batches [][]entities.KVChange
+func (f *fakeKVWatch) GetKVBucket(context.Context, string, string) (*entities.KVBucketInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return &entities.KVBucketInfo{}, f.bucketErr
 }
 
-func (e *emitted) emit(batch []entities.KVChange) error {
+func (f *fakeKVWatch) setBucketErr(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.bucketErr = err
+}
+
+type emitted struct {
+	mu     sync.Mutex
+	events []entities.KVWatchEvent
+}
+
+func (e *emitted) emit(ev entities.KVWatchEvent) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.batches = append(e.batches, batch)
+	e.events = append(e.events, ev)
 	return nil
 }
 
@@ -49,10 +65,16 @@ func (e *emitted) all() []entities.KVChange {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	var out []entities.KVChange
-	for _, b := range e.batches {
-		out = append(out, b...)
+	for _, ev := range e.events {
+		out = append(out, ev.Changes...)
 	}
 	return out
+}
+
+func (e *emitted) last() entities.KVWatchEvent {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.events[len(e.events)-1]
 }
 
 func kvWatchService(kv *fakeKVWatch) *Service {
@@ -90,11 +112,11 @@ func TestWatchKV_ConfirmsTheWatchWithAnEmptyFirstBatch(t *testing.T) {
 	kv := &fakeKVWatch{changes: make(chan entities.KVChange)}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	first := make(chan []entities.KVChange, 1)
+	first := make(chan entities.KVWatchEvent, 1)
 	go func() {
-		_ = kvWatchService(kv).WatchKV(ctx, &entities.KVWatchRequest{Bucket: "cfg"}, func(batch []entities.KVChange) error {
+		_ = kvWatchService(kv).WatchKV(ctx, &entities.KVWatchRequest{Bucket: "cfg"}, func(ev entities.KVWatchEvent) error {
 			select {
-			case first <- batch:
+			case first <- ev:
 			default:
 			}
 			return nil
@@ -102,8 +124,9 @@ func TestWatchKV_ConfirmsTheWatchWithAnEmptyFirstBatch(t *testing.T) {
 	}()
 
 	select {
-	case batch := <-first:
-		assert.Empty(t, batch)
+	case ev := <-first:
+		assert.Empty(t, ev.Changes)
+		assert.False(t, ev.Offline)
 	case <-time.After(time.Second):
 		t.Fatal("the watch sent nothing before the first change")
 	}
@@ -128,7 +151,7 @@ func TestWatchKV_StopsWhenEmitFails(t *testing.T) {
 	kv.changes <- entities.KVChange{Key: "a", Operation: "put"}
 	boom := errors.New("client gone")
 
-	err := kvWatchService(kv).WatchKV(t.Context(), &entities.KVWatchRequest{Bucket: "cfg"}, func([]entities.KVChange) error { return boom })
+	err := kvWatchService(kv).WatchKV(t.Context(), &entities.KVWatchRequest{Bucket: "cfg"}, func(entities.KVWatchEvent) error { return boom })
 
 	require.ErrorIs(t, err, boom)
 }
@@ -140,4 +163,52 @@ func TestWatchKV_PassesOnAWatchThatCannotStart(t *testing.T) {
 	err := kvWatchService(kv).WatchKV(t.Context(), &entities.KVWatchRequest{Bucket: "missing"}, (&emitted{}).emit)
 
 	require.ErrorIs(t, err, errs.ErrBucketNotFound)
+}
+
+func TestWatchKV_ReportsTheBucketStreamOfflineAndBack(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		kv := &fakeKVWatch{changes: make(chan entities.KVChange)}
+		ctx, cancel := context.WithCancel(t.Context())
+		out := &emitted{}
+		done := make(chan error, 1)
+		go func() {
+			done <- kvWatchService(kv).WatchKV(ctx, &entities.KVWatchRequest{Bucket: "cfg"}, out.emit)
+		}()
+
+		kv.setBucketErr(&errs.NATSAPIError{Code: 500, ErrorCode: 10118, Description: "stream is offline"})
+		time.Sleep(kvHealthInterval + time.Second)
+		synctest.Wait()
+		assert.True(t, out.last().Offline, "the watch says its bucket's stream is out of reach")
+
+		kv.setBucketErr(nil)
+		time.Sleep(kvHealthInterval)
+		synctest.Wait()
+		assert.False(t, out.last().Offline, "the watch says the stream is back")
+		assert.Empty(t, out.last().Changes)
+
+		cancel()
+		assert.NoError(t, <-done)
+	})
+}
+
+func TestWatchKV_StaysOnlineWhenAHealthCheckFailsForAnotherReason(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		kv := &fakeKVWatch{changes: make(chan entities.KVChange)}
+		ctx, cancel := context.WithCancel(t.Context())
+		out := &emitted{}
+		done := make(chan error, 1)
+		go func() {
+			done <- kvWatchService(kv).WatchKV(ctx, &entities.KVWatchRequest{Bucket: "cfg"}, out.emit)
+		}()
+
+		kv.setBucketErr(errs.ErrNATSTimeout)
+		time.Sleep(2 * kvHealthInterval)
+		synctest.Wait()
+
+		require.Len(t, out.events, 1, "only the confirming frame was sent")
+		cancel()
+		assert.NoError(t, <-done)
+	})
 }

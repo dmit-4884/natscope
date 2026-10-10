@@ -27,6 +27,16 @@ type KVWatchRequest struct {
 	Filter string
 }
 
+// KVWatchEvent is one frame of a KV watch.
+type KVWatchEvent struct {
+	// Changes are the changes since the last frame, oldest first.
+	Changes []KVChange
+
+	// Offline is true while the bucket's stream cannot be reached because its server is down; the watch resumes by
+	// itself when the stream is back.
+	Offline bool
+}
+
 // LiveSubscriptionTarget is one subject (with optional stream binding) to
 // live-deliver.
 type LiveSubscriptionTarget struct {

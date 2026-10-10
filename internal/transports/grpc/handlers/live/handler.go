@@ -88,10 +88,13 @@ func (h *Handler) WatchKV(
 		ConnectionID: in.GetConnectionId(),
 		Bucket:       in.GetBucket(),
 		Filter:       in.GetFilter(),
-	}, func(changes []entities.KVChange) error {
-		return stream.Send(&livepb.WatchKVEvent{Changes: slices.To(changes, func(c entities.KVChange) *natspb.KVChange {
-			return converter.Convert(&c, &natspb.KVChange{}, kvChangeOpts...)
-		})})
+	}, func(ev entities.KVWatchEvent) error {
+		return stream.Send(&livepb.WatchKVEvent{
+			Changes: slices.To(ev.Changes, func(c entities.KVChange) *natspb.KVChange {
+				return converter.Convert(&c, &natspb.KVChange{}, kvChangeOpts...)
+			}),
+			Offline: ev.Offline,
+		})
 	})
 }
 

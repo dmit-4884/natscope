@@ -138,6 +138,16 @@ describe('KVStorePage', () => {
     expect(screen.getByText(/reconnecting/i)).toHaveTextContent('Reconnecting… (Failed to fetch)')
   })
 
+  it('says the bucket stream is offline instead of live', () => {
+    keys.watch = { ...keys.watch, status: 'offline' }
+    renderPage()
+
+    fireEvent.click(screen.getByRole('switch', { name: /live updates/i }))
+
+    expect(screen.queryByText(/^live$/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/stream is offline/i)).toBeInTheDocument()
+  })
+
   it('offers a restart when the watch stops', () => {
     keys.watch = { ...keys.watch, status: 'stopped', error: 'connection closed' }
     renderPage()

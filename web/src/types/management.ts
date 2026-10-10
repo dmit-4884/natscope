@@ -260,6 +260,11 @@ export interface KVChange {
   size: number
 }
 
+export interface KVWatchFrame {
+  changes: KVChange[]
+  offline: boolean
+}
+
 export interface KVEntry {
   bucket: string
   key: string

@@ -7,7 +7,7 @@ import { usePageVisible } from '@/hooks/usePageVisible'
 import type { KVChange, KVKeyList } from '@/types/management'
 import { kvKeys } from './kvKeys'
 
-export type KVWatchStatus = 'off' | 'starting' | 'live' | 'reconnecting' | 'stopped'
+export type KVWatchStatus = 'off' | 'starting' | 'live' | 'offline' | 'reconnecting' | 'stopped'
 
 const MAX_CHANGES = 200
 const KEY_LIST_LIMIT = 1000
@@ -19,7 +19,7 @@ const NO_CHANGES: KVChange[] = []
 
 interface WatchState {
   key: string
-  status: 'live' | 'reconnecting' | 'stopped'
+  status: 'live' | 'offline' | 'reconnecting' | 'stopped'
   error?: string
   changes: KVChange[]
 }
@@ -82,13 +82,17 @@ export function useKVWatch(connectionId: string | undefined, bucket: string | un
     void (async () => {
       try {
         let started = false
-        for await (const batch of api.watchKV(connectionId, bucket, filter, controller.signal)) {
+        for await (const frame of api.watchKV(connectionId, bucket, filter, controller.signal)) {
+          const batch = frame.changes
           if (!started) {
             started = true
             failuresRef.current = 0
             queryClient.invalidateQueries({ queryKey: kvKeys.keys(connectionId, bucket) })
           }
-          update((changes) => ({ status: 'live', changes: [...batch].reverse().concat(changes).slice(0, MAX_CHANGES) }))
+          update((changes) => ({
+            status: frame.offline ? 'offline' : 'live',
+            changes: [...batch].reverse().concat(changes).slice(0, MAX_CHANGES),
+          }))
           if (batch.length === 0) continue
           applyChanges(queryClient, connectionId, bucket, filter, batch)
           if (Date.now() - bucketsRefreshedAt > BUCKETS_REFRESH_MS) {

@@ -190,3 +190,30 @@ func (e *NATSAPIError) Error() string {
 	}
 	return e.Description
 }
+
+// JetStream err_code values of a stream or consumer whose server is down or has no quorum.
+const (
+	jsErrStreamOffline         = 10118
+	jsErrConsumerOffline       = 10119
+	jsErrStreamOfflineReason   = 10194
+	jsErrConsumerOfflineReason = 10195
+)
+
+// Offline reports whether the server refused the call because the stream or consumer is offline.
+func (e *NATSAPIError) Offline() bool {
+	if e == nil {
+		return false
+	}
+	switch e.ErrorCode {
+	case jsErrStreamOffline, jsErrConsumerOffline, jsErrStreamOfflineReason, jsErrConsumerOfflineReason:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsOffline reports whether err is a JetStream refusal for a stream or consumer that is offline.
+func IsOffline(err error) bool {
+	apiErr, ok := errors.AsType[*NATSAPIError](err)
+	return ok && apiErr.Offline()
+}

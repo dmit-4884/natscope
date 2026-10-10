@@ -23,6 +23,7 @@ import type {
   KVChange,
   KVEntry,
   KVKeyList,
+  KVWatchFrame,
   ObjectBucketConfig,
   ObjectBucketInfo,
   ObjectInfo,
@@ -488,16 +489,19 @@ export async function* watchKV(
   bucket: string,
   filter: string,
   signal: AbortSignal,
-): AsyncGenerator<KVChange[]> {
+): AsyncGenerator<KVWatchFrame> {
   for await (const event of liveClient.watchKV({ connectionId, bucket, filter }, { signal })) {
-    yield event.changes.map((c) => ({
-      key: c.key,
-      operation: c.operation as KVChange['operation'],
-      revision: Number(c.revision),
-      created: tsToMillis(c.created),
-      value: c.value,
-      size: c.size,
-    }))
+    yield {
+      changes: event.changes.map((c) => ({
+        key: c.key,
+        operation: c.operation as KVChange['operation'],
+        revision: Number(c.revision),
+        created: tsToMillis(c.created),
+        value: c.value,
+        size: c.size,
+      })),
+      offline: event.offline,
+    }
   }
 }
 
