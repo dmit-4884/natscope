@@ -13,6 +13,7 @@ import {
   useDeleteObject,
 } from '@/contexts/objects'
 import { decodeBase64ToBytes } from '@/utils/base64'
+import { shellQuote } from '@/utils/shell'
 import { toast } from '@/utils/toast'
 import { plural } from '@/utils/plural'
 import { formatBytes, formatDateTime } from '@/utils/formatters'
@@ -72,6 +73,7 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
   } = useObjects(connectionId, bucketName)
 
   const tooLarge = !!selectedObject && selectedObject.size > TRANSFER_LIMIT_BYTES
+  const getCommand = selectedObject ? `nats object get ${shellQuote(bucketName ?? '')} ${shellQuote(selectedObject.name)}` : ''
 
   // Fetch selected object data
   const { data: objectData, isLoading: objectLoading } = useObject(
@@ -129,7 +131,7 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
     if (!file || !bucketName) return
     if (file.size + UPLOAD_OVERHEAD_BYTES > TRANSFER_LIMIT_BYTES) {
       toast.error(
-        `${file.name} is ${formatBytes(file.size)}; uploads here stop at ${TRANSFER_LIMIT_LABEL}. Use nats object put ${bucketName} ${file.name}`,
+        `${file.name} is ${formatBytes(file.size)}; uploads here stop at ${TRANSFER_LIMIT_LABEL}. Use nats object put ${shellQuote(bucketName)} ${shellQuote(file.name)}`,
       )
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
@@ -469,8 +471,8 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                         Over {TRANSFER_LIMIT_LABEL}, too large to open or download here. Get it with the nats CLI:
                       </p>
                       <div className="inline-flex items-center gap-2">
-                        <code className="text-xs text-content-primary">{`nats object get ${bucketName} ${selectedObject.name}`}</code>
-                        <CopyButton value={`nats object get ${bucketName} ${selectedObject.name}`} size="sm" />
+                        <code className="text-xs text-content-primary">{getCommand}</code>
+                        <CopyButton value={getCommand} size="sm" />
                       </div>
                     </div>
                   </div>

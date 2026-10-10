@@ -1,4 +1,5 @@
 import type { StreamConfig, ConsumerConfig } from '@/types/nats'
+import { shellQuote as sq } from '@/utils/shell'
 
 /**
  * Generate official `nats` CLI commands from a stream/consumer config (target
@@ -8,12 +9,6 @@ import type { StreamConfig, ConsumerConfig } from '@/types/nats'
  * metadata/push consumers/backoff/flow_control/etc.) are NOT reproduced — copy
  * the JSON config for those.
  */
-
-/**
- * Single-quote so the shell treats the value literally — prevents `$`/backtick
- * expansion of `$KV.`/`$O.` subjects and attacker-controllable descriptions.
- */
-const sq = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`
 
 /**
  * Render a nanosecond duration as a compact Go duration string (non-positive →

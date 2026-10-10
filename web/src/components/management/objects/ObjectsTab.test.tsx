@@ -62,9 +62,18 @@ describe('ObjectsTab transfer limit', () => {
     fireEvent.click(screen.getByText('dump.bin'))
 
     expect(screen.getByText(/over 32 MiB/i)).toBeInTheDocument()
-    expect(screen.getByText('nats object get files dump.bin')).toBeInTheDocument()
+    expect(screen.getByText("nats object get 'files' 'dump.bin'")).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /download/i })).not.toBeInTheDocument()
     expect(fetched.names.filter(Boolean)).toEqual([])
+  })
+
+  it('quotes the object name in the command it offers, so a name cannot run anything', () => {
+    fetched.objects = [{ ...object, name: "it's; rm -rf ~", size: 200 * 1024 * 1024, mod_time: 0 }]
+    renderTab(false)
+
+    fireEvent.click(screen.getByText("it's; rm -rf ~"))
+
+    expect(screen.getByText(`nats object get 'files' 'it'\\''s; rm -rf ~'`)).toBeInTheDocument()
   })
 
   it('refuses a file over the limit before reading it', () => {
