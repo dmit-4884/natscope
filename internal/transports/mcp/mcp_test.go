@@ -121,7 +121,7 @@ func (f *fakeConnections) List(_ context.Context, in *entities.SavedConnectionsL
 }
 
 func savedConnection(id, name string) *entities.SavedConnection {
-	return &entities.SavedConnection{BaseEntity: entities.BaseEntity{Id: id}, Name: name}
+	return &entities.SavedConnection{Id: id, Name: name}
 }
 
 func TestConnectionsResolve(t *testing.T) {

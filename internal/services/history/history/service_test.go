@@ -154,7 +154,7 @@ func TestService_List(t *testing.T) {
 		t.Parallel()
 		expected := &entities.List[entities.PublishHistories]{
 			Items: entities.PublishHistories{
-				{BaseEntity: entities.BaseEntity{Id: "h1"}},
+				{Id: "h1"},
 			},
 		}
 		store := &mockStorage{listResult: expected}

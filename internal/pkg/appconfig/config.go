@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-ozzo/ozzo-validation/v4"
@@ -174,10 +175,8 @@ func validateLoggerOutputFormat(value any) error {
 	if !ok || l == nil || l.OutputFormat == "" {
 		return nil
 	}
-	for _, known := range knownLogOutputFormats {
-		if l.OutputFormat == known {
-			return nil
-		}
+	if slices.Contains(knownLogOutputFormats, l.OutputFormat) {
+		return nil
 	}
 	return fmt.Errorf("outputFormat: unsupported value %q (expected one of %s)",
 		l.OutputFormat, strings.Join(knownLogOutputFormats, ", "))

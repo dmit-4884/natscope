@@ -259,8 +259,8 @@ func (s *Service) checkRepoURL(repositoryURL string) error {
 	if u == "" {
 		return fmt.Errorf("%w: repository URL is empty", errs.ErrInvalidRequest)
 	}
-	if i := strings.Index(u, "://"); i >= 0 {
-		scheme := strings.ToLower(u[:i])
+	if before, _, ok := strings.Cut(u, "://"); ok {
+		scheme := strings.ToLower(before)
 		switch {
 		case slices.Contains(allowedGitSchemes, scheme):
 			return nil

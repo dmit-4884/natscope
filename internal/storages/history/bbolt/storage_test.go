@@ -49,7 +49,7 @@ func TestHistory_SaveAndListFilter(t *testing.T) {
 	// Filter by connection URL.
 	byURL, err := s.List(ctx, &entities.PublishHistoryList{
 		ConnectionURL: new("nats://a:4222"),
-		ListBase:      entities.ListBase{Limit: new(int64(10)), IncludeTotalCount: true},
+		Limit:         new(int64(10)), IncludeTotalCount: true,
 	})
 	if err != nil {
 		t.Fatalf("list by url: %v", err)
@@ -62,7 +62,7 @@ func TestHistory_SaveAndListFilter(t *testing.T) {
 	both, err := s.List(ctx, &entities.PublishHistoryList{
 		ConnectionURL: new("nats://a:4222"),
 		Stream:        new("ORDERS"),
-		ListBase:      entities.ListBase{Limit: new(int64(10))},
+		Limit:         new(int64(10)),
 	})
 	if err != nil {
 		t.Fatalf("list by url+stream: %v", err)
@@ -91,7 +91,7 @@ func TestHistory_ListFilterByConnectionID(t *testing.T) {
 
 	byID, err := s.List(ctx, &entities.PublishHistoryList{
 		ConnectionID: new("conn-multi"),
-		ListBase:     entities.ListBase{Limit: new(int64(10))},
+		Limit:        new(int64(10)),
 	})
 	if err != nil {
 		t.Fatalf("list by connection_id: %v", err)
@@ -102,7 +102,7 @@ func TestHistory_ListFilterByConnectionID(t *testing.T) {
 
 	sharedFiltered, err := s.List(ctx, &entities.PublishHistoryList{
 		ConnectionID: new("conn-shared-1"),
-		ListBase:     entities.ListBase{Limit: new(int64(10))},
+		Limit:        new(int64(10)),
 	})
 	if err != nil {
 		t.Fatalf("list by connection_id (shared url): %v", err)
@@ -117,12 +117,12 @@ func TestHistory_PaginationNewestFirst(t *testing.T) {
 	ctx := t.Context()
 
 	// Entries may share a CreatedAt ms; (sort_key, id) keyset still totally orders them.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_ = s.Save(ctx, entry("nats://a:4222", "S", "s.x"))
 	}
 
 	page, err := s.List(ctx, &entities.PublishHistoryList{
-		ListBase: entities.ListBase{Limit: new(int64(2)), IncludeTotalCount: true},
+		Limit: new(int64(2)), IncludeTotalCount: true,
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)
@@ -139,7 +139,7 @@ func TestHistory_PaginationNewestFirst(t *testing.T) {
 	cursor := ""
 	for {
 		p, err := s.List(ctx, &entities.PublishHistoryList{
-			ListBase: entities.ListBase{Cursor: cursor, Limit: new(int64(2))},
+			Cursor: cursor, Limit: new(int64(2)),
 		})
 		if err != nil {
 			t.Fatalf("page walk: %v", err)
@@ -184,7 +184,7 @@ func TestHistory_PruneKeepsNewest(t *testing.T) {
 		t.Fatalf("removed = %d, want 7", removed)
 	}
 
-	page, err := s.List(ctx, &entities.PublishHistoryList{ListBase: entities.ListBase{IncludeTotalCount: true}})
+	page, err := s.List(ctx, &entities.PublishHistoryList{IncludeTotalCount: true})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}

@@ -113,7 +113,7 @@ func parseBufLock(data []byte) []bufDep {
 		}
 		cur = nil
 	}
-	for _, raw := range bytes.Split(data, []byte{'\n'}) {
+	for raw := range bytes.SplitSeq(data, []byte{'\n'}) {
 		line := string(raw)
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
@@ -265,7 +265,7 @@ func readModuleFilesDir(path string) (string, bool) {
 		return "", false
 	}
 	var version, filesDir string
-	for _, raw := range bytes.Split(data, []byte{'\n'}) {
+	for raw := range bytes.SplitSeq(data, []byte{'\n'}) {
 		line := strings.TrimSpace(string(raw))
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue

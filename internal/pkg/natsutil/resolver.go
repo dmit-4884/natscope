@@ -124,7 +124,7 @@ func hasWildcard(pattern string) bool {
 // specificity scores a pattern: literal token +10, "*" +1, ">" -5 (least specific).
 func specificity(pattern string) int {
 	score := 0
-	for _, t := range strings.Split(pattern, ".") {
+	for t := range strings.SplitSeq(pattern, ".") {
 		switch t {
 		case ">":
 			score -= 5

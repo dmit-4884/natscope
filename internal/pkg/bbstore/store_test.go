@@ -81,7 +81,7 @@ func newStoreSortedByUpdated(t *testing.T) *bbstore.Store[widget, *widget] {
 
 func mk(id, name string, createdAt int64) *widget {
 	return &widget{
-		Base: bbstore.Base{ID: id, Etag: "e-" + id, CreatedAt: createdAt, UpdatedAt: createdAt},
+		ID: id, Etag: "e-" + id, CreatedAt: createdAt, UpdatedAt: createdAt,
 		Name: name,
 	}
 }

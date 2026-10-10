@@ -92,10 +92,10 @@ type decodeResolver struct {
 
 var opaqueAnyType = func() protoreflect.MessageType {
 	fd, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
-		Name:        proto.String("natscope/opaque.proto"),
-		Package:     proto.String("natscope.opaque"),
-		Syntax:      proto.String("proto3"),
-		MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String("Unresolved")}},
+		Name:        new("natscope/opaque.proto"),
+		Package:     new("natscope.opaque"),
+		Syntax:      new("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{{Name: new("Unresolved")}},
 	}, nil)
 	if err != nil {
 		panic(fmt.Sprintf("build opaque any type: %v", err))

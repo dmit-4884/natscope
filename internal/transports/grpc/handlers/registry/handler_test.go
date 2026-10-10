@@ -28,7 +28,7 @@ type mockProtoSvc struct {
 	description   *entities.TypeDescription
 	describeErr   error
 	gotReachable  bool
-	exampleResult map[string]interface{}
+	exampleResult map[string]any
 	exampleErr    error
 	status        *entities.SchemaStatus
 	statusErr     error
@@ -136,7 +136,7 @@ func TestHandler_GenerateExample(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
-		svc := &mockProtoSvc{exampleResult: map[string]interface{}{"field": "value"}}
+		svc := &mockProtoSvc{exampleResult: map[string]any{"field": "value"}}
 		handler := New(svc)
 
 		resp, err := handler.GenerateExample(t.Context(), connect.NewRequest(&registrypb.GenerateExampleRequest{

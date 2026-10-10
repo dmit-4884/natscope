@@ -188,7 +188,7 @@ func TestList(t *testing.T) {
 	}
 
 	out, err := svc.List(t.Context(), &entities.MessageTemplatesList{
-		ListBase: entities.ListBase{IncludeTotalCount: true},
+		IncludeTotalCount: true,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, out)

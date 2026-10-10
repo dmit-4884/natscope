@@ -196,7 +196,7 @@ func TestValidation(t *testing.T) {
 			func() error {
 				_, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
 					ConnectionId: "x", StreamName: "x",
-					StartSeq:  uint64Ptr(1),
+					StartSeq:  new(uint64(1)),
 					StartTime: timestamppb.New(time.Now()),
 				}))
 				return err
@@ -454,7 +454,7 @@ func TestValidation(t *testing.T) {
 			func() error {
 				_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
 					Name: "qa-038-enum", Urls: []string{"nats://127.0.0.1:4222"},
-					Auth: &natstypes.AuthConfig{Method: 99, Token: strPtr("x")},
+					Auth: &natstypes.AuthConfig{Method: 99, Token: new("x")},
 				}))
 				return err
 			},
@@ -464,7 +464,7 @@ func TestValidation(t *testing.T) {
 			"settings.Update unknown fetch_method rejected",
 			func() error {
 				_, err := env.settings.UpdateSettings(ctx, connect.NewRequest(&settingspb.UpdateSettingsRequest{
-					Messages: &settingstypes.MessageSettings{FetchMethod: strPtr("bogus")},
+					Messages: &settingstypes.MessageSettings{FetchMethod: new("bogus")},
 				}))
 				return err
 			},
@@ -491,7 +491,3 @@ func TestValidation(t *testing.T) {
 		})
 	}
 }
-
-func uint64Ptr(v uint64) *uint64 { return &v }
-
-func strPtr(v string) *string { return &v }

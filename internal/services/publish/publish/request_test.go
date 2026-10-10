@@ -43,12 +43,11 @@ func TestRequest_RawPayload(t *testing.T) {
 			return want, nil
 		})
 
-	got, err := s.Request(t.Context(), &entities.RequestMessage{PublishRequest: entities.PublishRequest{
+	got, err := s.Request(t.Context(), &entities.RequestMessage{
 		ConnectionID: " conn-1 ",
 		Subject:      "svc.ping",
 		Data:         "ping",
-		Headers:      map[string]string{"K": "v"},
-	}})
+		Headers:      map[string]string{"K": "v"}})
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 
@@ -76,13 +75,12 @@ func TestRequest_ProtoEncoded(t *testing.T) {
 		})
 
 	msgType, sourceID := "api.v1.Ping", "src-1"
-	_, err := s.Request(t.Context(), &entities.RequestMessage{PublishRequest: entities.PublishRequest{
+	_, err := s.Request(t.Context(), &entities.RequestMessage{
 		ConnectionID: "conn-1",
 		Subject:      "svc.ping",
 		Data:         `{"n":1}`,
 		MessageType:  &msgType,
-		SourceID:     &sourceID,
-	}})
+		SourceID:     &sourceID})
 	require.NoError(t, err)
 }
 
@@ -101,9 +99,8 @@ func TestRequest_EncodeErrorIsTyped(t *testing.T) {
 		})
 
 	msgType, sourceID := "api.v1.Ping", "src-1"
-	_, err := s.Request(t.Context(), &entities.RequestMessage{PublishRequest: entities.PublishRequest{
-		ConnectionID: "conn-1", Subject: "svc.ping", Data: "{}", MessageType: &msgType, SourceID: &sourceID,
-	}})
+	_, err := s.Request(t.Context(), &entities.RequestMessage{
+		ConnectionID: "conn-1", Subject: "svc.ping", Data: "{}", MessageType: &msgType, SourceID: &sourceID})
 
 	encErr, ok := errors.AsType[*errs.ProtoEncodeError](err)
 	require.True(t, ok, "an encode failure must be a *errs.ProtoEncodeError, got %v", err)
@@ -122,8 +119,8 @@ func TestRequest_CustomTimeout(t *testing.T) {
 		})
 
 	_, err := s.Request(t.Context(), &entities.RequestMessage{
-		PublishRequest: entities.PublishRequest{ConnectionID: "conn-1", Subject: "svc.ping"},
-		Timeout:        250 * time.Millisecond,
+		ConnectionID: "conn-1", Subject: "svc.ping",
+		Timeout: 250 * time.Millisecond,
 	})
 	require.NoError(t, err)
 }
@@ -166,7 +163,7 @@ func TestRequest_PropagatesNATSErrors(t *testing.T) {
 		})
 
 	_, err := s.Request(t.Context(), &entities.RequestMessage{
-		PublishRequest: entities.PublishRequest{ConnectionID: "conn-1", Subject: "svc.ping"},
+		ConnectionID: "conn-1", Subject: "svc.ping",
 	})
 	require.ErrorIs(t, err, errs.ErrNATSNoResponders)
 }

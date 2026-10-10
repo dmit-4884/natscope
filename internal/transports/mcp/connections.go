@@ -27,7 +27,7 @@ func NewConnections(svc connectionssvc.Service) *Connections {
 // List returns every saved connection.
 func (c *Connections) List(ctx context.Context) (entities.SavedConnections, error) {
 	var all entities.SavedConnections
-	req := &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: new(entities.MaxListLimit)}}
+	req := &entities.SavedConnectionsList{Limit: new(entities.MaxListLimit)}
 	for {
 		page, err := c.svc.List(ctx, req)
 		if err != nil {

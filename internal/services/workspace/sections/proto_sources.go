@@ -237,7 +237,7 @@ func hasTokenSource(items []protoSourceItem) bool {
 
 func (s *ProtoSourcesSection) all(ctx context.Context) (entities.ProtoSources, error) {
 	res, err := s.svc.ListSources(ctx, &entities.ProtoSourcesList{
-		ListBase: entities.ListBase{Limit: new(listAllLimit)},
+		Limit: new(listAllLimit),
 	})
 	if err != nil {
 		return nil, err

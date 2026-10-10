@@ -24,11 +24,11 @@ func TestListBase_GetLimit(t *testing.T) {
 		want  int64
 	}{
 		{name: "NilLimit_ReturnsDefault", limit: nil, want: DefaultListLimit},
-		{name: "CustomLimit", limit: ptrInt64(25), want: 25},
-		{name: "ZeroLimit_ReturnsDefault", limit: ptrInt64(0), want: DefaultListLimit},
-		{name: "NegativeLimit_ReturnsDefault", limit: ptrInt64(-5), want: DefaultListLimit},
-		{name: "AtMaxLimit", limit: ptrInt64(MaxListLimit), want: MaxListLimit},
-		{name: "OverMaxLimit_Clamped", limit: ptrInt64(1000), want: MaxListLimit},
+		{name: "CustomLimit", limit: new(int64(25)), want: 25},
+		{name: "ZeroLimit_ReturnsDefault", limit: new(int64(0)), want: DefaultListLimit},
+		{name: "NegativeLimit_ReturnsDefault", limit: new(int64(-5)), want: DefaultListLimit},
+		{name: "AtMaxLimit", limit: new(MaxListLimit), want: MaxListLimit},
+		{name: "OverMaxLimit_Clamped", limit: new(int64(1000)), want: MaxListLimit},
 	}
 
 	for _, tt := range tests {

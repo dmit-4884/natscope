@@ -26,7 +26,7 @@ const listAllSourcesLimit int64 = 1_000_000
 // allSources returns every source, bypassing the default 50-item page cap.
 func (s *Service) allSources(ctx context.Context) (entities.ProtoSources, error) {
 	list, err := s.sourcesStorage.List(ctx, &entities.ProtoSourcesList{
-		ListBase: entities.ListBase{Limit: new(listAllSourcesLimit)},
+		Limit: new(listAllSourcesLimit),
 	})
 	if err != nil {
 		return nil, err

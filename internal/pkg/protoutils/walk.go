@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -117,11 +118,9 @@ func WalkProtoTree(root string, opts WalkOptions) (*WalkResult, error) {
 					return filepath.SkipDir
 				}
 			}
-			for _, pref := range excludePrefixes {
-				if rel == pref {
-					res.Skipped = append(res.Skipped, SkippedFile{Path: rel, Reason: "excluded by prefix"})
-					return filepath.SkipDir
-				}
+			if slices.Contains(excludePrefixes, rel) {
+				res.Skipped = append(res.Skipped, SkippedFile{Path: rel, Reason: "excluded by prefix"})
+				return filepath.SkipDir
 			}
 			return nil
 		}

@@ -77,7 +77,7 @@ type pingConfigDoc struct {
 }
 
 type connectionMetaDoc struct {
-	LastTestedAt     time.Time `json:"lastTestedAt,omitempty"`
+	LastTestedAt     time.Time `json:"lastTestedAt"`
 	LastSuccess      bool      `json:"lastSuccess,omitempty"`
 	LastRTTMs        *int64    `json:"lastRttMs,omitempty"`
 	ServerVersion    *string   `json:"serverVersion,omitempty"`

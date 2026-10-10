@@ -53,8 +53,8 @@ func TestSubjectMapping_ApplyUpdate(t *testing.T) {
 		// Seed a known-old UpdatedAt instead of sleeping (deterministic, race-free).
 		m.UpdatedAt = time.UnixMilli(1).UTC()
 		m.ApplyUpdate(&SubjectMappingUpdate{
-			Pattern:     ptrString("new.*"),
-			MessageType: ptrString("NewType"),
+			Pattern:     new("new.*"),
+			MessageType: new("NewType"),
 		})
 
 		assert.Equal(t, "new.*", m.Pattern)
@@ -65,7 +65,7 @@ func TestSubjectMapping_ApplyUpdate(t *testing.T) {
 	t.Run("NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var m *SubjectMapping
-		m.ApplyUpdate(&SubjectMappingUpdate{Pattern: ptrString("x")})
+		m.ApplyUpdate(&SubjectMappingUpdate{Pattern: new("x")})
 	})
 
 	t.Run("NilRequest", func(t *testing.T) {

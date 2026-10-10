@@ -93,8 +93,8 @@ func TestBaseEntity_IsDeleted(t *testing.T) {
 		want      bool
 	}{
 		{name: "NotDeleted_NilDeletedAt", deletedAt: nil, want: false},
-		{name: "Deleted_WithTimestamp", deletedAt: ptrTime(time.Now().UTC()), want: true},
-		{name: "Deleted_ZeroTimestamp", deletedAt: ptrTime(time.Time{}), want: true},
+		{name: "Deleted_WithTimestamp", deletedAt: new(time.Now().UTC()), want: true},
+		{name: "Deleted_ZeroTimestamp", deletedAt: new(time.Time{}), want: true},
 	}
 
 	for _, tt := range tests {
@@ -267,15 +267,3 @@ func TestBaseEntity_GetID(t *testing.T) {
 }
 
 // helpers
-
-func ptrInt64(i int64) *int64 {
-	return &i
-}
-
-func ptrTime(t time.Time) *time.Time {
-	return &t
-}
-
-func ptrString(s string) *string {
-	return &s
-}

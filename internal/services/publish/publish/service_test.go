@@ -241,7 +241,7 @@ func TestPublish_ProtoEncoded(t *testing.T) {
 		encodeRawFn: func(_ context.Context, req entities.CodecRequest) ([]byte, error) {
 			assert.Equal(t, "api.v1.Order", req.MessageType)
 			assert.Equal(t, "src-1", req.SourceID)
-			var v map[string]interface{}
+			var v map[string]any
 			require.NoError(t, json.Unmarshal(req.JSON, &v))
 			return encoded, nil
 		},

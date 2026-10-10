@@ -201,7 +201,7 @@ func redactConnection(c *entities.SavedConnection) connectionItem {
 }
 
 func (s *ConnectionsSection) all(ctx context.Context) (entities.SavedConnections, error) {
-	res, err := s.svc.List(ctx, &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: new(listAllLimit)}})
+	res, err := s.svc.List(ctx, &entities.SavedConnectionsList{Limit: new(listAllLimit)})
 	if err != nil {
 		return nil, err
 	}

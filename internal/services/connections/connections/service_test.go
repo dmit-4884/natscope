@@ -264,7 +264,7 @@ func TestService_List(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		expected := &entities.List[entities.SavedConnections]{
-			Items:      entities.SavedConnections{{BaseEntity: entities.BaseEntity{Id: "1"}}},
+			Items:      entities.SavedConnections{{Id: "1"}},
 			NextCursor: new("next"),
 		}
 		store := &mockStorage{listResult: expected}
@@ -302,7 +302,7 @@ func TestService_Update(t *testing.T) {
 
 		result, err := svc.Update(t.Context(), &entities.SavedConnectionUpdate{
 			Id:   existing.Id,
-			Name: ptrStr("new"),
+			Name: new("new"),
 		})
 
 		require.NoError(t, err)
@@ -375,7 +375,7 @@ func TestService_Duplicate(t *testing.T) {
 			c.URLs = []string{"nats://localhost:4222"}
 			c.Auth = &entities.AuthConfig{
 				Method: entities.AuthMethodToken,
-				Token:  ptrStr("secret"),
+				Token:  new("secret"),
 			}
 		})
 		store := &mockStorage{getResult: existing}
@@ -411,7 +411,7 @@ func TestService_TestConnection(t *testing.T) {
 			c.URLs = []string{"nats://trusted:4222"}
 			c.Auth = &entities.AuthConfig{
 				Method: entities.AuthMethodToken,
-				Token:  ptrStr("stored-secret"),
+				Token:  new("stored-secret"),
 			}
 		})
 		store := &mockStorage{getResult: saved}
@@ -425,7 +425,7 @@ func TestService_TestConnection(t *testing.T) {
 			URLs:         []string{"nats://attacker:4222"},
 			Auth: &entities.AuthConfig{
 				Method: entities.AuthMethodToken,
-				Token:  ptrStr("attacker-token"),
+				Token:  new("attacker-token"),
 			},
 		})
 
@@ -448,7 +448,7 @@ func TestService_TestConnection(t *testing.T) {
 		t.Parallel()
 		saved := entities.SavedConnectionNew(func(c *entities.SavedConnection) {
 			c.URLs = []string{"nats://trusted:4222"}
-			c.Connection = &entities.ConnectionConfig{JetstreamDomain: ptrStr("hub"), ConnectTimeout: new(5 * time.Second)}
+			c.Connection = &entities.ConnectionConfig{JetstreamDomain: new("hub"), ConnectTimeout: new(5 * time.Second)}
 		})
 		store := &mockStorage{getResult: saved}
 		natsSvc := &mockNATSService{testResult: &entities.TestConnectionResult{Success: true}}
@@ -457,7 +457,7 @@ func TestService_TestConnection(t *testing.T) {
 		_, err := svc.TestConnection(t.Context(), &entities.TestConnectionRequest{
 			ConnectionID: saved.Id,
 			URLs:         []string{"nats://edited:4222"},
-			Connection:   &entities.ConnectionConfig{JetstreamDomain: ptrStr("leaf"), ConnectTimeout: new(2 * time.Second)},
+			Connection:   &entities.ConnectionConfig{JetstreamDomain: new("leaf"), ConnectTimeout: new(2 * time.Second)},
 		})
 
 		require.NoError(t, err)
@@ -472,7 +472,7 @@ func TestService_TestConnection(t *testing.T) {
 		t.Parallel()
 		saved := entities.SavedConnectionNew(func(c *entities.SavedConnection) {
 			c.URLs = []string{"nats://trusted:4222"}
-			c.Connection = &entities.ConnectionConfig{JetstreamDomain: ptrStr("hub")}
+			c.Connection = &entities.ConnectionConfig{JetstreamDomain: new("hub")}
 		})
 		store := &mockStorage{getResult: saved}
 		natsSvc := &mockNATSService{testResult: &entities.TestConnectionResult{Success: true}}
@@ -480,7 +480,7 @@ func TestService_TestConnection(t *testing.T) {
 
 		_, err := svc.TestConnection(t.Context(), &entities.TestConnectionRequest{
 			ConnectionID: saved.Id,
-			Connection:   &entities.ConnectionConfig{JetstreamDomain: ptrStr("hub"), InboxPrefix: ptrStr("")},
+			Connection:   &entities.ConnectionConfig{JetstreamDomain: new("hub"), InboxPrefix: new("")},
 		})
 
 		require.NoError(t, err)
@@ -506,8 +506,6 @@ func TestService_TestConnection(t *testing.T) {
 		assert.False(t, store.updateCalled, "no Meta write without ConnectionID")
 	})
 }
-
-func ptrStr(s string) *string { return &s }
 
 // TestService_LiftsURLCredentials pins the security invariant: credentials
 // embedded in a server URL never reach the document store. They are moved into
@@ -562,7 +560,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 		conn, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{
 			Name: "c",
 			URLs: []string{"nats://h1:4222"},
-			Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptrStr("explicit")},
+			Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new("explicit")},
 		})
 
 		require.NoError(t, err)
@@ -579,7 +577,7 @@ func TestService_LiftsURLCredentials(t *testing.T) {
 		_, err := svc.Create(t.Context(), &entities.SavedConnectionCreate{
 			Name: "c",
 			URLs: []string{"nats://bob:s3cr3t@h1:4222"},
-			Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: ptrStr("explicit")},
+			Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: new("explicit")},
 		})
 
 		require.ErrorIs(t, err, errs.ErrConnectionURLCredentialsConflict)

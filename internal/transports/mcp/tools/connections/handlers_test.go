@@ -19,11 +19,11 @@ func TestRedact(t *testing.T) {
 	secret := "s3cr3t-value"
 	rtt := int64(3)
 	conn := &entities.SavedConnection{
-		BaseEntity: entities.BaseEntity{Id: "conn-1"},
-		Name:       "local",
-		URLs:       []string{"nats://alice:" + secret + "@localhost:4222", "nats://localhost:4223", "nats://bob:" + secret + "%zz@badhost:4222"},
-		Auth:       &entities.AuthConfig{Method: entities.AuthMethodToken, Token: &secret, Password: &secret, NkeySeed: &secret},
-		TLS:        &entities.TlsConfig{ClientKey: &secret},
+		Id:   "conn-1",
+		Name: "local",
+		URLs: []string{"nats://alice:" + secret + "@localhost:4222", "nats://localhost:4223", "nats://bob:" + secret + "%zz@badhost:4222"},
+		Auth: &entities.AuthConfig{Method: entities.AuthMethodToken, Token: &secret, Password: &secret, NkeySeed: &secret},
+		TLS:  &entities.TlsConfig{ClientKey: &secret},
 		Meta: &entities.ConnectionMeta{
 			LastTestedAt: time.Unix(1790000000, 0).UTC(), LastSuccess: true, LastRTTMs: &rtt,
 			LastError: new("dial nats://alice:" + secret + "@localhost:4222 failed"),

@@ -194,7 +194,7 @@ func TestPool_ASlowCloseDoesNotHoldOtherConnections(t *testing.T) {
 	pool := NewPool(&fakeDialer{}, func(context.Context, string) (*entities.SavedConnection, error) {
 		return &entities.SavedConnection{}, nil
 	})
-	slow := &blockingCloseClient{fakeClient: fakeClient{connected: true}, closing: make(chan struct{}), release: make(chan struct{})}
+	slow := &blockingCloseClient{connected: true, closing: make(chan struct{}), release: make(chan struct{})}
 	other := &fakeClient{connected: true}
 	pool.clients["a"] = slow
 	pool.clients["b"] = other

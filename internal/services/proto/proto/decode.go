@@ -55,7 +55,7 @@ func (s *Service) Decode(ctx context.Context, req entities.CodecRequest) (*entit
 
 	// Add formatted JSON for single-message decode (used by codec UI).
 	if result.Success && len(result.Decoded) > 0 {
-		var pretty interface{}
+		var pretty any
 		if jsonErr := json.Unmarshal(result.Decoded, &pretty); jsonErr == nil {
 			if formatted, formatErr := json.MarshalIndent(pretty, "", "  "); formatErr == nil {
 				result.FormattedJSON = string(formatted)

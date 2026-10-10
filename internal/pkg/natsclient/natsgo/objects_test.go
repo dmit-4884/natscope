@@ -73,7 +73,7 @@ func TestToObjectInfo_MapsLink(t *testing.T) {
 
 	t.Run("no link", func(t *testing.T) {
 		t.Parallel()
-		info := &jetstream.ObjectInfo{ObjectMeta: jetstream.ObjectMeta{Name: "plain"}}
+		info := &jetstream.ObjectInfo{Name: "plain"}
 		got := toObjectInfo(info)
 		assert.Equal(t, "plain", got.Name)
 		assert.Nil(t, got.Link)
@@ -82,10 +82,8 @@ func TestToObjectInfo_MapsLink(t *testing.T) {
 	t.Run("object link", func(t *testing.T) {
 		t.Parallel()
 		info := &jetstream.ObjectInfo{
-			ObjectMeta: jetstream.ObjectMeta{
-				Name: "lnk",
-				Opts: &jetstream.ObjectMetaOptions{Link: &jetstream.ObjectLink{Bucket: "target-bucket", Name: "target-name"}},
-			},
+			Name: "lnk",
+			Opts: &jetstream.ObjectMetaOptions{Link: &jetstream.ObjectLink{Bucket: "target-bucket", Name: "target-name"}},
 		}
 		got := toObjectInfo(info)
 		require.NotNil(t, got.Link)
@@ -96,10 +94,8 @@ func TestToObjectInfo_MapsLink(t *testing.T) {
 	t.Run("bucket link has no target name", func(t *testing.T) {
 		t.Parallel()
 		info := &jetstream.ObjectInfo{
-			ObjectMeta: jetstream.ObjectMeta{
-				Name: "blnk",
-				Opts: &jetstream.ObjectMetaOptions{Link: &jetstream.ObjectLink{Bucket: "target-bucket"}},
-			},
+			Name: "blnk",
+			Opts: &jetstream.ObjectMetaOptions{Link: &jetstream.ObjectLink{Bucket: "target-bucket"}},
 		}
 		got := toObjectInfo(info)
 		require.NotNil(t, got.Link)

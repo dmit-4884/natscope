@@ -58,8 +58,8 @@ func TestPool_ReadOnlyConnection_RefusesEveryWriteAndPassesReads(t *testing.T) {
 	v := reflect.ValueOf(c)
 	clientType := reflect.TypeFor[Client]()
 	seen := 0
-	for i := range clientType.NumMethod() {
-		name := clientType.Method(i).Name
+	for method := range clientType.Methods() {
+		name := method.Name
 		if name == "IsConnected" || name == "IsReconnecting" || name == "Status" || name == "Close" {
 			continue
 		}

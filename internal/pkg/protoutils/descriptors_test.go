@@ -24,15 +24,15 @@ func setOf(t *testing.T, files ...*descriptorpb.FileDescriptorProto) []byte {
 
 func fileWith(name, pkg string, messages ...*descriptorpb.DescriptorProto) *descriptorpb.FileDescriptorProto {
 	return &descriptorpb.FileDescriptorProto{
-		Name: proto.String(name), Package: proto.String(pkg), MessageType: messages, Syntax: proto.String("proto3"),
+		Name: new(name), Package: new(pkg), MessageType: messages, Syntax: new("proto3"),
 	}
 }
 
 func message(name string, fields ...string) *descriptorpb.DescriptorProto {
-	m := &descriptorpb.DescriptorProto{Name: proto.String(name)}
+	m := &descriptorpb.DescriptorProto{Name: new(name)}
 	for i, f := range fields {
 		m.Field = append(m.Field, &descriptorpb.FieldDescriptorProto{
-			Name: proto.String(f), Number: proto.Int32(int32(i + 1)), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+			Name: new(f), Number: new(int32(i + 1)), Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
 		})
 	}
 	return m
@@ -113,7 +113,7 @@ func TestFindConflicts(t *testing.T) {
 				commented := func(text string) *descriptorpb.FileDescriptorProto {
 					f := fileWith("common.proto", "c", message("Common"))
 					f.SourceCodeInfo = &descriptorpb.SourceCodeInfo{Location: []*descriptorpb.SourceCodeInfo_Location{
-						{Path: []int32{4, 0}, Span: []int32{1, 0, 20}, LeadingComments: proto.String(text)},
+						{Path: []int32{4, 0}, Span: []int32{1, 0, 20}, LeadingComments: new(text)},
 					}}
 					return f
 				}

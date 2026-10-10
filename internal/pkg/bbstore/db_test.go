@@ -17,14 +17,14 @@ func TestDropBuckets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open old: %v", err)
 	}
-	if err := old.Save(t.Context(), &widget{Base: bbstore.Base{ID: "w1"}, Name: "stale"}); err != nil {
+	if err := old.Save(t.Context(), &widget{ID: "w1", Name: "stale"}); err != nil {
 		t.Fatalf("save old: %v", err)
 	}
 	kept, err := bbstore.Open[widget, *widget](t.Context(), db, spec("kept"))
 	if err != nil {
 		t.Fatalf("open kept: %v", err)
 	}
-	if err := kept.Save(t.Context(), &widget{Base: bbstore.Base{ID: "w2"}, Name: "keep"}); err != nil {
+	if err := kept.Save(t.Context(), &widget{ID: "w2", Name: "keep"}); err != nil {
 		t.Fatalf("save kept: %v", err)
 	}
 

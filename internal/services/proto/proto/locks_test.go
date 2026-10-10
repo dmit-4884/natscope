@@ -18,9 +18,7 @@ func TestSourceLocks(t *testing.T) {
 		var active, maxActive int32
 		var wg sync.WaitGroup
 		for range 8 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				unlock := l.lock("src-1")
 				defer unlock()
 				cur := atomic.AddInt32(&active, 1)
@@ -32,7 +30,7 @@ func TestSourceLocks(t *testing.T) {
 				}
 				time.Sleep(2 * time.Millisecond)
 				atomic.AddInt32(&active, -1)
-			}()
+			})
 		}
 		wg.Wait()
 		assert.EqualValues(t, 1, maxActive, "concurrent compiles of one source must serialize")

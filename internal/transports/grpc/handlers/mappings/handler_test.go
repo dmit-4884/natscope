@@ -217,7 +217,7 @@ func TestHandler_Delete(t *testing.T) {
 		t.Parallel()
 		svc := &mockMappingsService{
 			getResult: &entities.SubjectMapping{
-				BaseEntity: entities.BaseEntity{Id: "m-1"},
+				Id: "m-1",
 			},
 		}
 		handler := New(svc, &stubProtoService{})

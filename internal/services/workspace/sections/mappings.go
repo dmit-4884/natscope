@@ -219,7 +219,7 @@ func (s *MappingsSection) listSources(ctx context.Context) (entities.ProtoSource
 		return nil, nil
 	}
 	res, err := s.protoSvc.ListSources(ctx, &entities.ProtoSourcesList{
-		ListBase: entities.ListBase{Limit: new(listAllLimit)},
+		Limit: new(listAllLimit),
 	})
 	if err != nil {
 		return nil, err

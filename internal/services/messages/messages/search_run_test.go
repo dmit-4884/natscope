@@ -135,7 +135,7 @@ func runSearch(t *testing.T, s *Service, req entities.MessageSearchRequest, stop
 func searchAll(t *testing.T, s *Service, req entities.MessageSearchRequest, stopAt func(run int) int) []uint64 {
 	t.Helper()
 	var all []uint64
-	for run := 0; run < 1000; run++ {
+	for run := range 1000 {
 		res := runSearch(t, s, req, stopAt(run))
 		all = append(all, res.matches...)
 		var next uint64

@@ -244,7 +244,7 @@ func TestService_Delete(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		existing := &entities.SubjectMapping{
-			BaseEntity: entities.BaseEntity{Id: "m-1"},
+			Id: "m-1",
 		}
 		store := &mockStorage{getResult: existing}
 		svc := New(store)
@@ -364,7 +364,7 @@ func TestService_GetAll(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		expected := entities.SubjectMappings{
-			{BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "orders.*"},
+			{Id: "m1", Pattern: "orders.*"},
 		}
 		store := &mockStorage{listAllResult: expected}
 		svc := New(store)

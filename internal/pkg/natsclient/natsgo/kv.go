@@ -621,18 +621,9 @@ func toKVBucketInfo(status jetstream.KeyValueStatus) entities.KVBucketInfo {
 		storage = entities.StorageMemory
 	}
 
-	replicas := cfg.Replicas
-	if replicas < 1 {
-		replicas = 1
-	}
+	replicas := max(cfg.Replicas, 1)
 
-	history := status.History()
-	if history < 0 {
-		history = 0
-	}
-	if history > maxKVHistory {
-		history = maxKVHistory
-	}
+	history := min(max(status.History(), 0), maxKVHistory)
 
 	return entities.KVBucketInfo{
 		Bucket:         status.Bucket(),

@@ -59,7 +59,7 @@ func TestSavedConnection_ApplyUpdate(t *testing.T) {
 		// Seed a known-old UpdatedAt instead of sleeping (deterministic, race-free).
 		c.UpdatedAt = time.UnixMilli(1).UTC()
 		c.ApplyUpdate(&SavedConnectionUpdate{
-			Name: ptrString("new-name"),
+			Name: new("new-name"),
 			URLs: []string{"nats://new:4222"},
 		})
 
@@ -76,7 +76,7 @@ func TestSavedConnection_ApplyUpdate(t *testing.T) {
 		})
 
 		c.ApplyUpdate(&SavedConnectionUpdate{
-			Name: ptrString("changed"),
+			Name: new("changed"),
 			// URLs is nil — should not change
 		})
 
@@ -87,7 +87,7 @@ func TestSavedConnection_ApplyUpdate(t *testing.T) {
 	t.Run("NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var c *SavedConnection
-		c.ApplyUpdate(&SavedConnectionUpdate{Name: ptrString("x")})
+		c.ApplyUpdate(&SavedConnectionUpdate{Name: new("x")})
 	})
 
 	t.Run("NilRequest", func(t *testing.T) {
@@ -105,8 +105,8 @@ func TestSavedConnection_ApplyUpdate(t *testing.T) {
 		c.ApplyUpdate(&SavedConnectionUpdate{
 			Auth: &AuthConfig{
 				Method:   AuthMethodUserPass,
-				Username: ptrString("admin"),
-				Password: ptrString("secret"),
+				Username: new("admin"),
+				Password: new("secret"),
 			},
 		})
 
@@ -166,7 +166,7 @@ func TestSavedConnectionsList(t *testing.T) {
 	t.Parallel()
 
 	l := &SavedConnectionsList{
-		ListBase: ListBase{Cursor: "abc", Limit: ptrInt64(10)},
+		Cursor: "abc", Limit: new(int64(10)),
 	}
 	assert.Equal(t, "abc", l.Cursor)
 	assert.Equal(t, int64(10), l.GetLimit())

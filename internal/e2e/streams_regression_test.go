@@ -35,7 +35,7 @@ func TestStreamRepublishClearDoesNotLoop(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
 			ConnectionId: connID, Subject: "rpl.a", Data: "{}",
 		}))
@@ -78,7 +78,7 @@ func TestStreamConsumerLimitsInactiveThresholdPersists(t *testing.T) {
 	assert.Equal(t, 30*time.Second, create.Msg.GetStream().GetConfig().GetConsumerLimits().GetInactiveThreshold().AsDuration())
 
 	update, err := env.management.UpdateStream(ctx, connect.NewRequest(&managementpb.UpdateStreamRequest{
-		ConnectionId: connID, StreamName: stream, Description: strPtr("x"), ConsumerLimits: limits,
+		ConnectionId: connID, StreamName: stream, Description: new("x"), ConsumerLimits: limits,
 	}))
 	require.NoError(t, err)
 	require.NotNil(t, update.Msg.GetStream().GetConfig().GetConsumerLimits())
@@ -110,7 +110,7 @@ func TestStreamSubjectTransformRoundTrips(t *testing.T) {
 	require.NotNil(t, got.Msg.GetStream().GetConfig().GetSubjectTransform())
 
 	update, err := env.management.UpdateStream(ctx, connect.NewRequest(&managementpb.UpdateStreamRequest{
-		ConnectionId: connID, StreamName: stream, Description: strPtr("edited"),
+		ConnectionId: connID, StreamName: stream, Description: new("edited"),
 		SubjectTransform: got.Msg.GetStream().GetConfig().GetSubjectTransform(),
 	}))
 	require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestStreamSourcesReplaceNotAppend(t *testing.T) {
 	require.NoError(t, err)
 
 	update, err := env.management.UpdateStream(ctx, connect.NewRequest(&managementpb.UpdateStreamRequest{
-		ConnectionId: connID, StreamName: "AGG", Description: strPtr("edited"),
+		ConnectionId: connID, StreamName: "AGG", Description: new("edited"),
 		Sources: []*managementpb.StreamSourceConfig{{Name: "ORIG"}},
 	}))
 	require.NoError(t, err, "resending the current sources list must replace, not append and duplicate")
@@ -165,7 +165,7 @@ func TestConsumerUpdateKeepsBackoffWhenOmitted(t *testing.T) {
 	require.Len(t, create.Msg.GetConsumer().GetConfig().GetBackOff(), 2)
 
 	update, err := env.management.UpdateConsumer(ctx, connect.NewRequest(&managementpb.UpdateConsumerRequest{
-		ConnectionId: connID, StreamName: stream, ConsumerName: "c", Description: strPtr("only description"),
+		ConnectionId: connID, StreamName: stream, ConsumerName: "c", Description: new("only description"),
 	}))
 	require.NoError(t, err)
 	backoff := update.Msg.GetConsumer().GetConfig().GetBackOff()
@@ -233,7 +233,7 @@ func TestMessageMultiValueHeadersPreserved(t *testing.T) {
 
 	listResp, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
 		ConnectionId: connID, StreamName: stream,
-		Direction: messagespb.Direction_DIRECTION_FORWARD, StartSeq: uint64Ptr(1),
+		Direction: messagespb.Direction_DIRECTION_FORWARD, StartSeq: new(uint64(1)),
 	}))
 	require.NoError(t, err)
 	require.Len(t, listResp.Msg.GetMessages(), 1)

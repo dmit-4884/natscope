@@ -91,7 +91,7 @@ func joinRelDir(dir, child string) string {
 func yamlListItems(content, key string) []string {
 	var out []string
 	inKey := false
-	for _, raw := range strings.Split(content, "\n") {
+	for raw := range strings.SplitSeq(content, "\n") {
 		trimmed := strings.TrimSpace(raw)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
@@ -103,8 +103,8 @@ func yamlListItems(content, key string) []string {
 		if !inKey {
 			continue
 		}
-		if strings.HasPrefix(trimmed, "- ") {
-			v := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+		if after, ok := strings.CutPrefix(trimmed, "- "); ok {
+			v := strings.TrimSpace(after)
 			v = stripScalar(v)
 			if v != "" {
 				out = append(out, v)
@@ -121,7 +121,7 @@ func yamlListItems(content, key string) []string {
 func bufModulePaths(content string) []string {
 	var out []string
 	inModules := false
-	for _, raw := range strings.Split(content, "\n") {
+	for raw := range strings.SplitSeq(content, "\n") {
 		trimmed := strings.TrimSpace(raw)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue

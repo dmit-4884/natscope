@@ -6,7 +6,7 @@ package natsgo
 import (
 	"context"
 	"errors"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -23,7 +23,7 @@ func minute(n int) time.Time { return timeBase.Add(time.Duration(n) * time.Minut
 // fakeNextPresent builds a nextPresentFunc over fixed present sequences (time = base + seq min), returning the first present seq at/after the requested one.
 func fakeNextPresent(present ...uint64) nextPresentFunc {
 	sorted := append([]uint64(nil), present...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	slices.Sort(sorted)
 	return func(seq uint64) (uint64, time.Time, bool, error) {
 		for _, s := range sorted {
 			if s >= seq {
@@ -204,7 +204,7 @@ func newFakeStream(info *jetstream.StreamInfo, present map[uint64]time.Time) *fa
 	for s := range present {
 		seqs = append(seqs, s)
 	}
-	sort.Slice(seqs, func(i, j int) bool { return seqs[i] < seqs[j] })
+	slices.Sort(seqs)
 	return &fakeStream{info: info, present: present, sortedSeqs: seqs}
 }
 

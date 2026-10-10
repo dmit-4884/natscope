@@ -54,8 +54,8 @@ func TestProtoSource_ApplyUpdate(t *testing.T) {
 		// Seed a known-old UpdatedAt instead of sleeping (deterministic, race-free).
 		s.UpdatedAt = time.UnixMilli(1).UTC()
 		s.ApplyUpdate(&ProtoSourceUpdate{
-			Name:       ptrString("new"),
-			Repository: ptrString("https://new.git"),
+			Name:       new("new"),
+			Repository: new("https://new.git"),
 		})
 
 		assert.Equal(t, "new", s.Name)
@@ -66,7 +66,7 @@ func TestProtoSource_ApplyUpdate(t *testing.T) {
 	t.Run("NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var s *ProtoSource
-		s.ApplyUpdate(&ProtoSourceUpdate{Name: ptrString("x")})
+		s.ApplyUpdate(&ProtoSourceUpdate{Name: new("x")})
 	})
 
 	t.Run("NilRequest", func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestProtoSource_AuthenticatedURL(t *testing.T) {
 		{
 			name:       "WithToken",
 			repository: "https://gitlab.com/org/proto.git",
-			token:      ptrString("my-secret-token"),
+			token:      new("my-secret-token"),
 			wantURL:    "https://oauth2:my-secret-token@gitlab.com/org/proto.git",
 		},
 		{
@@ -102,19 +102,19 @@ func TestProtoSource_AuthenticatedURL(t *testing.T) {
 		{
 			name:       "WithEmptyToken",
 			repository: "https://gitlab.com/org/proto.git",
-			token:      ptrString(""),
+			token:      new(""),
 			wantURL:    "https://gitlab.com/org/proto.git",
 		},
 		{
 			name:       "InvalidURL",
 			repository: "://invalid",
-			token:      ptrString("token"),
+			token:      new("token"),
 			wantURL:    "://invalid",
 		},
 		{
 			name:       "EmptyRepository",
 			repository: "",
-			token:      ptrString("token"),
+			token:      new("token"),
 			wantURL:    "//oauth2:token@",
 		},
 	}
@@ -158,7 +158,7 @@ func TestProtoSource_ApplyUpdate_LocalPath(t *testing.T) {
 		})
 
 		s.ApplyUpdate(&ProtoSourceUpdate{
-			LocalPath: ptrString("/new/path"),
+			LocalPath: new("/new/path"),
 		})
 
 		require.NotNil(t, s.LocalPath)
@@ -188,7 +188,7 @@ func TestProtoSource_ApplyUpdate_LocalPath(t *testing.T) {
 
 		// Update only Name, Repository should remain unchanged
 		s.ApplyUpdate(&ProtoSourceUpdate{
-			Name: ptrString("updated"),
+			Name: new("updated"),
 		})
 
 		assert.Equal(t, "updated", s.Name)
@@ -204,7 +204,7 @@ func TestProtoSource_AuthenticatedURL_NonGitTypes(t *testing.T) {
 		s := &ProtoSource{
 			SourceType: SourceTypeLocal,
 			Repository: "https://example.com/proto.git",
-			Token:      ptrString("secret"),
+			Token:      new("secret"),
 		}
 		got := s.AuthenticatedURL()
 		assert.Equal(t, "https://example.com/proto.git", got, "non-git types should return Repository as-is")
@@ -215,7 +215,7 @@ func TestProtoSource_AuthenticatedURL_NonGitTypes(t *testing.T) {
 		s := &ProtoSource{
 			SourceType: "",
 			Repository: "https://gitlab.com/org/proto.git",
-			Token:      ptrString("token"),
+			Token:      new("token"),
 		}
 		got := s.AuthenticatedURL()
 		assert.Equal(t, "https://oauth2:token@gitlab.com/org/proto.git", got)
@@ -228,9 +228,9 @@ func TestProtoSources_IDs(t *testing.T) {
 	t.Run("MultipleItems", func(t *testing.T) {
 		t.Parallel()
 		sources := ProtoSources{
-			{BaseEntity: BaseEntity{Id: "a"}},
-			{BaseEntity: BaseEntity{Id: "b"}},
-			{BaseEntity: BaseEntity{Id: "c"}},
+			{Id: "a"},
+			{Id: "b"},
+			{Id: "c"},
 		}
 		assert.Equal(t, []string{"a", "b", "c"}, sources.IDs())
 	})

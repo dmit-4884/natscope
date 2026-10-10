@@ -74,8 +74,8 @@ func extractMissingImport(msg string) string {
 		return strings.TrimSpace(rest)
 	}
 	const prefix = `could not resolve path "`
-	if i := strings.Index(msg, prefix); i >= 0 {
-		rest := msg[i+len(prefix):]
+	if _, after, ok := strings.Cut(msg, prefix); ok {
+		rest := after
 		if j := strings.Index(rest, `"`); j > 0 {
 			return rest[:j]
 		}

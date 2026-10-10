@@ -35,7 +35,7 @@ const secretSubstrings = "password token nkey credentials jwt clientKey clientCe
 func assertNoSecrets(t *testing.T, payload []byte, values ...string) {
 	t.Helper()
 	lower := strings.ToLower(string(payload))
-	for _, kw := range strings.Fields(secretSubstrings) {
+	for kw := range strings.FieldsSeq(secretSubstrings) {
 		assert.NotContainsf(t, lower, kw, "export must not contain %q", kw)
 	}
 	for _, v := range values {
@@ -297,7 +297,7 @@ func TestTemplatesSection_Roundtrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), res.Created)
 
-	listed, err := dst.List(ctx, &entities.MessageTemplatesList{ListBase: entities.ListBase{Limit: new(int64(100))}})
+	listed, err := dst.List(ctx, &entities.MessageTemplatesList{Limit: new(int64(100))})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, "t1", listed.Items[0].Name)

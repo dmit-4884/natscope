@@ -76,7 +76,7 @@ func TestValidationReasonCodes(t *testing.T) {
 			func() error {
 				_, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
 					ConnectionId: "x", StreamName: "x",
-					StartSeq:  uint64Ptr(1),
+					StartSeq:  new(uint64(1)),
 					StartTime: timestamppb.New(time.Now()),
 				}))
 				return err

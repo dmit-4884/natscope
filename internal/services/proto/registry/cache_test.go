@@ -57,10 +57,10 @@ func (s *stubDescriptors) GetByFingerprint(_ context.Context, sourceID, fp strin
 func descriptorSetBytes(t *testing.T, pkg, msg string) []byte {
 	t.Helper()
 	file := &descriptorpb.FileDescriptorProto{
-		Name:        proto.String(msg + ".proto"),
-		Package:     proto.String(pkg),
-		MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String(msg)}},
-		Syntax:      proto.String("proto3"),
+		Name:        new(msg + ".proto"),
+		Package:     new(pkg),
+		MessageType: []*descriptorpb.DescriptorProto{{Name: new(msg)}},
+		Syntax:      new("proto3"),
 	}
 	set := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{file}}
 	data, err := proto.Marshal(set)

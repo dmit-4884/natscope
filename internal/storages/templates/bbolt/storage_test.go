@@ -165,7 +165,7 @@ func TestTemplates_ListPagination(t *testing.T) {
 		}
 	}
 	page, err := s.List(ctx, &entities.MessageTemplatesList{
-		ListBase: entities.ListBase{Limit: new(int64(2)), IncludeTotalCount: true},
+		Limit: new(int64(2)), IncludeTotalCount: true,
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)

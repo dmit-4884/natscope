@@ -36,7 +36,7 @@ func TestPagination(t *testing.T) {
 	const pageSize = 10
 
 	t.Run("mappings", func(t *testing.T) {
-		for i := 0; i < total; i++ {
+		for i := range total {
 			_, err := env.mappings.CreateMapping(ctx, connect.NewRequest(&mappingspb.CreateMappingRequest{
 				Pattern:     fmt.Sprintf("page.test.%03d", i),
 				MessageType: "x.Y",
@@ -74,7 +74,7 @@ func TestPagination(t *testing.T) {
 	})
 
 	t.Run("templates", func(t *testing.T) {
-		for i := 0; i < total; i++ {
+		for i := range total {
 			_, err := env.templates.CreateTemplate(ctx, connect.NewRequest(&templatespb.CreateTemplateRequest{
 				Name: fmt.Sprintf("page-template-%03d", i), Subject: "x", Data: "{}",
 			}))
@@ -108,7 +108,7 @@ func TestPagination(t *testing.T) {
 	})
 
 	t.Run("connections (no total_size field, just exhaustion)", func(t *testing.T) {
-		for i := 0; i < total; i++ {
+		for i := range total {
 			_, err := env.connections.CreateConnection(ctx, connect.NewRequest(&connectionspb.CreateConnectionRequest{
 				Name: fmt.Sprintf("page-conn-%03d", i), Urls: []string{"nats://127.0.0.1:1"},
 			}))
@@ -142,7 +142,7 @@ func TestPagination(t *testing.T) {
 func setMessagesFetchMethod(t *testing.T, env *e2eEnv, method string) {
 	t.Helper()
 	_, err := env.settings.UpdateSettings(t.Context(), connect.NewRequest(&settingspb.UpdateSettingsRequest{
-		Messages: &settingstypes.MessageSettings{FetchMethod: strPtr(method)},
+		Messages: &settingstypes.MessageSettings{FetchMethod: new(method)},
 	}))
 	require.NoError(t, err)
 }
@@ -164,7 +164,7 @@ func walkMessages(
 	seen := map[uint64]bool{}
 	var startSeq *uint64
 
-	for page := 0; page < maxPages; page++ {
+	for range maxPages {
 		req := &messagespb.ListMessagesRequest{
 			ConnectionId: connID, StreamName: stream,
 			Direction: direction, Limit: &limit, StartSeq: startSeq,
@@ -205,7 +205,7 @@ func TestMessagesPaginationSurvivesDeletionGap(t *testing.T) {
 	require.NoError(t, err)
 
 	const total = 150
-	for i := 0; i < total; i++ {
+	for range total {
 		_, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
 			ConnectionId: connID, Subject: "gapped.a", Data: "{}",
 		}))
@@ -263,11 +263,11 @@ func TestMessagesPaginationSubjectFilterFindsOldMatches(t *testing.T) {
 
 	rare1 := publish("sparse.rare")
 	const filler = 120
-	for i := 0; i < filler; i++ {
+	for range filler {
 		publish("sparse.a")
 	}
 	rare2 := publish("sparse.rare")
-	for i := 0; i < filler; i++ {
+	for range filler {
 		publish("sparse.a")
 	}
 	rare3 := publish("sparse.rare")
@@ -348,7 +348,7 @@ func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 			ConnectionId: connID, Name: stream, Storage: 1, Subjects: []string{"ob.>"},
 		}))
 		require.NoError(t, err)
-		for i := 0; i < 51; i++ {
+		for range 51 {
 			_, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
 				ConnectionId: connID, Subject: "ob.a", Data: "{}",
 			}))
@@ -358,7 +358,7 @@ func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 		limit := int64(50)
 		resp, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
 			ConnectionId: connID, StreamName: stream, Direction: messagespb.Direction_DIRECTION_FORWARD,
-			StartSeq: uint64Ptr(1), Limit: &limit,
+			StartSeq: new(uint64(1)), Limit: &limit,
 		}))
 		require.NoError(t, err)
 		require.Len(t, resp.Msg.GetMessages(), 50, "a stream of exactly limit+1 messages must not drop the last one")
@@ -367,7 +367,7 @@ func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 
 		next, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
 			ConnectionId: connID, StreamName: stream, Direction: messagespb.Direction_DIRECTION_FORWARD,
-			StartSeq: uint64Ptr(51), Limit: &limit,
+			StartSeq: new(uint64(51)), Limit: &limit,
 		}))
 		require.NoError(t, err)
 		require.Len(t, next.Msg.GetMessages(), 1)
@@ -381,21 +381,21 @@ func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 			ConnectionId: connID, Name: stream, Storage: 1, Subjects: []string{"dg.>"},
 		}))
 		require.NoError(t, err)
-		for i := 0; i < 200; i++ {
+		for range 200 {
 			_, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
 				ConnectionId: connID, Subject: "dg.a", Data: "{}",
 			}))
 			require.NoError(t, err)
 		}
 		_, err = env.management.PurgeStream(ctx, connect.NewRequest(&managementpb.PurgeStreamRequest{
-			ConnectionId: connID, StreamName: stream, Sequence: uint64Ptr(120),
+			ConnectionId: connID, StreamName: stream, Sequence: new(uint64(120)),
 		}))
 		require.NoError(t, err)
 
 		limit := int64(50)
 		resp, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
 			ConnectionId: connID, StreamName: stream, Direction: messagespb.Direction_DIRECTION_FORWARD,
-			StartSeq: uint64Ptr(1), Limit: &limit,
+			StartSeq: new(uint64(1)), Limit: &limit,
 		}))
 		require.NoError(t, err)
 		require.NotEmpty(t, resp.Msg.GetMessages(), "a page starting before FirstSeq must not come back empty and loop to sequence 1")
@@ -413,7 +413,7 @@ func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 			ConnectionId: connID, Name: stream, Storage: 1, Subjects: []string{"wf.>"},
 		}))
 		require.NoError(t, err)
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			_, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
 				ConnectionId: connID, Subject: "wf.a", Data: "{}",
 			}))
@@ -427,7 +427,7 @@ func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 		limit := int64(10)
 		resp, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
 			ConnectionId: connID, StreamName: stream, Direction: messagespb.Direction_DIRECTION_FORWARD,
-			SubjectFilter: strPtr("wf.*"), Limit: &limit,
+			SubjectFilter: new("wf.*"), Limit: &limit,
 		}))
 		require.NoError(t, err)
 		require.Len(t, resp.Msg.GetMessages(), 10, "forward+wildcard without a start seq must start at the oldest message")
@@ -437,7 +437,7 @@ func TestMessagesPaginationDirectModeBoundaries(t *testing.T) {
 		limitExact := int64(3)
 		exact, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
 			ConnectionId: connID, StreamName: stream, Direction: messagespb.Direction_DIRECTION_FORWARD,
-			SubjectFilter: strPtr("wf.a"), Limit: &limitExact,
+			SubjectFilter: new("wf.a"), Limit: &limitExact,
 		}))
 		require.NoError(t, err)
 		require.Len(t, exact.Msg.GetMessages(), 3)
@@ -460,7 +460,7 @@ func TestMessagesPaginationStartTimeFarFuture(t *testing.T) {
 		ConnectionId: connID, Name: stream, Storage: 1, Subjects: []string{"ft.>"},
 	}))
 	require.NoError(t, err)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_, err := env.publish.PublishMessage(ctx, connect.NewRequest(&publishpb.PublishMessageRequest{
 			ConnectionId: connID, Subject: "ft.a", Data: "{}",
 		}))
@@ -508,7 +508,7 @@ func TestMessagesPaginationEmptyStream(t *testing.T) {
 	t.Run("direct mode with a wildcard filter", func(t *testing.T) {
 		setMessagesFetchMethod(t, env, "direct")
 		resp, err := env.messages.ListMessages(ctx, connect.NewRequest(&messagespb.ListMessagesRequest{
-			ConnectionId: connID, StreamName: stream, SubjectFilter: strPtr("empty.*"),
+			ConnectionId: connID, StreamName: stream, SubjectFilter: new("empty.*"),
 		}))
 		require.NoError(t, err, "a never-written stream must return an empty page, not a NATS bad-request error")
 		assert.Empty(t, resp.Msg.GetMessages())

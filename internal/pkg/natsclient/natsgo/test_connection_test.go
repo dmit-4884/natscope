@@ -46,7 +46,7 @@ func TestConnection_ConnectTimeoutUnitsAreDurationNotMultiplied(t *testing.T) {
 	start := time.Now()
 	result, err := d.TestConnection(t.Context(), &entities.TestConnectionRequest{
 		URLs:           []string{"nats://" + ln.Addr().String()},
-		ConnectTimeout: durationPtr(300 * time.Millisecond),
+		ConnectTimeout: new(300 * time.Millisecond),
 	})
 	require.NoError(t, err)
 	require.False(t, result.Success)
@@ -71,7 +71,7 @@ func TestConnection_CtxCancelCutsProbeShort(t *testing.T) {
 	start := time.Now()
 	result, err := d.TestConnection(ctx, &entities.TestConnectionRequest{
 		URLs:           []string{"nats://" + ln.Addr().String()},
-		ConnectTimeout: durationPtr(30 * time.Second),
+		ConnectTimeout: new(30 * time.Second),
 	})
 	require.NoError(t, err)
 	require.False(t, result.Success)
@@ -88,7 +88,7 @@ func TestConnection_NkeySeedErrorSurfacesAsFailure(t *testing.T) {
 		URLs: []string{"nats://127.0.0.1:1"},
 		Auth: &entities.AuthConfig{
 			Method:   entities.AuthMethodNKey,
-			NkeySeed: strPtr("not-a-valid-seed"),
+			NkeySeed: new("not-a-valid-seed"),
 		},
 	})
 	require.NoError(t, err)
@@ -124,6 +124,3 @@ func TestConnection_MalformedHTTPResponseIsSanitized(t *testing.T) {
 	require.False(t, result.Success)
 	require.NotContains(t, result.Error, "QA_BANNER_SECRET")
 }
-
-func durationPtr(d time.Duration) *time.Duration { return &d }
-func strPtr(s string) *string                    { return &s }

@@ -177,7 +177,7 @@ func toTemplateUpdate(id string, it templateItem) *entities.MessageTemplateUpdat
 }
 
 func (s *TemplatesSection) all(ctx context.Context) (entities.MessageTemplates, error) {
-	res, err := s.svc.List(ctx, &entities.MessageTemplatesList{ListBase: entities.ListBase{Limit: new(listAllLimit)}})
+	res, err := s.svc.List(ctx, &entities.MessageTemplatesList{Limit: new(listAllLimit)})
 	if err != nil {
 		return nil, err
 	}

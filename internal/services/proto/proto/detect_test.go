@@ -198,7 +198,7 @@ func TestDecodeSubject(t *testing.T) {
 	t.Parallel()
 	env, sourceID := newDetectEnv(t, nil)
 	env.svc.mappingsService = &fakeMappings{resolver: natsutil.NewMappingResolver(entities.SubjectMappings{
-		{BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "$KV.notes.>", MessageType: "det.Note", SourceID: sourceID},
+		{Id: "m1", Pattern: "$KV.notes.>", MessageType: "det.Note", SourceID: sourceID},
 	})}
 	ctx := t.Context()
 
@@ -219,7 +219,7 @@ func TestDecodeSubject(t *testing.T) {
 	assert.Nil(t, env.svc.DecodeSubject(ctx, "$KV.users.c", []byte("plain text"), true))
 
 	missing := &fakeMappings{resolver: natsutil.NewMappingResolver(entities.SubjectMappings{
-		{BaseEntity: entities.BaseEntity{Id: "m2"}, Pattern: "$KV.gone.>", MessageType: "det.Note", SourceID: "missing"},
+		{Id: "m2", Pattern: "$KV.gone.>", MessageType: "det.Note", SourceID: "missing"},
 	})}
 	env.svc.mappingsService = missing
 	broken := env.svc.DecodeSubject(ctx, "$KV.gone.a", userWire("ann"), true)

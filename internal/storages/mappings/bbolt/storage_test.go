@@ -97,7 +97,7 @@ func TestMappings_ListPagination(t *testing.T) {
 	ctx := t.Context()
 
 	const n = 5
-	for i := 0; i < n; i++ {
+	for i := range n {
 		m := entities.SubjectMappingNew(func(m *entities.SubjectMapping) {
 			m.Pattern = "p" + string(rune('a'+i)) + ".>"
 			m.MessageType = "T"
@@ -110,7 +110,7 @@ func TestMappings_ListPagination(t *testing.T) {
 
 	limit := int64(2)
 	page, err := s.List(ctx, &entities.SubjectMappingsList{
-		ListBase: entities.ListBase{Limit: &limit, IncludeTotalCount: true},
+		Limit: &limit, IncludeTotalCount: true,
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)
@@ -130,7 +130,7 @@ func TestMappings_ListPagination(t *testing.T) {
 	cursor := ""
 	for {
 		p, err := s.List(ctx, &entities.SubjectMappingsList{
-			ListBase: entities.ListBase{Cursor: cursor, Limit: &limit},
+			Cursor: cursor, Limit: &limit,
 		})
 		if err != nil {
 			t.Fatalf("list page: %v", err)

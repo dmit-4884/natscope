@@ -131,7 +131,7 @@ func liftContextCredentials(c *entities.CliContext) {
 }
 
 func (s *Service) savedNames(ctx context.Context) (map[string]struct{}, error) {
-	list, err := s.storage.List(ctx, &entities.SavedConnectionsList{ListBase: entities.ListBase{Limit: new(int64(allConnectionsLimit))}})
+	list, err := s.storage.List(ctx, &entities.SavedConnectionsList{Limit: new(int64(allConnectionsLimit))})
 	if err != nil {
 		return nil, err
 	}

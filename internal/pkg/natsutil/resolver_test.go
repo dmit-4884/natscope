@@ -122,13 +122,11 @@ func TestResolver_CacheConsistentWithLinearScan(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 50 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if got := r.Resolve(subject); got == nil || got.Id != "specific" {
 				t.Errorf("expected specific mapping on warm concurrent lookup, got %#v", got)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

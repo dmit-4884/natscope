@@ -41,7 +41,7 @@ func newToolset() *Toolset {
 		nil, nil,
 		fakeMappings{resolver: natsutil.NewMappingResolver(entities.SubjectMappings{
 			{
-				BaseEntity: entities.BaseEntity{Id: "m1"}, Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "src", PinnedFingerprint: &pinned,
+				Id: "m1", Pattern: "orders.*", MessageType: "o.v1.Order", SourceID: "src", PinnedFingerprint: &pinned,
 				Framing: entities.Framing{Kind: entities.FramingGRPC},
 			},
 		})},
