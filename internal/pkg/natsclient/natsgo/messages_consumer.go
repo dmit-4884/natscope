@@ -32,6 +32,15 @@ const backwardWidenFactor = 4
 // backwardWidenAttempts bounds how many times the backward window widens.
 const backwardWidenAttempts = 6
 
+// backwardFilterSlack bounds a filtered backward window at this many pages of matches.
+const backwardFilterSlack = 4
+
+// backwardEmptyGrowth widens a filtered backward window that holds no match.
+const backwardEmptyGrowth = 16
+
+// backwardGrowthTarget is how many times the wanted matches a widened filtered backward window aims at.
+const backwardGrowthTarget = 2
+
 // getMessagesViaConsumer fetches via an ephemeral consumer (best for
 // filtered/sparse streams); rejects WorkQueue since AckNone would drain it.
 func (c *Client) getMessagesViaConsumer(
@@ -74,6 +83,10 @@ func (c *Client) getMessagesViaConsumer(
 		endSeq = info.State.LastSeq
 	}
 
+	if subjectFilter != "" {
+		return c.consumeFilteredBackward(ctx, stream, info, subjectFilter, endSeq, startSeq, limit)
+	}
+
 	maxWindow := uint64(DefaultSearchRange - 1)
 	window := min(uint64(limit+1)*backwardFetchMultiplier, maxWindow)
 
@@ -102,6 +115,123 @@ func (c *Client) getMessagesViaConsumer(
 	resp.HasMore = true
 	resp.NextSeq = fetchStart - 1
 	return resp, nil
+}
+
+// consumeFilteredBackward reads the newest limit matches of filter up to endSeq from a window sized by the server's
+// count of matches.
+func (c *Client) consumeFilteredBackward(
+	ctx context.Context,
+	stream jetstream.Stream,
+	info *jetstream.StreamInfo,
+	filter string,
+	endSeq uint64,
+	startSeq uint64,
+	limit int,
+) (*entities.MessagesResponse, error) {
+	start, older, err := c.filteredBackwardStart(ctx, stream, info, filter, endSeq, limit)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.consumeBrowseBatch(ctx, stream, info, start, startSeq, []string{filter}, limit, DefaultDirection)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.HasMore && older {
+		resp.HasMore = true
+		resp.NextSeq = start - 1
+	}
+	return resp, nil
+}
+
+// filteredBackwardStart picks the first sequence of a window ending at endSeq that holds more than limit matches of
+// filter but no more than backwardFilterSlack times that, or the stream's first sequence; older reports matches
+// before it.
+func (c *Client) filteredBackwardStart(
+	ctx context.Context,
+	stream jetstream.Stream,
+	info *jetstream.StreamInfo,
+	filter string,
+	endSeq uint64,
+	limit int,
+) (start uint64, older bool, err error) {
+	first := max(info.State.FirstSeq, 1)
+	above, err := c.pendingFrom(ctx, stream, filter, endSeq+1)
+	if err != nil {
+		return 0, false, err
+	}
+	upToEnd := func(seq uint64) (uint64, error) {
+		n, pendingErr := c.pendingFrom(ctx, stream, filter, seq)
+		return n - min(n, above), pendingErr
+	}
+	total, err := upToEnd(first)
+	if err != nil {
+		return 0, false, err
+	}
+	want := uint64(limit) + 1
+	if total <= want || endSeq <= first {
+		return first, false, nil
+	}
+
+	most := min(want*backwardFilterSlack, DefaultSearchRange)
+	span := endSeq - first + 1
+	window := min(want*backwardFetchMultiplier, span)
+	fewer := endSeq + 1
+	for {
+		start = endSeq - window + 1
+		n, err := upToEnd(start)
+		if err != nil {
+			return 0, false, err
+		}
+		if n < want && window < span {
+			fewer = start
+			window = min(growBackwardWindow(window, n, want), span)
+			continue
+		}
+		for n > most && fewer-start > 1 {
+			mid := start + (fewer-start)>>1
+			m, err := upToEnd(mid)
+			if err != nil {
+				return 0, false, err
+			}
+			if m >= want {
+				start, n = mid, m
+			} else {
+				fewer = mid
+			}
+		}
+		return start, total > n, nil
+	}
+}
+
+// growBackwardWindow widens a window holding n of the wanted matches so the next one should hold about twice as many.
+func growBackwardWindow(window, n, want uint64) uint64 {
+	if n == 0 {
+		return window * backwardEmptyGrowth
+	}
+	return window * max(backwardGrowthTarget, backwardGrowthTarget*want/n)
+}
+
+// pendingFrom counts the matches of filter from seq on.
+func (c *Client) pendingFrom(ctx context.Context, stream jetstream.Stream, filter string, seq uint64) (uint64, error) {
+	cfg := jetstream.ConsumerConfig{
+		Name:              browseConsumerPrefix + nats.NewInbox()[7:],
+		DeliverPolicy:     jetstream.DeliverByStartSequencePolicy,
+		OptStartSeq:       seq,
+		FilterSubject:     filter,
+		AckPolicy:         jetstream.AckNonePolicy,
+		InactiveThreshold: browseConsumerInactiveThreshold,
+		MemoryStorage:     true,
+	}
+	defer c.trackOwnConsumer(cfg.Name)()
+
+	consumer, err := stream.CreateConsumer(ctx, cfg)
+	if err != nil {
+		return 0, wrapErr(noAnswer(err))
+	}
+	cleanupCtx, cancel := corecontext.ApplyTimeout(context.WithoutCancel(ctx), ephemeralCleanupTimeout)
+	defer cancel()
+	_ = stream.DeleteConsumer(cleanupCtx, cfg.Name) //nolint:errcheck // best-effort cleanup
+	return consumer.CachedInfo().NumPending, nil
 }
 
 // errLostDelivery means a delivery never reached this client, so the window has a hole.
