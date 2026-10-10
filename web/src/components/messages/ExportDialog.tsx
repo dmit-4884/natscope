@@ -1,20 +1,23 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Message } from '@/types/nats'
 import { Modal, DownloadIcon } from '@/components/ui'
-import { decodeBase64ToUtf8 } from '@/utils/base64'
 import { formatCount } from '@/utils/formatters'
 import { getErrorMessage } from '@/api/errors'
 import { getMessages } from '@/api/messages'
 import { useMessagesPolicy } from '@/contexts/settings'
 import { toast } from '@/utils/toast'
-import { collectRange } from './exportRange'
+import { createExportSerializer, type ExportFormat } from './exportFormat'
+import { walkRange } from './exportRange'
 
-type ExportFormat = 'json' | 'ndjson' | 'csv'
 type ExportScope = 'filtered' | 'all' | 'range'
 
 // Range-walk page size; matches backend DefaultMaxMessageLimit (500) — higher
 // is clamped server-side.
 const RANGE_PAGE_SIZE = 500
+
+// The file is assembled in browser memory, so the range is capped well below the
+// 10M the settings allow.
+const MAX_RANGE_LIMIT = 1_000_000
 
 interface ExportOptions {
   format: ExportFormat
@@ -23,6 +26,7 @@ interface ExportOptions {
   includeHeaders: boolean
   includeDecoded: boolean
   limit?: number
+  rangeLimit?: number
 }
 
 interface ExportDialogProps {
@@ -36,6 +40,8 @@ interface ExportDialogProps {
   connectionId?: string | null
   /** Stream's first sequence — where the range walk starts. */
   streamFirstSeq?: number
+  /** Subject filter active in the toolbar; the server-side range walk honours it. */
+  subjectFilter?: string
 }
 
 export default function ExportDialog({
@@ -47,6 +53,7 @@ export default function ExportDialog({
   totalCount,
   connectionId,
   streamFirstSeq,
+  subjectFilter,
 }: ExportDialogProps) {
   const msgPolicy = useMessagesPolicy()
   const [options, setOptions] = useState<ExportOptions>(() => ({
@@ -56,7 +63,9 @@ export default function ExportDialog({
     includeHeaders: false,
     includeDecoded: true,
     limit: 1000,
+    rangeLimit: Math.min(msgPolicy.exportRangeLimit, MAX_RANGE_LIMIT),
   }))
+  const patchOptions = (patch: Partial<ExportOptions>) => setOptions((prev) => ({ ...prev, ...patch }))
   const [isExporting, setIsExporting] = useState(false)
   // Range-export progress: number fetched so far, plus a cancel handle.
   const [rangeProgress, setRangeProgress] = useState<number | null>(null)
@@ -65,7 +74,7 @@ export default function ExportDialog({
   // Abort any in-flight range export on unmount.
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  const rangeLimit = options.scope === 'range' ? (options.limit || msgPolicy.exportRangeLimit) : options.limit
+  const rangeLimit = options.rangeLimit || Math.min(msgPolicy.exportRangeLimit, MAX_RANGE_LIMIT)
 
   const messagesToExport = useMemo(() => {
     switch (options.scope) {
@@ -86,119 +95,19 @@ export default function ExportDialog({
     return count
   }, [messagesToExport, options.limit])
 
-  const formatMessage = (msg: Message, includeMetadata: boolean, includeHeaders: boolean, includeDecoded: boolean) => {
-    if (!includeMetadata) {
-      // Payload only — prefer decoded.
-      if (includeDecoded && msg.decoded) {
-        return msg.decoded
-      }
-      try {
-        return JSON.parse(decodeBase64ToUtf8(msg.data_base64))
-      } catch {
-        return msg.data_base64
-      }
-    }
+  const serializerOptions = () => ({
+    format: options.format,
+    includeMetadata: options.includeMetadata,
+    includeHeaders: options.includeHeaders,
+    includeDecoded: options.includeDecoded,
+  })
 
-    const formatted: Record<string, unknown> = {
-      sequence: msg.sequence,
-      subject: msg.subject,
-      timestamp: msg.timestamp,
-    }
-
-    if (includeHeaders && msg.headers) {
-      formatted.headers = msg.headers
-    }
-
-    if (includeDecoded && msg.decoded) {
-      formatted.data = msg.decoded
-      formatted.decoded_type = msg.decoded_type
-    } else {
-      try {
-        formatted.data = JSON.parse(decodeBase64ToUtf8(msg.data_base64))
-      } catch {
-        formatted.data = msg.data_base64
-      }
-    }
-
-    return formatted
-  }
-
-  const serializeMessages = (msgs: Message[]) => {
-    const formatted = msgs.map((msg) =>
-      formatMessage(msg, options.includeMetadata, options.includeHeaders, options.includeDecoded)
-    )
-
-    switch (options.format) {
-      case 'json':
-        return JSON.stringify(formatted, null, 2)
-
-      case 'ndjson':
-        return formatted.map((msg) => JSON.stringify(msg)).join('\n')
-
-      case 'csv': {
-        if (formatted.length === 0) return ''
-
-        // Build CSV headers
-        const headers: string[] = []
-
-        if (options.includeMetadata) {
-          headers.push('sequence', 'subject', 'timestamp')
-          if (options.includeHeaders) {
-            headers.push('headers')
-          }
-        }
-        headers.push('data')
-
-        // Build rows
-        const rows = formatted.map((msg) => {
-          const row: string[] = []
-
-          if (options.includeMetadata) {
-            const typedMsg = msg as Record<string, unknown>
-            row.push(String(typedMsg.sequence || ''))
-            row.push(escapeCsvValue(String(typedMsg.subject || '')))
-            row.push(String(typedMsg.timestamp || ''))
-            if (options.includeHeaders) {
-              row.push(escapeCsvValue(JSON.stringify(typedMsg.headers || {})))
-            }
-            row.push(escapeCsvValue(JSON.stringify(typedMsg.data)))
-          } else {
-            row.push(escapeCsvValue(JSON.stringify(msg)))
-          }
-
-          return row.join(',')
-        })
-
-        return [headers.join(','), ...rows].join('\n')
-      }
-
-      default:
-        return ''
-    }
-  }
-
-  const escapeCsvValue = (value: string): string => {
-    // Guard against CSV formula injection: a leading =, +, - or @ makes
-    // spreadsheet apps evaluate the cell as a formula. Prefix with a single
-    // quote to force text.
-    const safe = /^[=+\-@]/.test(value) ? `'${value}` : value
-    if (safe.includes(',') || safe.includes('"') || safe.includes('\n')) {
-      return `"${safe.replace(/"/g, '""')}"`
-    }
-    return safe
-  }
-
-  const download = (content: string) => {
-    const mimeTypes: Record<ExportFormat, string> = {
-      json: 'application/json',
-      ndjson: 'application/x-ndjson',
-      csv: 'text/csv',
-    }
-    const blob = new Blob([content], { type: mimeTypes[options.format] })
+  const download = (parts: BlobPart[], mime: string, extension: string) => {
+    const blob = new Blob(parts, { type: mime })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${streamName}-messages-${Date.now()}.${options.format === 'ndjson' ? 'ndjson' : options.format}`
+    a.download = `${streamName}-messages-${Date.now()}.${extension}`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -212,13 +121,15 @@ export default function ExportDialog({
       toast.error('Range export needs an active connection')
       return
     }
-    const limit = options.limit || msgPolicy.exportRangeLimit
+    const limit = rangeLimit
+    const serializer = createExportSerializer(serializerOptions())
+    const parts: BlobPart[] = [serializer.begin()]
     const controller = new AbortController()
     abortRef.current = controller
     setIsExporting(true)
     setRangeProgress(0)
     try {
-      const result = await collectRange(
+      const result = await walkRange(
         (startSeq, signal) =>
           getMessages(
             streamName,
@@ -227,37 +138,41 @@ export default function ExportDialog({
               start_seq: startSeq,
               limit: RANGE_PAGE_SIZE,
               direction: 'forward',
+              subject_filter: subjectFilter || undefined,
               // Full payloads — preview truncation would corrupt the export.
               max_payload_bytes: 0,
             },
             signal,
           ),
-        { startSeq: streamFirstSeq && streamFirstSeq > 0 ? streamFirstSeq : 1, limit, signal: controller.signal, onProgress: setRangeProgress },
+        {
+          startSeq: streamFirstSeq && streamFirstSeq > 0 ? streamFirstSeq : 1,
+          limit,
+          signal: controller.signal,
+          onProgress: setRangeProgress,
+          onPage: (messages) => {
+            parts.push(new Blob([serializer.chunk(messages)]))
+          },
+        },
       )
 
-      if (result.aborted && result.messages.length === 0) {
+      if (result.aborted && result.count === 0) {
         toast.info('Export cancelled')
         return
       }
-      download(serializeMessages(result.messages))
+      parts.push(serializer.end())
+      download(parts, serializer.mime, serializer.extension)
       if (result.aborted) {
         // Cancelled mid-export with partial data — warn so the user knows the
         // file is incomplete.
-        toast.warning(
-          `Export cancelled — ${formatCount(result.messages.length)} of ${formatCount(limit)} messages saved`,
-        )
+        toast.warning(`Export cancelled — ${formatCount(result.count)} of ${formatCount(limit)} messages saved`)
       } else if (result.truncated) {
-        toast.warning(`Exported first ${formatCount(result.messages.length)} messages (limit reached)`) // explicit truncation
+        toast.warning(`Exported first ${formatCount(result.count)} messages (limit reached)`) // explicit truncation
       } else {
-        toast.success(`Exported ${formatCount(result.messages.length)} messages`)
+        toast.success(`Exported ${formatCount(result.count)} messages`)
       }
       onClose()
     } catch (error) {
-      if (controller.signal.aborted) {
-        toast.info('Export cancelled')
-      } else {
-        toast.error(`Export failed: ${getErrorMessage(error)}`)
-      }
+      toast.error(`Export failed: ${getErrorMessage(error)}`)
     } finally {
       setIsExporting(false)
       setRangeProgress(null)
@@ -273,7 +188,12 @@ export default function ExportDialog({
     setIsExporting(true)
     try {
       const limit = options.limit || messagesToExport.length
-      download(serializeMessages(messagesToExport.slice(0, limit)))
+      const serializer = createExportSerializer(serializerOptions())
+      download(
+        [serializer.begin(), serializer.chunk(messagesToExport.slice(0, limit)), serializer.end()],
+        serializer.mime,
+        serializer.extension,
+      )
       onClose()
     } catch (error) {
       toast.error(`Export failed: ${getErrorMessage(error)}`)
@@ -296,7 +216,7 @@ export default function ExportDialog({
               {(['json', 'ndjson', 'csv'] as ExportFormat[]).map((format) => (
                 <button
                   key={format}
-                  onClick={() => setOptions({ ...options, format })}
+                  onClick={() => patchOptions({ format })}
                   className={`px-3 py-2 text-sm font-medium rounded-md border transition-colors ${
                     options.format === format
                       ? 'border-border-focus bg-accent-light text-accent-text'
@@ -324,7 +244,7 @@ export default function ExportDialog({
                   name="scope"
                   value="filtered"
                   checked={options.scope === 'filtered'}
-                  onChange={() => setOptions({ ...options, scope: 'filtered' })}
+                  onChange={() => patchOptions({ scope: 'filtered' })}
                   className="text-accent focus:ring-border-focus"
                 />
                 <span className="text-sm text-gray-700">
@@ -337,7 +257,7 @@ export default function ExportDialog({
                   name="scope"
                   value="all"
                   checked={options.scope === 'all'}
-                  onChange={() => setOptions({ ...options, scope: 'all' })}
+                  onChange={() => patchOptions({ scope: 'all' })}
                   className="text-accent focus:ring-border-focus"
                 />
                 <span className="text-sm text-gray-700">
@@ -356,7 +276,7 @@ export default function ExportDialog({
                   value="range"
                   checked={options.scope === 'range'}
                   disabled={!connectionId}
-                  onChange={() => setOptions({ ...options, scope: 'range', limit: msgPolicy.exportRangeLimit })}
+                  onChange={() => patchOptions({ scope: 'range' })}
                   className="text-accent focus:ring-border-focus"
                   data-testid="export-scope-range"
                 />
@@ -367,10 +287,22 @@ export default function ExportDialog({
               </label>
             </div>
             {options.scope === 'range' && (
-              <p className="mt-1.5 text-xs text-content-tertiary">
-                Walks the stream server-side with full payloads, up to the limit below. Larger
-                exports may take a while.
-              </p>
+              <div className="mt-1.5 space-y-1 text-xs text-content-tertiary">
+                <p>
+                  Walks the stream server-side with full payloads, up to the limit below.{' '}
+                  {subjectFilter ? (
+                    <>
+                      Only subjects matching the toolbar filter <span className="font-mono">{subjectFilter}</span> are exported.
+                    </>
+                  ) : (
+                    'No subject filter is set, so every message in the stream is exported.'
+                  )}
+                </p>
+                <p>
+                  The file is built in the browser, so very large exports need a lot of memory (up to{' '}
+                  {formatCount(MAX_RANGE_LIMIT)} messages at most). Cancel keeps what was fetched so far.
+                </p>
+              </div>
             )}
           </div>
 
@@ -382,7 +314,7 @@ export default function ExportDialog({
                 <input
                   type="checkbox"
                   checked={options.includeMetadata}
-                  onChange={(e) => setOptions({ ...options, includeMetadata: e.target.checked })}
+                  onChange={(e) => patchOptions({ includeMetadata: e.target.checked })}
                   className="text-accent focus:ring-border-focus rounded"
                 />
                 <span className="text-sm text-gray-700">Include metadata (sequence, subject, timestamp)</span>
@@ -391,7 +323,7 @@ export default function ExportDialog({
                 <input
                   type="checkbox"
                   checked={options.includeHeaders}
-                  onChange={(e) => setOptions({ ...options, includeHeaders: e.target.checked })}
+                  onChange={(e) => patchOptions({ includeHeaders: e.target.checked })}
                   className="text-accent focus:ring-border-focus rounded"
                 />
                 <span className="text-sm text-gray-700">Include message headers</span>
@@ -400,7 +332,7 @@ export default function ExportDialog({
                 <input
                   type="checkbox"
                   checked={options.includeDecoded}
-                  onChange={(e) => setOptions({ ...options, includeDecoded: e.target.checked })}
+                  onChange={(e) => patchOptions({ includeDecoded: e.target.checked })}
                   className="text-accent focus:ring-border-focus rounded"
                 />
                 <span className="text-sm text-gray-700">Include decoded protobuf data</span>
@@ -416,19 +348,20 @@ export default function ExportDialog({
             <div className="flex items-center gap-2">
               <input
                 type="number"
-                value={(options.scope === 'range' ? rangeLimit : options.limit) || ''}
+                value={(options.scope === 'range' ? options.rangeLimit : options.limit) || ''}
                 onChange={(e) => {
+                  const key = options.scope === 'range' ? 'rangeLimit' : 'limit'
                   if (!e.target.value) {
-                    setOptions({ ...options, limit: undefined })
+                    patchOptions({ [key]: undefined })
                     return
                   }
-                  // Clamp to [1, 10_000_000] — zero/negative would silently
-                  // drop data in slice/collectRange.
+                  // Clamp to [1, MAX_RANGE_LIMIT] — zero/negative would silently
+                  // drop data, and the file is assembled in browser memory.
                   const parsed = parseInt(e.target.value, 10)
-                  const clamped = Number.isFinite(parsed) ? Math.max(1, Math.min(parsed, 10_000_000)) : undefined
-                  setOptions({ ...options, limit: clamped })
+                  const clamped = Number.isFinite(parsed) ? Math.max(1, Math.min(parsed, MAX_RANGE_LIMIT)) : undefined
+                  patchOptions({ [key]: clamped })
                 }}
-                placeholder={options.scope === 'range' ? String(msgPolicy.exportRangeLimit) : 'No limit'}
+                placeholder={options.scope === 'range' ? String(rangeLimit) : 'No limit'}
                 className="w-32 px-3 py-1.5 text-sm border border-border-strong rounded-md focus:ring-border-focus focus:border-border-focus"
                 min={1}
                 data-testid="export-limit"
@@ -448,7 +381,7 @@ export default function ExportDialog({
                 </span>
               ) : (
                 <span>
-                  Up to <strong>{formatCount(rangeLimit || msgPolicy.exportRangeLimit)}</strong> messages
+                  Up to <strong>{formatCount(rangeLimit)}</strong> messages
                 </span>
               )
             ) : (

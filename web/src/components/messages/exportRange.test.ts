@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { Message } from '@/types/nats'
-import { collectRange, type RangePage } from './exportRange'
+import { walkRange, type RangePage } from './exportRange'
 
 function msg(seq: number): Message {
   return {
@@ -13,8 +13,6 @@ function msg(seq: number): Message {
   }
 }
 
-// Fake stream of `total` messages (seq 1..total) served `pageSize` at a time;
-// records requested pages.
 function fakeStream(total: number, pageSize: number) {
   const calls: number[] = []
   const fetchPage = async (startSeq: number): Promise<RangePage> => {
@@ -28,38 +26,53 @@ function fakeStream(total: number, pageSize: number) {
   return { fetchPage, calls }
 }
 
-describe('collectRange', () => {
-  it('collects the whole stream when under the limit', async () => {
+function collect(fetchPage: (startSeq: number, signal?: AbortSignal) => Promise<RangePage>, opts: { startSeq: number; limit: number; signal?: AbortSignal; onProgress?: (n: number) => void }) {
+  const seqs: number[] = []
+  const pages: number[] = []
+  const result = walkRange(fetchPage, {
+    ...opts,
+    onPage: (messages) => {
+      pages.push(messages.length)
+      for (const m of messages) seqs.push(m.sequence)
+    },
+  })
+  return result.then((r) => ({ ...r, seqs, pages }))
+}
+
+describe('walkRange', () => {
+  it('hands over every page of the stream when under the limit', async () => {
     const { fetchPage } = fakeStream(12, 5)
-    const r = await collectRange(fetchPage, { startSeq: 1, limit: 1000 })
-    expect(r.messages.map((m) => m.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    const r = await collect(fetchPage, { startSeq: 1, limit: 1000 })
+    expect(r.seqs).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    expect(r.pages).toEqual([5, 5, 2])
+    expect(r.count).toBe(12)
     expect(r.reachedEnd).toBe(true)
     expect(r.truncated).toBe(false)
     expect(r.aborted).toBe(false)
   })
 
-  it('stops at the limit and marks truncated when more remain', async () => {
+  it('stops at the limit, clips the last page and marks truncated when more remain', async () => {
     const { fetchPage } = fakeStream(100, 10)
-    const r = await collectRange(fetchPage, { startSeq: 1, limit: 25 })
-    expect(r.messages).toHaveLength(25)
-    expect(r.messages[0].sequence).toBe(1)
-    expect(r.messages[24].sequence).toBe(25)
+    const r = await collect(fetchPage, { startSeq: 1, limit: 25 })
+    expect(r.count).toBe(25)
+    expect(r.seqs[24]).toBe(25)
+    expect(r.pages).toEqual([10, 10, 5])
     expect(r.reachedEnd).toBe(false)
     expect(r.truncated).toBe(true)
   })
 
   it('is not truncated when the end coincides with the limit', async () => {
     const { fetchPage } = fakeStream(20, 5)
-    const r = await collectRange(fetchPage, { startSeq: 1, limit: 20 })
-    expect(r.messages).toHaveLength(20)
+    const r = await collect(fetchPage, { startSeq: 1, limit: 20 })
+    expect(r.count).toBe(20)
     expect(r.reachedEnd).toBe(true)
     expect(r.truncated).toBe(false)
   })
 
-  it('reports progress after each page', async () => {
+  it('reports progress after each page, never beyond the limit', async () => {
     const { fetchPage } = fakeStream(12, 5)
     const onProgress = vi.fn()
-    await collectRange(fetchPage, { startSeq: 1, limit: 1000, onProgress })
+    await collect(fetchPage, { startSeq: 1, limit: 1000, onProgress })
     expect(onProgress.mock.calls.map((c) => c[0])).toEqual([5, 10, 12])
   })
 
@@ -67,61 +80,77 @@ describe('collectRange', () => {
     const { fetchPage } = fakeStream(50, 10)
     const ctrl = new AbortController()
     ctrl.abort()
-    const r = await collectRange(fetchPage, { startSeq: 1, limit: 1000, signal: ctrl.signal })
-    expect(r.messages).toHaveLength(0)
+    const r = await collect(fetchPage, { startSeq: 1, limit: 1000, signal: ctrl.signal })
+    expect(r.count).toBe(0)
     expect(r.aborted).toBe(true)
     expect(r.truncated).toBe(false)
   })
 
   it('starts paging from the given startSeq', async () => {
     const { fetchPage, calls } = fakeStream(30, 10)
-    const r = await collectRange(fetchPage, { startSeq: 11, limit: 1000 })
+    const r = await collect(fetchPage, { startSeq: 11, limit: 1000 })
     expect(calls[0]).toBe(11)
-    expect(r.messages[0].sequence).toBe(11)
+    expect(r.seqs[0]).toBe(11)
     expect(r.reachedEnd).toBe(true)
   })
 
-  // m19: no-progress guard — has_more stays true but next_seq never advances.
   it('breaks out when has_more=true but next_seq makes no forward progress', async () => {
     let calls = 0
-    const fetchPage = async (_startSeq: number): Promise<RangePage> => {
+    const fetchPage = async (): Promise<RangePage> => {
       calls++
-      // Buggy server that loops in place: has_more=true, next_seq stuck at
-      // start.
       return { messages: [msg(1)], has_more: true, next_seq: 1 }
     }
-    const r = await collectRange(fetchPage, { startSeq: 1, limit: 1000 })
-    // Breaks after first page (no forward progress).
+    const r = await collect(fetchPage, { startSeq: 1, limit: 1000 })
     expect(calls).toBe(1)
     expect(r.reachedEnd).toBe(true)
   })
 
-  it('breaks out when has_more=true but the page is empty (no progress)', async () => {
+  it('breaks out when has_more=true but the page is empty', async () => {
     let calls = 0
     const fetchPage = async (startSeq: number): Promise<RangePage> => {
       calls++
       return { messages: [], has_more: true, next_seq: startSeq + 1 }
     }
-    const r = await collectRange(fetchPage, { startSeq: 1, limit: 1000 })
+    const r = await collect(fetchPage, { startSeq: 1, limit: 1000 })
     expect(calls).toBe(1)
-    expect(r.messages).toHaveLength(0)
+    expect(r.count).toBe(0)
     expect(r.reachedEnd).toBe(true)
   })
 
-  // Abort mid-export: aborted=true and messages collected before the abort are
-  // returned, not discarded.
-  it('aborts mid-export and returns partial results with aborted=true', async () => {
+  it('keeps what was handed over when the abort lands between pages', async () => {
     const ctrl = new AbortController()
     let calls = 0
-    const fetchPage = async (startSeq: number, _signal?: AbortSignal): Promise<RangePage> => {
+    const fetchPage = async (startSeq: number): Promise<RangePage> => {
       calls++
       if (calls === 2) ctrl.abort()
-      const page: Message[] = [msg(startSeq)]
-      return { messages: page, has_more: true, next_seq: startSeq + 1 }
+      return { messages: [msg(startSeq)], has_more: true, next_seq: startSeq + 1 }
     }
-    const r = await collectRange(fetchPage, { startSeq: 1, limit: 1000, signal: ctrl.signal })
+    const r = await collect(fetchPage, { startSeq: 1, limit: 1000, signal: ctrl.signal })
     expect(r.aborted).toBe(true)
-    // First page collected before the abort check.
-    expect(r.messages.length).toBeGreaterThan(0)
+    expect(r.count).toBeGreaterThan(0)
+  })
+
+  it('treats an abort that rejects an in-flight page fetch as a clean abort with the earlier pages kept', async () => {
+    const ctrl = new AbortController()
+    let calls = 0
+    const fetchPage = async (startSeq: number): Promise<RangePage> => {
+      calls++
+      if (calls === 3) {
+        ctrl.abort()
+        throw new DOMException('The operation was aborted', 'AbortError')
+      }
+      return { messages: [msg(startSeq), msg(startSeq + 1)], has_more: true, next_seq: startSeq + 2 }
+    }
+    const r = await collect(fetchPage, { startSeq: 1, limit: 1000, signal: ctrl.signal })
+    expect(r.aborted).toBe(true)
+    expect(r.seqs).toEqual([1, 2, 3, 4])
+    expect(r.count).toBe(4)
+  })
+
+  it('still throws a fetch failure that is not an abort', async () => {
+    const fetchPage = async (): Promise<RangePage> => {
+      throw new Error('boom')
+    }
+    await expect(collect(fetchPage, { startSeq: 1, limit: 10, signal: new AbortController().signal })).rejects.toThrow('boom')
   })
 })

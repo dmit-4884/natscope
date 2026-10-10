@@ -479,6 +479,7 @@ export default function UnifiedMessageList({
           streamName={streamName || ''}
           connectionId={connectionId}
           streamFirstSeq={streamDetail?.state?.first_seq}
+          subjectFilter={filters.subject || undefined}
           totalCount={streamDetail?.state?.messages}
         />
       )}
