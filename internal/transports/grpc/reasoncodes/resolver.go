@@ -120,8 +120,8 @@ func (r *Resolver) Resolve(ruleID, fieldName string) string {
 
 // ruleSuffix returns the segment of ruleID after the last ".".
 func ruleSuffix(ruleID string) string {
-	if i := strings.LastIndexByte(ruleID, '.'); i >= 0 {
-		return ruleID[i+1:]
+	if _, suffix, ok := strings.CutLast(ruleID, "."); ok {
+		return suffix
 	}
 	return ruleID
 }

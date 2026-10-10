@@ -135,8 +135,8 @@ func maskAuthority(raw string) string {
 
 	scheme := strings.Index(raw, sep)
 	if scheme == -1 {
-		if at := strings.LastIndexByte(raw, '@'); at >= 0 {
-			return maskedUserinfo + "@" + raw[at+1:]
+		if _, host, ok := strings.CutLast(raw, "@"); ok {
+			return maskedUserinfo + "@" + host
 		}
 		return raw
 	}
