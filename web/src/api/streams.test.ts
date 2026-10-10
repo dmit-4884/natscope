@@ -107,3 +107,17 @@ describe('toConsumerInfo activity and delivery target', () => {
     expect(info.config?.deliver_subject).toBeUndefined()
   })
 })
+
+describe('toConsumerInfo push settings', () => {
+  it('keeps the deliver group and the pull byte limit', () => {
+    const info = toConsumerInfo(
+      create(ConsumerInfoSchema, {
+        name: 'push',
+        config: { deliverSubject: 'push.x', deliverGroup: 'workers', maxRequestMaxBytes: 4096n },
+      }),
+    )
+
+    expect(info.config?.deliver_group).toBe('workers')
+    expect(info.config?.max_bytes).toBe(4096)
+  })
+})

@@ -138,6 +138,7 @@ export interface ConsumerConfig {
   durable_name?: string
   description?: string
   deliver_subject?: string
+  deliver_group?: string
   deliver_policy?: string
   opt_start_seq?: number
   opt_start_time?: string
@@ -157,6 +158,7 @@ export interface ConsumerConfig {
   headers_only?: boolean
   max_batch?: number
   max_expires?: number
+  max_bytes?: number
   inactive_threshold?: number
   num_replicas?: number
   mem_storage?: boolean

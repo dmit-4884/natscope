@@ -307,7 +307,7 @@ export function ConsumerView({
               <h3 className="font-medium text-content-primary">Raw Configuration</h3>
               <div className="flex items-center gap-2">
                 <CopyButton
-                  value={() => consumerConfigToNatsCli(consumer.name, streamName, consumer.config ?? {})}
+                  value={() => consumerConfigToNatsCli(consumer.name, streamName, consumer.config ?? {}, consumer.paused ? consumer.pause_until : undefined)}
                   variant="button"
                   size="sm"
                   label="Copy as nats CLI"

@@ -132,24 +132,80 @@ describe('streamConfigToNatsCli', () => {
     expect(cmd).not.toContain('--max-msgs-per-subject')
   })
 
-  it('appends a NOTE for exotic features it cannot reproduce', () => {
+  it('emits the real flags for newer stream features', () => {
     const cmd = streamConfigToNatsCli({
-      name: 'MIRROR_S',
+      name: 'S',
+      subjects: ['s.>'],
+      config: streamCfg({
+        allow_msg_ttl: true,
+        allow_msg_counter: true,
+        allow_msg_schedules: true,
+        subject_delete_marker_ttl: 90 * S,
+        allow_atomic: true,
+        allow_batched: true,
+        mirror_direct: true,
+        discard_new_per_subject: true,
+        persist_mode: 'async',
+      }),
+    })
+    expect(cmd).toContain(' --allow-msg-ttl')
+    expect(cmd).toContain(' --allow-counter')
+    expect(cmd).toContain(' --allow-schedules')
+    expect(cmd).toContain('--subject-del-markers-ttl=1m30s')
+    expect(cmd).toContain(' --allow-batch')
+    expect(cmd).toContain(' --allow-fast')
+    expect(cmd).toContain(' --allow-mirror-direct')
+    expect(cmd).toContain(' --discard-per-subject')
+    expect(cmd).toContain('--persist-mode=async')
+    expect(cmd).not.toContain('# NOTE')
+  })
+
+  it('emits flags for mirror, sources, republish, transform, consumer limits and metadata', () => {
+    const cmd = streamConfigToNatsCli({
+      name: 'S',
       subjects: [],
       config: streamCfg({
         mirror: { name: 'SOURCE' },
-        republish: { src: 'a.>', dest: 'b.>' },
+        sources: [{ name: 'A' }, { name: 'B' }],
+        republish: { src: 'a.>', dest: 'b.>', headers_only: true },
         subject_transform: { src: 'a.>', dest: 'c.>' },
-        consumer_limits: { max_ack_pending: 100 },
+        consumer_limits: { max_ack_pending: 100, inactive_threshold: 30 * S },
         metadata: { team: 'platform' },
       }),
     })
+    expect(cmd).toContain("--mirror='SOURCE'")
+    expect(cmd).toContain("--source='A' --source='B'")
+    expect(cmd).toContain('--republish-source=')
+    expect(cmd).toContain('--republish-destination=')
+    expect(cmd).toContain('--republish-headers')
+    expect(cmd).toContain('--transform-source=')
+    expect(cmd).toContain('--transform-destination=')
+    expect(cmd).toContain('--limit-consumer-max-pending=100')
+    expect(cmd).toContain('--limit-consumer-inactive=30s')
+    expect(cmd).toContain("--metadata='team=platform'")
+    expect(cmd).not.toContain('# NOTE')
+  })
+
+  it('notes a mirror or source that carries more than a name', () => {
+    const cmd = streamConfigToNatsCli({
+      name: 'S',
+      subjects: [],
+      config: streamCfg({ mirror: { name: 'SOURCE', opt_start_seq: 5 }, sources: [{ name: 'A', filter_subject: 'a.>' }] }),
+    })
     expect(cmd).toContain('# NOTE: omitted')
     expect(cmd).toContain('mirror')
-    expect(cmd).toContain('republish')
-    expect(cmd).toContain('subject_transform')
-    expect(cmd).toContain('consumer_limits')
-    expect(cmd).toContain('metadata')
+    expect(cmd).toContain('sources')
+  })
+
+  it('notes every non-default field that has no flag, including ones it has never heard of', () => {
+    const config = { ...streamCfg({ sealed: true }), brand_new_option: 'x', empty_list: [], off: false, zero: 0 } as StreamConfig
+    const cmd = streamConfigToNatsCli({ name: 'S', subjects: ['s'], config })
+    expect(cmd).toContain('# NOTE: omitted')
+    expect(cmd).toContain('sealed')
+    expect(cmd).toContain('brand_new_option')
+    expect(cmd).not.toContain('empty_list')
+    expect(cmd).not.toContain('off,')
+    expect(cmd).not.toMatch(/zero/)
   })
 
   it('does not append a NOTE when nothing is dropped', () => {
@@ -189,9 +245,54 @@ describe('consumerConfigToNatsCli', () => {
     expect(cmd).toContain('--ack=none')
   })
 
-  it('always adds --pull so the command is non-interactive', () => {
+  it('adds --pull to a pull consumer so the command is non-interactive', () => {
     const cmd = consumerConfigToNatsCli('c', 'S', { deliver_policy: 'all', ack_policy: 'explicit' })
     expect(cmd).toContain('--pull')
+    expect(cmd).not.toContain('--target')
+  })
+
+  it('keeps a push consumer push: --target, group, flow control, heartbeat, and no --pull', () => {
+    const cmd = consumerConfigToNatsCli('c', 'S', {
+      deliver_policy: 'all',
+      ack_policy: 'explicit',
+      deliver_subject: 'push.orders.0',
+      deliver_group: 'workers',
+      flow_control: true,
+      idle_heartbeat: 5 * S,
+    })
+    expect(cmd).toContain("--target='push.orders.0'")
+    expect(cmd).toContain("--deliver-group='workers'")
+    expect(cmd).toContain('--flow-control')
+    expect(cmd).toContain('--heartbeat=5s')
+    expect(cmd).not.toContain('--pull')
+    expect(cmd).not.toContain('# NOTE')
+  })
+
+  it('emits flags for pull limits, headers only, memory, inactive threshold, metadata and priority groups', () => {
+    const cmd = consumerConfigToNatsCli('c', 'S', {
+      deliver_policy: 'all',
+      ack_policy: 'explicit',
+      rate_limit_bps: 1000,
+      max_batch: 100,
+      max_expires: 30 * S,
+      headers_only: true,
+      mem_storage: true,
+      inactive_threshold: 60 * S,
+      metadata: { owner: 'billing' },
+      priority_policy: 'pinned_client',
+      priority_groups: ['g1', 'g2'],
+      priority_timeout: 2 * S,
+    })
+    expect(cmd).toContain('--bps=1000')
+    expect(cmd).toContain('--max-pull-batch=100')
+    expect(cmd).toContain('--max-pull-expire=30s')
+    expect(cmd).toContain('--headers-only')
+    expect(cmd).toContain('--memory')
+    expect(cmd).toContain('--inactive-threshold=1m')
+    expect(cmd).toContain("--metadata='owner=billing'")
+    expect(cmd).toContain("--pinned-groups='g1' --pinned-groups='g2'")
+    expect(cmd).toContain('--pinned-ttl=2s')
+    expect(cmd).not.toContain('# NOTE')
   })
 
   it('single-quotes a $KV.-prefixed filter subject', () => {
@@ -226,21 +327,23 @@ describe('consumerConfigToNatsCli', () => {
     expect(cmd).toContain('--deliver=42')
   })
 
-  it('appends a NOTE for consumer settings it cannot express as flags', () => {
-    const cmd = consumerConfigToNatsCli('c', 'S', {
+  it('notes backoff, a pause deadline and any unknown field that has no flag', () => {
+    const config = {
       deliver_policy: 'all',
       ack_policy: 'explicit',
-      headers_only: true,
-      inactive_threshold: 30 * S,
-      mem_storage: true,
-    })
+      backoff: [1 * S, 5 * S],
+      brand_new_option: 7,
+      max_ack_pending: 0,
+    } as ConsumerConfig
+    const cmd = consumerConfigToNatsCli('c', 'S', config, '2026-10-10T19:35:07Z')
     expect(cmd).toContain('# NOTE: omitted')
-    expect(cmd).toContain('headers_only')
-    expect(cmd).toContain('inactive_threshold')
-    expect(cmd).toContain('mem_storage')
+    expect(cmd).toContain('backoff')
+    expect(cmd).toContain('brand_new_option')
+    expect(cmd).toContain('pause_until')
+    expect(cmd).toContain('2026-10-10T19:35:07Z')
   })
 
-  it('does not append an omission NOTE when those settings are unset', () => {
+  it('does not append an omission NOTE when nothing is dropped', () => {
     const cmd = consumerConfigToNatsCli('c', 'S', { deliver_policy: 'all', ack_policy: 'explicit', inactive_threshold: 0 })
     expect(cmd).not.toContain('# NOTE: omitted')
   })
