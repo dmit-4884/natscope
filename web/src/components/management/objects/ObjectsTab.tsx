@@ -9,23 +9,20 @@ import {
   useSealObjectBucket,
   useObjects,
   useObject,
-  usePutObject,
+  useUploadObject,
   useDeleteObject,
 } from '@/contexts/objects'
+import { objectDownloadUrl } from '@/api/objectTransfer'
 import { decodeBase64ToBytes } from '@/utils/base64'
-import { shellQuote } from '@/utils/shell'
-import { toast } from '@/utils/toast'
 import { plural } from '@/utils/plural'
 import { formatBytes, formatDateTime } from '@/utils/formatters'
 import { useConfirmation } from '@/contexts/settings'
-import { Button, Modal, Input, Badge, Alert, QueryErrorState, Spinner, JsonEditor, CloseIcon, CopyButton, Tabs, tabPanelProps, OverflowMenu } from '@/components/ui'
+import { Button, Modal, Input, Badge, Alert, QueryErrorState, Spinner, JsonEditor, CloseIcon, Tabs, tabPanelProps, OverflowMenu, buttonClassName } from '@/components/ui'
 import type { ConnectionOutletContext } from '@/components/common/ConnectedLayout'
 import Tooltip from '@/components/common/Tooltip'
 import { ObjectBucketFormFields } from './ObjectBucketFormFields'
 
-const TRANSFER_LIMIT_BYTES = 32 * 1024 * 1024
-const TRANSFER_LIMIT_LABEL = '32 MiB'
-const UPLOAD_OVERHEAD_BYTES = 64 * 1024
+const PREVIEW_LIMIT_BYTES = 100_000
 
 const defaultBucketConfig: ObjectBucketConfig = {
   bucket: '',
@@ -72,8 +69,7 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
     refetch: refetchObjects,
   } = useObjects(connectionId, bucketName)
 
-  const tooLarge = !!selectedObject && selectedObject.size > TRANSFER_LIMIT_BYTES
-  const getCommand = selectedObject ? `nats object get ${shellQuote(bucketName ?? '')} ${shellQuote(selectedObject.name)}` : ''
+  const tooLarge = !!selectedObject && selectedObject.size > PREVIEW_LIMIT_BYTES
 
   // Fetch selected object data
   const { data: objectData, isLoading: objectLoading } = useObject(
@@ -87,7 +83,7 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
   const createBucket = useCreateObjectBucket(connectionId)
   const deleteBucket = useDeleteObjectBucket(connectionId)
   const sealBucket = useSealObjectBucket(connectionId)
-  const putObject = usePutObject(connectionId, bucketName)
+  const uploadObject = useUploadObject(connectionId, bucketName)
   const deleteObject = useDeleteObject(connectionId, bucketName)
 
   // Filter objects
@@ -128,53 +124,15 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
+    if (fileInputRef.current) fileInputRef.current.value = ''
     if (!file || !bucketName) return
-    if (file.size + UPLOAD_OVERHEAD_BYTES > TRANSFER_LIMIT_BYTES) {
-      toast.error(
-        `${file.name} is ${formatBytes(file.size)}; uploads here stop at ${TRANSFER_LIMIT_LABEL}. Use nats object put ${shellQuote(bucketName)} ${shellQuote(file.name)}`,
-      )
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      return
+    try {
+      await uploadObject.mutateAsync({ file, description: uploadDescription || undefined })
+      setUploadDescription('')
+      refetchObjects()
+    } catch {
+      /* toasted by useUploadObject */
     }
-
-    const reader = new FileReader()
-    reader.onload = async () => {
-      const arrayBuffer = reader.result as ArrayBuffer
-      const uint8Array = new Uint8Array(arrayBuffer)
-      try {
-        await putObject.mutateAsync({
-          name: file.name,
-          data: uint8Array,
-          options: uploadDescription ? { description: uploadDescription } : undefined,
-        })
-        setUploadDescription('')
-        refetchObjects()
-      } catch {
-        /* toasted by usePutObject */
-      }
-    }
-    reader.onerror = () => {
-      toast.error(`Failed to read ${file.name}`)
-    }
-    reader.readAsArrayBuffer(file)
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  // Handle download
-  const handleDownload = () => {
-    if (!objectData || !selectedObject) return
-    const blob = new Blob([decodeBase64ToBytes(objectData.data)], { type: 'application/octet-stream' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = selectedObject.name
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
   }
 
   const performAction = async (action: ObjectConfirmAction) => {
@@ -438,14 +396,16 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    {!tooLarge && (
-                      <Button variant="secondary" size="sm" onClick={handleDownload}>
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Download
-                      </Button>
-                    )}
+                    <a
+                      href={objectDownloadUrl(connectionId, bucketName ?? '', selectedObject.name)}
+                      download={selectedObject.name}
+                      className={buttonClassName('secondary', 'sm')}
+                    >
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download
+                    </a>
                     {!readOnly && (
                       <Button
                         variant="danger"
@@ -465,16 +425,8 @@ function ObjectsTab({ createMode = false }: ObjectsTabProps) {
 
               <div className="flex-1 overflow-auto p-4">
                 {tooLarge ? (
-                  <div className="flex items-center justify-center h-full text-content-tertiary">
-                    <div className="text-center space-y-2">
-                      <p className="text-sm">
-                        Over {TRANSFER_LIMIT_LABEL}, too large to open or download here. Get it with the nats CLI:
-                      </p>
-                      <div className="inline-flex items-center gap-2">
-                        <code className="text-xs text-content-primary">{getCommand}</code>
-                        <CopyButton value={getCommand} size="sm" />
-                      </div>
-                    </div>
+                  <div className="flex items-center justify-center h-full text-sm text-content-tertiary">
+                    Too large to preview; download it to view.
                   </div>
                 ) : objectLoading ? (
                   <div className="flex items-center justify-center h-full">

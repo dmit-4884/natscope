@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/utils/toast'
 import * as api from '@/api/management'
 import { getErrorMessage } from '@/api/errors'
+import { uploadObject } from '@/api/objectTransfer'
 import type { ObjectBucketConfig } from '@/types/management'
 import { objectKeys } from '../queries/objectKeys'
 
@@ -59,26 +60,18 @@ export function useSealObjectBucket(connectionId: string | undefined) {
   })
 }
 
-export function usePutObject(connectionId: string | undefined, bucket: string | undefined) {
+export function useUploadObject(connectionId: string | undefined, bucket: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      name,
-      data,
-      options,
-    }: {
-      name: string
-      data: string | Uint8Array
-      options?: { description?: string; metadata?: Record<string, string> }
-    }) => {
+    mutationFn: ({ file, description }: { file: File; description?: string }) => {
       if (!connectionId || !bucket) throw new Error('No connection or bucket')
-      return api.putObject(connectionId, bucket, name, data, options)
+      return uploadObject(connectionId, bucket, file, description)
     },
-    onSuccess: (info) => {
-      toast.success(`Object "${info.name}" uploaded`)
+    onSuccess: (_, { file }) => {
+      toast.success(`Object "${file.name}" uploaded`)
       queryClient.invalidateQueries({ queryKey: objectKeys.list(connectionId, bucket) })
       queryClient.invalidateQueries({ queryKey: objectKeys.bucket(connectionId, bucket) })
-      queryClient.invalidateQueries({ queryKey: objectKeys.object(connectionId, bucket, info.name) })
+      queryClient.invalidateQueries({ queryKey: objectKeys.object(connectionId, bucket, file.name) })
       queryClient.invalidateQueries({ queryKey: objectKeys.buckets(connectionId) })
     },
     onError: (error: Error) => {

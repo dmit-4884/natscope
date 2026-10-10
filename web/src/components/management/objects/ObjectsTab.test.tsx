@@ -34,7 +34,7 @@ vi.mock('@/contexts/objects', async (importOriginal) => ({
   useCreateObjectBucket: () => mutation,
   useDeleteObjectBucket: () => mutation,
   useSealObjectBucket: () => mutation,
-  usePutObject: () => mutation,
+  useUploadObject: () => mutation,
   useDeleteObject: () => mutation,
 }))
 
@@ -49,42 +49,39 @@ function renderTab(readOnly: boolean) {
   )
 }
 
-describe('ObjectsTab transfer limit', () => {
+
+describe('ObjectsTab transfers', () => {
   beforeEach(() => {
     fetched.names = []
     fetched.objects = [{ ...object, name: 'dump.bin', size: 200 * 1024 * 1024, mod_time: 0 }]
     mutation.mutateAsync.mockReset()
   })
 
-  it('says an object over the limit is too big to open here and how to get it', () => {
+  it('downloads an object of any size and only skips the preview of a large one', () => {
     renderTab(false)
 
     fireEvent.click(screen.getByText('dump.bin'))
 
-    expect(screen.getByText(/over 32 MiB/i)).toBeInTheDocument()
-    expect(screen.getByText("nats object get 'files' 'dump.bin'")).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /download/i })).not.toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /download/i })
+    expect(Object.fromEntries(new URL(link.getAttribute('href')!).searchParams)).toEqual({
+      connection: 'conn-1',
+      bucket: 'files',
+      name: 'dump.bin',
+    })
+    expect(link).toHaveAttribute('download', 'dump.bin')
+    expect(screen.getByText(/too large to preview/i)).toBeInTheDocument()
     expect(fetched.names.filter(Boolean)).toEqual([])
   })
 
-  it('quotes the object name in the command it offers, so a name cannot run anything', () => {
-    fetched.objects = [{ ...object, name: "it's; rm -rf ~", size: 200 * 1024 * 1024, mod_time: 0 }]
-    renderTab(false)
-
-    fireEvent.click(screen.getByText("it's; rm -rf ~"))
-
-    expect(screen.getByText(`nats object get 'files' 'it'\\''s; rm -rf ~'`)).toBeInTheDocument()
-  })
-
-  it('refuses a file over the limit before reading it', () => {
+  it('uploads a file of any size as it is', () => {
     renderTab(false)
     const file = new File(['x'], 'huge.bin')
     Object.defineProperty(file, 'size', { value: 300 * 1024 * 1024 })
 
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } })
 
-    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(expect.stringMatching(/huge\.bin.*32 MiB/))
-    expect(mutation.mutateAsync).not.toHaveBeenCalled()
+    expect(mutation.mutateAsync).toHaveBeenCalledWith({ file, description: undefined })
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
   })
 })
 

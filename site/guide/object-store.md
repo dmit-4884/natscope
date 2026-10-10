@@ -20,6 +20,9 @@ Options** (storage type, replicas, compression). Click **Create Object Store**.
 - **Download** on any object writes it back to disk.
 - **Delete** removes an object.
 
+Both directions stream, so an object of any size moves through natscope without being held in memory. A
+text object under 100 KB also shows a preview; a larger one shows only its details.
+
 ## Seal a bucket
 
 The bucket's overflow menu holds **Seal bucket…** and **Delete bucket…**. Sealing makes the bucket

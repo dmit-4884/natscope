@@ -2,6 +2,6 @@ export {
   useCreateObjectBucket,
   useDeleteObjectBucket,
   useSealObjectBucket,
-  usePutObject,
+  useUploadObject,
   useDeleteObject,
 } from './useObjectMutations'

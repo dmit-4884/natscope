@@ -715,31 +715,6 @@ export async function getObject(
   }
 }
 
-export async function putObject(
-  connectionId: string,
-  bucket: string,
-  name: string,
-  data: string | Uint8Array,
-  options?: { description?: string; metadata?: Record<string, string> }
-): Promise<ObjectInfo> {
-  let bytes: Uint8Array
-  if (typeof data === 'string') {
-    bytes = new TextEncoder().encode(data)
-  } else {
-    bytes = data
-  }
-
-  const response = await managementClient.putObject({
-    connectionId,
-    bucket,
-    name,
-    data: new Uint8Array(bytes) as Uint8Array<ArrayBuffer>,
-    description: options?.description ?? '',
-    metadata: options?.metadata ?? {},
-  })
-  return toObjectInfo(response.info!)
-}
-
 export async function deleteObject(
   connectionId: string,
   bucket: string,

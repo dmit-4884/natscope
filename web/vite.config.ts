@@ -55,6 +55,10 @@ export default defineConfig({
         target: process.env.NATSCOPE_BACKEND_URL ?? 'http://localhost:4280',
         changeOrigin: true,
       },
+      '/api/objects': {
+        target: process.env.NATSCOPE_BACKEND_URL ?? 'http://localhost:4280',
+        changeOrigin: true,
+      },
     },
   },
 })
