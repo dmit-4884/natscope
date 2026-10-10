@@ -1,8 +1,8 @@
 module github.com/dmit-4884/natscope
 
-go 1.26.0
+go 1.27.0
 
-toolchain go1.26.2
+toolchain go1.27.2
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260709200747-435963d16310.1
