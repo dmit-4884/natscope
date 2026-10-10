@@ -61,9 +61,9 @@ function change(key: string, operation: KVChange['operation'], revision: number)
   return { key, operation, revision, created: 0, value: btoa('v'), size: 1 }
 }
 
-function setup(enabled = true, filter = '') {
+function setup(enabled = true, filter = '', list: KVKeyList = { keys: ['a', 'b'], truncated: false }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  client.setQueryData<KVKeyList>(kvKeys.keyList('conn-1', 'CONFIG', filter), { keys: ['a', 'b'], truncated: false })
+  client.setQueryData<KVKeyList>(kvKeys.keyList('conn-1', 'CONFIG', filter), list)
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
   const hook = renderHook(({ on }) => useKVWatch('conn-1', 'CONFIG', filter, on), { wrapper, initialProps: { on: enabled } })
   return { client, hook }
@@ -115,6 +115,24 @@ describe('useKVWatch', () => {
 
     await waitFor(() => expect(hook.result.current.changes.map((c) => c.key)).toEqual(['a', 'c']))
     expect(client.getQueryData<KVKeyList>(kvKeys.keyList('conn-1', 'CONFIG', ''))?.keys).toEqual(['b', 'c'])
+  })
+
+  it('adds no key to a list the server cut, only drops deleted ones', async () => {
+    const { client } = setup(true, '', { keys: ['a', 'b'], truncated: true })
+    act(() => watch.push!([]))
+    act(() => watch.push!([change('c', 'put', 3), change('a', 'delete', 4)]))
+
+    await waitFor(() => expect(client.getQueryData<KVKeyList>(kvKeys.keyList('conn-1', 'CONFIG', ''))?.keys).toEqual(['b']))
+  })
+
+  it('stops a growing list at the key limit and marks it cut', async () => {
+    const full = Array.from({ length: 1000 }, (_, i) => `k${i}`)
+    const { client } = setup(true, '', { keys: full, truncated: false })
+    act(() => watch.push!([]))
+    act(() => watch.push!([change('new', 'put', 1001)]))
+
+    await waitFor(() => expect(client.getQueryData<KVKeyList>(kvKeys.keyList('conn-1', 'CONFIG', ''))?.truncated).toBe(true))
+    expect(client.getQueryData<KVKeyList>(kvKeys.keyList('conn-1', 'CONFIG', ''))?.keys).toHaveLength(1000)
   })
 
   it('reports a watch that stops and starts again on restart', async () => {

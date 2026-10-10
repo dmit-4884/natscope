@@ -8,6 +8,7 @@ import { kvKeys } from './kvKeys'
 export type KVWatchStatus = 'off' | 'starting' | 'live' | 'stopped'
 
 const MAX_CHANGES = 200
+const KEY_LIST_LIMIT = 1000
 const BUCKETS_REFRESH_MS = 5_000
 const NO_CHANGES: KVChange[] = []
 
@@ -22,11 +23,22 @@ function applyChanges(queryClient: QueryClient, connectionId: string, bucket: st
   queryClient.setQueryData<KVKeyList>(kvKeys.keyList(connectionId, bucket, filter), (list) => {
     if (!list) return list
     const keys = new Set(list.keys)
+    let truncated = list.truncated
+    let changed = false
     for (const c of changes) {
-      if (c.operation === 'put') keys.add(c.key)
-      else keys.delete(c.key)
+      if (c.operation !== 'put') {
+        changed = keys.delete(c.key) || changed
+      } else if (keys.has(c.key)) {
+        continue
+      } else if (truncated || keys.size >= KEY_LIST_LIMIT) {
+        changed = changed || !truncated
+        truncated = true
+      } else {
+        keys.add(c.key)
+        changed = true
+      }
     }
-    return { ...list, keys: [...keys] }
+    return changed ? { keys: [...keys], truncated } : list
   })
   for (const key of new Set(changes.map((c) => c.key))) {
     queryClient.invalidateQueries({ queryKey: kvKeys.key(connectionId, bucket, key) })
