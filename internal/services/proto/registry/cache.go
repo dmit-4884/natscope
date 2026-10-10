@@ -6,15 +6,15 @@ package registry
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sync"
+	"strings"
 	"time"
+
+	"github.com/altessa-s/go-atlas/core/runtime/panics"
+	"github.com/altessa-s/go-atlas/data/cache/lru"
 
 	"github.com/dmit-4884/natscope/internal/entities"
 	"github.com/dmit-4884/natscope/internal/errs"
 	"github.com/dmit-4884/natscope/internal/pkg/protoutils"
-
-	"golang.org/x/sync/singleflight"
 
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
 )
@@ -31,27 +31,23 @@ type DescriptorsLookup interface {
 // source/tag pairs would otherwise grow without limit.
 const maxCachedSnapshots = 32
 
-// Cache is a thread-safe per-snapshot registry cache; singleflight guards
-// lookups against thundering-herd parse on a cold key.
+// Cache is a thread-safe per-snapshot registry cache that keeps the most
+// recently used snapshots; concurrent lookups of a cold key share one parse.
 type Cache struct {
 	descriptors DescriptorsLookup
-
-	mu      sync.RWMutex
-	entries map[string]*Snapshot
-
-	sf singleflight.Group
+	entries     *lru.Cache[string, *Snapshot]
 }
 
 // NewCache constructs a new Cache wrapping the given descriptor storage.
 func NewCache(descriptors DescriptorsLookup) *Cache {
 	return &Cache{
 		descriptors: descriptors,
-		entries:     make(map[string]*Snapshot),
+		entries:     panics.MustResult(lru.NewCache[string, *Snapshot](maxCachedSnapshots)),
 	}
 }
 
 // GetOrBuild returns the cached snapshot for (sourceID, revision), parsing from
-// storage on miss; concurrent calls share one parse via singleflight.
+// storage on miss; concurrent calls share one parse.
 func (c *Cache) GetOrBuild(ctx context.Context, sourceID, revision string) (*Snapshot, error) {
 	if sourceID == "" {
 		return nil, errs.ErrMappingSourceNotFound
@@ -60,24 +56,7 @@ func (c *Cache) GetOrBuild(ctx context.Context, sourceID, revision string) (*Sna
 		return nil, errs.ErrMappingDescriptorMissing
 	}
 
-	key := snapshotKey(sourceID, revision)
-
-	c.mu.RLock()
-	snap := c.entries[key]
-	c.mu.RUnlock()
-	if snap != nil {
-		return snap, nil
-	}
-
-	v, err, _ := c.sf.Do(key, func() (any, error) {
-		// Re-check: another caller may have populated while we waited.
-		c.mu.RLock()
-		cached := c.entries[key]
-		c.mu.RUnlock()
-		if cached != nil {
-			return cached, nil
-		}
-
+	return c.entries.GetOrCompute(ctx, snapshotKey(sourceID, revision), func(ctx context.Context) (*Snapshot, error) {
 		d, err := c.descriptors.GetBySourceRevision(ctx, sourceID, revision)
 		if err != nil {
 			if errors.Is(err, errs.ErrProtoDescriptorNotFound) {
@@ -94,30 +73,15 @@ func (c *Cache) GetOrBuild(ctx context.Context, sourceID, revision string) (*Sna
 			return nil, coreerrs.Wrap(err, "registry: parse descriptor")
 		}
 
-		built := &Snapshot{
+		return &Snapshot{
 			SourceID:    sourceID,
 			Revision:    revision,
 			Descriptor:  d,
 			Schema:      schema,
 			ParsedAt:    time.Now(),
 			Fingerprint: d.Fingerprint,
-		}
-
-		c.mu.Lock()
-		c.evictLocked()
-		c.entries[key] = built
-		c.mu.Unlock()
-
-		return built, nil
+		}, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	snap, ok := v.(*Snapshot)
-	if !ok {
-		return nil, fmt.Errorf("%w: %T", errs.ErrUnexpectedSingleflightType, v)
-	}
-	return snap, nil
 }
 
 // GetByFingerprint returns the cached snapshot for a content hash, scoped to
@@ -130,14 +94,11 @@ func (c *Cache) GetByFingerprint(ctx context.Context, sourceID, fingerprint stri
 		return nil, errs.ErrMappingSourceIDRequired
 	}
 
-	c.mu.RLock()
-	for _, snap := range c.entries {
+	for _, snap := range c.entries.All() {
 		if snap.SourceID == sourceID && snap.Fingerprint == fingerprint {
-			c.mu.RUnlock()
 			return snap, nil
 		}
 	}
-	c.mu.RUnlock()
 
 	d, err := c.descriptors.GetByFingerprint(ctx, sourceID, fingerprint)
 	if err != nil {
@@ -151,10 +112,7 @@ func (c *Cache) GetByFingerprint(ctx context.Context, sourceID, fingerprint stri
 
 // Invalidate drops the cached snapshot for (sourceID, revision) if present.
 func (c *Cache) Invalidate(sourceID, revision string) {
-	key := snapshotKey(sourceID, revision)
-	c.mu.Lock()
-	delete(c.entries, key)
-	c.mu.Unlock()
+	c.entries.Remove(snapshotKey(sourceID, revision))
 }
 
 // InvalidateSource drops all cached snapshots belonging to the given source.
@@ -163,30 +121,10 @@ func (c *Cache) InvalidateSource(sourceID string) {
 		return
 	}
 	prefix := sourceID + "\x00"
-	c.mu.Lock()
-	for k := range c.entries {
-		if len(k) >= len(prefix) && k[:len(prefix)] == prefix {
-			delete(c.entries, k)
+	for k := range c.entries.Keys() {
+		if strings.HasPrefix(k, prefix) {
+			c.entries.Remove(k)
 		}
-	}
-	c.mu.Unlock()
-}
-
-// evictLocked drops the oldest snapshots until there is room for one more.
-// Caller holds c.mu.
-func (c *Cache) evictLocked() {
-	for len(c.entries) >= maxCachedSnapshots {
-		oldestKey := ""
-		var oldestAt time.Time
-		for k, snap := range c.entries {
-			if oldestKey == "" || snap.ParsedAt.Before(oldestAt) {
-				oldestKey, oldestAt = k, snap.ParsedAt
-			}
-		}
-		if oldestKey == "" {
-			return
-		}
-		delete(c.entries, oldestKey)
 	}
 }
 

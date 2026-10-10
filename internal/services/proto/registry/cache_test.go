@@ -256,11 +256,9 @@ func TestCache_EvictsOldestBeyondLimit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	c.mu.RLock()
-	size := len(c.entries)
-	_, oldestStillCached := c.entries[snapshotKey("src", "v0")]
-	_, newestCached := c.entries[snapshotKey("src", "v"+strconv.Itoa(total-1))]
-	c.mu.RUnlock()
+	size := c.entries.Len()
+	oldestStillCached := c.entries.Has(snapshotKey("src", "v0"))
+	newestCached := c.entries.Has(snapshotKey("src", "v"+strconv.Itoa(total-1)))
 
 	assert.LessOrEqual(t, size, maxCachedSnapshots, "cache must stay bounded")
 	assert.False(t, oldestStillCached, "the oldest snapshot must be evicted first")
