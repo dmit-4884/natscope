@@ -44,7 +44,7 @@ test.describe('Streams — create & config', () => {
     // Cleanup: delete via the UI.
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await page.getByPlaceholder(name).fill(name)
-    await page.getByRole('button', { name: 'Delete', exact: true }).last().click()
+    await page.getByRole('button', { name: 'Delete stream', exact: true }).click()
     await expect(page).toHaveURL(/\/streams$/)
   })
 
@@ -69,7 +69,7 @@ test.describe('Streams — create & config', () => {
     // Cleanup.
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await page.getByPlaceholder(name).fill(name)
-    await page.getByRole('button', { name: 'Delete', exact: true }).last().click()
+    await page.getByRole('button', { name: 'Delete stream', exact: true }).click()
   })
 
   test('config: purge removes all messages, preserving the stream', async ({ page, env }) => {
@@ -85,7 +85,7 @@ test.describe('Streams — create & config', () => {
     await page.goto(`/streams/${name}/config`)
     await page.getByRole('button', { name: 'Purge', exact: true }).click()
     await page.getByPlaceholder(name).fill(name)
-    await page.getByRole('button', { name: 'Purge', exact: true }).last().click()
+    await page.getByRole('button', { name: 'Purge stream', exact: true }).click()
     await expect(page.getByText(/\b0\b.*messages|Messages.*\b0\b/i)).toBeVisible({ timeout: 10_000 }).catch(() => {})
 
     // Stream must still exist (config screen still loads it).
@@ -94,7 +94,7 @@ test.describe('Streams — create & config', () => {
     // Cleanup.
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await page.getByPlaceholder(name).fill(name)
-    await page.getByRole('button', { name: 'Delete', exact: true }).last().click()
+    await page.getByRole('button', { name: 'Delete stream', exact: true }).click()
   })
 
   test('config: seal makes the stream read-only (Purge disabled, Seal hidden)', async ({ page, env }) => {
@@ -109,7 +109,7 @@ test.describe('Streams — create & config', () => {
     await page.goto(`/streams/${name}/config`)
     await page.getByRole('button', { name: 'Seal', exact: true }).click()
     await page.getByPlaceholder(name).fill(name)
-    await page.getByRole('button', { name: 'Seal', exact: true }).last().click()
+    await page.getByRole('button', { name: 'Seal stream', exact: true }).click()
 
     await expect(page.getByText('Sealed', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
     await expect(page.getByRole('button', { name: 'Purge', exact: true })).toBeDisabled()

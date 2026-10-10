@@ -47,7 +47,7 @@ export function StreamConfirmDialog({ type, streamName, onCancel, onConfirm }: P
       isOpen
       title={`${verb} Stream`}
       description={MESSAGES[type](streamName)}
-      confirmLabel={verb}
+      confirmLabel={`${verb} stream`}
       requireTypedName={streamName}
       confirmDisabled={!!purgeError}
       extra={
