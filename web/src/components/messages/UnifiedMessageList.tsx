@@ -16,6 +16,7 @@ import {
   useLivePolicy,
   useUpdateSettings,
 } from '@/contexts/settings'
+import { formatCount } from '@/utils/formatters'
 import MessageDiffViewer from './MessageDiffViewer'
 import ExportDialog from './ExportDialog'
 import { parseStartDate } from './jumpToTime'
@@ -38,6 +39,7 @@ import { useLiveSubscription } from './unified/useLiveSubscription'
 import { useLoadMoreMessages } from './unified/useLoadMoreMessages'
 import { useMessageSearch, type MessageSearch } from './unified/useMessageSearch'
 import { SearchStatusBar } from './unified/SearchStatusBar'
+import { SkippedCount } from './unified/SkippedCount'
 import { toSelectedHistoryMessage } from './unified/selectedMessage'
 import {
   liveToMessage,
@@ -182,6 +184,8 @@ export default function UnifiedMessageList({
     togglePause,
     newMessageIds,
     clearMessages: clearLive,
+    messagesDropped,
+    messagesReceived,
   } = useLiveSubscription({
     connectionId,
     streamName,
@@ -411,6 +415,13 @@ export default function UnifiedMessageList({
           ) : (
             <span>No messages at or after {formatDateTime(jumpStartMs!)}</span>
           )}
+        </div>
+      )}
+
+      {mode === 'realtime' && !!messagesDropped && (
+        <div className="px-4 py-1 text-xs text-content-tertiary border-b tabular-nums" data-testid="feed-counts">
+          {messagesReceived !== undefined && `${formatCount(messagesReceived)} received · `}
+          <SkippedCount count={messagesDropped} note="Skipped messages remain in the stream." />
         </div>
       )}
 

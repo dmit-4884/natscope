@@ -4,6 +4,7 @@ import { Button, CloseIcon, Dropdown, EyeOffIcon, PauseIcon, PlayIcon, SearchInp
 import { matchSubject } from '@/shared/domain/subjectMatch'
 import { formatCount, formatNumber } from '@/utils/formatters'
 import { plural } from '@/utils/plural'
+import { SkippedCount } from '../messages/unified/SkippedCount'
 import { LIVE_MESSAGE_LIMITS, type LiveMessageLimit } from '../messages/unified/messageListUtils'
 
 const RATE_OPTIONS = [
@@ -66,11 +67,10 @@ function FeedSummary({ counts, liveLimit }: { counts: FeedCounts; liveLimit: num
       {counts.received > counts.shown && ` · showing the last ${formatCount(liveLimit)}`}
       {counts.matching !== null && ` · ${formatCount(counts.matching)} match`}
       {!!counts.skipped && (
-        <Tooltip content="Skipped by the display rate limit or because the browser could not keep up. Core NATS keeps no copy.">
-          <span className="text-status-warning-text" data-testid="feed-skipped">
-            {` · ${formatCount(counts.skipped)} skipped`}
-          </span>
-        </Tooltip>
+        <>
+          {' · '}
+          <SkippedCount count={counts.skipped} note="Core NATS keeps no copy." />
+        </>
       )}
     </span>
   )

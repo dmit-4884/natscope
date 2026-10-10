@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { useLayoutEffect } from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Code, ConnectError } from '@connectrpc/connect'
 import { create, toBinary } from '@bufbuild/protobuf'
 import { ErrorInfoSchema } from '@/gen/google/rpc/error_details_pb'
@@ -12,6 +12,7 @@ const { fixtures } = vi.hoisted(() => ({
     messagesError: null as unknown,
     messagesData: undefined as unknown,
     messagesEnabled: [] as unknown[],
+    liveClients: [] as Array<{ onStats?: (p: { messages_received: number; messages_dropped: number; msg_per_second: number }) => void }>,
     workQueueStream: {
       name: 'ORDERS_WORKQUEUE',
       subjects: ['orders.>'],
@@ -58,6 +59,10 @@ vi.mock('@/contexts/live', async (importOriginal) => {
     subscribeSubjects = vi.fn()
     unsubscribe = vi.fn()
     disconnect = vi.fn()
+    onStats?: (p: { messages_received: number; messages_dropped: number; msg_per_second: number }) => void
+    constructor() {
+      fixtures.liveClients.push(this)
+    }
     connect() {}
   }
   return {
@@ -134,6 +139,26 @@ describe('UnifiedMessageList paging', () => {
     renderList()
 
     expect(screen.getByTestId('load-more')).toBeInTheDocument()
+  })
+})
+
+describe('UnifiedMessageList realtime skipped count', () => {
+  it('shows how many live messages were skipped without blaming the browser', async () => {
+    fixtures.messagesError = null
+    fixtures.defaultViewMode = 'realtime'
+    fixtures.liveClients.length = 0
+    renderList()
+
+    await waitFor(() => expect(fixtures.liveClients.length).toBeGreaterThan(0))
+    act(() => {
+      fixtures.liveClients.forEach((c) => c.onStats?.({ messages_received: 5000, messages_dropped: 4321, msg_per_second: 900 }))
+    })
+
+    const skipped = await screen.findByTestId('feed-skipped')
+    expect(skipped).toHaveTextContent('4,321 skipped')
+    fireEvent.mouseEnter(skipped)
+    expect(await screen.findByText(/server could not deliver/i)).toBeInTheDocument()
+    expect(screen.queryByText(/browser/i)).not.toBeInTheDocument()
   })
 })
 
