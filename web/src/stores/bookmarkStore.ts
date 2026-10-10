@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { z } from 'zod'
+import { toast } from '@/utils/toast'
 
 const bookmarkSchema = z.object({
   id: z.string(),
@@ -17,8 +18,10 @@ const bookmarksArraySchema = z.array(bookmarkSchema)
 
 export type Bookmark = z.infer<typeof bookmarkSchema>
 
-/** Safety cap; oldest evicted past this to bound localStorage growth. */
+/** Safety cap that bounds localStorage growth; only note-less bookmarks are ever evicted. */
 const MAX_BOOKMARKS = 500
+
+let evictionAnnounced = false
 
 interface BookmarkState {
   bookmarks: Bookmark[]
@@ -43,10 +46,20 @@ export const useBookmarkStore = create<BookmarkState>()(
           id: crypto.randomUUID(),
           createdAt: new Date().toISOString(),
         }
-        const next = [...bookmarks, newBookmark]
-        // FIFO eviction at cap — keeps newest MAX_BOOKMARKS entries.
-        const trimmed = next.length > MAX_BOOKMARKS ? next.slice(next.length - MAX_BOOKMARKS) : next
-        set({ bookmarks: trimmed })
+        if (bookmarks.length < MAX_BOOKMARKS) {
+          set({ bookmarks: [...bookmarks, newBookmark] })
+          return
+        }
+        const evictable = bookmarks.findIndex((b) => !b.note)
+        if (evictable === -1) {
+          toast.error(`Bookmark limit of ${MAX_BOOKMARKS} reached and every bookmark has a note. Remove one to add another.`)
+          return
+        }
+        set({ bookmarks: [...bookmarks.slice(0, evictable), ...bookmarks.slice(evictable + 1), newBookmark] })
+        if (!evictionAnnounced) {
+          evictionAnnounced = true
+          toast.warning(`Bookmark limit of ${MAX_BOOKMARKS} reached: the oldest bookmark without a note was removed to make room.`)
+        }
       },
 
       removeBookmark: (id) => {
