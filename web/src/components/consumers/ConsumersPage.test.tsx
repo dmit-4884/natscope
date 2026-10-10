@@ -94,6 +94,24 @@ describe('ConsumersPage', () => {
     expect(within(rows()[2]).getByText('Caught up')).toBeInTheDocument()
   })
 
+  it('sorts by a clicked column and flips the order on a second click', async () => {
+    mockedOverview.mockResolvedValue(overview())
+    renderPage()
+    await screen.findByText('billing')
+    const names = () => rows().map((r) => within(r).getAllByText(/^(archiver|billing|mailer)$/)[0].textContent)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pending' }))
+    expect(names()).toEqual(['billing', 'mailer', 'archiver'])
+    expect(screen.getByRole('columnheader', { name: 'Pending' })).toHaveAttribute('aria-sort', 'descending')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pending' }))
+    expect(names()).toEqual(['archiver', 'mailer', 'billing'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Consumer' }))
+    expect(names()).toEqual(['archiver', 'billing', 'mailer'])
+    expect(screen.getByRole('columnheader', { name: 'Consumer' })).toHaveAttribute('aria-sort', 'ascending')
+  })
+
   it('opens a consumer on its stream page', async () => {
     mockedOverview.mockResolvedValue(overview())
     renderPage()

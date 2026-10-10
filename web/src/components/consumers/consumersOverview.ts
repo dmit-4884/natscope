@@ -38,6 +38,55 @@ export function buildRows(overview: ConsumersOverview, now: number): ConsumerRow
     .sort(compareByHealth)
 }
 
+const SORT_KEYS = ['consumer', 'status', 'pending', 'ack', 'redelivered', 'last'] as const
+
+export type ConsumerSortKey = (typeof SORT_KEYS)[number]
+
+export type SortDirection = 'asc' | 'desc'
+
+export function isConsumerSortKey(key: string): key is ConsumerSortKey {
+  return (SORT_KEYS as readonly string[]).includes(key)
+}
+
+export interface ConsumerSort {
+  key: ConsumerSortKey
+  direction: SortDirection
+}
+
+export const DEFAULT_SORT: ConsumerSort = { key: 'status', direction: 'asc' }
+
+const SORT_VALUES: Record<Exclude<ConsumerSortKey, 'consumer' | 'status'>, (row: ConsumerRow) => number> = {
+  pending: (row) => row.consumer.num_pending,
+  ack: (row) => row.consumer.num_ack_pending,
+  redelivered: (row) => row.consumer.num_redelivered ?? 0,
+  last: (row) => row.consumer.delivered?.last_active ?? Number.NEGATIVE_INFINITY,
+}
+
+export function firstDirection(key: ConsumerSortKey): SortDirection {
+  return key === 'consumer' || key === 'status' ? 'asc' : 'desc'
+}
+
+export function nextSort(current: ConsumerSort, key: ConsumerSortKey): ConsumerSort {
+  if (current.key !== key) return { key, direction: firstDirection(key) }
+  return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+}
+
+function compareBy(key: ConsumerSortKey, a: ConsumerRow, b: ConsumerRow): number {
+  switch (key) {
+    case 'status':
+      return compareByHealth(a, b)
+    case 'consumer':
+      return a.consumer.name.localeCompare(b.consumer.name) || (a.consumer.stream_name ?? '').localeCompare(b.consumer.stream_name ?? '')
+    default:
+      return SORT_VALUES[key](a) - SORT_VALUES[key](b)
+  }
+}
+
+export function sortRows(rows: ConsumerRow[], { key, direction }: ConsumerSort): ConsumerRow[] {
+  const sign = direction === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) => sign * compareBy(key, a, b) || compareByHealth(a, b))
+}
+
 export function filterRows(rows: ConsumerRow[], query: string, problemsOnly: boolean): ConsumerRow[] {
   const needle = query.trim().toLowerCase()
   return rows.filter((row) => {

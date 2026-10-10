@@ -1,21 +1,32 @@
 import { type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import Tooltip from '@/components/common/Tooltip'
 import { isPlainClick } from '@/utils/clicks'
 import { cn } from '@/utils/cn'
+import { ChevronDownIcon, ChevronUpIcon } from './icons'
 import { QueryErrorState } from './QueryErrorState'
 import { SkeletonRows } from './Skeleton'
 
 export interface DataTableColumn<T> {
   key: string
   header: ReactNode
+  hint?: string
+  sortable?: boolean
   width?: string
   align?: 'left' | 'right'
   render: (item: T) => ReactNode
+}
+
+export interface DataTableSort {
+  key: string
+  direction: 'asc' | 'desc'
 }
 
 export interface DataTableProps<T> {
   columns: DataTableColumn<T>[]
   items: T[]
   rowKey: (item: T) => string
+  sort?: DataTableSort
+  onSortChange?: (key: string) => void
   onRowClick?: (item: T) => void
   rowHref?: (item: T) => string
   rowActions?: (item: T) => ReactNode
@@ -30,10 +41,64 @@ export interface DataTableProps<T> {
   rowLabel?: (item: T) => string
 }
 
+function ColumnHeader<T>({
+  column,
+  sort,
+  onSortChange,
+}: {
+  column: DataTableColumn<T>
+  sort?: DataTableSort
+  onSortChange?: (key: string) => void
+}) {
+  const label = column.hint ? (
+    <span className="underline decoration-dotted underline-offset-2">{column.header}</span>
+  ) : (
+    column.header
+  )
+
+  if (!column.sortable || !onSortChange) {
+    if (!column.hint) return <>{label}</>
+    return (
+      <Tooltip content={column.hint}>
+        <span className="cursor-help" tabIndex={0}>
+          {label}
+        </span>
+      </Tooltip>
+    )
+  }
+
+  const active = sort?.key === column.key
+  const Arrow = active && sort.direction === 'asc' ? ChevronUpIcon : ChevronDownIcon
+  const button = (
+    <button
+      type="button"
+      onClick={() => onSortChange(column.key)}
+      className={cn(
+        'group inline-flex items-center gap-1 rounded uppercase tracking-wide font-medium hover:text-content-primary',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus',
+        active && 'text-content-primary',
+      )}
+    >
+      {label}
+      <span aria-hidden="true" className={cn(active ? 'visible' : 'invisible group-hover:visible text-content-muted')}>
+        <Arrow className="w-3 h-3" />
+      </span>
+    </button>
+  )
+  return column.hint ? <Tooltip content={column.hint}>{button}</Tooltip> : button
+}
+
+function ariaSort(column: { key: string; sortable?: boolean }, sort?: DataTableSort) {
+  if (!column.sortable || sort?.key !== column.key) return undefined
+  return sort.direction === 'asc' ? 'ascending' : 'descending'
+}
+
 export function DataTable<T>({
   columns,
   items,
   rowKey,
+  sort,
+  onSortChange,
   onRowClick,
   rowHref,
   rowActions,
@@ -74,9 +139,10 @@ export function DataTable<T>({
           {columns.map((column) => (
             <th
               key={column.key}
+              aria-sort={ariaSort(column, sort)}
               className={cn('px-4 py-2 font-medium', column.align === 'right' ? 'text-right' : 'text-left')}
             >
-              {column.header}
+              <ColumnHeader column={column} sort={sort} onSortChange={onSortChange} />
             </th>
           ))}
           {hasActions && <th className="px-4 py-2 text-right font-medium">Actions</th>}

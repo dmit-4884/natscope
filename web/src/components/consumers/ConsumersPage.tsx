@@ -29,21 +29,22 @@ import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import { ConsumerStatus } from '../streams/consumers/ConsumerStatus'
 import { statusText } from '../streams/consumers/consumerHealth'
 import { getFilterSubjectsArray } from '../streams/consumers/consumerUtils'
-import { buildRows, filterRows, formatAgo, rowsToCsv, rowsToJson, type ConsumerRow } from './consumersOverview'
+import {
+  buildRows,
+  DEFAULT_SORT,
+  filterRows,
+  formatAgo,
+  isConsumerSortKey,
+  nextSort,
+  rowsToCsv,
+  rowsToJson,
+  sortRows,
+  type ConsumerRow,
+} from './consumersOverview'
 
 const WHAT_IS_IT =
   'A consumer reads a stream for an application and remembers what it delivered and what clients acknowledged. ' +
   'With Auto-refresh on, natscope reads them every 5 seconds and says in plain words what holds one back.'
-
-function ColumnHint({ label, hint }: { label: string; hint: string }) {
-  return (
-    <Tooltip content={hint}>
-      <span className="cursor-help underline decoration-dotted underline-offset-2" tabIndex={0}>
-        {label}
-      </span>
-    </Tooltip>
-  )
-}
 
 function Count({ value, max }: { value: number; max?: number }) {
   return (
@@ -59,6 +60,7 @@ function columns(now: number): DataTableColumn<ConsumerRow>[] {
     {
       key: 'consumer',
       header: 'Consumer',
+      sortable: true,
       width: 'w-[28%]',
       render: ({ consumer, kind }) => {
         const filters = getFilterSubjectsArray(consumer)
@@ -80,30 +82,39 @@ function columns(now: number): DataTableColumn<ConsumerRow>[] {
     {
       key: 'status',
       header: 'Status',
+      sortable: true,
       width: 'w-[24%]',
       render: ({ issues, state }) => <ConsumerStatus issues={issues} state={state} limit={2} />,
     },
     {
       key: 'pending',
-      header: <ColumnHint label="Pending" hint="Messages this consumer has not delivered yet" />,
+      header: 'Pending',
+      hint: 'Messages this consumer has not delivered yet',
+      sortable: true,
       align: 'right',
       render: ({ consumer }) => <Count value={consumer.num_pending} />,
     },
     {
       key: 'ack',
-      header: <ColumnHint label="Waiting for ack" hint="Delivered messages no client has acknowledged yet, out of the most the consumer allows" />,
+      header: 'Waiting for ack',
+      hint: 'Delivered messages no client has acknowledged yet, out of the most the consumer allows',
+      sortable: true,
       align: 'right',
       render: ({ consumer }) => <Count value={consumer.num_ack_pending} max={consumer.config?.max_ack_pending} />,
     },
     {
       key: 'redelivered',
-      header: <ColumnHint label="Redelivered" hint="Unacknowledged messages the server had to deliver more than once" />,
+      header: 'Redelivered',
+      hint: 'Unacknowledged messages the server had to deliver more than once',
+      sortable: true,
       align: 'right',
       render: ({ consumer }) => <Count value={consumer.num_redelivered ?? 0} />,
     },
     {
       key: 'last',
-      header: <ColumnHint label="Last delivery" hint="When the consumer last handed a message to a client" />,
+      header: 'Last delivery',
+      hint: 'When the consumer last handed a message to a client',
+      sortable: true,
       render: ({ consumer }) => {
         const at = consumer.delivered?.last_active
         if (at == null && (consumer.delivered?.consumer_seq ?? 0) > 0) {
@@ -165,12 +176,13 @@ export default function ConsumersPage() {
   const [query, setQuery] = useState('')
   const [problemsOnly, setProblemsOnly] = useState(false)
   const [manualRefresh, setManualRefresh] = useState(false)
+  const [sort, setSort] = useState(DEFAULT_SORT)
 
   const { data, error, isLoading, isFetching, dataUpdatedAt, refetch } = useConsumersOverview(connectionId, { autoRefresh })
   const denial = data ? null : getAccessDenial(error)
 
   const allRows = useMemo(() => (data ? buildRows(data, dataUpdatedAt) : []), [data, dataUpdatedAt])
-  const rows = useMemo(() => filterRows(allRows, query, problemsOnly), [allRows, query, problemsOnly])
+  const rows = useMemo(() => sortRows(filterRows(allRows, query, problemsOnly), sort), [allRows, query, problemsOnly, sort])
   const tableColumns = useMemo(() => columns(dataUpdatedAt), [dataUpdatedAt])
 
   const stuck = allRows.filter((r) => r.state === 'stuck').length
@@ -253,6 +265,10 @@ export default function ConsumersPage() {
             <div className="flex-1 min-h-0 overflow-auto border-t border-border">
               {rows.length > 0 ? (
                 <DataTable columns={tableColumns} items={rows} rowKey={(r) => r.key} onRowClick={open} rowHref={hrefOf}
+                  sort={sort}
+                  onSortChange={(key) => {
+                    if (isConsumerSortKey(key)) setSort((current) => nextSort(current, key))
+                  }}
                   rowLabel={(r) => `${r.consumer.name} on ${r.consumer.stream_name}: ${statusText(r.issues, r.state)}`}
                   className="min-w-[44rem]"
                 />

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { ConsumersOverview } from '@/api/stats'
 import type { ConsumerInfo, StreamInfo } from '@/types/nats'
-import { buildRows, filterRows, formatAgo, rowsToCsv, rowsToJson } from './consumersOverview'
+import { buildRows, filterRows, firstDirection, formatAgo, rowsToCsv, rowsToJson, sortRows } from './consumersOverview'
 
 const NOW = Date.UTC(2026, 9, 5, 12, 0, 0)
 
@@ -103,5 +103,60 @@ describe('formatAgo', () => {
     expect(formatAgo(NOW - 3 * 3_600_000, NOW)).toBe('3h ago')
     expect(formatAgo(NOW - 2 * 86_400_000, NOW)).toBe('2d ago')
     expect(formatAgo(undefined, NOW)).toBe('never')
+  })
+})
+
+describe('sortRows', () => {
+  const rows = buildRows(overview, NOW)
+  const names = (sorted: typeof rows) => sorted.map((r) => r.consumer.name)
+
+  it('keeps the health order when sorting by status, and reverses it', () => {
+    expect(names(sortRows(rows, { key: 'status', direction: 'asc' }))).toEqual(['billing', 'ghost', 'mailer', 'archiver'])
+    expect(names(sortRows(rows, { key: 'status', direction: 'desc' }))).toEqual(['archiver', 'mailer', 'ghost', 'billing'])
+  })
+
+  it('sorts by pending messages either way', () => {
+    expect(names(sortRows(rows, { key: 'pending', direction: 'desc' }))).toEqual(['billing', 'mailer', 'ghost', 'archiver'])
+    expect(names(sortRows(rows, { key: 'pending', direction: 'asc' }))).toEqual(['archiver', 'ghost', 'mailer', 'billing'])
+  })
+
+  it('sorts by consumer name', () => {
+    expect(names(sortRows(rows, { key: 'consumer', direction: 'asc' }))).toEqual(['archiver', 'billing', 'ghost', 'mailer'])
+  })
+
+  it('breaks ties in the health order whatever the direction', () => {
+    expect(names(sortRows(rows, { key: 'ack', direction: 'desc' }))).toEqual(['billing', 'ghost', 'mailer', 'archiver'])
+    expect(names(sortRows(rows, { key: 'ack', direction: 'asc' }))).toEqual(['ghost', 'mailer', 'archiver', 'billing'])
+  })
+
+  it('sorts by redeliveries', () => {
+    const redelivered = buildRows(
+      { ...overview, consumers: [consumer('once', 'ORDERS', { num_redelivered: 1 }), consumer('often', 'ORDERS', { num_redelivered: 9 }), consumer('never', 'ORDERS')] },
+      NOW,
+    )
+    expect(names(sortRows(redelivered, { key: 'redelivered', direction: 'desc' }))).toEqual(['often', 'once', 'never'])
+  })
+
+  it('puts a consumer that never delivered after the latest deliveries', () => {
+    const delivered = buildRows(
+      {
+        ...overview,
+        consumers: [
+          consumer('idle', 'ORDERS', { delivered: { consumer_seq: 0, stream_seq: 0 } }),
+          consumer('recent', 'ORDERS', { delivered: { consumer_seq: 1, stream_seq: 1, last_active: NOW - 1_000 } }),
+          consumer('stale', 'ORDERS', { delivered: { consumer_seq: 1, stream_seq: 1, last_active: NOW - 60_000 } }),
+        ],
+      },
+      NOW,
+    )
+    expect(names(sortRows(delivered, { key: 'last', direction: 'desc' }))).toEqual(['recent', 'stale', 'idle'])
+    expect(names(sortRows(delivered, { key: 'last', direction: 'asc' }))).toEqual(['idle', 'stale', 'recent'])
+  })
+
+  it('starts counts and times with the largest and names with A', () => {
+    expect(firstDirection('pending')).toBe('desc')
+    expect(firstDirection('last')).toBe('desc')
+    expect(firstDirection('consumer')).toBe('asc')
+    expect(firstDirection('status')).toBe('asc')
   })
 })

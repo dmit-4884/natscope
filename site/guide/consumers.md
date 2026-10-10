@@ -35,7 +35,8 @@ A consumer with nothing wrong is **Catching up** while it has work left, and **C
 
 The page reads the consumers every 5 seconds; turn **Auto-refresh** off to freeze the numbers. **Problems only** hides the
 healthy consumers, the filter matches consumer names, streams and filter subjects, and the download button exports the
-list as CSV or JSON. Click a row to open the consumer on its stream; Cmd/Ctrl-click or middle-click opens it in a new tab.
+list as CSV or JSON in the order shown. Stuck consumers come first; click a column header to sort by it instead, and click it again to
+reverse the order. Click a row to open the consumer on its stream; Cmd/Ctrl-click or middle-click opens it in a new tab.
 
 The server keeps the time of the last delivery in memory only, so after a server restart **Last delivery** says **unknown** until the
 consumer delivers again. Natscope's own short-lived consumers, which it creates to read streams, are left out.
