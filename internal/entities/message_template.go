@@ -43,20 +43,14 @@ func MessageTemplateNew(init ...func(*MessageTemplate)) *MessageTemplate {
 }
 
 // ApplyUpdate applies the partial update; non-nil Headers/Wildcards replace
-// wholesale (nil keeps existing) since converter can't tell nil from empty.
+// wholesale (nil keeps existing).
 func (t *MessageTemplate) ApplyUpdate(req *MessageTemplateUpdate) {
 	if t == nil || req == nil {
 		return
 	}
 	converter.Convert(req, t,
 		converter.WithIgnoreNilValues(),
-		converter.WithIgnoreFields("etag", "Headers", "Wildcards"))
-	if req.Headers != nil {
-		t.Headers = req.Headers
-	}
-	if req.Wildcards != nil {
-		t.Wildcards = req.Wildcards
-	}
+		converter.WithIgnoreFields("etag"))
 	t.BeforeUpdate()
 }
 

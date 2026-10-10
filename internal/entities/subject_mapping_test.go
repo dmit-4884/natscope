@@ -62,6 +62,25 @@ func TestSubjectMapping_ApplyUpdate(t *testing.T) {
 		assert.True(t, m.UpdatedAt.After(time.UnixMilli(1).UTC()))
 	})
 
+	t.Run("FramingReplacesWholesale", func(t *testing.T) {
+		t.Parallel()
+		m := SubjectMappingNew(func(m *SubjectMapping) {
+			m.Framing = Framing{Kind: FramingConfluent, SchemaID: 7, Prefix: []byte("p"), Suffix: []byte("s")}
+		})
+		m.ApplyUpdate(&SubjectMappingUpdate{Framing: &Framing{Kind: FramingGRPC}})
+
+		assert.Equal(t, Framing{Kind: FramingGRPC}, m.Framing)
+	})
+
+	t.Run("NilFramingKeepsExisting", func(t *testing.T) {
+		t.Parallel()
+		want := Framing{Kind: FramingConfluent, SchemaID: 7}
+		m := SubjectMappingNew(func(m *SubjectMapping) { m.Framing = want })
+		m.ApplyUpdate(&SubjectMappingUpdate{Pattern: new("x")})
+
+		assert.Equal(t, want, m.Framing)
+	})
+
 	t.Run("NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var m *SubjectMapping
