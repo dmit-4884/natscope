@@ -104,6 +104,21 @@ func TestHandler_PublishMessage(t *testing.T) {
 		assert.Equal(t, "12", resp.Msg.GetCounterValue())
 	})
 
+	t.Run("DuplicateAndError", func(t *testing.T) {
+		t.Parallel()
+		svc := &mockPublishService{result: &entities.PublishResult{Stream: "orders", Sequence: 9, Duplicate: true, Error: new("boom")}}
+		handler := New(svc, &stubProtoService{})
+
+		resp, err := handler.PublishMessage(t.Context(), connect.NewRequest(&publishpb.PublishMessageRequest{
+			ConnectionId: "conn-1",
+			Subject:      "orders.new",
+		}))
+		require.NoError(t, err)
+		assert.True(t, resp.Msg.Duplicate)
+		assert.Equal(t, "boom", resp.Msg.GetError())
+		assert.Nil(t, resp.Msg.Access)
+	})
+
 	t.Run("RefusedNamesThePermission", func(t *testing.T) {
 		t.Parallel()
 		svc := &mockPublishService{result: &entities.PublishResult{
