@@ -171,6 +171,30 @@ func TestStatusErrorConvert(t *testing.T) {
 			wantReason: "NATS_API_ERROR",
 		},
 		{
+			name:       "NATSAPIError_StreamOffline",
+			err:        &errs.NATSAPIError{Code: 500, ErrorCode: 10118, Description: "stream is offline"},
+			wantCode:   codes.Unavailable,
+			wantReason: "NATS_API_ERROR",
+		},
+		{
+			name:       "NATSAPIError_StreamOfflineWithReason",
+			err:        &errs.NATSAPIError{Code: 500, ErrorCode: 10194, Description: "stream is offline: no quorum"},
+			wantCode:   codes.Unavailable,
+			wantReason: "NATS_API_ERROR",
+		},
+		{
+			name:       "NATSAPIError_ConsumerOffline",
+			err:        &errs.NATSAPIError{Code: 500, ErrorCode: 10119, Description: "consumer is offline"},
+			wantCode:   codes.Unavailable,
+			wantReason: "NATS_API_ERROR",
+		},
+		{
+			name:       "NATSAPIError_ConsumerOfflineWithReason",
+			err:        &errs.NATSAPIError{Code: 500, ErrorCode: 10195, Description: "consumer is offline: no quorum"},
+			wantCode:   codes.Unavailable,
+			wantReason: "NATS_API_ERROR",
+		},
+		{
 			name:       "NATSAPIError_UnclassifiedServerError",
 			err:        &errs.NATSAPIError{Code: 500, ErrorCode: 10041, Description: "raft failure"},
 			wantCode:   codes.Internal,

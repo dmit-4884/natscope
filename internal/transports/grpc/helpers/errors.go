@@ -212,7 +212,7 @@ const (
 )
 
 // JetStream API err_code values reported with a 5xx HTTP code that mean invalid input,
-// an unsupported topology or exhausted capacity.
+// an unsupported topology, exhausted capacity or an asset whose server is down.
 const (
 	jsErrClusterNotActive           = 10006
 	jsErrClusterRequired            = 10010
@@ -228,6 +228,10 @@ const (
 	jsErrStreamReplicasNotSupported = 10074
 	jsErrStreamStoreFailed          = 10077
 	jsErrStreamInvalid              = 10096
+	jsErrStreamOffline              = 10118
+	jsErrConsumerOffline            = 10119
+	jsErrStreamOfflineReason        = 10194
+	jsErrConsumerOfflineReason      = 10195
 )
 
 // jsErrCodeClasses reclassifies 5xx JetStream API errors by err_code.
@@ -246,6 +250,10 @@ var jsErrCodeClasses = map[uint16]codes.Code{
 	jsErrMemoryResourcesExceeded:    codes.ResourceExhausted,
 	jsErrStorageResourcesExceeded:   codes.ResourceExhausted,
 	jsErrStreamStoreFailed:          codes.ResourceExhausted,
+	jsErrStreamOffline:              codes.Unavailable,
+	jsErrConsumerOffline:            codes.Unavailable,
+	jsErrStreamOfflineReason:        codes.Unavailable,
+	jsErrConsumerOfflineReason:      codes.Unavailable,
 }
 
 // apiErrorGRPCCode maps a JetStream API error to a gRPC code, preferring the
