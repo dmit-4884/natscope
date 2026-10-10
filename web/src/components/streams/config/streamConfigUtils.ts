@@ -45,9 +45,45 @@ export function normalizeSubjects(subjects: string[] | undefined): string[] {
   return (subjects ?? []).map((s) => s.trim()).filter((s) => s !== '')
 }
 
+const STREAM_NAME_FORBIDDEN = /[\s.*>/\\]/
+
+export function validateStreamName(name: string): string | undefined {
+  if (STREAM_NAME_FORBIDDEN.test(name.trim())) {
+    return "A stream name cannot contain spaces, '.', '*', '>', '/' or '\\'."
+  }
+  return undefined
+}
+
+export function validateSubject(subject: string): string | undefined {
+  const value = subject.trim()
+  if (value === '') return undefined
+  if (/\s/.test(value)) return 'A subject cannot contain spaces.'
+  const tokens = value.split('.')
+  if (tokens.some((token) => token === '')) return 'A subject cannot have empty parts (leading, trailing or doubled dots).'
+  for (const [index, token] of tokens.entries()) {
+    if (token.includes('>') && token !== '>') return "'>' must be a whole part of the subject."
+    if (token.includes('*') && token !== '*') return "'*' must be a whole part of the subject."
+    if (token === '>' && index !== tokens.length - 1) return "'>' must be the last part of the subject."
+  }
+  return undefined
+}
+
+export function createBlockedReason(value: StreamCreateRequest): string | undefined {
+  const name = value.name?.trim() ?? ''
+  if (!name) return 'Enter a stream name.'
+  const nameError = validateStreamName(name)
+  if (nameError) return nameError
+  const subjects = normalizeSubjects(value.subjects)
+  if (!isMirrorConfigured(value) && subjects.length === 0) return 'Add at least one subject, or configure a mirror.'
+  for (const subject of subjects) {
+    const subjectError = validateSubject(subject)
+    if (subjectError) return `Subject "${subject}": ${subjectError}`
+  }
+  return undefined
+}
+
 export function canCreateStream(value: StreamCreateRequest): boolean {
-  if (!value.name?.trim()) return false
-  return isMirrorConfigured(value) || normalizeSubjects(value.subjects).length > 0
+  return createBlockedReason(value) === undefined
 }
 
 function toFormSource(source: StreamSourceRef): StreamSource {

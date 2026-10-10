@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { StreamCreateRequest, StreamSource } from '@/types/management'
 import { ConfigField, type ConfigFieldMode } from '@/components/streams/config/ConfigField'
 import {
@@ -25,6 +25,8 @@ export interface StreamFormFieldsProps {
   isEditMode: boolean
   defaultExpanded?: boolean
   originalValue?: StreamCreateRequest | null
+  /** Labels of the fields holding text that is not a valid value yet. */
+  onInvalidFieldsChange?: (labels: string[]) => void
 }
 
 // Sections beyond the declarative STREAM_FIELDS registry: nested-object
@@ -54,6 +56,7 @@ export function StreamFormFields({
   isEditMode,
   defaultExpanded = false,
   originalValue,
+  onInvalidFieldsChange,
 }: StreamFormFieldsProps) {
   const mode: ConfigFieldMode = isEditMode ? 'edit' : 'create'
 
@@ -72,6 +75,18 @@ export function StreamFormFields({
     subjectTransform: false,
     consumerLimits: false,
   })
+
+  const [invalidKeys, setInvalidKeys] = useState<string[]>([])
+  const reportInvalid = useCallback(
+    (key: string, invalid: boolean) =>
+      setInvalidKeys((prev) => (prev.includes(key) === invalid ? prev : invalid ? [...prev, key] : prev.filter((k) => k !== key))),
+    [],
+  )
+  const notify = useRef(onInvalidFieldsChange)
+  notify.current = onInvalidFieldsChange
+  useEffect(() => {
+    notify.current?.(STREAM_FIELDS.filter((f) => invalidKeys.includes(f.key as string)).map((f) => f.label))
+  }, [invalidKeys])
 
   const toggleSection = (section: StreamFieldSection | ComplexSectionKey) =>
     setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }))
@@ -109,6 +124,7 @@ export function StreamFormFields({
                   def={def as StreamFieldDef}
                   value={(value as unknown as Record<string, unknown>)[def.key as string]}
                   onChange={(v) => setField(def.key as string, v)}
+                  onInvalid={(invalid) => reportInvalid(def.key as string, invalid)}
                   mode={mode}
                   unsupportedReason={
                     def.requiresCapability ? unsupportedReason(def.requiresCapability) : undefined

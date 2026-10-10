@@ -1,13 +1,25 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/utils/toast'
 import * as api from '@/api/management'
-import { getErrorMessage } from '@/api/errors'
+import { NATS_API_ERROR_SUBJECTS_OVERLAP, getErrorMessage, getNatsApiErrorCode } from '@/api/errors'
+import type { StreamsResponse } from '@/api/streams'
 import type {
   StreamCreateRequest,
   StreamUpdateRequest,
   StreamPurgeRequest,
 } from '@/types/management'
+import { overlappingStreams } from '../../domain/overlappingStreams'
 import { streamKeys } from '../queries/streamKeys'
+
+function describeWriteFailure(error: unknown, subjects: string[] | undefined, loaded: StreamsResponse | undefined, except?: string): string {
+  if (getNatsApiErrorCode(error) === NATS_API_ERROR_SUBJECTS_OVERLAP) {
+    const overlaps = overlappingStreams(subjects ?? [], loaded?.streams ?? [], except)
+    if (overlaps.length > 0) {
+      return `Subjects overlap with ${overlaps.map((o) => `${o.name} (${o.subjects.join(', ')})`).join('; ')}`
+    }
+  }
+  return getErrorMessage(error)
+}
 
 export function useCreateStream(connectionId: string | undefined) {
   const queryClient = useQueryClient()
@@ -20,8 +32,9 @@ export function useCreateStream(connectionId: string | undefined) {
       toast.success(`Stream "${stream.name}" created`)
       queryClient.invalidateQueries({ queryKey: streamKeys.list(connectionId) })
     },
-    onError: (error: Error) => {
-      toast.error(`Failed to create stream: ${getErrorMessage(error)}`)
+    onError: (error: Error, config) => {
+      const loaded = queryClient.getQueryData<StreamsResponse>(streamKeys.list(connectionId))
+      toast.error(`Failed to create stream: ${describeWriteFailure(error, config.subjects, loaded)}`)
     },
   })
 }
@@ -38,8 +51,9 @@ export function useUpdateStream(connectionId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: streamKeys.list(connectionId) })
       queryClient.invalidateQueries({ queryKey: streamKeys.detail(connectionId, stream.name) })
     },
-    onError: (error: Error) => {
-      toast.error(`Failed to update stream: ${getErrorMessage(error)}`)
+    onError: (error: Error, { name, config }) => {
+      const loaded = queryClient.getQueryData<StreamsResponse>(streamKeys.list(connectionId))
+      toast.error(`Failed to update stream: ${describeWriteFailure(error, config.subjects, loaded, name)}`)
     },
   })
 }

@@ -168,14 +168,15 @@ describe('enableOnlyLockReason', () => {
 })
 
 describe('duration field labels', () => {
-  it('names nanoseconds on every duration field, like Max Age', () => {
+  it('takes human durations on every duration field, so no label asks for nanoseconds', () => {
     for (const def of STREAM_FIELDS.filter((f) => f.type === 'duration_ns')) {
-      expect(def.label).toMatch(/\(ns\)$/)
+      expect(def.label).not.toMatch(/\(ns\)/)
+      expect(def.helperText).not.toMatch(/\d{9}/)
     }
   })
 
-  it('does not tell the user to type seconds into a nanosecond field', () => {
+  it('tells the user the delete marker minimum in plain time', () => {
     const marker = STREAM_FIELDS.find((f) => f.key === 'subject_delete_marker_ttl')!
-    expect(marker.helperText).toContain('1000000000')
+    expect(marker.helperText).toContain('at least 1s')
   })
 })

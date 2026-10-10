@@ -4,6 +4,9 @@ import type { ReplicaInfo, StreamDetail } from '@/types/nats'
 import {
   COMPRESSION_LABELS,
   canCreateStream,
+  createBlockedReason,
+  validateStreamName,
+  validateSubject,
   isMirrorConfigured,
   normalizeSubjects,
   replicaState,
@@ -142,5 +145,53 @@ describe('streamToConfig', () => {
 
   it('defaults persist mode to default', () => {
     expect(streamToConfig(detail({})).persist_mode).toBe('default')
+  })
+})
+
+describe('validateStreamName', () => {
+  it.each(['ORDERS', 'my-stream_v2', '_internal', 'orders2026'])('accepts %j', (name) => {
+    expect(validateStreamName(name)).toBeUndefined()
+  })
+
+  it.each(['A3 bad name', 'a.b', 'a*b', 'a>b', 'a/b', 'a\\b', 'tab\tname'])('refuses %j and names the offending characters', (name) => {
+    expect(validateStreamName(name)).toMatch(/spaces/)
+  })
+
+  it('says nothing about an empty name, the submit reason covers it', () => {
+    expect(validateStreamName('')).toBeUndefined()
+  })
+})
+
+describe('validateSubject', () => {
+  it.each(['orders.>', 'orders.*.new', '>', 'a', '$KV.bucket.>'])('accepts %j', (subject) => {
+    expect(validateSubject(subject)).toBeUndefined()
+  })
+
+  it.each([
+    ['a..x', /empty/i],
+    ['.a', /empty/i],
+    ['a.', /empty/i],
+    ['a b', /spaces/i],
+    ['a.>.b', /last/i],
+    ['a.b*', /whole/i],
+  ])('refuses %j', (subject, message) => {
+    expect(validateSubject(subject)).toMatch(message)
+  })
+})
+
+describe('createBlockedReason', () => {
+  it('states what is missing, in order', () => {
+    expect(createBlockedReason(draft({ name: '', subjects: [''] }))).toBe('Enter a stream name.')
+    expect(createBlockedReason(draft({ name: 'ORDERS', subjects: [''] }))).toBe('Add at least one subject, or configure a mirror.')
+  })
+
+  it('states the first broken rule', () => {
+    expect(createBlockedReason(draft({ name: 'a b', subjects: ['x'] }))).toMatch(/spaces/)
+    expect(createBlockedReason(draft({ name: 'ORDERS', subjects: ['a..x'] }))).toMatch(/a\.\.x.*empty/i)
+  })
+
+  it('is empty when the stream can be created', () => {
+    expect(createBlockedReason(draft({ name: 'ORDERS', subjects: ['orders.>'] }))).toBeUndefined()
+    expect(createBlockedReason(draft({ name: 'M', subjects: [], mirror: { name: 'SOURCE' } }))).toBeUndefined()
   })
 })

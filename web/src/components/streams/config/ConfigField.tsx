@@ -3,7 +3,9 @@ import { useRowKeys } from '@/hooks/useRowKeys'
 import { Input, Select, Badge, CloseIcon, LockClosedIcon } from '@/components/ui'
 import { cn } from '@/utils/cn'
 import { clampInt32, INT32_MAX, INT32_MIN } from '@/utils/numbers'
+import { DurationInput } from './DurationInput'
 import type { StreamFieldDef } from './streamFieldDefinitions'
+import { validateSubject } from './streamConfigUtils'
 
 export type ConfigFieldMode = 'create' | 'edit'
 
@@ -15,9 +17,11 @@ interface Props {
   /** When set, the connected server doesn't support this field — control is disabled and the reason shown. */
   unsupportedReason?: string
   lockedReason?: string
+  /** Called with true while the control holds text it cannot turn into a value. */
+  onInvalid?: (invalid: boolean) => void
 }
 
-export function ConfigField({ def, value, onChange, mode, unsupportedReason, lockedReason }: Props) {
+export function ConfigField({ def, value, onChange, mode, unsupportedReason, lockedReason, onInvalid }: Props) {
   const isUnsupported = !!unsupportedReason
   const isLocked = (mode === 'edit' && !def.editableOnUpdate) || isUnsupported || !!lockedReason
   const labelId = useId()
@@ -40,7 +44,7 @@ export function ConfigField({ def, value, onChange, mode, unsupportedReason, loc
         ) : null}
       </div>
 
-      <FieldControl def={def} value={value} onChange={onChange} isLocked={isLocked} labelId={labelId} />
+      <FieldControl def={def} value={value} onChange={onChange} isLocked={isLocked} labelId={labelId} onInvalid={onInvalid} mode={mode} />
 
       {isUnsupported ? (
         <p className="text-xs text-status-warning-text mt-1">{unsupportedReason}</p>
@@ -61,23 +65,40 @@ interface ControlProps {
   onChange: (next: unknown) => void
   isLocked: boolean
   labelId: string
+  onInvalid?: (invalid: boolean) => void
+  mode: ConfigFieldMode
 }
 
-function FieldControl({ def, value, onChange, isLocked, labelId }: ControlProps) {
+function FieldControl({ def, value, onChange, isLocked, labelId, onInvalid, mode }: ControlProps) {
   switch (def.type) {
-    case 'text':
+    case 'text': {
+      const text = value == null ? '' : String(value)
+      const error = mode === 'create' && !isLocked ? def.validate?.(text) : undefined
       return (
         <Input
-          value={value == null ? '' : String(value)}
+          value={text}
+          error={!!error}
+          errorMessage={error}
           readOnly={isLocked}
           placeholder={def.placeholder}
           onChange={isLocked ? undefined : (e) => onChange(e.target.value)}
           aria-labelledby={labelId}
         />
       )
+    }
 
-    case 'number':
-    case 'duration_ns': {
+    case 'duration_ns':
+      return (
+        <DurationInput
+          value={value == null ? ((def.defaultValue as number | undefined) ?? 0) : Number(value)}
+          onChange={onChange}
+          onInvalid={onInvalid}
+          readOnly={isLocked}
+          labelId={labelId}
+        />
+      )
+
+    case 'number': {
       const fallback = (def.defaultValue as number | undefined) ?? 0
       return (
         <Input
@@ -193,6 +214,8 @@ function SubjectsInput({ value, readOnly, onChange }: SubjectsInputProps) {
             <Input
               value={subject}
               readOnly={readOnly}
+              error={!!validateSubject(subject)}
+              errorMessage={validateSubject(subject)}
               placeholder="orders.>"
               aria-label={`Subject ${index + 1}`}
               onChange={readOnly ? undefined : (e) => update(index, e.target.value)}

@@ -1,7 +1,7 @@
 import type { CapabilityKey } from '@/contexts/connection'
 import type { StreamCreateRequest, StreamUpdateRequest } from '@/types/management'
 import { stableJson } from '@/utils/stableJson'
-import { isMirrorConfigured, normalizeSubjects } from './streamConfigUtils'
+import { isMirrorConfigured, normalizeSubjects, validateStreamName } from './streamConfigUtils'
 
 // UI-only metadata for stream config fields (rendering + payload filtering);
 // backend is source of truth.
@@ -53,6 +53,8 @@ export interface StreamFieldDef {
   enableOnly?: boolean
   /** Backed by a proto int32; the value is clamped to the int32 range. */
   int32?: boolean
+  /** Inline error for a text value, shown while it is being typed. */
+  validate?: (text: string) => string | undefined
 }
 
 export const STREAM_SECTIONS: ReadonlyArray<{ key: StreamFieldSection; label: string }> = [
@@ -73,6 +75,7 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
     helperText: 'Unique identifier for the stream.',
     immutableReason: 'Stream name cannot be changed after creation.',
     placeholder: 'my-stream',
+    validate: validateStreamName,
   },
   {
     key: 'description',
@@ -167,12 +170,12 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
   },
   {
     key: 'max_age',
-    label: 'Max Age (ns)',
+    label: 'Max Age',
     type: 'duration_ns',
     section: 'limits',
     editableOnCreate: true,
     editableOnUpdate: true,
-    helperText: '0 for unlimited.',
+    helperText: 'Like 7d, 12h or 30m. 0 for unlimited.',
     defaultValue: 0,
   },
   {
@@ -198,12 +201,12 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
   },
   {
     key: 'duplicate_window',
-    label: 'Duplicate Window (ns)',
+    label: 'Duplicate Window',
     type: 'duration_ns',
     section: 'advanced',
     editableOnCreate: true,
     editableOnUpdate: true,
-    helperText: 'Time window for duplicate detection. 0 to disable.',
+    helperText: 'Time window for duplicate detection, like 2m or 1h. 0 to disable.',
     defaultValue: 0,
   },
   {
@@ -279,13 +282,13 @@ export const STREAM_FIELDS: ReadonlyArray<StreamFieldDef> = [
   },
   {
     key: 'subject_delete_marker_ttl',
-    label: 'Delete Marker TTL (ns)',
+    label: 'Delete Marker TTL',
     type: 'duration_ns',
     section: 'advanced',
     editableOnCreate: true,
     editableOnUpdate: true,
     helperText:
-      'Leave a delete marker when Max Age removes the last message of a subject, kept this long (at least 1000000000 = 1s, 0 = off). Turns on per-message TTL and rollups; not allowed on mirrors. Requires NATS 2.11+.',
+      'Leave a delete marker when Max Age removes the last message of a subject, kept this long (at least 1s, like 30s or 1h; 0 = off). Turns on per-message TTL and rollups; not allowed on mirrors. Requires NATS 2.11+.',
     requiresCapability: 'messageTtl',
   },
   {

@@ -128,10 +128,12 @@ const ACCESS_SUBJECT_KEY = 'subject'
 const NATS_API_ERROR_REASON = 'NATS_API_ERROR'
 const NATS_API_ERROR_CODE_KEY = 'err_code'
 const NATS_API_ERROR_WRONG_LAST_SEQUENCE = '10071'
+export const NATS_API_ERROR_SUBJECTS_OVERLAP = '10065'
 
 const NATS_API_ERROR_CODE_LABELS: Record<string, string> = {
   [NATS_API_ERROR_WRONG_LAST_SEQUENCE]:
     'The value changed since you loaded it — reload it and reapply your change',
+  [NATS_API_ERROR_SUBJECTS_OVERLAP]: 'Subjects overlap with an existing stream',
 }
 
 /**
@@ -248,7 +250,7 @@ export function getErrorMessage(error: unknown): string {
     }
 
     // Fall back to server message, stripping the [code] prefix Connect prepends.
-    const serverMessage = stripErrorCodePrefix(error.message ?? '')
+    const serverMessage = stripNatsPrefix(stripErrorCodePrefix(error.message ?? ''))
     if (serverMessage) return serverMessage
 
     // Fall back to code label
@@ -260,6 +262,11 @@ export function getErrorMessage(error: unknown): string {
   }
 
   return String(error)
+}
+
+/** Drops the `nats: ` prefix the NATS client puts on its error text. */
+function stripNatsPrefix(message: string): string {
+  return message.replace(/^nats:\s*/i, '')
 }
 
 /** Drops the `[code]` prefix Connect prepends to a status message. */
@@ -288,6 +295,16 @@ export function getAccessDenial(error: unknown): AccessCheck | null {
 /** True if error is a specific gRPC code. */
 export function isErrorCode(error: unknown, code: Code): boolean {
   return error instanceof ConnectError && error.code === code
+}
+
+/** The JetStream API error code (`err_code`) the server attached to a failure; null when there is none. */
+export function getNatsApiErrorCode(error: unknown): string | null {
+  if (!(error instanceof ConnectError)) return null
+  for (const info of error.findDetails(ErrorInfoSchema)) {
+    if (info.reason !== NATS_API_ERROR_REASON) continue
+    return info.metadata?.[NATS_API_ERROR_CODE_KEY] || null
+  }
+  return null
 }
 
 function labelForNatsAPIError(error: ConnectError): string {

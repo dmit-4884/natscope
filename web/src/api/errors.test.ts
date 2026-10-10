@@ -12,6 +12,7 @@ import {
   getErrorMessage,
   getErrorReason,
   getFieldErrors,
+  getNatsApiErrorCode,
   getValidationViolations,
   isErrorCode,
   isValidationError,
@@ -295,5 +296,29 @@ describe('getAccessDenial', () => {
     expect(getAccessDenial(domainError(Code.PermissionDenied, 'x', 'NATS_PERMISSION_VIOLATION'))).toBeNull()
     expect(getAccessDenial(domainError(Code.NotFound, 'x', 'NATS_STREAM_NOT_FOUND'))).toBeNull()
     expect(getAccessDenial(new Error('x'))).toBeNull()
+  })
+})
+
+describe('nats transport prefix', () => {
+  it('drops the raw "nats:" prefix from a server message', () => {
+    const err = new ConnectError('nats: invalid stream name: "A3 bad name"', Code.InvalidArgument)
+    expect(getErrorMessage(err)).toBe('invalid stream name: "A3 bad name"')
+  })
+})
+
+describe('getNatsApiErrorCode', () => {
+  it('reads the JetStream error code the server attached', () => {
+    expect(getNatsApiErrorCode(natsAPIError('subjects overlap', '10065'))).toBe('10065')
+  })
+
+  it('is null for other errors', () => {
+    expect(getNatsApiErrorCode(new Error('x'))).toBeNull()
+    expect(getNatsApiErrorCode(domainError(Code.NotFound, 'x', 'NATS_STREAM_NOT_FOUND'))).toBeNull()
+  })
+
+  it('labels a subjects-overlap failure', () => {
+    expect(getErrorMessage(natsAPIError('nats: subjects overlap with an existing stream', '10065'))).toBe(
+      'Subjects overlap with an existing stream',
+    )
   })
 })

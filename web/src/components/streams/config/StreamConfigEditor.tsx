@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button, JsonEditor } from '@/components/ui'
 import { StreamFormFields } from '@/components/common/forms'
 import type { StreamCreateRequest } from '@/types/management'
@@ -28,6 +29,8 @@ export function StreamConfigEditor({
   onCancel,
   onSave,
 }: Props) {
+  const [invalidFields, setInvalidFields] = useState<string[]>([])
+  const blocked = invalidFields.length > 0 && editorMode === 'form'
   return (
     <>
       <div className="flex items-center justify-between px-4 py-2 border-b bg-surface-secondary shrink-0 gap-3">
@@ -56,7 +59,12 @@ export function StreamConfigEditor({
           <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
           </Button>
-          <Button size="sm" onClick={onSave} disabled={isSaving || !hasChanges}>
+          {blocked && (
+            <span className="text-xs text-status-warning-text" data-testid="save-blocked-reason">
+              Fix the value of {invalidFields.join(', ')} first.
+            </span>
+          )}
+          <Button size="sm" onClick={onSave} disabled={isSaving || !hasChanges || blocked}>
             {isSaving ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>
@@ -68,6 +76,7 @@ export function StreamConfigEditor({
             onChange={onChange}
             isEditMode={true}
             originalValue={originalValue}
+            onInvalidFieldsChange={setInvalidFields}
           />
         </div>
       ) : (

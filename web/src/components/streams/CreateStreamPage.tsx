@@ -6,7 +6,7 @@ import { Button, JsonEditor, Tabs, tabPanelProps } from '@/components/ui'
 import { StreamFormFields } from '@/components/common/forms'
 import type { ConnectionOutletContext } from '../common/ConnectedLayout'
 import { buildStreamCreatePayload } from './config/streamFieldDefinitions'
-import { canCreateStream } from './config/streamConfigUtils'
+import { createBlockedReason } from './config/streamConfigUtils'
 
 const defaultStreamConfig: StreamCreateRequest = {
   name: '',
@@ -25,6 +25,7 @@ export default function CreateStreamPage() {
   const navigate = useNavigate()
 
   const [formValue, setFormValue] = useState<StreamCreateRequest>(defaultStreamConfig)
+  const [invalidFields, setInvalidFields] = useState<string[]>([])
   const [editorMode, setEditorMode] = useState<'form' | 'json'>('form')
 
   const createStream = useCreateStream(connectionId || undefined)
@@ -38,6 +39,10 @@ export default function CreateStreamPage() {
       /* toasted by the mutation hook; stay on the form */
     }
   }
+
+  const blockedReason =
+    createBlockedReason(formValue) ??
+    (invalidFields.length > 0 ? `Fix the value of ${invalidFields.join(', ')} first.` : undefined)
 
   const handleCancel = () => {
     navigate(`/streams`)
@@ -76,6 +81,7 @@ export default function CreateStreamPage() {
               onChange={setFormValue}
               isEditMode={false}
               defaultExpanded={true}
+              onInvalidFieldsChange={setInvalidFields}
             />
           </div>
         ) : (
@@ -89,13 +95,18 @@ export default function CreateStreamPage() {
       </div>
 
       {/* Footer */}
-      <div className="flex justify-end gap-3 px-6 py-4 border-t bg-surface-secondary">
+      <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-surface-secondary">
+        {blockedReason && (
+          <p className="mr-auto text-sm text-content-secondary" data-testid="create-blocked-reason">
+            {blockedReason}
+          </p>
+        )}
         <Button variant="secondary" onClick={handleCancel}>
           Cancel
         </Button>
         <Button
           onClick={handleCreate}
-          disabled={createStream.isPending || !canCreateStream(formValue)}
+          disabled={createStream.isPending || !!blockedReason}
         >
           {createStream.isPending ? 'Creating...' : 'Create Stream'}
         </Button>
