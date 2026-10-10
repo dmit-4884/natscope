@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -23,10 +25,11 @@ import (
 var errTailFull = errors.New("tail reached maxMessages")
 
 type tailCollector struct {
-	mu    sync.Mutex
-	out   tailOutput
-	max   int
-	limit int
+	mu      sync.Mutex
+	out     tailOutput
+	max     int
+	limit   int
+	started time.Time
 }
 
 func (c *tailCollector) emit(ev *entities.LiveEvent) error {
@@ -48,14 +51,24 @@ func (c *tailCollector) emit(ev *entities.LiveEvent) error {
 	return nil
 }
 
-func (c *tailCollector) result() tailOutput {
+func (c *tailCollector) result(now time.Time) tailOutput {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.out.StoppedBy = "timeout"
 	if len(c.out.Messages) >= c.max {
 		c.out.StoppedBy = "maxMessages"
 	}
+	if elapsed := now.Sub(c.started).Seconds(); elapsed > 0 {
+		c.out.PerSecond = int64(math.Round(float64(len(c.out.Messages)) / elapsed))
+	}
 	return c.out
+}
+
+func tailNote(in tailInput) string {
+	if in.MaxMessages <= maxTailMessages {
+		return ""
+	}
+	return fmt.Sprintf("maxMessages is capped at %d; %d messages were collected at most", maxTailMessages, maxTailMessages)
 }
 
 func (t *Toolset) tailSubject(ctx context.Context, _ *mcp.CallToolRequest, in tailInput) (*mcp.CallToolResult, tailOutput, error) {
@@ -71,9 +84,10 @@ func (t *Toolset) tailSubject(ctx context.Context, _ *mcp.CallToolRequest, in ta
 		target.StreamName = &stream
 	}
 	collector := &tailCollector{
-		out:   tailOutput{Messages: []liveMessageView{}},
-		max:   maxMessages,
-		limit: limit,
+		out:     tailOutput{Messages: []liveMessageView{}, Note: tailNote(in)},
+		max:     maxMessages,
+		limit:   limit,
+		started: time.Now(),
 	}
 
 	tailCtx, cancel := corectx.ApplyTimeout(ctx, time.Duration(mcptransport.Limit(in.Seconds, defaultTailSeconds, maxTailSeconds))*time.Second)
@@ -90,7 +104,7 @@ func (t *Toolset) tailSubject(ctx context.Context, _ *mcp.CallToolRequest, in ta
 	case err == nil && ctx.Err() != nil:
 		return nil, tailOutput{}, ctx.Err()
 	}
-	return nil, collector.result(), nil
+	return nil, collector.result(time.Now()), nil
 }
 
 func newLiveMessageView(m *entities.LiveMessage, limit int) liveMessageView {

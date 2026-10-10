@@ -148,7 +148,7 @@ func TestTailCollectorStopsAtMax(t *testing.T) {
 	require.NoError(t, c.emit(&entities.LiveEvent{Stats: &entities.LiveStats{MessagesDropped: 4}}))
 	require.NoError(t, c.emit(&entities.LiveEvent{Error: &entities.LiveError{Message: "partial"}}))
 
-	out := c.result()
+	out := c.result(time.Now())
 	assert.Len(t, out.Messages, 2)
 	assert.Equal(t, int64(4), out.Dropped)
 	assert.Equal(t, []string{"partial"}, out.Errors)
@@ -161,7 +161,27 @@ func TestTailCollectorReportsTimeoutBelowMax(t *testing.T) {
 	require.NoError(t, c.emit(&entities.LiveEvent{Batch: &entities.LiveBatch{Messages: []*entities.LiveMessage{
 		{NatsMessage: entities.NatsMessage{Subject: "a", Data: []byte("1")}},
 	}}}))
-	assert.Equal(t, "timeout", c.result().StoppedBy)
+	assert.Equal(t, "timeout", c.result(time.Now()).StoppedBy)
+}
+
+func TestTailCollectorReportsTheRateItSaw(t *testing.T) {
+	t.Parallel()
+	started := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	c := &tailCollector{out: tailOutput{Messages: []liveMessageView{}}, max: 2, limit: 64, started: started}
+	require.ErrorIs(t, c.emit(&entities.LiveEvent{Batch: &entities.LiveBatch{Messages: []*entities.LiveMessage{
+		{NatsMessage: entities.NatsMessage{Subject: "a", Data: []byte("1")}},
+		{NatsMessage: entities.NatsMessage{Subject: "b", Data: []byte("2")}},
+	}}}), errTailFull)
+
+	out := c.result(started.Add(10 * time.Millisecond))
+
+	assert.Equal(t, int64(200), out.PerSecond, "200 messages a second at least: the tail filled up before it could see more")
+}
+
+func TestTailNoteSaysWhenMaxMessagesIsCapped(t *testing.T) {
+	t.Parallel()
+	assert.Empty(t, tailNote(tailInput{MaxMessages: maxTailMessages}))
+	assert.Equal(t, "maxMessages is capped at 200; 200 messages were collected at most", tailNote(tailInput{MaxMessages: 1000}))
 }
 
 func TestPayloadLimitHonorsResponseBudget(t *testing.T) {

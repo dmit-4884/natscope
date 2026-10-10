@@ -79,6 +79,8 @@ type liveMessageView struct {
 type tailOutput struct {
 	Messages  []liveMessageView `json:"messages"`
 	StoppedBy string            `json:"stoppedBy" jsonschema:"timeout or maxMessages"`
-	Dropped   int64             `json:"dropped,omitempty" jsonschema:"messages the server-side rate limit skipped"`
+	PerSecond int64             `json:"perSecond,omitempty" jsonschema:"messages a second until the tail stopped; a lower bound when stoppedBy is maxMessages"`
+	Dropped   int64             `json:"dropped,omitempty" jsonschema:"messages the server skipped, as of its statistics every 5 s; a shorter tail reports 0"`
+	Note      string            `json:"note,omitempty"`
 	Errors    []string          `json:"errors,omitempty"`
 }
