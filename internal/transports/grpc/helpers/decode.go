@@ -5,6 +5,7 @@ package grpchelpers
 
 import (
 	"github.com/altessa-s/go-atlas/core/collections/slices"
+	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -42,8 +43,6 @@ func DecodeResultToProto(r *entities.DecodeResult) *protopb.DecodeResult {
 			return pb
 		}),
 	}
-	if r.Error != "" {
-		pb.Error = &r.Error
-	}
+	pb.Error = ptr.WrapNonZero(r.Error)
 	return pb
 }

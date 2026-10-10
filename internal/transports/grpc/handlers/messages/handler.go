@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/altessa-s/go-atlas/core/collections/slices"
+	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -141,16 +142,12 @@ func searchEventToProto(event *entities.MessageSearchEvent) *messagespb.SearchMe
 	case event.Done != nil:
 		done := converter.Convert(event.Done, &messagespb.SearchDone{}, converter.WithIgnoreFields("NextSeq"))
 		done.RangeFirstSeq, done.RangeLastSeq = event.Done.RangeFirst, event.Done.RangeLast
-		if event.Done.NextSeq > 0 {
-			done.NextSeq = &event.Done.NextSeq
-		}
+		done.NextSeq = ptr.WrapNonZero(event.Done.NextSeq)
 		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Done{Done: done}}
 	case event.Progress != nil:
 		progress := converter.Convert(event.Progress, &messagespb.SearchProgress{}, converter.WithIgnoreFields("ResumeSeq"))
 		progress.RangeFirstSeq, progress.RangeLastSeq = event.Progress.RangeFirst, event.Progress.RangeLast
-		if event.Progress.ResumeSeq > 0 {
-			progress.ResumeSeq = &event.Progress.ResumeSeq
-		}
+		progress.ResumeSeq = ptr.WrapNonZero(event.Progress.ResumeSeq)
 		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Progress{Progress: progress}}
 	default:
 		return &messagespb.SearchMessagesResponse{Event: &messagespb.SearchMessagesResponse_Matches{

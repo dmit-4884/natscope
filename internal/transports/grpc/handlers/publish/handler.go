@@ -10,6 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/altessa-s/go-atlas/core/types/ptr"
 	"github.com/altessa-s/go-atlas/domain/converter"
 
 	"github.com/dmit-4884/natscope/internal/entities"
@@ -110,9 +111,7 @@ func (h *Handler) EncodeMessage(
 			resp.Data = data
 		}
 	}
-	if result.Error != "" {
-		resp.Error = &result.Error
-	}
+	resp.Error = ptr.WrapNonZero(result.Error)
 	return connect.NewResponse(resp), nil
 }
 

@@ -72,9 +72,7 @@ func (h *Handler) DecodeWire(
 		Fields:     wireFieldsToProto(dump.Fields),
 		ValidBytes: int32(dump.ValidBytes), //nolint:gosec // bounded by the request size
 	}
-	if dump.Error != "" {
-		resp.Error = &dump.Error
-	}
+	resp.Error = ptr.WrapNonZero(dump.Error)
 	return connect.NewResponse(resp), nil
 }
 
@@ -136,9 +134,7 @@ func (h *Handler) EncodeMessage(
 			pbResult.Data = data
 		}
 	}
-	if result.Error != "" {
-		pbResult.Error = &result.Error
-	}
+	pbResult.Error = ptr.WrapNonZero(result.Error)
 	return connect.NewResponse(&codecpb.EncodeMessageResponse{Result: pbResult}), nil
 }
 
@@ -160,9 +156,7 @@ func (h *Handler) ValidateMessage(
 	}
 
 	pbResult := &protopb.ValidationResult{Valid: result.Valid}
-	if result.Error != "" {
-		pbResult.Error = &result.Error
-	}
+	pbResult.Error = ptr.WrapNonZero(result.Error)
 	pbResult.Violations = slices.To(
 		result.Violations,
 		func(v *entities.ValidationViolation) *protopb.ValidationViolation {
