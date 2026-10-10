@@ -48,7 +48,6 @@ linters:
             - $gostd
             - github.com/spf13/cobra
             - github.com/altessa-s/go-atlas
-            - github.com/google/uuid
             - github.com/google/jsonschema-go
             - github.com/modelcontextprotocol/go-sdk
             - github.com/go-ozzo/ozzo-validation/v4

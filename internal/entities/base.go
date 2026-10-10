@@ -6,8 +6,7 @@ package entities
 import (
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // BaseEntity holds identity, timestamps, soft-delete, opaque ETag for OCC.
