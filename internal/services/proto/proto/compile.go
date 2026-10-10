@@ -30,6 +30,7 @@ import (
 
 	atlasslices "github.com/altessa-s/go-atlas/core/collections/slices"
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
+	coreio "github.com/altessa-s/go-atlas/core/io"
 )
 
 // compileOutput is everything one compile pass produced.
@@ -150,13 +151,13 @@ func confinedAccessor(roots []string) func(string) (io.ReadCloser, error) {
 			if err != nil {
 				return nil, err
 			}
-			data, err := io.ReadAll(io.LimitReader(f, maxUploadFileBytes+1))
+			data, err := io.ReadAll(coreio.NewLimitedReadCloser(f, maxUploadFileBytes))
 			_ = f.Close() //nolint:errcheck // read-only file
+			if errors.Is(err, coreio.ErrReadLimitExceeded) {
+				return nil, errImportTooLarge
+			}
 			if err != nil {
 				return nil, err
-			}
-			if len(data) > maxUploadFileBytes {
-				return nil, errImportTooLarge
 			}
 			return io.NopCloser(bytes.NewReader(data)), nil
 		}

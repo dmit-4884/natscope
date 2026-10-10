@@ -24,6 +24,7 @@ import (
 	"github.com/dmit-4884/natscope/internal/entities"
 
 	coreerrs "github.com/altessa-s/go-atlas/core/errors"
+	coreio "github.com/altessa-s/go-atlas/core/io"
 )
 
 const (
@@ -371,12 +372,12 @@ func readLimited(path string) ([]byte, error) {
 	if !info.Mode().IsRegular() {
 		return nil, errors.New("not a regular file")
 	}
-	content, err := io.ReadAll(io.LimitReader(f, maxReferencedFile+1))
+	content, err := io.ReadAll(coreio.NewLimitedReadCloser(f, maxReferencedFile))
+	if errors.Is(err, coreio.ErrReadLimitExceeded) {
+		return nil, errors.New("larger than 1 MiB")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if len(content) > maxReferencedFile {
-		return nil, errors.New("larger than 1 MiB")
 	}
 	return content, nil
 }

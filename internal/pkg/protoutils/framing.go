@@ -16,6 +16,8 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/reflect/protoreflect"
+
+	coreio "github.com/altessa-s/go-atlas/core/io"
 )
 
 const (
@@ -82,12 +84,12 @@ func unframeGRPC(data []byte) ([]byte, int, error) {
 		if err != nil {
 			return nil, 0, fmt.Errorf("compressed gRPC frame is not gzip: %w", err)
 		}
-		inflated, err := io.ReadAll(io.LimitReader(zr, maxInflatedBytes+1))
+		inflated, err := io.ReadAll(coreio.NewLimitedReadCloser(zr, maxInflatedBytes))
+		if errors.Is(err, coreio.ErrReadLimitExceeded) {
+			return nil, 0, fmt.Errorf("compressed gRPC frame inflates past %d bytes", maxInflatedBytes)
+		}
 		if err != nil {
 			return nil, 0, fmt.Errorf("inflate gRPC frame: %w", err)
-		}
-		if len(inflated) > maxInflatedBytes {
-			return nil, 0, fmt.Errorf("compressed gRPC frame inflates past %d bytes", maxInflatedBytes)
 		}
 		return inflated, -1, nil
 	default:
