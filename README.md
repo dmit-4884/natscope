@@ -4,7 +4,7 @@
 
 **A web UI for NATS JetStream that decodes Protobuf payloads.**
 
-[![Release](https://img.shields.io/github/v/release/dmit-4884/natscope)](https://github.com/dmit-4884/natscope/releases)
+[![Release](https://img.shields.io/github/v/release/dmit-4884/natscope?include_prereleases)](https://github.com/dmit-4884/natscope/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/dmit-4884/natscope/ci.yml?branch=main&label=CI)](https://github.com/dmit-4884/natscope/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/dmit-4884/natscope)](LICENSE)
 

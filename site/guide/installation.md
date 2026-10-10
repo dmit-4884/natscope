@@ -32,7 +32,7 @@ encrypted file vault for secrets because containers have no OS keychain.
 ## Binary
 
 Download an archive for your OS and architecture from
-[GitHub Releases](https://github.com/dmit-4884/natscope/releases/latest), extract it, and run the
+[GitHub Releases](https://github.com/dmit-4884/natscope/releases), extract it, and run the
 `natscope` binary.
 
 ## From source
