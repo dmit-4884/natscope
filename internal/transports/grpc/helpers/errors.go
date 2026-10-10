@@ -62,6 +62,7 @@ var commonDomainErrors = []struct {
 	{errs.ErrStreamNotFound, errorMapping{codes.NotFound, "stream not found", "NATS_STREAM_NOT_FOUND"}},
 	{errs.ErrStreamNameInUse, errorMapping{codes.AlreadyExists, "stream name already in use", "NATS_STREAM_NAME_IN_USE"}},
 	{errs.ErrConsumerNotFound, errorMapping{codes.NotFound, "consumer not found", "NATS_CONSUMER_NOT_FOUND"}},
+	{errs.ErrConsumerExists, errorMapping{codes.AlreadyExists, "consumer already exists with a different configuration", "NATS_CONSUMER_EXISTS"}},
 	{errs.ErrJetStreamNotEnabled, errorMapping{codes.FailedPrecondition, "jetstream not enabled", "NATS_JETSTREAM_NOT_ENABLED"}},
 	{errs.ErrBucketNotFound, errorMapping{codes.NotFound, "bucket not found", "NATS_BUCKET_NOT_FOUND"}},
 	{errs.ErrBucketExists, errorMapping{codes.AlreadyExists, "bucket already exists", "NATS_BUCKET_EXISTS"}},

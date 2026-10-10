@@ -62,6 +62,8 @@ var natsSentinelMap = []struct {
 	{jetstream.ErrStreamNotFound, errs.ErrStreamNotFound},
 	{jetstream.ErrStreamNameAlreadyInUse, errs.ErrStreamNameInUse},
 	{jetstream.ErrConsumerNotFound, errs.ErrConsumerNotFound},
+	{jetstream.ErrConsumerExists, errs.ErrConsumerExists},
+	{jetstream.ErrConsumerNameAlreadyInUse, errs.ErrConsumerExists},
 	{jetstream.ErrJetStreamNotEnabled, errs.ErrJetStreamNotEnabled},
 	{jetstream.ErrJetStreamNotEnabledForAccount, errs.ErrJetStreamNotEnabled},
 	{nats.ErrNoResponders, errs.ErrJetStreamNotEnabled},

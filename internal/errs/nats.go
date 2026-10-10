@@ -36,6 +36,7 @@ var (
 	ErrStreamNotFound      = errors.New("nats: stream not found")
 	ErrStreamNameInUse     = errors.New("nats: stream name already in use")
 	ErrConsumerNotFound    = errors.New("nats: consumer not found")
+	ErrConsumerExists      = errors.New("nats: consumer already exists")
 	ErrJetStreamNotEnabled = errors.New("nats: jetstream not enabled")
 	ErrBucketNotFound      = errors.New("nats: bucket not found")
 	ErrBucketExists        = errors.New("nats: bucket already exists")

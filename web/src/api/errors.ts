@@ -46,6 +46,7 @@ const DOMAIN_REASON_LABELS: Record<string, string> = {
   NATS_STREAM_NOT_FOUND: 'Stream not found',
   NATS_STREAM_NAME_IN_USE: 'Stream name already in use',
   NATS_CONSUMER_NOT_FOUND: 'Consumer not found',
+  NATS_CONSUMER_EXISTS: 'A consumer with this name already exists with a different configuration',
   NATS_JETSTREAM_NOT_ENABLED: 'JetStream not enabled',
   NATS_MSG_NOT_FOUND: 'Message not found',
   NATS_MSG_DELETE_DENIED: 'Message deletion is disabled on this stream',

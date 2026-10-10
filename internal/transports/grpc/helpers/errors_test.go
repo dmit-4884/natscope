@@ -96,6 +96,7 @@ func TestStatusErrorConvert(t *testing.T) {
 		{name: "ErrStreamNotFound", err: errs.ErrStreamNotFound, wantCode: codes.NotFound, wantReason: "NATS_STREAM_NOT_FOUND"},
 		{name: "ErrStreamNameInUse", err: errs.ErrStreamNameInUse, wantCode: codes.AlreadyExists, wantReason: "NATS_STREAM_NAME_IN_USE"},
 		{name: "ErrConsumerNotFound", err: errs.ErrConsumerNotFound, wantCode: codes.NotFound, wantReason: "NATS_CONSUMER_NOT_FOUND"},
+		{name: "ErrConsumerExists", err: errs.ErrConsumerExists, wantCode: codes.AlreadyExists, wantReason: "NATS_CONSUMER_EXISTS"},
 		{name: "ErrJetStreamNotEnabled", err: errs.ErrJetStreamNotEnabled, wantCode: codes.FailedPrecondition, wantReason: "NATS_JETSTREAM_NOT_ENABLED"},
 		{name: "ErrBucketNotFound", err: errs.ErrBucketNotFound, wantCode: codes.NotFound, wantReason: "NATS_BUCKET_NOT_FOUND"},
 		{name: "ErrBucketExists", err: errs.ErrBucketExists, wantCode: codes.AlreadyExists, wantReason: "NATS_BUCKET_EXISTS"},
