@@ -59,8 +59,8 @@ message SubscribeRequest {
   // Zero means no limit; omitted falls back to user settings (Live.maxDisplayRate).
   optional int32 max_display_rate = 4 [(buf.validate.field).int32 = {gte: 0, lte: 10000}];
 
-  // Optional. Subject patterns whose messages are counted in the statistics but not delivered. They are left out
-  // before the display rate applies, so they do not use it up.
+  // Optional. Subject patterns whose messages are neither delivered nor counted in the statistics. They are left
+  // out before the display rate applies, so they do not use it up.
   repeated string exclude_subjects = 5 [(buf.validate.field).repeated = {
     max_items: 100,
     items: {string: {min_len: 1}}
