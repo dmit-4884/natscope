@@ -43,6 +43,23 @@ describe('useConsumersOverview', () => {
     expect(getOverviewMock.mock.calls.length).toBeGreaterThanOrEqual(3)
   })
 
+  it('polls a slow listing less often, at a tenth of the time it takes', async () => {
+    getOverviewMock.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ consumers: [], streams: [], unreadable: [] }), 2000)),
+    )
+    renderHook(() => useConsumersOverview('conn-1', { autoRefresh: true }), { wrapper: makeWrapper() })
+
+    await waitFor(() => expect(getOverviewMock).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000 + 15_000)
+    })
+    expect(getOverviewMock).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6000)
+    })
+    expect(getOverviewMock).toHaveBeenCalledTimes(2)
+  })
+
   it('stops polling once the server refuses the listing', async () => {
     getOverviewMock.mockRejectedValue(
       new AccessDeniedError('refused', { status: 'denied', operation: 'publish', subject: '$JS.API.STREAM.LIST' }),
