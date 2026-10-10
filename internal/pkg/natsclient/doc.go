@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package natsclient is the domain-typed client surface for a single NATS /
 // JetStream connection: entities in, entities out, no SDK types on the

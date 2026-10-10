@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package mcptransport serves natscope over the Model Context Protocol: a stateless
 // Streamable HTTP endpoint mounted on the Connect listener, with tools grouped per domain.

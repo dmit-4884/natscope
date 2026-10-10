@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package schema holds the MCP tools over the Protobuf registry: message types, subject mappings, decoding and validation.
 package schema

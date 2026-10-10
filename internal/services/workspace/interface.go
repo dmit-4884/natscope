@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package workspace defines the section-registry contract for export/import;
 // the Service iterates the registry and never imports domains directly.

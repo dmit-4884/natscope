@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package history is the storage contract for publish history.
 package history

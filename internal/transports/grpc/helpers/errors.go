@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package grpchelpers translates application errors (sentinels in errs,
 // SDK-free) into gRPC/Connect status; per-handler converters delegate here for

@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package workspace implements the domain-agnostic coordinator: it iterates the
 // Section registry to export, validate, and import.

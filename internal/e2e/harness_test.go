@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package e2e contains end-to-end integration tests that boot the real natscope
 // application (real services + the unified Connect transport) against an

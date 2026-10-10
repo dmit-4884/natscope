@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package conflicts is the storage contract for proto schema conflicts.
 // Rewritten in full on every reload — the runtime merge is the source of truth,

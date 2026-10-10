@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package objectstransport moves Object Store content over plain HTTP in a stream, so an object is not bound by the
 // size of a single Connect message.

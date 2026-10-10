@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package bbstore is a JSON-document store over a bbolt key-value database. It
 // is the bbolt counterpart of the former SQLite docstore: each store is one

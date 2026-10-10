@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package convcodecs holds custom go-atlas converter codecs. Each handles one
 // type pair the converter lacks built-in support for, delegating to the next

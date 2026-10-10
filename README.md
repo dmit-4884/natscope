@@ -35,4 +35,4 @@ Open <http://localhost:4280> and add a connection. Natscope binds to loopback; r
 [remote access](https://natscope.app/reference/remote-access) before you open it to a network.
 
 [Configuration](https://natscope.app/reference/configuration) · [Building from source](CONTRIBUTING.md) ·
-[Apache 2.0](LICENSE)
+[MIT](LICENSE)

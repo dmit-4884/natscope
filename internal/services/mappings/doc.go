@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package mappings is the subject-mapping service surface: binds NATS subject
 // patterns (`*`/`>` wildcards) to proto message types within a source, with

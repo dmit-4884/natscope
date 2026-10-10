@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package streamgraph builds the relations graph of an account's streams from their infos: which
 // streams source, mirror or republish into which, with placeholders for upstreams in other accounts

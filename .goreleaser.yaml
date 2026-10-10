@@ -105,7 +105,7 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/dmit-4884/natscope
     description: Web UI for browsing NATS JetStream with protobuf decoding
-    license: "Apache-2.0"
+    license: "MIT"
     install: |
       bin.install "natscope"
     test: |

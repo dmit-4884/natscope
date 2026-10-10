@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package connections is the saved-NATS-connections service surface: CRUD,
 // duplication, and saved-config probing with probe-outcome persisted to Meta.

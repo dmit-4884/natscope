@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package secrets stores per-entity secret values outside the database, in the
 // OS keychain. The database keeps only non-secret fields; secrets (NATS auth,

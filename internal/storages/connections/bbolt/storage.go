@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package bbolt is the bbolt implementation of saved-connections storage. The
 // whole connection is stored as one JSON document; secret fields (NATS auth, TLS

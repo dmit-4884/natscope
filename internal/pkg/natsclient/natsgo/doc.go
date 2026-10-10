@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package natsgo is the nats.go implementation of the natsclient interfaces.
 // It owns every SDK-facing concern for a single connection: dialing, the

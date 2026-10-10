@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package reasoncodes maps this service's protovalidate rule IDs to canonical,
 // client-facing validation reason codes.

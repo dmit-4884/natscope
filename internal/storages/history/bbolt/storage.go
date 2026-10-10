@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package bbolt is the bbolt (doc-model) implementation of publish-history
 // storage. One document per publish; listing filters by connection/stream.

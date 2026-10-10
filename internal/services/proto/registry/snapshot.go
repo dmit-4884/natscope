@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package registry provides a per-snapshot proto descriptor cache;
 // decode/encode use the cached snapshot directly with no cross-source merging

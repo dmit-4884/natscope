@@ -98,7 +98,7 @@ export default defineConfig({
       text: 'Edit this page on GitHub'
     },
     footer: {
-      message: 'Released under the Apache License 2.0.',
+      message: 'Released under the MIT License.',
       copyright: 'Copyright © 2026 The Natscope Authors'
     },
     outline: [2, 3]

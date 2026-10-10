@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package bbolt is the bbolt (doc-model) implementation of proto schema conflict
 // storage. The whole list is rewritten on every reload, so there is no per-row

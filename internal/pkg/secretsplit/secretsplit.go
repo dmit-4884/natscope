@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package secretsplit maps a persistence document's secret fields to and from an
 // out-of-database vault. A secret field is tagged `behavior:"input_only"` and

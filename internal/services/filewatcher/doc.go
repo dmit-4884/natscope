@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package filewatcher tracks one local directory per source (keyed by opaque
 // sourceID) and reports .proto changes via a single debounced ChangeCallback.

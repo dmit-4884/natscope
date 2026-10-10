@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package management provides Connect handlers for JetStream CRUD (streams,
 // consumers, KV, object stores); methods split by resource type.

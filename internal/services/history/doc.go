@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package history records every publish attempt (success or failure) for the
 // UI's history panel: Record stores an outcome, List paginates.

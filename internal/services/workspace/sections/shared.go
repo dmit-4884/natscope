@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package sections holds one Section adapter per domain (connections, proto
 // sources, mappings, templates, settings), each secret-free by design.

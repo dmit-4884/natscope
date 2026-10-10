@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package layouts is the storage contract for sidebar layouts, one document
 // per saved connection. The bbolt implementation lives in the [bbolt]

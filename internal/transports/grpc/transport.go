@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package grpc owns the unified Connect-RPC transport: one HTTP/2+h2c listener
 // serving Connect, gRPC, and gRPC-Web natively off the same mux as the embedded

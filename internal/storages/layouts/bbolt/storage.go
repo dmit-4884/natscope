@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package bbolt is the bbolt (doc-model) implementation of sidebar layout
 // storage: one document per saved connection, keyed by the connection id.

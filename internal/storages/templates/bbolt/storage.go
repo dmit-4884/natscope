@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package bbolt is the bbolt (doc-model) implementation of message-template
 // storage. Each template is one JSON document; headers and wildcards are nested.

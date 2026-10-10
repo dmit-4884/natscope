@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package live is the live-subscription service surface: one session per client
 // viewing real-time messages (subscribe, batch, rate-limit, decode, emit stats,

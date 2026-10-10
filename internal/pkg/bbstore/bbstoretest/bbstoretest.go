@@ -1,5 +1,5 @@
 // Copyright 2026 The Natscope Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package bbstoretest provides a throwaway bbolt database for tests. Each call
 // returns an isolated database that is closed automatically when the test
