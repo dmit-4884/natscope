@@ -38,10 +38,40 @@ export interface LiveSubscription {
   deniedSubjects: string[]
   msgPerSecond: number | undefined
   messagesDropped: number | undefined
+  messagesReceived: number | undefined
   pausedCount: number
 }
 
 const MAX_COUNTED_SUBJECTS = 1000
+
+interface Tally {
+  carried: number
+  session: number
+  cleared: number
+}
+
+type Tallies = Record<'dropped' | 'received', Tally>
+
+const freshTallies = (): Tallies => ({
+  dropped: { carried: 0, session: 0, cleared: 0 },
+  received: { carried: 0, session: 0, cleared: 0 },
+})
+
+const tallyTotal = (t: Tally) => t.carried + t.session - t.cleared
+
+function carryTallies(t: Tallies): Tallies {
+  return {
+    dropped: { carried: tallyTotal(t.dropped), session: 0, cleared: 0 },
+    received: { carried: tallyTotal(t.received), session: 0, cleared: 0 },
+  }
+}
+
+function clearTallies(t: Tallies): Tallies {
+  return {
+    dropped: { carried: 0, session: t.dropped.session, cleared: t.dropped.session },
+    received: { carried: 0, session: t.received.session, cleared: t.received.session },
+  }
+}
 
 function toLiveMessage(msg: WSMessagePayload): LiveMessage {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
@@ -84,7 +114,8 @@ export function useLiveSubscription({
   const [deniedSubjects, setDeniedSubjects] = useState<string[]>([])
   const [msgPerSecond, setMsgPerSecond] = useState<number | undefined>(undefined)
   const [messagesDropped, setMessagesDropped] = useState<number | undefined>(undefined)
-  const skippedRef = useRef({ carried: 0, session: 0, cleared: 0 })
+  const [messagesReceived, setMessagesReceived] = useState<number | undefined>(undefined)
+  const talliesRef = useRef(freshTallies())
   const [pausedCount, setPausedCount] = useState(0)
   const [feedFor, setFeedFor] = useState(connectionId)
   if (feedFor !== connectionId) {
@@ -266,9 +297,11 @@ export function useLiveSubscription({
     socket.onBatch = processBatch
     socket.onStats = (payload: WSStatsPayload) => {
       setMsgPerSecond(payload.msg_per_second)
-      const skipped = skippedRef.current
-      skipped.session = payload.messages_dropped
-      setMessagesDropped(skipped.carried + skipped.session - skipped.cleared)
+      const tallies = talliesRef.current
+      tallies.dropped.session = payload.messages_dropped
+      tallies.received.session = payload.messages_received
+      setMessagesDropped(tallyTotal(tallies.dropped))
+      setMessagesReceived(tallyTotal(tallies.received))
       if (!globalStats) return
       setGlobalStats({
         messagesReceived: payload.messages_received,
@@ -303,7 +336,8 @@ export function useLiveSubscription({
       setWs(null)
       setMsgPerSecond(undefined)
       setMessagesDropped(undefined)
-      skippedRef.current = { carried: 0, session: 0, cleared: 0 }
+      setMessagesReceived(undefined)
+      talliesRef.current = freshTallies()
       setPausedCount(0)
       setIsPaused(false)
       stopDrip()
@@ -315,8 +349,7 @@ export function useLiveSubscription({
   // Subscribe / unsubscribe when stream changes on an open connection.
   useEffect(() => {
     if (!ws || wsStatus === 'disconnected') return
-    const skipped = skippedRef.current
-    skippedRef.current = { carried: skipped.carried + skipped.session - skipped.cleared, session: 0, cleared: 0 }
+    talliesRef.current = carryTallies(talliesRef.current)
     if (subjectsKey) ws.subscribeSubjects(subjectsKey.split('\n'), limitsRef.current)
     else if (streamName) ws.subscribe(streamName)
     else ws.unsubscribe()
@@ -353,9 +386,9 @@ export function useLiveSubscription({
     setPausedCount(0)
     setLiveMessages([])
     setSubjectCounts({})
-    const skipped = skippedRef.current
-    skippedRef.current = { carried: 0, session: skipped.session, cleared: skipped.session }
+    talliesRef.current = clearTallies(talliesRef.current)
     setMessagesDropped((prev) => (prev === undefined ? prev : 0))
+    setMessagesReceived((prev) => (prev === undefined ? prev : 0))
   }, [stopDrip])
 
   const opening = !!connectionId && enabled && ws === null && wsStatus === 'disconnected'
@@ -376,6 +409,7 @@ export function useLiveSubscription({
       deniedSubjects,
       msgPerSecond,
       messagesDropped,
+      messagesReceived,
       pausedCount,
     }),
     [
@@ -391,6 +425,7 @@ export function useLiveSubscription({
       deniedSubjects,
       msgPerSecond,
       messagesDropped,
+      messagesReceived,
       pausedCount,
     ],
   )

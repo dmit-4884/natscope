@@ -307,6 +307,34 @@ describe('useLiveSubscription subjects', () => {
     expect(result.current.pausedCount).toBe(7)
   })
 
+  it('takes the received count from the server, across a restart, and clears it with the feed', () => {
+    const { result, rerender } = renderHook(
+      ({ rate }) =>
+        useLiveSubscription({
+          connectionId: 'conn-1',
+          streamName: null,
+          subjects: ['>'],
+          enabled: true,
+          initialLimit: 100,
+          globalStats: false,
+          subjectLimits: { maxDisplayRate: rate },
+        }),
+      { initialProps: { rate: 5 } },
+    )
+    const client = clients[clients.length - 1]
+    act(() => client.onStats?.({ messages_received: 800_000, messages_dropped: 500_000, msg_per_second: 20_000 }))
+    expect(result.current.messagesReceived).toBe(800_000)
+
+    rerender({ rate: 10 })
+    act(() => client.onStats?.({ messages_received: 10, messages_dropped: 3, msg_per_second: 2 }))
+    expect(result.current.messagesReceived).toBe(800_010)
+
+    act(() => result.current.clearMessages())
+    expect(result.current.messagesReceived).toBe(0)
+    act(() => client.onStats?.({ messages_received: 25, messages_dropped: 3, msg_per_second: 2 }))
+    expect(result.current.messagesReceived).toBe(15)
+  })
+
   it('keeps counting skipped messages when the subscription restarts', () => {
     const { result, rerender } = renderHook(
       ({ rate }) =>

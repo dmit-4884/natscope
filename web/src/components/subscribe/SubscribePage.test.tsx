@@ -62,6 +62,7 @@ function liveState(over: Partial<ReturnType<typeof useLiveSubscription>> = {}): 
     deniedSubjects: [],
     msgPerSecond: undefined,
     messagesDropped: undefined,
+    messagesReceived: undefined,
     pausedCount: 0,
     ...over,
   }
@@ -376,6 +377,21 @@ describe('SubscribePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
 
     expect(screen.getByRole('button', { name: 'Resume (+8)' })).toBeInTheDocument()
+  })
+
+  it('counts received messages as the server does, not by the subjects it lists', () => {
+    mockedLive.mockReturnValue(
+      liveState({
+        liveMessages: [message('1', 'orders.new')],
+        subjectCounts: { 'orders.new': 250 },
+        messagesReceived: 800_000,
+      }),
+    )
+    renderPage()
+    addSubject('orders.>')
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+
+    expect(screen.getByTestId('feed-counts')).toHaveTextContent(/^800,000 messages received/)
   })
 
   it('says how much of the feed is shown and how much was skipped', () => {

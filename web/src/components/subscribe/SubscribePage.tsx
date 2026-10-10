@@ -105,7 +105,8 @@ export default function SubscribePage() {
     [live.liveMessages, query, subjectFilter, session.muted],
   )
 
-  const received = useMemo(() => Object.values(live.subjectCounts).reduce((sum, n) => sum + n, 0), [live.subjectCounts])
+  const counted = useMemo(() => Object.values(live.subjectCounts).reduce((sum, n) => sum + n, 0), [live.subjectCounts])
+  const received = live.messagesReceived ?? counted
   const filtering = query.trim() !== '' || subjectFilter !== null
 
   const onSubjectsChange = useCallback((subjects: string[]) => updateDraft({ subjects }), [updateDraft])

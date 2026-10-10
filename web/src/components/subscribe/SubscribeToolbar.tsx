@@ -61,7 +61,7 @@ interface Props {
 function FeedSummary({ counts, liveLimit }: { counts: FeedCounts; liveLimit: number }) {
   return (
     <span className="mr-1 text-xs text-content-tertiary tabular-nums" data-testid="feed-counts">
-      {plural(counts.received, 'message')} received
+      {plural(counts.received, 'message', undefined, formatCount)} received
       {!!counts.msgPerSecond && ` · ${formatCount(counts.msgPerSecond)} msg/s`}
       {counts.received > counts.shown && ` · showing the last ${formatCount(liveLimit)}`}
       {counts.matching !== null && ` · ${formatCount(counts.matching)} match`}
