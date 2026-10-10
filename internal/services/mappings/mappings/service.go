@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -97,9 +96,7 @@ func (s *Service) Update(
 	}
 
 	existing.ApplyUpdate(in)
-	if existing.PinnedFingerprint != nil && *existing.PinnedFingerprint == "" {
-		existing.PinnedFingerprint = nil
-	}
+	_ = normalizer.Normalize(existing) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed entity
 
 	// Validate the merged result.
 	if existing.SourceID == "" {
@@ -161,10 +158,7 @@ func (s *Service) BulkSave(
 	prepared := make(entities.SubjectMappings, len(mappings))
 	for i, m := range mappings {
 		cp := *m
-		// Raw entities skip the DTO normalizer, so trim here as Create does.
-		cp.Pattern = strings.TrimSpace(cp.Pattern)
-		cp.MessageType = strings.TrimSpace(cp.MessageType)
-		cp.SourceID = strings.TrimSpace(cp.SourceID)
+		_ = normalizer.Normalize(&cp) //nolint:errcheck // canonical: normalize tags can't fail on a well-formed entity
 
 		if cp.SourceID == "" {
 			return nil, errs.ErrMappingSourceIDRequired

@@ -201,6 +201,14 @@ func TestService_Update(t *testing.T) {
 		assert.Equal(t, "api.v1.Order", got.MessageType)
 	})
 
+	t.Run("a whitespace-only pin unpins", func(t *testing.T) {
+		t.Parallel()
+		svc := New(&mockStorage{getResult: current()})
+		got, err := svc.Update(t.Context(), &entities.SubjectMappingUpdate{Id: "m1", PinnedFingerprint: new("  ")})
+		require.NoError(t, err)
+		assert.Nil(t, got.PinnedFingerprint)
+	})
+
 	t.Run("unset fields stay", func(t *testing.T) {
 		t.Parallel()
 		svc := New(&mockStorage{getResult: current()})

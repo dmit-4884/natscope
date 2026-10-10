@@ -39,19 +39,19 @@ type SubjectMapping struct {
 	BaseEntity
 
 	// Pattern is the NATS subject pattern (e.g., "orders.>" or "users.*").
-	Pattern string
+	Pattern string `normalize:"trim"`
 
 	// MessageType is the fully qualified protobuf message type (e.g.,
 	// "api.v1.OrderEvent").
-	MessageType string
+	MessageType string `normalize:"trim"`
 
 	// SourceID is required; decode resolves descriptors only from this source's
 	// active selection.
-	SourceID string
+	SourceID string `normalize:"trim"`
 
 	// PinnedFingerprint pins resolution to a descriptor by content hash (survives
 	// identical recompiles).
-	PinnedFingerprint *string
+	PinnedFingerprint *string `normalize:"trim,nil_on_empty"`
 
 	// Framing wraps the protobuf message of every payload on the pattern.
 	Framing Framing
