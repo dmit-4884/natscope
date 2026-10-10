@@ -6,6 +6,7 @@ package mcptransport
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -243,4 +244,36 @@ func TestAddToolNormalizesInput(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, res.IsError)
 	assert.Equal(t, map[string]any{"subject": "orders.>", "direction": "backward"}, res.StructuredContent)
+}
+
+func TestAddToolSerializesSchemasOnce(t *testing.T) {
+	t.Parallel()
+	type countInput struct {
+		Limit int `json:"limit"`
+	}
+	type countOutput struct {
+		Count int `json:"count"`
+	}
+	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "v0"}, nil)
+	tool := &mcp.Tool{Name: "count"}
+	AddTool(server, tool, func(_ context.Context, _ *mcp.CallToolRequest, in countInput) (*mcp.CallToolResult, countOutput, error) {
+		return nil, countOutput{Count: in.Limit}, nil
+	})
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	_, err := server.Connect(t.Context(), serverTransport, nil)
+	require.NoError(t, err)
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "client", Version: "v0"}, nil).Connect(t.Context(), clientTransport, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = cs.Close() })
+
+	assert.IsType(t, json.RawMessage{}, tool.InputSchema, "tools/list must not re-marshal the input schema on every call")
+	assert.IsType(t, json.RawMessage{}, tool.OutputSchema, "tools/list must not re-marshal the output schema on every call")
+	listed, err := cs.ListTools(t.Context(), nil)
+	require.NoError(t, err)
+	require.Len(t, listed.Tools, 1)
+	assert.Contains(t, listed.Tools[0].InputSchema, "properties")
+	bad, err := cs.CallTool(t.Context(), &mcp.CallToolParams{Name: "count", Arguments: map[string]any{"limit": "many"}})
+	if err == nil {
+		assert.True(t, bad.IsError, "input is still validated against the schema")
+	}
 }

@@ -28,7 +28,7 @@ var schemaOptions = &jsonschema.ForOptions{
 }
 
 // AddTool registers a typed tool; its input is normalized by `normalize` tags, json.RawMessage fields accept any JSON and handler errors reach
-// the agent as sanitized, reason-coded messages.
+// the agent as sanitized, reason-coded messages. Schemas are serialized once here, so tools/list does not re-marshal them on every call.
 func AddTool[In, Out any](s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
 	t.InputSchema = mustSchema[In]()
 	t.OutputSchema = mustSchema[Out]()
@@ -45,12 +45,16 @@ func AddTool[In, Out any](s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, O
 	})
 }
 
-func mustSchema[T any]() *jsonschema.Schema {
+func mustSchema[T any]() json.RawMessage {
 	s, err := jsonschema.For[T](schemaOptions)
+	var raw json.RawMessage
+	if err == nil {
+		raw, err = json.Marshal(s)
+	}
 	if err != nil {
 		panic(fmt.Sprintf("mcp: schema for %s: %v", reflect.TypeFor[T](), err))
 	}
-	return s
+	return raw
 }
 
 type agentError struct {
